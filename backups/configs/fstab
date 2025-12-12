@@ -1,0 +1,4 @@
+proc            /proc           proc    defaults          0       0
+PARTUUID=d54ea4ea-52b0-4f42-bcb6-fa63c91c645b  /boot/firmware  vfat    defaults          0       2
+PARTUUID=356b6b75-2d93-4b9f-af42-43ca7ceb2737  /               ext4    defaults,noatime  0       1
+LABEL=storage  /mnt/storage  ext4  defaults,noatime  0  2
