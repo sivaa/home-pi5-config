@@ -251,6 +251,11 @@
           <span class="nav-icon">🏠</span>
           <span class="nav-label">3D</span>
         </button>
+        <button class="nav-tab" :class="{ active: currentView === 'config' }"
+                @click="setView('config')" title="Sensor Config (Press 9)">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Config</span>
+        </button>
       </div>
     </nav>
 
@@ -1202,6 +1207,51 @@
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+  <!-- Sensor Config Module (imports from modular files) -->
+  <script type="module">
+    import { sensorConfigView } from './views/sensor-config.js';
+    import { initSensorsStore } from './js/stores/sensors-store.js';
+    import { FLOOR_PLAN_CONFIG, SENSOR_VISUALS } from './js/config.js';
+
+    // Make sensorConfigView available globally with config bound
+    window.sensorConfigView = function() {
+      return sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, THREE.OrbitControls);
+    };
+
+    // Initialize sensors store - handle both early and late loading scenarios
+    function initSensors() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG && !Alpine.store('sensors')) {
+        initSensorsStore(Alpine, CONFIG);
+        console.log('[sensor-config] Sensors store initialized');
+      }
+      // Initialize the store's MQTT subscriptions after a short delay
+      setTimeout(() => {
+        if (Alpine.store('sensors') && Alpine.store('mqtt')?.client) {
+          Alpine.store('sensors').init();
+          console.log('[sensor-config] Sensors MQTT subscriptions initialized');
+        }
+      }, 2000);
+    }
+
+    // Try to initialize on alpine:init
+    document.addEventListener('alpine:init', () => {
+      const CONFIG = window.CONFIG;
+      if (CONFIG) {
+        initSensorsStore(Alpine, CONFIG);
+        console.log('[sensor-config] Sensors store registered in alpine:init');
+      }
+    });
+
+    // Also try after DOMContentLoaded (in case alpine:init already fired)
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initSensors);
+    } else {
+      // DOM already loaded, run now
+      setTimeout(initSensors, 100);
+    }
+  </script>
+
   <script>
     // ========================================
     // CONFIGURATION
@@ -1223,6 +1273,8 @@
       maxHistoryPoints: 500,
       historyHours: 6
     };
+    // Make CONFIG globally available for modules
+    window.CONFIG = CONFIG;
 
     // ========================================
     // ALPINE STORES
@@ -1256,16 +1308,34 @@
               this.client.subscribe(`${CONFIG.baseTopic}/${room.sensor}`, { qos: 0 });
             });
 
-            // Subscribe to light topics
+            // Subscribe to light topics (state and availability)
             Alpine.store('lights').list.forEach(light => {
               this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}`, { qos: 0 });
+              this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}/availability`, { qos: 0 });
             });
           });
 
           this.client.on('message', (topic, message) => {
             try {
-              const data = JSON.parse(message.toString());
+              const msgStr = message.toString();
               const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+
+              // Check if it's an availability message
+              if (topic.endsWith('/availability')) {
+                const lightTopic = deviceName.replace('/availability', '');
+                // Handle both JSON {"state":"online"} and plain string "online"
+                let isOnline;
+                try {
+                  const data = JSON.parse(msgStr);
+                  isOnline = data.state === 'online';
+                } catch {
+                  isOnline = msgStr === 'online';
+                }
+                Alpine.store('lights').setAvailability(lightTopic, isOnline);
+                return;
+              }
+
+              const data = JSON.parse(msgStr);
 
               // Check if it's a room sensor
               const roomConfig = CONFIG.rooms.find(r => r.sensor === deviceName);
@@ -1391,7 +1461,8 @@
             colorTemp: 370,
             linkquality: null,
             lastSeen: null,
-            syncing: false
+            syncing: false,
+            available: true
           },
           {
             id: 'living_light',
@@ -1403,7 +1474,8 @@
             colorTemp: 370,
             linkquality: null,
             lastSeen: null,
-            syncing: false
+            syncing: false,
+            available: true
           }
         ],
         syncing: false,
@@ -1442,6 +1514,14 @@
             light.syncing = false;
             this.initializing = false;
             this.syncing = this.anyLightSyncing;
+          }
+        },
+
+        setAvailability(topic, isOnline) {
+          const light = this.list.find(l => l.topic === topic);
+          if (light) {
+            light.available = isOnline;
+            console.log(`Light ${light.name} availability: ${isOnline ? 'online' : 'offline'}`);
           }
         },
 
@@ -1716,8 +1796,8 @@
 
           // Keyboard shortcuts for view switching
           document.addEventListener('keydown', (e) => {
-            if (e.key >= '1' && e.key <= '8' && !e.ctrlKey && !e.metaKey) {
-              const views = ['comfort', 'compare', 'floor', 'ambient', 'timeline', 'classic', 'lights', '3d'];
+            if (e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.metaKey) {
+              const views = ['comfort', 'compare', 'floor', 'ambient', 'timeline', 'classic', 'lights', '3d', 'config'];
               this.setView(views[parseInt(e.key) - 1]);
             }
           });
