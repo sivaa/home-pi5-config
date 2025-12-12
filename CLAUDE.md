@@ -54,6 +54,9 @@ pi-setup/
 - **Storage:**
   - NVMe: `/` and `/boot/firmware`
   - SD Card: `/mnt/storage` (extra storage)
+- **Hardware:**
+  - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
+  - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
 
 ---
 
@@ -74,3 +77,7 @@ pi-setup/
 > *"We are preparing for the worst day and we need to recover and get it up exactly the same as before."*
 
 All documentation should enable complete system restoration from scratch.
+- make sure that all teh coding agents refers to the proper documents. create agents.md based on the standard and add high level instructions on where to refer. because we are gonna use this pi for many services
+- don't use anything from zigbee-backup-old-device folder without user's explict approval. its a backup from old device and lot of things to changed. be honest with this
+- every soruce and config file should be first in this repo and later moved to      pi. eerything single time. golden rule
+- no services should run locaally (mac) never ever unless user explicts asks

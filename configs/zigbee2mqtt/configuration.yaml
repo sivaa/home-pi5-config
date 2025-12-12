@@ -1,0 +1,45 @@
+homeassistant: true
+permit_join: false
+frontend:
+  port: 8080
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+serial:
+  port: /dev/ttyUSB0
+  adapter: ember
+advanced:
+  channel: 25
+  network_key: GENERATE
+  log_level: info
+  last_seen: epoch
+availability:
+  enabled: true
+  active:
+    timeout: 10      # minutes - for mains-powered devices (routers/lights)
+  passive:
+    timeout: 1500    # minutes - for battery devices (sensors/remotes)
+device_options:
+  retain: true
+devices:
+  # === LIGHTS (IKEA TRADFRI) ===
+  '0xd0cf5efffe25ab28':
+    friendly_name: Study Room Light
+  '0xd0cf5efffe24d093':
+    friendly_name: Living Room Light
+  # === REMOTES (IKEA) ===
+  '0x90fd9ffffef4cebf':
+    friendly_name: Study Room Light Remote
+  '0x90fd9ffffee43106':
+    friendly_name: Living Room Light Remote
+  # === TRH SENSORS (Temperature/Humidity - Sonoff) ===
+  '0xc09b9efffed502b9':
+    friendly_name: Living Room TRH
+  '0xc09b9efffef541a8':
+    friendly_name: Bed Room TRH
+  '0xc09b9efffef541b2':
+    friendly_name: Study Room TRH
+  '0xc09b9efffed502b7':
+    friendly_name: Kitchen TRH
+  '0xc09b9efffec0e447':
+    friendly_name: Bath Room TRH

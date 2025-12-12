@@ -1,0 +1,706 @@
+use <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Apartment Sensor Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+        #canvas-container { position: relative; width: 100vw; height: 100vh; }
+        #sensor-panel {
+    position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 280px;
+            color: white;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .sensor-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 8px;
+            border-left: 3px solid;
+            transition: all 0.3s ease;
+        }
+        .sensor-item:hover {
+            background: rgba(51, 65, 85, 0.8);
+            transform: translateX(5px);
+        }
+        .sensor-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .room-label {
+            position: absolute;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            pointer-events: none;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 15px 25px;
+            color: white;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .control-btn {
+            padding: 8px 16px;
+            background: rgba(59, 130, 246, 0.8);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 1);
+            transform: translateY(-2px);
+        }
+        .control-btn.active {
+            background: rgba(34, 197, 94, 0.8);
+        }
+        #legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .sensor-overlay {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            pointer-events: none;
+            border: 1.5px solid rgba(100, 200, 255, 0.6);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body class="bg-slate-900">
+    <div id="canvas-container">
+        <canvas id="apartment-canvas"></canvas>
+        
+        <div id="sensor-panel">
+            <h2 class="text-xl font-bold mb-4 text-blue-400">🏠 Real-Time Sensors</h2>
+            
+            <div class="sensor-item" style="border-left-color: #ef4444;">
+                <span>🌡️ Living Room Temp</span>
+                <span class="sensor-value" id="temp-living">22.5°C</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #3b82f6;">
+                <span>💧 Living Room Humidity</span>
+                <span class="sensor-value" id="humidity-living">45%</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #ef4444;">
+                <span>🌡️ Bedroom 1 Temp</span>
+                <span class="sensor-value" id="temp-bedroom1">21.8°C</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #3b82f6;">
+                <span>💧 Bedroom 1 Humidity</span>
+                <span class="sensor-value" id="humidity-bedroom1">48%</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #ef4444;">
+                <span>🌡️ Bedroom 2 Temp</span>
+                <span class="sensor-value" id="temp-bedroom2">22.1°C</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #3b82f6;">
+                <span>💧 Bedroom 2 Humidity</span>
+                <span class="sensor-value" id="humidity-bedroom2">46%</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #10b981;">
+                <span>🌬️ Air Quality</span>
+                <span class="sensor-value" id="air-quality">Good</span>
+            </div>
+            
+            <div class="sensor-item" style="border-left-color: #f59e0b;">
+                <span>⚡ Power Usage</span>
+                <span class="sensor-value" id="power-usage">2.4 kW</span>
+            </div>
+        </div>
+        
+        <div id="legend">
+            <h3 class="text-lg font-bold mb-3 text-blue-400">Room Map</h3>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #60a5fa;"></div>
+                <span>Study Room</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #34d399;"></div>
+                <span>Living Room</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #93c5fd;"></div>
+                <span>Balcony</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #fbbf24;"></div>
+                <span>Bedroom</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f87171;"></div>
+                <span>Kitchen</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #a78bfa;"></div>
+                <span>Bath Room</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #94a3b8;"></div>
+                <span>Hallway</span>
+            </div>
+        </div>
+        
+        <div id="controls">
+            <button class="control-btn active" id="view-3d">3D View</button>
+            <button class="control-btn" id="view-top">Top View</button>
+            <button class="control-btn" id="toggle-walls">Toggle Walls</button>
+            <button class="control-btn" id="auto-rotate">Auto Rotate</button>
+        </div>
+    </div>
+
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+        scene.fog = new THREE.Fog(0x0f172a, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(15, 20, 15);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: document.getElementById('apartment-canvas'),
+            antialias: true 
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2.2;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.camera.left = -20;
+        directionalLight.shadow.camera.right = 20;
+        directionalLight.shadow.camera.top = 20;
+        directionalLight.shadow.camera.bottom = -20;
+        scene.add(directionalLight);
+
+        // Apartment layout based on EXACT floor plan measurements (all in meters)
+        // Origin: Bottom-left corner (0,0)
+        // Total dimensions: 9.239m wide x 7.665m deep
+        const roomHeight = 2.0; // Reduced wall height for better visibility
+        const wallThickness = 0.15;
+        
+        // Calculate apartment center for positioning in 3D space
+        const apartmentWidth = 9.239;
+        const apartmentDepth = 7.665;
+        const centerX = apartmentWidth / 2; // 4.6195
+        const centerZ = apartmentDepth / 2; // 3.8325
+        
+        // Define room positions and sizes based on the exact floor plan
+        // Position = center of room in world coordinates (centered at origin)
+        const rooms = {
+            study: {
+                x: 1.954 - centerX,   // Study room center X (shifted left after 20% reduction)
+                z: 1.8485 - centerZ,  // Study room center Z
+                width: 3.908,         // 80% of original width (4.885 × 0.8)
+                depth: 3.697,
+                color: 0x60a5fa,
+                name: 'Study Room'
+            },
+            living: { 
+                x: 2.375 - centerX,   // Living room center X
+                z: 5.681 - centerZ,   // Living room center Z
+                width: 4.750, 
+                depth: 3.968, 
+                color: 0x34d399, 
+                name: 'Living Room' 
+            },
+            balcony: { 
+                x: 0.525 - centerX,   // Balcony center X
+                z: 7.065 - centerZ,   // Balcony center Z
+                width: 1.050, 
+                depth: 1.200, 
+                color: 0x93c5fd, 
+                name: 'Balcony' 
+            },
+            bedroom: { 
+                x: 6.9945 - centerX,  // Bedroom center X
+                z: 5.976 - centerZ,   // Bedroom center Z
+                width: 4.489, 
+                depth: 3.378, 
+                color: 0xfbbf24, 
+                name: 'Bedroom' 
+            },
+            kitchen: { 
+                x: 7.5735 - centerX,  // Kitchen center X
+                z: 3.218 - centerZ,   // Kitchen center Z
+                width: 3.331, 
+                depth: 2.138, 
+                color: 0xf87171, 
+                name: 'Kitchen' 
+            },
+            bathroom: { 
+                x: 7.5405 - centerX,  // Bathroom center X
+                z: 1.0745 - centerZ,  // Bathroom center Z
+                width: 3.397, 
+                depth: 2.149, 
+                color: 0xa78bfa, 
+                name: 'Bath Room' 
+            },
+            hallway: { 
+                x: 5.4 - centerX,     // Hallway center X (approximate)
+                z: 2.0 - centerZ,     // Hallway center Z (approximate)
+                width: 1.5, 
+                depth: 2.5, 
+                color: 0x94a3b8, 
+                name: 'Hallway' 
+            }
+        };
+
+        // Create floor based on apartment dimensions
+        const floorGeometry = new THREE.BoxGeometry(apartmentWidth + 0.5, 0.1, apartmentDepth + 0.5);
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x374151 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.position.y = -0.05;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Create rooms
+        const roomMeshes = [];
+        Object.entries(rooms).forEach(([key, room]) => {
+            // Room floor
+            const roomFloorGeometry = new THREE.BoxGeometry(room.width, 0.05, room.depth);
+            const roomFloorMaterial = new THREE.MeshStandardMaterial({ 
+                color: room.color,
+                transparent: true,
+                opacity: 0.3
+            });
+            const roomFloor = new THREE.Mesh(roomFloorGeometry, roomFloorMaterial);
+            roomFloor.position.set(room.x, 0.025, room.z);
+            roomFloor.receiveShadow = true;
+            scene.add(roomFloor);
+
+            // Room walls - subtle glassy look
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.25,
+                metalness: 0.4,
+                roughness: 0.08,
+                side: THREE.DoubleSide
+            });
+            
+            // Front wall
+            const frontWall = new THREE.Mesh(
+                new THREE.BoxGeometry(room.width, roomHeight, wallThickness),
+                wallMaterial
+            );
+            frontWall.position.set(room.x, roomHeight/2, room.z + room.depth/2);
+            frontWall.castShadow = true;
+            frontWall.receiveShadow = true;
+            scene.add(frontWall);
+
+            // Back wall
+            const backWall = new THREE.Mesh(
+                new THREE.BoxGeometry(room.width, roomHeight, wallThickness),
+                wallMaterial
+            );
+            backWall.position.set(room.x, roomHeight/2, room.z - room.depth/2);
+            backWall.castShadow = true;
+            backWall.receiveShadow = true;
+            scene.add(backWall);
+
+            // Left wall
+            const leftWall = new THREE.Mesh(
+                new THREE.BoxGeometry(wallThickness, roomHeight, room.depth),
+                wallMaterial
+            );
+            leftWall.position.set(room.x - room.width/2, roomHeight/2, room.z);
+            leftWall.castShadow = true;
+            leftWall.receiveShadow = true;
+            scene.add(leftWall);
+
+            // Right wall
+            const rightWall = new THREE.Mesh(
+                new THREE.BoxGeometry(wallThickness, roomHeight, room.depth),
+                wallMaterial
+            );
+            rightWall.position.set(room.x + room.width/2, roomHeight/2, room.z);
+            rightWall.castShadow = true;
+            rightWall.receiveShadow = true;
+            scene.add(rightWall);
+
+            roomMeshes.push({ mesh: roomFloor, walls: [frontWall, backWall, leftWall, rightWall] });
+        });
+
+        // Add furniture indicators
+        const furnitureMaterial = new THREE.MeshStandardMaterial({ color: 0x64748b });
+        
+        // Bedroom furniture - bed (1.8m x 2.0m)
+        const bed = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 2.0), furnitureMaterial);
+        bed.position.set(rooms.bedroom.x, 0.3, rooms.bedroom.z);
+        bed.castShadow = true;
+        scene.add(bed);
+
+        // Add doors
+        const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.7 });
+        const doorHandleMaterial = new THREE.MeshStandardMaterial({ color: 0xC0C0C0, metalness: 0.9 });
+
+        function createDoor(x, z, rotation = 0) {
+            const doorWidth = 0.9; // Standard door width
+            const doorHeight = roomHeight * 0.85;
+            
+            const doorFrame = new THREE.Mesh(
+                new THREE.BoxGeometry(doorWidth, doorHeight, wallThickness),
+                doorMaterial
+            );
+            doorFrame.position.set(x, doorHeight/2, z);
+            doorFrame.rotation.y = rotation;
+            doorFrame.castShadow = true;
+            scene.add(doorFrame);
+
+            // Door handle
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.15), doorHandleMaterial);
+            handle.position.set(x + 0.3 * Math.cos(rotation), doorHeight/2, z + 0.3 * Math.sin(rotation));
+            handle.rotation.z = Math.PI / 2;
+            handle.rotation.y = rotation;
+            handle.castShadow = true;
+            scene.add(handle);
+        }
+
+        // Doors based on exact floor plan coordinates (converted to world coordinates)
+        // Balcony ↔ Living Room door at (0.525m, 6.465m) - rotation for vertical door
+        createDoor(0.525 - centerX, 6.465 - centerZ, Math.PI/2);
+        
+        // Living Room ↔ Hallway door at (5.533m, 3.697m)
+        createDoor(5.533 - centerX, 3.697 - centerZ, 0);
+        
+        // Study Room ↔ Hallway door at (4.885m, 1.848m)
+        createDoor(4.885 - centerX, 1.848 - centerZ, Math.PI/2);
+        
+        // Bedroom ↔ Hallway door at (6.105m, 3.697m)
+        createDoor(6.105 - centerX, 3.697 - centerZ, 0);
+        
+        // Hallway ↔ Kitchen door at (5.908m, 2.818m)
+        createDoor(5.908 - centerX, 2.818 - centerZ, Math.PI/2);
+        
+        // Hallway ↔ Bathroom door at (5.908m, 1.338m)
+        createDoor(5.908 - centerX, 1.338 - centerZ, Math.PI/2);
+
+        // Add windows
+        const windowGlass = new THREE.MeshStandardMaterial({ 
+            color: 0x87CEEB, 
+            metalness: 0.3, 
+            roughness: 0.2,
+            transparent: true,
+            opacity: 0.4
+        });
+        const windowFrame = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+
+        function createWindow(x, z, rotation = 0, height = 2.0) {
+            const winWidth = height; // Use height parameter as window size
+            const winHeight = 1.3;
+            
+            // Window frame
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(winWidth, winHeight, wallThickness),
+                windowFrame
+            );
+            frame.position.set(x, roomHeight * 0.6, z);
+            frame.rotation.y = rotation;
+            frame.castShadow = true;
+            scene.add(frame);
+
+            // Window glass
+            const glass = new THREE.Mesh(
+                new THREE.BoxGeometry(winWidth * 0.9, winHeight * 0.9, wallThickness * 0.5),
+                windowGlass
+            );
+            glass.position.set(x, roomHeight * 0.6, z);
+            glass.rotation.y = rotation;
+            scene.add(glass);
+        }
+
+        // Windows based on exact floor plan positions
+        // Living Room Left Wall at (0.000m, 1.848m)
+        createWindow(0.0 - centerX, 1.848 - centerZ, Math.PI/2, 2.5);
+        
+        // Study Room Left Wall at (0.000m, 1.848m)
+        createWindow(0.0 - centerX, 1.848 - centerZ, Math.PI/2, 2.5);
+        
+        // Bedroom Right Wall at (9.239m, 5.976m)
+        createWindow(9.239 - centerX, 5.976 - centerZ, Math.PI/2, 2.5);
+        
+        // Kitchen Right Wall at (9.239m, 3.218m)
+        createWindow(9.239 - centerX, 3.218 - centerZ, Math.PI/2, 1.8);
+        
+        // Bathroom Right Wall at (9.239m, 1.487m)
+        createWindow(9.239 - centerX, 1.487 - centerZ, Math.PI/2, 1.2);
+
+        // Add Balcony Railing (green railing as per floor plan)
+        const railingMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x2d5016, 
+            metalness: 0.7, 
+            roughness: 0.3 
+        });
+        
+        // Balcony boundaries: (0, 6.465) to (1.050, 7.665)
+        const railingHeight = 1.0;
+        const railingThickness = 0.05;
+        
+        // Front railing (top edge at z=7.665)
+        const frontRailing = new THREE.Mesh(
+            new THREE.BoxGeometry(1.050, railingHeight, railingThickness),
+            railingMaterial
+        );
+        frontRailing.position.set(
+            0.525 - centerX,
+            railingHeight/2,
+            7.665 - centerZ
+        );
+        frontRailing.castShadow = true;
+        scene.add(frontRailing);
+        
+        // Right railing (right edge at x=1.050)
+        const rightRailing = new THREE.Mesh(
+            new THREE.BoxGeometry(railingThickness, railingHeight, 1.200),
+            railingMaterial
+        );
+        rightRailing.position.set(
+            1.050 - centerX,
+            railingHeight/2,
+            7.065 - centerZ
+        );
+        rightRailing.castShadow = true;
+        scene.add(rightRailing);
+
+        // Sensor overlay displays on 3D layout
+        const sensorDisplays = [];
+        
+        function createSensorDisplay(roomKey, sensorType, worldPosition) {
+            const div = document.createElement('div');
+            div.className = 'sensor-overlay';
+            document.getElementById('canvas-container').appendChild(div);
+            
+            sensorDisplays.push({
+                element: div,
+                worldPosition: new THREE.Vector3(worldPosition.x, worldPosition.y, worldPosition.z),
+                sensorType: sensorType,
+                roomKey: roomKey
+            });
+        }
+
+        // Create sensor displays at specific room locations based on new floor plan
+        // Living Room
+        createSensorDisplay('living', 'temp', { x: rooms.living.x, y: 1.3, z: rooms.living.z });
+        createSensorDisplay('living', 'humidity', { x: rooms.living.x - 1, y: 1.3, z: rooms.living.z + 0.5 });
+        
+        // Bedroom (mapped to bedroom1 sensors)
+        createSensorDisplay('bedroom1', 'temp', { x: rooms.bedroom.x, y: 1.3, z: rooms.bedroom.z });
+        createSensorDisplay('bedroom1', 'humidity', { x: rooms.bedroom.x - 0.5, y: 1.3, z: rooms.bedroom.z + 1 });
+        
+        // Kitchen (mapped to bedroom2 sensors)
+        createSensorDisplay('bedroom2', 'temp', { x: rooms.kitchen.x, y: 1.3, z: rooms.kitchen.z });
+        createSensorDisplay('bedroom2', 'humidity', { x: rooms.kitchen.x - 0.5, y: 1.3, z: rooms.kitchen.z + 0.5 });
+        
+        // Hallway
+        createSensorDisplay('hallway', 'air-quality', { x: rooms.hallway.x, y: 1.3, z: rooms.hallway.z });
+
+        function updateSensorDisplayPositions() {
+            sensorDisplays.forEach(display => {
+                const vector = display.worldPosition.clone();
+                vector.project(camera);
+                
+                const widthHalf = window.innerWidth / 2;
+                const heightHalf = window.innerHeight / 2;
+                
+                const x = (vector.x * widthHalf) + widthHalf;
+                const y = -(vector.y * heightHalf) + heightHalf;
+                
+                display.element.style.left = x + 'px';
+                display.element.style.top = y + 'px';
+            });
+        }
+
+        // Control variables
+        let wallsVisible = true;
+        let autoRotate = false;
+        let currentView = '3d';
+
+        // Control buttons
+        document.getElementById('view-3d').addEventListener('click', function() {
+            camera.position.set(15, 20, 15);
+            camera.lookAt(0, 0, 0);
+            controls.update();
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            currentView = '3d';
+        });
+
+        document.getElementById('view-top').addEventListener('click', function() {
+            camera.position.set(0, 30, 0);
+            camera.lookAt(0, 0, 0);
+            controls.update();
+            document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            currentView = 'top';
+        });
+
+        document.getElementById('toggle-walls').addEventListener('click', function() {
+            wallsVisible = !wallsVisible;
+            roomMeshes.forEach(room => {
+                room.walls.forEach(wall => {
+                    wall.visible = wallsVisible;
+                });
+            });
+            this.classList.toggle('active');
+        });
+
+        document.getElementById('auto-rotate').addEventListener('click', function() {
+            autoRotate = !autoRotate;
+            controls.autoRotate = autoRotate;
+            this.classList.toggle('active');
+        });
+
+        // Simulate real-time sensor data
+        let sensorData = {
+            'living-temp': 22.5,
+            'living-humidity': 45,
+            'bedroom1-temp': 21.8,
+            'bedroom1-humidity': 48,
+            'bedroom2-temp': 22.1,
+            'bedroom2-humidity': 46,
+            'air-quality': 'Good',
+            'power-usage': 2.4
+        };
+
+        function updateSensorData() {
+            // Temperature sensors
+            sensorData['living-temp'] = (20 + Math.random() * 4).toFixed(1);
+            sensorData['bedroom1-temp'] = (20 + Math.random() * 4).toFixed(1);
+            sensorData['bedroom2-temp'] = (20 + Math.random() * 4).toFixed(1);
+            
+            // Humidity sensors
+            sensorData['living-humidity'] = (40 + Math.random() * 20).toFixed(0);
+            sensorData['bedroom1-humidity'] = (40 + Math.random() * 20).toFixed(0);
+            sensorData['bedroom2-humidity'] = (40 + Math.random() * 20).toFixed(0);
+            
+            // Air quality
+            const airQualityValues = ['Excellent', 'Good', 'Moderate', 'Fair'];
+            sensorData['air-quality'] = airQualityValues[Math.floor(Math.random() * 2)];
+            
+            // Power usage
+            sensorData['power-usage'] = (1.5 + Math.random() * 2).toFixed(1);
+
+            // Update panel displays
+            document.getElementById('temp-living').textContent = sensorData['living-temp'] + '°C';
+            document.getElementById('humidity-living').textContent = sensorData['living-humidity'] + '%';
+            document.getElementById('temp-bedroom1').textContent = sensorData['bedroom1-temp'] + '°C';
+            document.getElementById('humidity-bedroom1').textContent = sensorData['bedroom1-humidity'] + '%';
+            document.getElementById('temp-bedroom2').textContent = sensorData['bedroom2-temp'] + '°C';
+            document.getElementById('humidity-bedroom2').textContent = sensorData['bedroom2-humidity'] + '%';
+            document.getElementById('air-quality').textContent = sensorData['air-quality'];
+            document.getElementById('power-usage').textContent = sensorData['power-usage'] + ' kW';
+
+            // Update overlay displays
+            sensorDisplays.forEach(display => {
+                let text = '';
+                if (display.sensorType === 'temp') {
+                    text = '🌡️ ' + sensorData[display.roomKey + '-temp'] + '°C';
+                } else if (display.sensorType === 'humidity') {
+                    text = '💧 ' + sensorData[display.roomKey + '-humidity'] + '%';
+                } else if (display.sensorType === 'air-quality') {
+                    text = '🌬️ ' + sensorData['air-quality'];
+                }
+                display.element.textContent = text;
+            });
+        }
+
+        // Update sensor data every 2 seconds
+        setInterval(updateSensorData, 2000);
+        updateSensorData(); // Initial update
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            updateSensorDisplayPositions();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

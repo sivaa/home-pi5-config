@@ -1,0 +1,56 @@
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"  # WebSocket for browser dashboard
+    volumes:
+      - ./services/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    mem_limit: 50m
+    memswap_limit: 100m
+
+  # Zigbee2MQTT Gateway
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./services/zigbee2mqtt/data:/app/data
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    environment:
+      - TZ=Australia/Sydney
+    group_add:
+      - dialout
+    mem_limit: 150m
+    memswap_limit: 200m
+
+  # Home Assistant
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./services/homeassistant:/config
+    environment:
+      - TZ=Australia/Sydney
+    privileged: true
+    mem_limit: 256m
+    memswap_limit: 384m
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:

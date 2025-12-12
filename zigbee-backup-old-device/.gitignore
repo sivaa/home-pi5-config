@@ -1,0 +1,87 @@
+# ===========================================
+# Smart Home Zigbee Project - .gitignore
+# ===========================================
+
+# ----- Python -----
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# ----- Node.js -----
+node_modules/
+package-lock.json
+
+# ----- Environment -----
+.env
+.env.local
+.env.*.local
+
+# ----- Logs -----
+logs/
+*.log
+nohup.out
+
+# ----- macOS -----
+.DS_Store
+
+# ----- IDE -----
+.idea/
+.vscode/
+*.swp
+*.swo
+.claude/
+
+# ----- Temporary Files -----
+*.tmp
+*.bak
+
+# ----- Test Artifacts -----
+test-results/
+test-screenshots/
+dashboard/test-screenshots/
+*-test-screenshot.png
+*.test-screenshot.png
+
+# ----- Secrets (NEVER commit) -----
+siva-home-assistant-*.json
+SERVICE_ACCOUNT.json
+*.secret
+*.credentials
+
+# ===========================================
+# Service Runtime Data
+# ===========================================
+
+# ----- Zigbee2MQTT -----
+services/zigbee2mqtt/data/state.json
+services/zigbee2mqtt/data/database.db
+services/zigbee2mqtt/data/coordinator_backup.json
+services/zigbee2mqtt/data/log/
+services/zigbee2mqtt/data/migration-*.log
+services/zigbee2mqtt/data/configuration_backup_*.yaml
+
+# ----- Home Assistant -----
+services/homeassistant/.storage/
+services/homeassistant/.HA_VERSION
+services/homeassistant/*.log*
+services/homeassistant/deps/
+services/homeassistant/tts/
+services/homeassistant/blueprints/
+services/homeassistant/.ha_run.lock
+services/homeassistant/home-assistant_v2.db*
+services/homeassistant/home-assistant.log*
+
+# ----- Grafana -----
+services/grafana/data/
+
+# ===========================================
+# Keep These Files (Exceptions)
+# ===========================================
+!services/zigbee2mqtt/data/configuration.yaml
+!services/zigbee2mqtt/data/configuration.example.yaml
+!services/homeassistant/configuration.yaml
+!services/grafana/dashboards/*.json
+!services/mosquitto/config/mosquitto.conf

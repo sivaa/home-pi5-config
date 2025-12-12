@@ -1,0 +1,68 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"  # WebSocket for dashboard
+    volumes:
+      - /opt/mosquitto/config:/mosquitto/config
+      - /opt/mosquitto/data:/mosquitto/data
+      - /opt/mosquitto/log:/mosquitto/log
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8080:8080"
+    volumes:
+      - /opt/zigbee2mqtt/data:/app/data
+    devices:
+      - /dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_76e8abf6fd73ef1197c4c274d9b539e6-if00-port0:/dev/ttyUSB0
+    environment:
+      - TZ=Australia/Sydney
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8123:8123"
+    volumes:
+      - /opt/homeassistant:/config
+    environment:
+      - TZ=Australia/Sydney
+    privileged: true
+
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - /opt/influxdb/data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=homeassistant
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+      - INFLUXDB_REPORTING_DISABLED=true
+
+  dashboard:
+    image: nginx:alpine
+    container_name: dashboard
+    restart: unless-stopped
+    ports:
+      - "8888:80"
+    volumes:
+      - /opt/dashboard/www:/usr/share/nginx/html:ro
+      - /opt/dashboard/nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/dashboard/nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - mosquitto
+      - influxdb

@@ -1,0 +1,195 @@
+    /* ========================================
+       CLASSIC VIEW (Vision 6)
+       ======================================== */
+    .classic-view {
+      padding: var(--space-lg);
+    }
+
+    .classic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .classic-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .classic-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .classic-card.stale {
+      opacity: 0.5;
+    }
+
+    .classic-comfort {
+      position: absolute;
+      top: var(--space-md);
+      right: var(--space-md);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .classic-comfort.good { background: var(--color-success); }
+    .classic-comfort.warm { background: var(--color-warning); }
+    .classic-comfort.hot { background: var(--color-danger); }
+    .classic-comfort.cold { background: var(--color-info); }
+    .classic-comfort.cool { background: var(--color-cold); }
+
+    .classic-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-md);
+    }
+
+    .classic-room-info { display: flex; flex-direction: column; gap: 2px; }
+    .classic-icon { font-size: var(--font-size-lg); }
+    .classic-name {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-secondary);
+    }
+
+    .classic-updated {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+      background: var(--color-bg);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    .classic-values {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: var(--space-md);
+    }
+
+    .classic-temp {
+      font-size: 42px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1;
+    }
+
+    .classic-temp .unit {
+      font-size: 20px;
+      font-weight: var(--font-weight-normal);
+      color: var(--color-text-tertiary);
+    }
+
+    .classic-temp .no-data {
+      color: var(--color-text-tertiary);
+      font-size: 28px;
+    }
+
+    .classic-humidity {
+      font-size: var(--font-size-md);
+      color: var(--color-text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .humidity-icon { font-size: var(--font-size-sm); }
+
+    .classic-sparkline {
+      height: 40px;
+      margin-top: var(--space-sm);
+    }
+
+    .sparkline-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Average Card */
+    .classic-average {
+      background: linear-gradient(135deg, #1D1D1F 0%, #3A3A3C 100%);
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      color: white;
+      box-shadow: var(--shadow-lg);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 2fr;
+      gap: var(--space-xl);
+      align-items: center;
+    }
+
+    .avg-section { text-align: center; }
+
+    .avg-label {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: var(--space-xs);
+    }
+
+    .avg-value {
+      font-size: 48px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1;
+    }
+
+    .avg-value .no-data {
+      font-size: 32px;
+      opacity: 0.5;
+    }
+
+    .avg-unit {
+      font-size: 24px;
+      font-weight: var(--font-weight-normal);
+      opacity: 0.7;
+    }
+
+    .avg-divider {
+      width: 1px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .avg-chart {
+      height: 60px;
+    }
+
+    .hidden-mobile {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .classic-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--space-sm);
+      }
+
+      .classic-card { padding: var(--space-md); }
+      .classic-temp { font-size: 32px; }
+
+      .classic-average {
+        grid-template-columns: 1fr 1fr;
+        padding: var(--space-lg);
+      }
+
+      .avg-divider { display: none; }
+      .hidden-mobile { display: none; }
+
+      .avg-chart {
+        grid-column: 1 / -1;
+        height: 50px;
+      }
+
+      .avg-value { font-size: 36px; }
+    }
+

@@ -25,6 +25,24 @@
 │    /mnt/storage   SD     111GB available                    │
 │                                                             │
 │    TOTAL: ~549GB                                            │
+├─────────────────────────────────────────────────────────────┤
+│  Hardware:                                                  │
+│    Zigbee:  Sonoff 3.0 USB Dongle Plus V2                   │
+│    Path:    /dev/serial/by-id/usb-Itead_Sonoff_...          │
+├─────────────────────────────────────────────────────────────┤
+│  Services (Docker):                                         │
+│    Dashboard:     http://pi:8888                            │
+│    Home Assistant:http://pi:8123                            │
+│    Zigbee2MQTT:   http://pi:8080                            │
+│    InfluxDB:      http://pi:8086                            │
+│    Grafana:       http://pi:3000                            │
+│    MQTT Broker:   mqtt://pi:1883 (WS: 9001)                 │
+├─────────────────────────────────────────────────────────────┤
+│  Zigbee Devices: 15 total                                   │
+│    Sensors: 9 (6x temp/humidity, 1x CO2, 1x PIR, 1x contact)│
+│    Lights:  2 (IKEA FLOALT panels)                          │
+│    Remotes: 2 (IKEA TRADFRI)                                │
+│    Plugs:   1 (SONOFF smart plug w/ energy monitor)         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,6 +54,11 @@
 |---|----------|-------------|
 | 1 | [NVMe Boot Setup](docs/01-nvme-boot-setup.md) | How we configured NVMe as primary boot device |
 | 2 | [SD Card Storage](docs/02-sd-card-storage.md) | Repurposing SD card as extra storage |
+| 3 | [Zigbee Dongle](docs/03-zigbee-dongle.md) | Sonoff Zigbee 3.0 USB Dongle Plus V2 setup |
+| 4 | [Zigbee2MQTT Setup](docs/04-zigbee2mqtt-setup.md) | Docker-based Zigbee2MQTT + Mosquitto |
+| 5 | [Zigbee Devices](docs/05-zigbee-devices.md) | Complete device inventory & pairing guide |
+| 6 | [WiFi Troubleshooting](docs/06-wifi-troubleshooting.md) | Metal case WiFi issues & power save fix |
+| 7 | [Dashboard & InfluxDB](docs/07-dashboard-influxdb.md) | Custom dashboard InfluxDB integration |
 
 ---
 
@@ -50,6 +73,10 @@ All critical configuration files are backed up in `backups/configs/`:
 | `eeprom-config.txt` | EEPROM/bootloader configuration |
 | `disk-info.txt` | Partition layout and UUIDs |
 | `system-info.txt` | OS version, hostname, network info |
+| `zigbee-dongle-info.txt` | Zigbee dongle USB device details |
+| `sshd_config` | SSH server configuration (locale fix applied) |
+| `sshd_config.original` | Original SSH config before modifications |
+| `wifi-powersave-off.conf` | NetworkManager WiFi power save disable config |
 
 ---
 
@@ -133,6 +160,14 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-13 | Fixed dashboard history modal - InfluxDB queries & entity ID mapping |
+| 2025-12-12 | Added contact sensor (SNZB-04P) |
+| 2025-12-12 | Added PIR motion sensor (SNZB-03P) and smart plug (S60ZBTPF) |
+| 2025-12-12 | Fixed WiFi disconnection: disabled power save, documented metal case issue |
+| 2025-12-12 | Added NOUS E10 CO2 sensor, created device inventory doc |
+| 2025-12-12 | Fixed SSH locale warning (removed LC_* from AcceptEnv) |
+| 2025-12-12 | Set up Zigbee2MQTT + Mosquitto via Docker |
+| 2025-12-12 | Added Zigbee dongle documentation |
 | 2025-12-12 | Initial setup: NVMe boot + SD storage |
 
 ---
@@ -141,18 +176,36 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 ```
 pi-setup/
-├── README.md              ← You are here (main index)
-├── CLAUDE.md              ← Instructions for AI assistants
+├── README.md              <- You are here (main index)
+├── CLAUDE.md              <- Instructions for AI assistants
+├── configs/
+│   └── zigbee2mqtt/       <- Source of truth for Pi configs
+│       ├── docker-compose.yml
+│       ├── configuration.yaml
+│       └── mosquitto.conf
 ├── docs/
 │   ├── 01-nvme-boot-setup.md
-│   └── 02-sd-card-storage.md
+│   ├── 02-sd-card-storage.md
+│   ├── 03-zigbee-dongle.md
+│   ├── 04-zigbee2mqtt-setup.md
+│   ├── 05-zigbee-devices.md
+│   ├── 06-wifi-troubleshooting.md
+│   └── 07-dashboard-influxdb.md
+├── services/                  <- Docker service configs (source of truth)
+│   ├── dashboard/             <- Custom smart home dashboard
+│   │   ├── www/index.html
+│   │   └── nginx/dashboard.conf
+│   ├── homeassistant/
+│   ├── mosquitto/
+│   └── zigbee2mqtt/
 └── backups/
     └── configs/
         ├── fstab
         ├── cmdline.txt
         ├── eeprom-config.txt
         ├── disk-info.txt
-        └── system-info.txt
+        ├── system-info.txt
+        └── zigbee-dongle-info.txt
 ```
 
 ---

@@ -1,0 +1,53 @@
+# Zigbee Dongle Device Information
+# Generated: December 12, 2025
+# Purpose: Recovery reference for Zigbee dongle identification
+
+## Quick Reference
+Device:     Sonoff Zigbee 3.0 USB Dongle Plus V2
+Maker:      Itead
+Vendor ID:  10c4
+Product ID: ea60
+Serial:     76e8abf6fd73ef1197c4c274d9b539e6
+Chip:       Silicon Labs CP210x UART Bridge
+
+## Persistent Device Path (USE THIS IN CONFIGS!)
+/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_76e8abf6fd73ef1197c4c274d9b539e6-if00-port0
+
+## Dynamic Device Path (may change!)
+/dev/ttyUSB0
+
+## USB Bus Location
+Bus 003 Device 002: ID 10c4:ea60 Silicon Labs CP210x UART Bridge
+
+## Full USB Device Descriptor
+Device Descriptor:
+  bLength                18
+  bDescriptorType         1
+  bcdUSB               2.00
+  bDeviceClass            0 [unknown]
+  bDeviceSubClass         0 [unknown]
+  bDeviceProtocol         0
+  bMaxPacketSize0        64
+  idVendor           0x10c4 Silicon Labs
+  idProduct          0xea60 CP210x UART Bridge
+  bcdDevice            1.00
+  iManufacturer           1 Itead
+  iProduct                2 Sonoff Zigbee 3.0 USB Dongle Plus V2
+  iSerial                 3 76e8abf6fd73ef1197c4c274d9b539e6
+  bNumConfigurations      1
+  MaxPower              100mA
+
+## Required Kernel Module
+cp210x                 49152  0
+usbserial              81920  1 cp210x
+
+## User Permission Requirements
+User must be in 'dialout' group for serial port access:
+  sudo usermod -aG dialout $USER
+
+## Verification Commands
+lsusb | grep 10c4                    # Check USB detection
+ls -la /dev/serial/by-id/            # Check serial symlink
+ls -la /dev/ttyUSB*                  # Check device node
+lsmod | grep cp210                   # Check kernel module
+dmesg | grep -i sonoff               # Check kernel messages

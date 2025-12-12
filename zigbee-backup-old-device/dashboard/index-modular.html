@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Home Climate</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Modularized CSS -->
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/views/comfort-score.css">
+  <link rel="stylesheet" href="styles/views/bar-compare.css">
+  <link rel="stylesheet" href="styles/views/floor-plan.css">
+  <link rel="stylesheet" href="styles/views/ambient.css">
+  <link rel="stylesheet" href="styles/views/timeline.css">
+  <link rel="stylesheet" href="styles/views/classic.css">
+  <link rel="stylesheet" href="styles/views/lights.css">
+  <link rel="stylesheet" href="styles/views/3d-view.css">
+
+  <!-- Three.js for 3D Floor Plan (CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div class="app-container" x-data="app()" x-init="init()">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="header-left">
+          <h1 class="header-title">Home Climate</h1>
+          <div class="status-badge"
+               :class="{ 'disconnected': !$store.mqtt.connected && !$store.mqtt.connecting, 'connecting': $store.mqtt.connecting }">
+            <span class="loading-indicator loading-sm" x-show="$store.mqtt.connecting"></span>
+            <span class="status-dot-header" x-show="!$store.mqtt.connecting" :class="{ 'connected': $store.mqtt.connected }"></span>
+            <span x-text="$store.mqtt.connecting ? 'Connecting' : ($store.mqtt.connected ? 'Live' : 'Offline')"></span>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="date-time" x-text="currentDateTime"></div>
+          <div class="last-update" x-text="'Last update: ' + lastUpdateText"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Menu -->
+    <nav class="nav-container">
+      <div class="nav-tabs">
+        <button class="nav-tab" :class="{ active: currentView === 'comfort' }"
+                @click="setView('comfort')" title="Comfort Score (Press 1)">
+          <span class="nav-icon">🎯</span>
+          <span class="nav-label">Score</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'compare' }"
+                @click="setView('compare')" title="Room Comparison (Press 2)">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Compare</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'floor' }"
+                @click="setView('floor')" title="Floor Plan (Press 3)">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Floor Plan</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'ambient' }"
+                @click="setView('ambient')" title="Ambient Display (Press 4)">
+          <span class="nav-icon">🌡️</span>
+          <span class="nav-label">Ambient</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'timeline' }"
+                @click="setView('timeline')" title="Timeline Story (Press 5)">
+          <span class="nav-icon">📖</span>
+          <span class="nav-label">Timeline</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'classic' }"
+                @click="setView('classic')" title="Classic Cards (Press 6)">
+          <span class="nav-icon">🃏</span>
+          <span class="nav-label">Classic</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'lights' }"
+                @click="setView('lights')" title="Light Control (Press 7)">
+          <span class="nav-icon">💡</span>
+          <span class="nav-label">Lights</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === '3d' }"
+                @click="setView('3d')" title="3D Floor Plan (Press 8)">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">3D</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="view-container">
+
+        <!-- Vision 1: Comfort Score -->
+        <div x-show="currentView === 'comfort'" x-cloak x-data="comfortScoreView()">
+          <div class="comfort-score-view">
+            <div class="score-hero" @click="showBreakdown = !showBreakdown">
+              <div class="score-label-top">YOUR HOME IS</div>
+              <div class="score-circle" :style="{ '--score-color': getColor() }">
+                <svg viewBox="0 0 200 200" class="score-ring">
+                  <circle cx="100" cy="100" r="90" fill="none" stroke="var(--color-border)" stroke-width="8"/>
+                  <circle cx="100" cy="100" r="90" fill="none" :stroke="getColor()" stroke-width="8"
+                          stroke-linecap="round" :stroke-dasharray="getScoreArc()"
+                          transform="rotate(-90 100 100)" class="score-arc"/>
+                </svg>
+                <div class="score-content">
+                  <span class="score-number" :style="{ color: getColor() }" x-text="homeScore"></span>
+                  <span class="score-label" x-text="getLabel()"></span>
+                </div>
+              </div>
+              <div class="score-hint">Tap for breakdown</div>
+            </div>
+
+            <div class="score-breakdown" x-show="showBreakdown" x-transition>
+              <div class="breakdown-title">Score Components</div>
+              <div class="breakdown-item">
+                <span class="breakdown-label">Temperature (70%)</span>
+                <div class="breakdown-bar">
+                  <div class="breakdown-fill" :style="{ width: (homeScore * 0.7) + '%', background: 'var(--color-primary)' }"></div>
+                </div>
+              </div>
+              <div class="breakdown-item">
+                <span class="breakdown-label">Humidity (30%)</span>
+                <div class="breakdown-bar">
+                  <div class="breakdown-fill" :style="{ width: (homeScore * 0.3) + '%', background: 'var(--color-success)' }"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="room-scores">
+              <template x-for="room in roomScores" :key="room.id">
+                <button class="room-pill" @click="openRoom(room)" :style="{ '--pill-color': getRoomColor(room.score) }">
+                  <span class="pill-icon" x-text="room.icon"></span>
+                  <span class="pill-score" :style="{ color: getRoomColor(room.score) }" x-text="room.score"></span>
+                  <span class="pill-dot" :style="{ background: getRoomColor(room.score) }"></span>
+                </button>
+              </template>
+            </div>
+
+            <div class="room-labels">
+              <template x-for="room in roomScores" :key="room.id + '-label'">
+                <span class="room-label-text" x-text="room.name.split(' ')[0]"></span>
+              </template>
+            </div>
+
+            <div class="comfort-spectrum">
+              <div class="spectrum-bar">
+                <div class="spectrum-gradient"></div>
+                <div class="spectrum-marker" :style="{ left: homeScore + '%' }">
+                  <div class="marker-line"></div>
+                  <div class="marker-label">You</div>
+                </div>
+              </div>
+              <div class="spectrum-labels">
+                <span>Poor</span>
+                <span>Okay</span>
+                <span>Perfect</span>
+              </div>
+            </div>
+
+            <div class="suggestions" x-show="suggestions.length > 0">
+              <template x-for="(suggestion, index) in suggestions" :key="index">
+                <div class="suggestion-card" :class="'suggestion-' + suggestion.type">
+                  <span class="suggestion-icon" x-text="suggestion.icon"></span>
+                  <div class="suggestion-content">
+                    <div class="suggestion-title" x-text="suggestion.title"></div>
+                    <div class="suggestion-message" x-text="suggestion.message"></div>
+                  </div>
+                  <button class="suggestion-dismiss" @click="suggestions.splice(index, 1)">&times;</button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision 2: Bar Compare -->
+        <div x-show="currentView === 'compare'" x-cloak x-data="barCompareView()">
+          <div class="bar-compare-view">
+            <div class="bar-controls">
+              <div class="view-toggle">
+                <button class="btn btn-secondary" :class="{ active: viewMode === 'temperature' }"
+                        @click="setViewMode('temperature')">🌡️ Temp</button>
+                <button class="btn btn-secondary" :class="{ active: viewMode === 'humidity' }"
+                        @click="setViewMode('humidity')">💧 Humid</button>
+                <button class="btn btn-secondary" :class="{ active: viewMode === 'both' }"
+                        @click="setViewMode('both')">Both</button>
+              </div>
+              <div class="sort-controls">
+                <select class="sort-select" x-model="sortBy">
+                  <option value="temperature">Sort: Temperature</option>
+                  <option value="humidity">Sort: Humidity</option>
+                  <option value="name">Sort: Name</option>
+                  <option value="score">Sort: Comfort</option>
+                </select>
+                <button class="sort-direction" @click="sortDirection = sortDirection === 'desc' ? 'asc' : 'desc'">
+                  <span x-text="sortDirection === 'desc' ? '↓' : '↑'"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="charts-container" :class="{ 'single-chart': viewMode !== 'both' }">
+              <div class="bar-chart" x-show="viewMode === 'temperature' || viewMode === 'both'">
+                <h3 class="chart-title">🌡️ Temperature</h3>
+                <div class="chart-wrapper">
+                  <div class="comfort-zone" :style="getComfortZoneStyle('temperature')"></div>
+                  <template x-for="room in sortedRooms" :key="room.id + '-temp'">
+                    <div class="bar-row" @click="openRoom(room)">
+                      <div class="bar-label">
+                        <span class="bar-icon" x-text="room.icon"></span>
+                        <span class="bar-name" x-text="room.name"></span>
+                      </div>
+                      <div class="bar-track">
+                        <div class="bar-fill" :style="{ width: getBarWidth(room.temperature, 'temperature') + '%', background: getBarColor(room.temperature, 'temperature') }"></div>
+                      </div>
+                      <div class="bar-value" x-text="room.temperature.toFixed(1) + '°'"></div>
+                    </div>
+                  </template>
+                  <div class="scale-labels">
+                    <template x-for="label in getScaleLabels('temperature')" :key="label">
+                      <span x-text="label"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bar-chart" x-show="viewMode === 'humidity' || viewMode === 'both'">
+                <h3 class="chart-title">💧 Humidity</h3>
+                <div class="chart-wrapper">
+                  <div class="comfort-zone" :style="getComfortZoneStyle('humidity')"></div>
+                  <template x-for="room in sortedRooms" :key="room.id + '-humid'">
+                    <div class="bar-row" @click="openRoom(room)">
+                      <div class="bar-label">
+                        <span class="bar-icon" x-text="room.icon"></span>
+                        <span class="bar-name" x-text="room.name"></span>
+                      </div>
+                      <div class="bar-track">
+                        <div class="bar-fill" :style="{ width: getBarWidth(room.humidity, 'humidity') + '%', background: getBarColor(room.humidity, 'humidity') }"></div>
+                      </div>
+                      <div class="bar-value" x-text="room.humidity.toFixed(0) + '%'"></div>
+                    </div>
+                  </template>
+                  <div class="scale-labels">
+                    <template x-for="label in getScaleLabels('humidity')" :key="label">
+                      <span x-text="label"></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="insights-section" x-show="insights.length > 0">
+              <h3 class="insights-title">📊 Auto-Insights</h3>
+              <div class="insights-list">
+                <template x-for="insight in insights" :key="insight.message">
+                  <div class="insight-card" :class="getInsightClass(insight.type)">
+                    <span class="insight-icon" x-text="insight.icon"></span>
+                    <div class="insight-content">
+                      <div class="insight-title" x-text="insight.title"></div>
+                      <div class="insight-message" x-text="insight.message"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision 3: Floor Plan -->
+        <div x-show="currentView === 'floor'" x-cloak x-data="floorPlanView()">
+          <div class="floor-plan-view">
+            <div class="floor-controls">
+              <div class="view-toggle">
+                <button class="btn btn-secondary" :class="{ active: viewType === 'temperature' }"
+                        @click="setViewType('temperature')">🌡️ Temperature</button>
+                <button class="btn btn-secondary" :class="{ active: viewType === 'humidity' }"
+                        @click="setViewType('humidity')">💧 Humidity</button>
+              </div>
+            </div>
+
+            <div class="floor-plan-container">
+              <svg class="floor-plan-svg" :viewBox="'0 0 ' + layout.width + ' ' + layout.height">
+                <!-- Compass -->
+                <g class="compass" transform="translate(590, 30)">
+                  <text font-size="12" fill="var(--color-text-tertiary)" text-anchor="middle">N</text>
+                  <line x1="0" y1="8" x2="0" y2="20" stroke="var(--color-text-tertiary)" stroke-width="2"/>
+                  <polygon points="-3,8 3,8 0,4" fill="var(--color-text-tertiary)"/>
+                </g>
+
+                <!-- Balcony (left of Living Room, west side) -->
+                <g class="balcony">
+                  <rect x="10" y="50" width="55" height="120" fill="none" stroke="var(--color-success)"
+                        stroke-width="2" stroke-dasharray="5,3" rx="4"/>
+                  <text x="37" y="115" font-size="10" fill="var(--color-success)" text-anchor="middle">Balcony</text>
+                </g>
+
+                <!-- Hallway (center corridor connecting all rooms) -->
+                <rect x="295" y="235" width="130" height="100" fill="var(--color-bg)"
+                      stroke="var(--color-border)" stroke-width="1" rx="4" opacity="0.5"/>
+                <text x="360" y="290" font-size="11" fill="var(--color-text-tertiary)" text-anchor="middle">Hallway</text>
+
+                <!-- Rooms -->
+                <template x-for="room in rooms" :key="room.id">
+                  <g class="floor-room" @click="openRoom(room)" style="cursor: pointer;">
+                    <rect :x="room.x" :y="room.y" :width="room.width" :height="room.height"
+                          :fill="room.color" stroke="var(--color-border)" stroke-width="2" rx="8" class="room-rect"/>
+                    <text :x="room.x + room.width/2" :y="room.y + room.height/2 - 15"
+                          text-anchor="middle" font-size="14" font-weight="500" fill="var(--color-text)"
+                          x-text="room.name"></text>
+                    <text :x="room.x + room.width/2" :y="room.y + room.height/2 + 10"
+                          text-anchor="middle" font-size="24" font-weight="600" fill="var(--color-text)"
+                          x-text="getValue(room)"></text>
+                    <text :x="room.x + room.width/2" :y="room.y + room.height/2 + 30"
+                          text-anchor="middle" font-size="12" fill="var(--color-text-secondary)"
+                          x-text="viewType === 'temperature' ? (room.humidity?.toFixed(0) + '%' || '') : (room.temperature?.toFixed(1) + '°' || '')"></text>
+                    <text :x="room.x + room.width - 20" :y="room.y + room.height - 15" font-size="16" x-text="room.icon"></text>
+                  </g>
+                </template>
+
+                <!-- Main Entry Door (east side at Bedroom) -->
+                <g transform="translate(595, 80)">
+                  <rect x="-10" y="-30" width="14" height="60" fill="var(--color-surface)"
+                        stroke="var(--color-primary)" stroke-width="2" rx="3"/>
+                  <text x="-3" y="45" font-size="8" fill="var(--color-primary)" text-anchor="middle" font-weight="500">🚪</text>
+                </g>
+
+                <!-- Windows indicators -->
+                <g class="windows" opacity="0.6">
+                  <rect x="66" y="130" width="4" height="50" fill="var(--color-info)" rx="2"/>
+                  <rect x="590" y="160" width="4" height="50" fill="var(--color-info)" rx="2"/>
+                  <rect x="16" y="320" width="4" height="50" fill="var(--color-info)" rx="2"/>
+                  <rect x="605" y="270" width="4" height="40" fill="var(--color-info)" rx="2"/>
+                  <rect x="605" y="380" width="4" height="35" fill="var(--color-info)" rx="2"/>
+                </g>
+              </svg>
+            </div>
+
+            <div class="floor-legend">
+              <div class="legend-title" x-text="viewType === 'temperature' ? 'Temperature' : 'Humidity'"></div>
+              <div class="legend-items">
+                <template x-for="item in getLegendItems()" :key="item.label">
+                  <div class="legend-item">
+                    <div class="legend-color" :style="{ background: item.color }"></div>
+                    <span class="legend-label" x-text="item.label"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="floor-tip">Tap any room for detailed history</div>
+          </div>
+        </div>
+
+        <!-- Vision 4: Ambient -->
+        <div x-show="currentView === 'ambient'" x-cloak x-data="ambientView()">
+          <div class="ambient-view" :style="{ background: getBackgroundColor() }" :class="{ 'dark-mode': isDarkMode }"
+               @click="showDetailsOverlay()">
+            <div class="ambient-main">
+              <div class="ambient-temperature">
+                <span x-text="currentRoom.temperature?.toFixed(1) || '--'"></span>
+                <span class="ambient-unit">°</span>
+              </div>
+              <div class="ambient-room-name" x-text="currentRoom.name"></div>
+              <div class="ambient-humidity">
+                <span>💧</span>
+                <span x-text="(currentRoom.humidity?.toFixed(0) || '--') + '%'"></span>
+              </div>
+            </div>
+
+            <div class="ambient-details" x-show="showDetails" x-transition.opacity>
+              <div class="detail-item">
+                <span class="detail-label">Today</span>
+                <span class="detail-value" x-text="getMinMaxToday()"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Trend</span>
+                <span class="detail-value trend" x-text="getTrend()"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Updated</span>
+                <span class="detail-value" x-text="formatLastUpdate()"></span>
+              </div>
+            </div>
+
+            <div class="ambient-room-dots">
+              <template x-for="(room, index) in rooms" :key="room.id">
+                <button class="room-dot-btn" :class="{ active: currentRoomIndex === index }"
+                        @click.stop="selectRoom(index)">
+                  <div class="dot-circle"></div>
+                  <div class="dot-label">
+                    <span class="dot-temp" x-text="room.temperature?.toFixed(0) + '°'"></span>
+                    <span class="dot-name" x-text="room.name.split(' ')[0]"></span>
+                  </div>
+                </button>
+              </template>
+            </div>
+
+            <div class="ambient-hint">
+              <span>← swipe to change room →</span>
+              <span class="hint-secondary" x-show="isDarkMode">Double-tap for light mode</span>
+            </div>
+
+            <div class="auto-rotate-indicator" x-show="autoRotate">🔄 Auto-rotating</div>
+          </div>
+        </div>
+
+        <!-- Vision 5: Timeline -->
+        <div x-show="currentView === 'timeline'" x-cloak x-data="timelineView()">
+          <div class="timeline-view">
+            <div class="timeline-header">
+              <h2 class="timeline-title">📖 Today's Climate Story</h2>
+              <div class="date-selector">
+                <button class="btn btn-secondary" :class="{ active: selectedDate === 'today' }"
+                        @click="setDate('today')">Today</button>
+                <button class="btn btn-secondary" :class="{ active: selectedDate === 'yesterday' }"
+                        @click="setDate('yesterday')">Yesterday</button>
+                <button class="btn btn-secondary" :class="{ active: selectedDate === 'week' }"
+                        @click="setDate('week')">This Week</button>
+              </div>
+            </div>
+
+            <template x-if="getTodaySummary()">
+              <div class="summary-card">
+                <div class="summary-title">📊 Summary</div>
+                <div class="summary-grid">
+                  <div class="summary-item">
+                    <span class="summary-label">Temperature Range</span>
+                    <span class="summary-value" x-text="getTodaySummary().minTemp + '° — ' + getTodaySummary().maxTemp + '°'"></span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Most Stable</span>
+                    <span class="summary-value" x-text="getTodaySummary().mostStable || '--'"></span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Most Variable</span>
+                    <span class="summary-value" x-text="getTodaySummary().mostVolatile || '--'"></span>
+                  </div>
+                  <div class="summary-item">
+                    <span class="summary-label">Events Detected</span>
+                    <span class="summary-value" x-text="getTodaySummary().eventCount"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div class="timeline-content">
+              <div class="timeline-now" x-show="selectedDate === 'today'">
+                <div class="now-marker">NOW</div>
+                <div class="now-line"></div>
+              </div>
+
+              <template x-if="events.length === 0 && !loading">
+                <div class="no-events">
+                  <span class="no-events-icon">📭</span>
+                  <span class="no-events-text">No significant events detected</span>
+                  <span class="no-events-hint">Events appear when temperature changes rapidly or reaches peaks</span>
+                </div>
+              </template>
+
+              <template x-if="loading">
+                <div class="loading-events">
+                  <span class="loading-indicator"></span>
+                  <span>Analyzing climate data...</span>
+                </div>
+              </template>
+
+              <div class="timeline-events">
+                <template x-for="event in events" :key="event.time + event.room">
+                  <div class="timeline-event" :class="getEventClass(event.type)" @click="openRoom(event.room)">
+                    <div class="event-time-marker">
+                      <span class="event-time" x-text="formatTime(event.time)"></span>
+                      <div class="event-dot"></div>
+                    </div>
+                    <div class="event-card">
+                      <div class="event-header">
+                        <span class="event-icon" x-text="event.eventIcon"></span>
+                        <span class="event-room-icon" x-text="event.icon"></span>
+                        <span class="event-title" x-text="event.title"></span>
+                      </div>
+                      <template x-if="event.cause">
+                        <div class="event-cause">
+                          <span class="cause-icon">💡</span>
+                          <span class="cause-text" x-text="'Likely: ' + event.cause.text"></span>
+                        </div>
+                      </template>
+                      <template x-if="event.type === 'RAPID_RISE' || event.type === 'RAPID_DROP'">
+                        <div class="event-details">
+                          <span x-text="event.value.toFixed(1) + '° → ' + event.endValue.toFixed(1) + '°'"></span>
+                          <span class="event-duration" x-text="'(' + event.duration + ' min)'"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div class="timeline-midnight" x-show="selectedDate === 'today'">
+                <div class="midnight-line"></div>
+                <div class="midnight-label">MIDNIGHT</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision 6: Classic Cards View -->
+        <div x-show="currentView === 'classic'" x-cloak x-data="classicView()">
+          <div class="classic-view">
+            <div class="classic-grid">
+              <template x-for="room in rooms" :key="room.id">
+                <div class="classic-card" :class="{ 'stale': isStale(room) }" @click="openRoom(room)">
+                  <div class="classic-comfort" :class="getComfortClass(room.temperature)"></div>
+                  <div class="classic-header">
+                    <div class="classic-room-info">
+                      <div class="classic-icon" x-text="room.icon"></div>
+                      <div class="classic-name" x-text="room.name"></div>
+                    </div>
+                    <div class="classic-updated" x-text="formatUpdate(room.lastSeen)"></div>
+                  </div>
+                  <div class="classic-values">
+                    <div class="classic-temp">
+                      <template x-if="room.temperature !== null">
+                        <span><span x-text="room.temperature.toFixed(1)"></span><span class="unit">°</span></span>
+                      </template>
+                      <template x-if="room.temperature === null">
+                        <span class="no-data">--</span>
+                      </template>
+                    </div>
+                    <div class="classic-humidity">
+                      <span class="humidity-icon">💧</span>
+                      <template x-if="room.humidity !== null">
+                        <span x-text="room.humidity.toFixed(0) + '%'"></span>
+                      </template>
+                      <template x-if="room.humidity === null">
+                        <span>--%</span>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="classic-sparkline">
+                    <svg :id="'classic-spark-' + room.id" class="sparkline-svg" preserveAspectRatio="none"></svg>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="classic-average">
+              <div class="avg-section">
+                <div class="avg-label">Home Average Temperature</div>
+                <div class="avg-value">
+                  <template x-if="avgTemperature !== null">
+                    <span><span x-text="avgTemperature.toFixed(1)"></span><span class="avg-unit">°C</span></span>
+                  </template>
+                  <template x-if="avgTemperature === null">
+                    <span class="no-data">--</span>
+                  </template>
+                </div>
+              </div>
+              <div class="avg-divider"></div>
+              <div class="avg-section">
+                <div class="avg-label">Home Average Humidity</div>
+                <div class="avg-value">
+                  <template x-if="avgHumidity !== null">
+                    <span><span x-text="avgHumidity.toFixed(0)"></span><span class="avg-unit">%</span></span>
+                  </template>
+                  <template x-if="avgHumidity === null">
+                    <span class="no-data">--</span>
+                  </template>
+                </div>
+              </div>
+              <div class="avg-divider hidden-mobile"></div>
+              <div class="avg-chart">
+                <svg id="classic-spark-avg" class="sparkline-svg" preserveAspectRatio="none"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision 7: Lights Control -->
+        <div x-show="currentView === 'lights'" x-cloak x-data="lightsView()">
+          <div class="lights-view">
+            <div class="lights-header">
+              <h2>💡 Light Control</h2>
+              <p class="lights-subtitle">
+                Control your IKEA FLOALT panel lights
+                <span class="loading-indicator" x-show="$store.lights.initializing && $store.mqtt.connected"></span>
+              </p>
+            </div>
+
+            <div class="lights-initializing" x-show="$store.lights.initializing && $store.mqtt.connected" x-transition>
+              <span class="loading-indicator loading-lg"></span>
+              <span>Loading light states...</span>
+            </div>
+
+            <div class="lights-warning" x-show="!$store.mqtt.connected">
+              <span class="loading-indicator"></span>
+              <span>Connecting to MQTT...</span>
+            </div>
+
+            <div class="master-control"
+                 :class="{
+                   'master-on': $store.lights.list.every(l => l.state === 'ON'),
+                   'master-syncing': $store.lights.syncing,
+                   'master-disabled': !$store.mqtt.connected || $store.lights.initializing
+                 }">
+              <div class="master-info">
+                <span class="master-icon">💡</span>
+                <div class="master-text">
+                  <span class="master-label">Master Control</span>
+                  <span class="master-status" x-text="$store.lights.lightsOnCount + ' of ' + $store.lights.list.length + ' lights on'"></span>
+                </div>
+              </div>
+              <button class="light-toggle master-toggle"
+                      :class="{ 'toggle-on': $store.lights.list.every(l => l.state === 'ON'), 'toggle-syncing': $store.lights.syncing }"
+                      @click="$store.lights.toggleAllLights()"
+                      :disabled="$store.lights.syncing || !$store.mqtt.connected || $store.lights.initializing">
+                <div class="toggle-track">
+                  <div class="toggle-thumb"></div>
+                </div>
+              </button>
+            </div>
+
+            <div class="lights-grid" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
+              <template x-for="light in $store.lights.list" :key="light.id">
+                <div class="light-card" :class="{ 'light-on': light.state === 'ON', 'light-off': light.state === 'OFF', 'light-syncing': light.syncing }">
+                  <div class="light-syncing-overlay" x-show="light.syncing" x-transition.opacity>
+                    <span class="loading-indicator"></span>
+                  </div>
+
+                  <div class="light-header">
+                    <div class="light-info">
+                      <span class="light-icon" x-text="light.icon"></span>
+                      <div class="light-details">
+                        <span class="light-name" x-text="light.name"></span>
+                        <span class="light-status">
+                          <span x-show="light.syncing" class="syncing-text">Syncing...</span>
+                          <span x-show="!light.syncing" x-text="light.state === 'ON' ? 'On' : 'Off'"></span>
+                        </span>
+                      </div>
+                    </div>
+                    <button class="light-toggle" :class="{ 'toggle-on': light.state === 'ON', 'toggle-syncing': light.syncing }"
+                            @click="$store.lights.toggleLight(light)" :disabled="light.syncing">
+                      <div class="toggle-track">
+                        <div class="toggle-thumb">
+                          <span class="loading-indicator loading-sm" x-show="light.syncing"></span>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div class="light-control" x-show="light.state === 'ON'" x-transition
+                       :class="{ 'control-disabled': !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
+                    <div class="control-row">
+                      <label class="control-label">
+                        <span class="control-icon">🔆</span>
+                        Brightness
+                      </label>
+                      <span class="control-value">
+                        <span x-show="light.syncing" class="control-syncing">⟳</span>
+                      </span>
+                    </div>
+                    <div class="slider-wrapper">
+                      <input type="range" class="slider brightness-slider" min="1" max="254"
+                             x-model="light.brightness"
+                             :disabled="!$store.mqtt.connected || $store.lights.initializing"
+                             @change="$store.lights.setBrightness(light, $event.target.value)"
+                             :style="'background: linear-gradient(90deg, rgba(255,220,180,0.8) 0%, rgba(255,240,210,0.6) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) 100%)'">
+                      <span class="slider-percent" x-text="Math.round(light.brightness / 254 * 100) + '%'"></span>
+                    </div>
+                  </div>
+
+                  <div class="light-control" x-show="light.state === 'ON'" x-transition
+                       :class="{ 'control-disabled': !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
+                    <div class="control-row">
+                      <label class="control-label">
+                        <span class="control-icon">🌡️</span>
+                        Color Temp
+                      </label>
+                      <span class="control-value">
+                        <span x-show="light.syncing" class="control-syncing">⟳</span>
+                        <span x-text="getColorTempLabel(light.colorTemp)"></span>
+                      </span>
+                    </div>
+                    <input type="range" class="slider colortemp-slider" min="250" max="454"
+                           x-model="light.colorTemp"
+                           :disabled="!$store.mqtt.connected || $store.lights.initializing"
+                           @change="$store.lights.setColorTemp(light, $event.target.value)">
+                    <div class="colortemp-labels">
+                      <span>Cool</span>
+                      <span>Warm</span>
+                    </div>
+                  </div>
+
+                  <div class="light-presets" x-show="light.state === 'ON'" x-transition>
+                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'reading')" title="Reading">📖</button>
+                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
+                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
+                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
+                  </div>
+
+                  <div class="light-meta">
+                    <span class="light-linkquality" :title="'Link Quality: ' + light.linkquality">
+                      📶 <span x-text="light.linkquality || '--'"></span>
+                    </span>
+                    <span class="light-update" x-text="formatLastUpdate(light.lastSeen)"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="lights-scenes" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
+              <h3 class="scenes-title">Quick Scenes</h3>
+              <div class="scenes-grid">
+                <button class="scene-btn" @click="$store.lights.applyScene('movie')">
+                  <span class="scene-icon">🎬</span>
+                  <span class="scene-name">Movie</span>
+                </button>
+                <button class="scene-btn" @click="$store.lights.applyScene('work')">
+                  <span class="scene-icon">💼</span>
+                  <span class="scene-name">Work</span>
+                </button>
+                <button class="scene-btn" @click="$store.lights.applyScene('evening')">
+                  <span class="scene-icon">🌆</span>
+                  <span class="scene-name">Evening</span>
+                </button>
+                <button class="scene-btn" @click="$store.lights.applyScene('goodnight')">
+                  <span class="scene-icon">😴</span>
+                  <span class="scene-name">Goodnight</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vision 8: 3D Floor Plan -->
+        <div x-show="currentView === '3d'" x-cloak x-data="threeDView()" x-init="init()">
+          <div class="three-d-view">
+            <div class="three-controls">
+              <div class="view-toggle">
+                <button class="btn btn-secondary" :class="{ active: viewMode === 'temperature' }"
+                        @click="setViewMode('temperature')">🌡️ Temperature</button>
+                <button class="btn btn-secondary" :class="{ active: viewMode === 'humidity' }"
+                        @click="setViewMode('humidity')">💧 Humidity</button>
+              </div>
+            </div>
+
+            <div class="three-container" x-ref="threeContainer"></div>
+
+            <div class="three-controls-bar">
+              <button class="three-control-btn" :class="{ active: viewMode3D === '3d' }"
+                      @click="set3DView()">
+                🎮 3D View
+              </button>
+              <button class="three-control-btn" :class="{ active: viewMode3D === 'top' }"
+                      @click="setTopView()">
+                📐 Top View
+              </button>
+              <button class="three-control-btn" :class="{ active: !wallsVisible }"
+                      @click="toggleWalls()">
+                🧱 <span x-text="wallsVisible ? 'Hide Walls' : 'Show Walls'"></span>
+              </button>
+              <button class="three-control-btn" :class="{ active: autoRotate }"
+                      @click="toggleAutoRotate()">
+                🔄 <span x-text="autoRotate ? 'Stop' : 'Rotate'"></span>
+              </button>
+              <button class="three-control-btn" :class="{ active: darkTheme }"
+                      @click="toggleDarkTheme()">
+                🌙 Dark
+              </button>
+              <div class="zoom-controls">
+                <button class="three-control-btn zoom-btn" @click="zoomIn()">➕</button>
+                <button class="three-control-btn zoom-btn" @click="zoomOut()">➖</button>
+              </div>
+            </div>
+
+            <div class="three-legend">
+              <div class="legend-title" x-text="viewMode === 'temperature' ? 'Temperature' : 'Humidity'"></div>
+              <div class="legend-items">
+                <template x-for="item in getLegendItems()" :key="item.label">
+                  <div class="legend-item">
+                    <div class="legend-color" :style="{ background: item.color }"></div>
+                    <span class="legend-label" x-text="item.label"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div class="three-tip">
+              🏠 Interactive 3D view of your home • Drag to rotate, scroll to zoom
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer" x-show="currentView !== 'ambient'">
+      <span class="footer-status">
+        <span class="loading-indicator" x-show="$store.mqtt.connecting"></span>
+        <span class="status-dot" :class="{ 'connected': $store.mqtt.connected, 'disconnected': !$store.mqtt.connected }" x-show="!$store.mqtt.connecting"></span>
+        <span x-text="$store.mqtt.connecting ? 'Connecting...' : ($store.mqtt.connected ? 'Connected' : 'Reconnecting...')"></span>
+      </span>
+      <span> • </span>
+      <span x-show="$store.rooms.loading" class="footer-status">
+        <span class="loading-indicator"></span>
+        <span>Loading history...</span>
+      </span>
+      <span x-show="!$store.rooms.loading" x-text="$store.rooms.historyCount + ' data points'"></span>
+      <span x-show="$store.lights.syncing"> • <span class="loading-indicator"></span> Syncing lights...</span>
+    </footer>
+
+    <!-- Room Detail Modal -->
+    <template x-if="$store.roomDetail.selectedRoom">
+      <div class="modal-overlay" @click.self="$store.roomDetail.close()" @keydown.escape.window="$store.roomDetail.close()">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">
+              <span class="icon" x-text="$store.roomDetail.selectedRoom.icon"></span>
+              <h2 x-text="$store.roomDetail.selectedRoom.name"></h2>
+            </div>
+            <button class="modal-close" @click="$store.roomDetail.close()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="time-range-selector">
+              <template x-for="range in $store.roomDetail.timeRanges" :key="range">
+                <button class="btn btn-secondary" :class="{ active: $store.roomDetail.timeRange === range }"
+                        @click="$store.roomDetail.setTimeRange(range)" x-text="range"></button>
+              </template>
+              <span x-show="$store.roomDetail.loading" class="loading-indicator"></span>
+            </div>
+
+            <div class="modal-stats">
+              <div class="modal-stat">
+                <div class="modal-stat-label">Temperature</div>
+                <div class="modal-stat-value temp"
+                     x-text="$store.roomDetail.selectedRoom.temperature !== null
+                       ? $store.roomDetail.selectedRoom.temperature.toFixed(1) + '°C' : '--'"></div>
+              </div>
+              <div class="modal-stat">
+                <div class="modal-stat-label">Humidity</div>
+                <div class="modal-stat-value humid"
+                     x-text="$store.roomDetail.selectedRoom.humidity !== null
+                       ? $store.roomDetail.selectedRoom.humidity.toFixed(0) + '%' : '--'"></div>
+              </div>
+              <div class="modal-stat">
+                <div class="modal-stat-label">Min / Max</div>
+                <div class="modal-stat-value minmax" x-text="$store.roomDetail.getMinMax()"></div>
+              </div>
+            </div>
+
+            <div class="modal-chart">
+              <div class="modal-chart-title" x-text="'Temperature History (last ' + $store.roomDetail.timeRange + ')'"></div>
+              <div class="chart-temp">
+                <template x-if="$store.roomDetail.tempHistory.length === 0 && !$store.roomDetail.loading">
+                  <div class="no-data-message">No data in this time range</div>
+                </template>
+                <svg id="modal-chart-temp" x-show="$store.roomDetail.tempHistory.length > 0"></svg>
+              </div>
+            </div>
+
+            <div class="modal-chart">
+              <div class="modal-chart-title" x-text="'Humidity History (last ' + $store.roomDetail.timeRange + ')'"></div>
+              <div class="chart-humid">
+                <template x-if="$store.roomDetail.humidHistory.length === 0 && !$store.roomDetail.loading">
+                  <div class="no-data-message">No data in this time range</div>
+                </template>
+                <svg id="modal-chart-humid" x-show="$store.roomDetail.humidHistory.length > 0"></svg>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <span x-text="'Last updated: ' + $store.roomDetail.formatUpdate($store.roomDetail.selectedRoom.lastSeen)"></span>
+            <span> • </span>
+            <span x-text="$store.roomDetail.tempHistory.length + ' temperature readings, ' + $store.roomDetail.humidHistory.length + ' humidity readings'"></span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+  </div>
+
+  <!-- External Dependencies -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Modular Application Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

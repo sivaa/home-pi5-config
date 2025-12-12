@@ -1,0 +1,40 @@
+homeassistant:
+  name: Home
+  unit_system: metric
+  time_zone: Australia/Sydney
+  internal_url: "http://pi:8123"
+
+frontend:
+config:
+
+http:
+  server_port: 8123
+
+# MQTT auto-discovery enabled by default
+# Zigbee2MQTT devices appear automatically
+
+# InfluxDB integration - writes sensor data directly
+influxdb:
+  host: influxdb
+  port: 8086
+  database: homeassistant
+  default_measurement: state
+  include:
+    entity_globs:
+      - sensor.*temperature*
+      - sensor.*humidity*
+      - sensor.*battery*
+
+# Recorder for local history
+recorder:
+  purge_keep_days: 7
+  commit_interval: 60
+  include:
+    entity_globs:
+      - sensor.*temperature*
+      - sensor.*humidity*
+
+logger:
+  default: warning
+  logs:
+    homeassistant.components.influxdb: info
