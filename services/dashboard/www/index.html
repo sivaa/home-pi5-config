@@ -1364,6 +1364,10 @@
                       @click="toggleAutoRotate()">
                 🔄 <span x-text="autoRotate ? 'Stop' : 'Rotate'"></span>
               </button>
+              <button class="network-control-btn" :class="{ active: showWallNumbers }"
+                      @click="toggleWallNumbers()">
+                🔢 <span x-text="showWallNumbers ? 'Hide #' : 'Show #'"></span>
+              </button>
               <button class="network-control-btn" @click="resetView()">
                 🎯 Reset
               </button>
@@ -4786,6 +4790,7 @@
       renderer: null,
       roomMeshes: {},
       wallMeshes: [],
+      wallNumberSprites: [],
       deviceMeshes: {},
       labelElements: {},
       signalElements: {},
@@ -4814,6 +4819,7 @@
       return {
         showSignalRange: true,
         showLabels: true,
+        showWallNumbers: true,
         autoRotate: false,
         rotationAngle: 0,
         zoomLevel: 1.0,
@@ -4899,6 +4905,14 @@
         },
 
         addWallNumbers() {
+          // Clear existing wall number sprites
+          networkState.wallNumberSprites.forEach(sprite => {
+            networkState.scene.remove(sprite);
+            if (sprite.material.map) sprite.material.map.dispose();
+            sprite.material.dispose();
+          });
+          networkState.wallNumberSprites = [];
+
           // Add number labels at start, middle, end of each wall for precise identification
           const createNumberSprite = (text, color = '#FF0000') => {
             const canvas = document.createElement('canvas');
@@ -4944,7 +4958,15 @@
               const sprite = createNumberSprite(label, color);
               sprite.position.set(pos[0], pos[1], pos[2]);
               networkState.scene.add(sprite);
+              networkState.wallNumberSprites.push(sprite);
             });
+          });
+        },
+
+        toggleWallNumbers() {
+          this.showWallNumbers = !this.showWallNumbers;
+          networkState.wallNumberSprites.forEach(sprite => {
+            sprite.visible = this.showWallNumbers;
           });
         },
 
