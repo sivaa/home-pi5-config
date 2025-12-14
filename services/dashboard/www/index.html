@@ -4897,7 +4897,7 @@
           networkState.scene.add(ambient);
           const directional = new THREE.DirectionalLight(0xffffff, 0.6);
           directional.position.set(15, 20, 15);
-          directional.castShadow = true;
+          directional.castShadow = false;  // No shadows anywhere
           networkState.scene.add(directional);
           const fill = new THREE.DirectionalLight(0xffffff, 0.3);
           fill.position.set(-10, 10, -10);
@@ -4971,27 +4971,27 @@
         },
 
         /**
-         * WALL INDEX REFERENCE (IMPORTANT - DO NOT MISREAD!)
-         * ====================================================
+         * WALL INDEX REFERENCE (Fully consolidated walls)
+         * =================================================
          * Walls are pushed to networkState.wallMeshes in this EXACT order:
          *
          * FIRST: Room walls via createRoom() for each room in config order:
-         *   Study:    0=back, 1=left, 2=right (front skipped)
-         *   Living:   3=front, 4=right (back and left skipped)
-         *   Bedroom:  5=front, 6=right (back skipped, left→west wall)
-         *   Kitchen:  7=right (back skipped, front skipped, left→west wall)
-         *   Bathroom: 8=back, 9=front, 10=right (left→west wall)
+         *   Study:    0=left (back→north wall, front skipped, right→east wall)
+         *   Living:   (none - all consolidated)
+         *   Bedroom:  1=right divider (back skipped, left→west wall, front→south wall)
+         *   Kitchen:  (none - all consolidated)
+         *   Bathroom: 2=front (back→north wall, left→west wall, right→east wall)
          *
-         * THEN: Interior divider walls created in buildFloorPlan():
-         *   11 = Study↔Living horizontal divider
-         *   12 = North wall connector (Study back to Bathroom back)
-         *   13 = Coat hanging wall (hallway, 30% from north)
-         *   14 = West apartment wall (single wall at x=0, replaces bathroom/kitchen/bedroom left walls)
+         * THEN: Consolidated walls created in buildFloorPlan():
+         *   3 = Study↔Living horizontal divider
+         *   4 = Coat hanging wall (hallway, 30% from north)
+         *   5 = North wall (z=0, full apartment width)
+         *   6 = West wall (x=0, full apartment depth)
+         *   7 = East wall upper (Bathroom+Kitchen right, z=0 to z=3.697)
+         *   8 = East wall lower (Study+Living right, z=0 to z=7.665)
+         *   9 = South wall (full apartment width at z=7.665)
          *
-         * TOTAL: 15 walls (indices 0-14)
-         *
-         * NOTE: West wall created as single piece to avoid 7mm overlap
-         * at kitchen/bedroom boundary (z=4.287) that caused darker appearance.
+         * TOTAL: 10 walls (indices 0-9)
          */
         buildFloorPlan() {
           networkState.wallMeshes = [];
@@ -5025,37 +5025,22 @@
           const living = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'living');
           const kitchen = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
           const bedroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
+          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
 
-          // Wall 1: Study ↔ Living (horizontal wall)
-          // At z = study front edge (3.697), from x=0 to study right edge
-          const studyFrontZ = study.z + study.depth/2;  // 3.697
+          // Wall 3: Study ↔ Living (horizontal divider wall)
+          // Moved 0.5m towards study (into study area)
+          const studyFrontZ = study.z + study.depth/2 - 0.5;  // 3.197 (moved towards study)
           const studyRightX = study.x + study.width/2;  // 4.885
           const wall1Width = studyRightX;  // From apartment left to study right
           const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wall1Width, wallHeight, 0.08), wallMat);
           wall1.position.set(wall1Width/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
-          wall1.castShadow = true;
           networkState.scene.add(wall1);
           networkState.wallMeshes.push(wall1);
 
           // Wall 2: Kitchen ↔ Bedroom - REMOVED (was wall index 17)
           // This interior divider was redundant - bedroom's back wall already defines the boundary
 
-          // Wall 3: Connect Study back wall (0) to Bathroom back wall (12)
-          // Fills the gap between x=4.885 (study right) and x=6.089 (bathroom left) at z=0
-          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
-          const studyRightEdge = study.x + study.width/2;  // 4.885
-          const bathroomLeftEdge = bathroom.x - bathroom.width/2;  // 6.089
-          const connectorWidth = bathroomLeftEdge - studyRightEdge;  // ~1.2
-          const connectorCenterX = (studyRightEdge + bathroomLeftEdge) / 2;
-          const northWallZ = 0;  // North edge of apartment
-
-          const connectorWall = new THREE.Mesh(new THREE.BoxGeometry(connectorWidth, wallHeight, 0.08), wallMat);
-          connectorWall.position.set(connectorCenterX - centerX, wallHeight/2, northWallZ - centerZ);
-          connectorWall.castShadow = true;
-          networkState.scene.add(connectorWall);
-          networkState.wallMeshes.push(connectorWall);
-
-          // Wall 17: Coat hanging wall in hallway (30% from wall 16 towards wall 15)
+          // Wall 4: Coat hanging wall in hallway (30% from north towards Study↔Living divider)
           const wall16Z = 0;  // North connector position
           const wall15Z = study.z + study.depth/2;  // 3.697 (Study↔Living divider)
           const coatWallLength = (wall15Z - wall16Z) * 0.30;  // 30% of distance ≈ 1.1m
@@ -5066,20 +5051,51 @@
 
           const coatWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, coatWallLength), wallMat);
           coatWall.position.set(coatWallX - centerX, wallHeight/2, coatWallCenterZ - centerZ);
-          coatWall.castShadow = true;
           networkState.scene.add(coatWall);
           networkState.wallMeshes.push(coatWall);
 
-          // Wall 18: West apartment wall (single wall to avoid overlaps between bathroom/kitchen/bedroom left walls)
+          // Wall 5: North wall (consolidated from Study back + connector + Bathroom back)
+          // Full apartment width at z=0 (north edge)
+          const northWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
+          const northWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
+          northWall.position.set(0, wallHeight/2, -centerZ);  // x centered, z at north edge
+          networkState.scene.add(northWall);
+          networkState.wallMeshes.push(northWall);
+
+          // Wall 6: West apartment wall (single wall to avoid overlaps)
           // Spans from z=0 to z=7.665 (entire apartment depth) at x=0
           const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
           const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
           westWall.position.set(-centerX, wallHeight/2, 0);  // x=0, centered in z
-          westWall.castShadow = true;
           networkState.scene.add(westWall);
           networkState.wallMeshes.push(westWall);
 
-          // Wall 4: Living ↔ Bedroom - NOT NEEDED (bedroom's right wall serves as divider)
+          // Wall 7: East wall upper (Bathroom+Kitchen right consolidated)
+          // From z=0 to studyFrontZ (3.197) at x = bathroom/kitchen right edge
+          const wall8Depth = studyFrontZ;  // 0 to 3.197 (joins Wall 3)
+          const wall8X = bathroom.x + bathroom.width/2;  // Right edge of bathroom/kitchen area
+          const eastWallUpper = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall8Depth), wallMat);
+          eastWallUpper.position.set(wall8X - centerX, wallHeight/2, wall8Depth/2 - centerZ);
+          networkState.scene.add(eastWallUpper);
+          networkState.wallMeshes.push(eastWallUpper);
+
+          // Wall 9: East wall lower (Study+Living right consolidated)
+          // From z=0 to z=7.665 (full depth) at x = study/living right edge (apartment east edge)
+          const wall9X = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239 (east edge)
+          const wall9Depth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const eastWallLower = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall9Depth), wallMat);
+          eastWallLower.position.set(wall9X - centerX, wallHeight/2, 0);  // Centered in z
+          networkState.scene.add(eastWallLower);
+          networkState.wallMeshes.push(eastWallLower);
+
+          // Wall 10: South wall (Bedroom+Living front consolidated)
+          // Full apartment width at z=7.665 (south edge)
+          const wall10Z = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const wall10Width = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
+          const southWall = new THREE.Mesh(new THREE.BoxGeometry(wall10Width, wallHeight, 0.08), wallMat);
+          southWall.position.set(0, wallHeight/2, wall10Z - centerZ);  // x centered, z at south edge
+          networkState.scene.add(southWall);
+          networkState.wallMeshes.push(southWall);
         },
 
         createRoom(config) {
@@ -5148,20 +5164,20 @@
           const halfD = config.depth / 2;
           const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7, transparent: true, opacity: 0.6 });
 
-          // Back wall (north) - skip for living, bedroom (stepped middle wall), and kitchen (uses bathroom's front wall at z=1.504)
-          if (config.id !== 'living' && config.id !== 'bedroom' && config.id !== 'kitchen') {
+          // Back wall (north) - skip for all rooms at z=0 edge (consolidated into single north wall)
+          // Only bathroom has a front wall (interior divider at z=1.504)
+          // Study, Living, Bedroom, Kitchen, Bathroom back walls are all consolidated
+          if (false) {  // All back walls consolidated into single north wall
             const backWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
             backWall.position.set(rx, wallHeight/2, rz - halfD);
-            backWall.castShadow = true;
             group.add(backWall);
             networkState.wallMeshes.push(backWall);
           }
 
-          // Front wall (south) - skip for study and kitchen (handled by stepped middle wall)
-          if (config.id !== 'study' && config.id !== 'kitchen') {
+          // Front wall (south) - skip for study, kitchen, bedroom, living (consolidated into single south wall)
+          if (config.id !== 'study' && config.id !== 'kitchen' && config.id !== 'bedroom' && config.id !== 'living') {
             const frontWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
             frontWall.position.set(rx, wallHeight/2, rz + halfD);
-            frontWall.castShadow = true;
             group.add(frontWall);
             networkState.wallMeshes.push(frontWall);
           }
@@ -5169,54 +5185,56 @@
           // Left wall (west) - skip for living room and west-edge rooms (single west wall created in buildFloorPlan)
           const roomAtWestEdge = ['bathroom', 'kitchen', 'bedroom'].includes(config.id);
           if (config.id !== 'living' && !roomAtWestEdge) {
-            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
-            leftWall.position.set(rx - halfW, wallHeight/2, rz);
-            leftWall.castShadow = true;
-            leftWall.userData = { roomId: config.id, side: 'left' };
-            group.add(leftWall);
-            networkState.wallMeshes.push(leftWall);
+            // For study, use studyFrontZ (3.197) to join Wall 3
+            if (config.id === 'study') {
+              const studyObj = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+              const studyFrontZ = studyObj.z + studyObj.depth/2 - 0.5;  // 3.197 (joins Wall 3)
+              const wall0Depth = studyFrontZ;  // From z=0 to z=3.197
+              const wall0CenterZ = studyFrontZ/2 - FLOOR_PLAN_CONFIG.apartmentDepth/2;  // Center of wall
+              const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall0Depth), wallMat);
+              leftWall.position.set(rx - halfW, wallHeight/2, wall0CenterZ);
+              leftWall.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall);
+              networkState.wallMeshes.push(leftWall);
+            } else {
+              const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+              leftWall.position.set(rx - halfW, wallHeight/2, rz);
+              leftWall.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall);
+              networkState.wallMeshes.push(leftWall);
+            }
           }
 
-          // Right wall (east) - special handling for kitchen and bedroom
-          if (config.id === 'kitchen') {
-            // Kitchen's right wall should stop at Study↔Living boundary (z=3.697)
-            // instead of extending to kitchen's front edge (z=4.287)
-            const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
-            const wall16Z = study.z + study.depth/2;  // 3.697
-            const kitchenBackZ = config.z - config.depth/2;  // 2.149
-            const shortenedDepth = wall16Z - kitchenBackZ;  // 1.548
-            const shortenedCenterZ = (kitchenBackZ + wall16Z) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+          // Right wall (east) - skip for rooms using consolidated east walls
+          // Bathroom, Kitchen → consolidated into east wall upper (Wall 8)
+          // Study, Living → consolidated into east wall lower (Wall 9)
+          // Only Bedroom keeps its individual right wall (divider between bedroom and living)
+          const roomsWithConsolidatedEastWall = ['bathroom', 'kitchen', 'study', 'living'];
+          if (!roomsWithConsolidatedEastWall.includes(config.id)) {
+            if (config.id === 'bedroom') {
+              // Bedroom's right wall (Wall 1) serves as divider between bedroom and living
+              // Extends from studyFrontZ (z=3.197) to south edge (z=7.665) - joins Wall 3
+              const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+              const wall15Z = study.z + study.depth/2 - 0.5;  // 3.197 (same as Wall 3, joins it)
+              const bedroomFrontZ = config.z + config.depth/2;  // 7.665 (apartment south edge)
+              const extendedDepth = bedroomFrontZ - wall15Z;  // 4.468 (extended to join Wall 3)
+              const extendedCenterZ = (wall15Z + bedroomFrontZ) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
 
-            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, shortenedDepth), wallMat);
-            rightWall.position.set(rx + halfW, wallHeight/2, shortenedCenterZ);
-            rightWall.castShadow = true;
-            group.add(rightWall);
-            networkState.wallMeshes.push(rightWall);
-          } else if (config.id === 'bedroom') {
-            // Bedroom's right wall (wall 7) extends to touch wall 15 (Study↔Living divider)
-            // and is moved inward to align with wall 10 (Kitchen's right wall)
-            const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
-            const kitchen = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
-            const wall15Z = study.z + study.depth/2;  // 3.697 (Study↔Living divider)
-            const bedroomFrontZ = config.z + config.depth/2;  // 7.665 (apartment south edge)
-            const extendedDepth = bedroomFrontZ - wall15Z;  // 3.968
-            const extendedCenterZ = (wall15Z + bedroomFrontZ) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+              // Position moved towards living room (increased x by 0.8m)
+              const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+              const wall7X = bathroom.x + bathroom.width/2 + 0.8 - FLOOR_PLAN_CONFIG.apartmentWidth / 2;
 
-            // Position between wall 10 (x=3.331) and bedroom edge (x=4.489)
-            // Using x=4.15 - slightly inward, closer to living room
-            const wall7X = 4.15 - FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // Convert to scene coords
-
-            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, extendedDepth), wallMat);
-            rightWall.position.set(wall7X, wallHeight/2, extendedCenterZ);
-            rightWall.castShadow = true;
-            group.add(rightWall);
-            networkState.wallMeshes.push(rightWall);
-          } else {
-            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
-            rightWall.position.set(rx + halfW, wallHeight/2, rz);
-            rightWall.castShadow = true;
-            group.add(rightWall);
-            networkState.wallMeshes.push(rightWall);
+              const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, extendedDepth), wallMat);
+              rightWall.position.set(wall7X, wallHeight/2, extendedCenterZ);
+              group.add(rightWall);
+              networkState.wallMeshes.push(rightWall);
+            } else {
+              // Default right wall for any other rooms
+              const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+              rightWall.position.set(rx + halfW, wallHeight/2, rz);
+              group.add(rightWall);
+              networkState.wallMeshes.push(rightWall);
+            }
           }
 
           // Furniture
@@ -5235,21 +5253,18 @@
             const bedGeom = new THREE.BoxGeometry(1.4, 0.3, 2.0);
             const bed = new THREE.Mesh(bedGeom, furnitureMat);
             bed.position.set(rx - config.width/4, 0.15, rz);
-            bed.castShadow = true;
             group.add(bed);
           } else if (config.id === 'living') {
             // Sofa
             const sofaGeom = new THREE.BoxGeometry(2.0, 0.4, 0.8);
             const sofa = new THREE.Mesh(sofaGeom, furnitureMat);
             sofa.position.set(rx, 0.2, rz + config.depth/4);
-            sofa.castShadow = true;
             group.add(sofa);
           } else if (config.id === 'study') {
             // Desk
             const deskGeom = new THREE.BoxGeometry(1.2, 0.5, 0.6);
             const desk = new THREE.Mesh(deskGeom, furnitureMat);
             desk.position.set(rx + config.width/4, 0.25, rz - config.depth/4);
-            desk.castShadow = true;
             group.add(desk);
           }
         },
