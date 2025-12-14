@@ -4962,9 +4962,9 @@
          *
          * THEN: Interior divider walls created in buildFloorPlan():
          *   16 = Study↔Living horizontal divider
-         *   (17 was Kitchen↔Bedroom - REMOVED as redundant)
+         *   17 = North wall connector (Study back to Bathroom back)
          *
-         * TOTAL: 17 walls (indices 0-16)
+         * TOTAL: 18 walls (indices 0-17)
          *
          * COMMON MISTAKE: Assuming interior walls are created BEFORE
          * room walls. They are created AFTER! Always verify by checking the
@@ -5005,7 +5005,22 @@
           // Wall 2: Kitchen ↔ Bedroom - REMOVED (was wall index 17)
           // This interior divider was redundant - bedroom's back wall already defines the boundary
 
-          // Wall 3: Living ↔ Bedroom - NOT NEEDED
+          // Wall 3: Connect Study back wall (0) to Bathroom back wall (12)
+          // Fills the gap between x=4.885 (study right) and x=6.089 (bathroom left) at z=0
+          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+          const studyRightEdge = study.x + study.width/2;  // 4.885
+          const bathroomLeftEdge = bathroom.x - bathroom.width/2;  // 6.089
+          const connectorWidth = bathroomLeftEdge - studyRightEdge;  // ~1.2
+          const connectorCenterX = (studyRightEdge + bathroomLeftEdge) / 2;
+          const northWallZ = 0;  // North edge of apartment
+
+          const connectorWall = new THREE.Mesh(new THREE.BoxGeometry(connectorWidth, wallHeight, 0.08), wallMat);
+          connectorWall.position.set(connectorCenterX - centerX, wallHeight/2, northWallZ - centerZ);
+          connectorWall.castShadow = true;
+          networkState.scene.add(connectorWall);
+          networkState.wallMeshes.push(connectorWall);
+
+          // Wall 4: Living ↔ Bedroom - NOT NEEDED
           // Bedroom's left wall from createRoom() already serves as the divider
         },
 
