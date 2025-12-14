@@ -4919,35 +4919,49 @@
           const hallwayDepth = frontWallZ - backWallZ;  // Full depth from back to hallway front
           const hallwayCenterZ = (backWallZ + frontWallZ) / 2;
 
-          // Hallway floor - extended from back wall to front
-          const hallwayGeom = new THREE.PlaneGeometry(hw.width, hallwayDepth);
+          // Hallway floor - spans from study right edge to bathroom left edge
+          const studyRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+          const bathroomRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+          const corridorLeft = studyRoom.x + studyRoom.width/2;
+          const corridorRight = bathroomRoom.x - bathroomRoom.width/2;
+          const corridorWidth = corridorRight - corridorLeft;
+          const corridorCenterX = (corridorLeft + corridorRight) / 2 - centerX;
+          const hallwayGeom = new THREE.PlaneGeometry(corridorWidth, hallwayDepth);
           const hallwayMat = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.8 });
           const hallway = new THREE.Mesh(hallwayGeom, hallwayMat);
           hallway.rotation.x = -Math.PI / 2;
-          hallway.position.set(hwX, 0.005, hallwayCenterZ);
+          hallway.position.set(corridorCenterX, 0.005, hallwayCenterZ);
           hallway.receiveShadow = true;
           networkState.scene.add(hallway);
 
           // Add hallway walls
           const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
 
-          // Hallway west wall - extends from back wall to hallway front
+          // Hallway west wall - at study's right edge, extends from back to hallway front
+          const studyRightEdge = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+          const westWallX = studyRightEdge.x + studyRightEdge.width/2 - centerX;
           const hwWestWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, hallwayDepth), wallMat);
-          hwWestWall.position.set(hwX - hw.width/2, wallHeight/2, hallwayCenterZ);
+          hwWestWall.position.set(westWallX, wallHeight/2, hallwayCenterZ);
           hwWestWall.castShadow = true;
           networkState.scene.add(hwWestWall);
           networkState.wallMeshes.push(hwWestWall);
 
-          // Hallway north wall - at the back, aligned with study/bathroom outer walls
-          const hwNorthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
-          hwNorthWall.position.set(hwX, wallHeight/2, backWallZ);
+          // Hallway north wall - spans from study right edge to bathroom left edge
+          const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+          const northWallLeft = study.x + study.width/2;  // Study right edge
+          const northWallRight = bathroom.x - bathroom.width/2;  // Bathroom left edge
+          const northWallWidth = northWallRight - northWallLeft;
+          const northWallCenterX = (northWallLeft + northWallRight) / 2 - centerX;
+          const hwNorthWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
+          hwNorthWall.position.set(northWallCenterX, wallHeight/2, backWallZ);
           hwNorthWall.castShadow = true;
           networkState.scene.add(hwNorthWall);
           networkState.wallMeshes.push(hwNorthWall);
 
-          // Hallway south wall (front of corridor)
-          const hwSouthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
-          hwSouthWall.position.set(hwX, wallHeight/2, frontWallZ);
+          // Hallway south wall (front of corridor) - same width as north wall
+          const hwSouthWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
+          hwSouthWall.position.set(northWallCenterX, wallHeight/2, frontWallZ);
           hwSouthWall.castShadow = true;
           networkState.scene.add(hwSouthWall);
           networkState.wallMeshes.push(hwSouthWall);
