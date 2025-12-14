@@ -5118,7 +5118,7 @@
             networkState.wallMeshes.push(leftWall);
           }
 
-          // Right wall (east) - special handling for kitchen to stop at wall 16
+          // Right wall (east) - special handling for kitchen and bedroom
           if (config.id === 'kitchen') {
             // Kitchen's right wall should stop at Study↔Living boundary (z=3.697)
             // instead of extending to kitchen's front edge (z=4.287)
@@ -5130,6 +5130,25 @@
 
             const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, shortenedDepth), wallMat);
             rightWall.position.set(rx + halfW, wallHeight/2, shortenedCenterZ);
+            rightWall.castShadow = true;
+            group.add(rightWall);
+            networkState.wallMeshes.push(rightWall);
+          } else if (config.id === 'bedroom') {
+            // Bedroom's right wall (wall 7) extends to touch wall 15 (Study↔Living divider)
+            // and is moved inward to align with wall 10 (Kitchen's right wall)
+            const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+            const kitchen = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
+            const wall15Z = study.z + study.depth/2;  // 3.697 (Study↔Living divider)
+            const bedroomFrontZ = config.z + config.depth/2;  // 7.665 (apartment south edge)
+            const extendedDepth = bedroomFrontZ - wall15Z;  // 3.968
+            const extendedCenterZ = (wall15Z + bedroomFrontZ) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+            // Align with Kitchen's right wall (wall 10) at x = 3.331
+            const wall10X = kitchen.x + kitchen.width/2;  // Kitchen's right edge
+            const wall7X = wall10X - FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // Convert to scene coords
+
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, extendedDepth), wallMat);
+            rightWall.position.set(wall7X, wallHeight/2, extendedCenterZ);
             rightWall.castShadow = true;
             group.add(rightWall);
             networkState.wallMeshes.push(rightWall);
