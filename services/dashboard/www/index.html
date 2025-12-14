@@ -4965,6 +4965,17 @@
           hwSouthWall.castShadow = true;
           networkState.scene.add(hwSouthWall);
           networkState.wallMeshes.push(hwSouthWall);
+
+          // Add middle dividing wall - straight line separating back rooms from front rooms
+          // Use study's front edge (z=3.697) as the dividing line
+          const studyFrontZ = studyRoom.z + studyRoom.depth/2;  // 3.697
+          const middleWallZ = studyFrontZ - centerZ;
+          const middleWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth;
+          const middleWall = new THREE.Mesh(new THREE.BoxGeometry(middleWallWidth, wallHeight, 0.08), wallMat);
+          middleWall.position.set(0, wallHeight/2, middleWallZ);
+          middleWall.castShadow = true;
+          networkState.scene.add(middleWall);
+          networkState.wallMeshes.push(middleWall);
         },
 
         createRoom(config) {
