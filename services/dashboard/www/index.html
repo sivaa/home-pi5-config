@@ -4966,16 +4966,41 @@
           networkState.scene.add(hwSouthWall);
           networkState.wallMeshes.push(hwSouthWall);
 
-          // Add middle dividing wall - straight line separating back rooms from front rooms
-          // Use study's front edge (z=3.697) as the dividing line
+          // Add stepped middle wall - bedroom is caved in compared to living room
+          // Left side at z=3.697 (study/living boundary)
+          // Right side at z=4.287 (kitchen/bedroom boundary)
           const studyFrontZ = studyRoom.z + studyRoom.depth/2;  // 3.697
-          const middleWallZ = studyFrontZ - centerZ;
-          const middleWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth;
-          const middleWall = new THREE.Mesh(new THREE.BoxGeometry(middleWallWidth, wallHeight, 0.08), wallMat);
-          middleWall.position.set(0, wallHeight/2, middleWallZ);
-          middleWall.castShadow = true;
-          networkState.scene.add(middleWall);
-          networkState.wallMeshes.push(middleWall);
+          const kitchenRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
+          const kitchenFrontZ = kitchenRoom.z + kitchenRoom.depth/2;  // 4.287
+
+          // Left wall section (study/living boundary) - from left edge to corridor
+          const leftWallZ = studyFrontZ - centerZ;
+          const leftWallWidth = corridorLeft;  // From x=0 to study right edge
+          const leftWallCenterX = corridorLeft/2 - centerX;
+          const leftMiddleWall = new THREE.Mesh(new THREE.BoxGeometry(leftWallWidth, wallHeight, 0.08), wallMat);
+          leftMiddleWall.position.set(leftWallCenterX, wallHeight/2, leftWallZ);
+          leftMiddleWall.castShadow = true;
+          networkState.scene.add(leftMiddleWall);
+          networkState.wallMeshes.push(leftMiddleWall);
+
+          // Right wall section (kitchen/bedroom boundary) - from corridor to right edge
+          const rightWallZ = kitchenFrontZ - centerZ;
+          const rightWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth - corridorRight;
+          const rightWallCenterX = (corridorRight + FLOOR_PLAN_CONFIG.apartmentWidth)/2 - centerX;
+          const rightMiddleWall = new THREE.Mesh(new THREE.BoxGeometry(rightWallWidth, wallHeight, 0.08), wallMat);
+          rightMiddleWall.position.set(rightWallCenterX, wallHeight/2, rightWallZ);
+          rightMiddleWall.castShadow = true;
+          networkState.scene.add(rightMiddleWall);
+          networkState.wallMeshes.push(rightMiddleWall);
+
+          // Step wall connecting the two levels (the cave-in)
+          const stepDepth = kitchenFrontZ - studyFrontZ;  // 0.59m
+          const stepCenterZ = (leftWallZ + rightWallZ) / 2;
+          const stepWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, stepDepth), wallMat);
+          stepWall.position.set(corridorRight - centerX, wallHeight/2, stepCenterZ);
+          stepWall.castShadow = true;
+          networkState.scene.add(stepWall);
+          networkState.wallMeshes.push(stepWall);
         },
 
         createRoom(config) {
