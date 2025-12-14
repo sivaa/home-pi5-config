@@ -4973,25 +4973,11 @@
           const kitchenRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
           const kitchenFrontZ = kitchenRoom.z + kitchenRoom.depth/2;  // 4.287
 
-          // Left wall section (study/living boundary) - from left edge to corridor
+          // Left wall section - REMOVED (user request)
           const leftWallZ = studyFrontZ - centerZ;
-          const leftWallWidth = corridorLeft;  // From x=0 to study right edge
-          const leftWallCenterX = corridorLeft/2 - centerX;
-          const leftMiddleWall = new THREE.Mesh(new THREE.BoxGeometry(leftWallWidth, wallHeight, 0.08), wallMat);
-          leftMiddleWall.position.set(leftWallCenterX, wallHeight/2, leftWallZ);
-          leftMiddleWall.castShadow = true;
-          networkState.scene.add(leftMiddleWall);
-          networkState.wallMeshes.push(leftMiddleWall);
 
-          // Right wall section (kitchen/bedroom boundary) - from corridor to right edge
+          // Right wall section - REMOVED (user request)
           const rightWallZ = kitchenFrontZ - centerZ;
-          const rightWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth - corridorRight;
-          const rightWallCenterX = (corridorRight + FLOOR_PLAN_CONFIG.apartmentWidth)/2 - centerX;
-          const rightMiddleWall = new THREE.Mesh(new THREE.BoxGeometry(rightWallWidth, wallHeight, 0.08), wallMat);
-          rightMiddleWall.position.set(rightWallCenterX, wallHeight/2, rightWallZ);
-          rightMiddleWall.castShadow = true;
-          networkState.scene.add(rightMiddleWall);
-          networkState.wallMeshes.push(rightMiddleWall);
 
           // Step wall connecting the two levels (the cave-in)
           const stepDepth = kitchenFrontZ - studyFrontZ;  // 0.59m
@@ -5029,19 +5015,23 @@
           const halfD = config.depth / 2;
           const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
 
-          // Back wall (north)
-          const backWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
-          backWall.position.set(rx, wallHeight/2, rz - halfD);
-          backWall.castShadow = true;
-          group.add(backWall);
-          networkState.wallMeshes.push(backWall);
+          // Back wall (north) - skip for living and bedroom (handled by stepped middle wall)
+          if (config.id !== 'living' && config.id !== 'bedroom') {
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+            backWall.position.set(rx, wallHeight/2, rz - halfD);
+            backWall.castShadow = true;
+            group.add(backWall);
+            networkState.wallMeshes.push(backWall);
+          }
 
-          // Front wall (south)
-          const frontWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
-          frontWall.position.set(rx, wallHeight/2, rz + halfD);
-          frontWall.castShadow = true;
-          group.add(frontWall);
-          networkState.wallMeshes.push(frontWall);
+          // Front wall (south) - skip for study and kitchen (handled by stepped middle wall)
+          if (config.id !== 'study' && config.id !== 'kitchen') {
+            const frontWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+            frontWall.position.set(rx, wallHeight/2, rz + halfD);
+            frontWall.castShadow = true;
+            group.add(frontWall);
+            networkState.wallMeshes.push(frontWall);
+          }
 
           // Left wall (west)
           const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
