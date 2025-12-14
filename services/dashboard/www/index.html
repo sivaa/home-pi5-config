@@ -5018,7 +5018,7 @@
 
           // Interior divider walls (created AFTER room walls, so these are walls 16-17)
           const wallHeight = 0.8;
-          const wallMat = new THREE.MeshStandardMaterial({ color: 0xB5A080, roughness: 0.7, transparent: true, opacity: 0.6 });
+          const wallMat = new THREE.MeshStandardMaterial({ color: 0xB5A080, roughness: 0.7, transparent: true, opacity: 0.4, depthWrite: false });
 
           // Get room references
           const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
@@ -5138,7 +5138,7 @@
           // Create all 4 walls automatically
           const halfW = config.width / 2;
           const halfD = config.depth / 2;
-          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7, transparent: true, opacity: 0.6 });
+          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7, transparent: true, opacity: 0.4, depthWrite: false });
 
           // Back wall (north) - skip for living and bedroom (handled by stepped middle wall)
           if (config.id !== 'living' && config.id !== 'bedroom') {
