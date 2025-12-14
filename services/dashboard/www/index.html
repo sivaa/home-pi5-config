@@ -4978,20 +4978,20 @@
          * FIRST: Room walls via createRoom() for each room in config order:
          *   Study:    0=back, 1=left, 2=right (front skipped)
          *   Living:   3=front, 4=right (back and left skipped)
-         *   Bedroom:  5=front, 6=left, 7=right (back skipped)
-         *   Kitchen:  8=back, 9=left, 10=right (front skipped)
-         *   Bathroom: 11=back, 12=front, 13=left, 14=right
+         *   Bedroom:  5=front, 6=right (back skipped, left→west wall)
+         *   Kitchen:  7=right (back skipped, front skipped, left→west wall)
+         *   Bathroom: 8=back, 9=front, 10=right (left→west wall)
          *
          * THEN: Interior divider walls created in buildFloorPlan():
-         *   15 = Study↔Living horizontal divider
-         *   16 = North wall connector (Study back to Bathroom back)
-         *   17 = Coat hanging wall (hallway, 30% from north)
+         *   11 = Study↔Living horizontal divider
+         *   12 = North wall connector (Study back to Bathroom back)
+         *   13 = Coat hanging wall (hallway, 30% from north)
+         *   14 = West apartment wall (single wall at x=0, replaces bathroom/kitchen/bedroom left walls)
          *
-         * TOTAL: 18 walls (indices 0-17)
+         * TOTAL: 15 walls (indices 0-14)
          *
-         * COMMON MISTAKE: Assuming interior walls are created BEFORE
-         * room walls. They are created AFTER! Always verify by checking the
-         * actual execution order in this function.
+         * NOTE: West wall created as single piece to avoid 7mm overlap
+         * at kitchen/bedroom boundary (z=4.287) that caused darker appearance.
          */
         buildFloorPlan() {
           networkState.wallMeshes = [];
@@ -5070,8 +5070,16 @@
           networkState.scene.add(coatWall);
           networkState.wallMeshes.push(coatWall);
 
-          // Wall 4: Living ↔ Bedroom - NOT NEEDED
-          // Bedroom's left wall from createRoom() already serves as the divider
+          // Wall 18: West apartment wall (single wall to avoid overlaps between bathroom/kitchen/bedroom left walls)
+          // Spans from z=0 to z=7.665 (entire apartment depth) at x=0
+          const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
+          westWall.position.set(-centerX, wallHeight/2, 0);  // x=0, centered in z
+          westWall.castShadow = true;
+          networkState.scene.add(westWall);
+          networkState.wallMeshes.push(westWall);
+
+          // Wall 4: Living ↔ Bedroom - NOT NEEDED (bedroom's right wall serves as divider)
         },
 
         createRoom(config) {
@@ -5158,8 +5166,9 @@
             networkState.wallMeshes.push(frontWall);
           }
 
-          // Left wall (west) - skip for living room (wall 4 removed)
-          if (config.id !== 'living') {
+          // Left wall (west) - skip for living room and west-edge rooms (single west wall created in buildFloorPlan)
+          const roomAtWestEdge = ['bathroom', 'kitchen', 'bedroom'].includes(config.id);
+          if (config.id !== 'living' && !roomAtWestEdge) {
             const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
             leftWall.position.set(rx - halfW, wallHeight/2, rz);
             leftWall.castShadow = true;
