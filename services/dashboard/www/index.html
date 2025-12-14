@@ -4899,22 +4899,51 @@
 
         buildFloorPlan() {
           networkState.wallMeshes = [];
-          const apW = FLOOR_PLAN_CONFIG.apartmentWidth;
-          const apD = FLOOR_PLAN_CONFIG.apartmentDepth;
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
 
-          // Warm beige floor
-          const floorGeometry = new THREE.PlaneGeometry(apW + 2, apD + 2);
-          const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.9 });
-          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-          floor.rotation.x = -Math.PI / 2;
-          floor.position.set(0, -0.01, 0);
-          floor.receiveShadow = true;
-          networkState.scene.add(floor);
-
-          // Build rooms with warm tones
+          // Build rooms with warm tones (each room has its own floor)
           FLOOR_PLAN_CONFIG.rooms.forEach(config => {
             this.createRoom(config);
           });
+
+          // Add hallway floor
+          const hw = FLOOR_PLAN_CONFIG.hallway;
+          const hallwayGeom = new THREE.PlaneGeometry(hw.width, hw.depth);
+          const hallwayMat = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.8 });
+          const hallway = new THREE.Mesh(hallwayGeom, hallwayMat);
+          hallway.rotation.x = -Math.PI / 2;
+          hallway.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
+          hallway.receiveShadow = true;
+          networkState.scene.add(hallway);
+
+          // Add hallway walls (close the corridor)
+          const wallHeight = 0.8;
+          const wallColor = 0xB5A080;
+          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
+          const hwX = hw.x - centerX;
+          const hwZ = hw.z - centerZ;
+
+          // Hallway west wall (between study and living)
+          const hwWestWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, hw.depth), wallMat);
+          hwWestWall.position.set(hwX - hw.width/2, wallHeight/2, hwZ);
+          hwWestWall.castShadow = true;
+          networkState.scene.add(hwWestWall);
+          networkState.wallMeshes.push(hwWestWall);
+
+          // Hallway north wall (top of corridor)
+          const hwNorthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
+          hwNorthWall.position.set(hwX, wallHeight/2, hwZ - hw.depth/2);
+          hwNorthWall.castShadow = true;
+          networkState.scene.add(hwNorthWall);
+          networkState.wallMeshes.push(hwNorthWall);
+
+          // Hallway south wall (bottom of corridor)
+          const hwSouthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
+          hwSouthWall.position.set(hwX, wallHeight/2, hwZ + hw.depth/2);
+          hwSouthWall.castShadow = true;
+          networkState.scene.add(hwSouthWall);
+          networkState.wallMeshes.push(hwSouthWall);
         },
 
         createRoom(config) {
