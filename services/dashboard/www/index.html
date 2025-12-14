@@ -5143,9 +5143,9 @@
             const extendedDepth = bedroomFrontZ - wall15Z;  // 3.968
             const extendedCenterZ = (wall15Z + bedroomFrontZ) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
 
-            // Align with Kitchen's right wall (wall 10) at x = 3.331
-            const wall10X = kitchen.x + kitchen.width/2;  // Kitchen's right edge
-            const wall7X = wall10X - FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // Convert to scene coords
+            // Position between wall 10 (x=3.331) and bedroom edge (x=4.489)
+            // Using x=4.15 - slightly inward, closer to living room
+            const wall7X = 4.15 - FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // Convert to scene coords
 
             const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, extendedDepth), wallMat);
             rightWall.position.set(wall7X, wallHeight/2, extendedCenterZ);
