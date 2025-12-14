@@ -81,3 +81,36 @@ All documentation should enable complete system restoration from scratch.
 - don't use anything from zigbee-backup-old-device folder without user's explict approval. its a backup from old device and lot of things to changed. be honest with this
 - every soruce and config file should be first in this repo and later moved to      pi. eerything single time. golden rule
 - no services should run locaally (mac) never ever unless user explicts asks
+
+---
+
+## Lessons Learned (AI Memory)
+
+### Dashboard Network View - Wall Index Tracing (2024-12-14)
+
+**Mistake Made:** When tracing wall indices in `services/dashboard/www/index.html`, incorrectly assumed interior divider walls (wall1, wall2) were created BEFORE room walls. This led to wrong wall identification (claimed wall 17 was bathroom's exterior wall when it's actually the Kitchen↔Bedroom interior divider).
+
+**Root Cause:** Did not carefully read the execution order in `buildFloorPlan()`:
+```javascript
+buildFloorPlan() {
+  // FIRST: Room walls created (walls 0-15)
+  FLOOR_PLAN_CONFIG.rooms.forEach(config => this.createRoom(config));
+
+  // THEN: Interior walls created (walls 16-17)
+  // wall1 → index 16
+  // wall2 → index 17
+}
+```
+
+**Correct Wall Index Map:**
+```
+0-2:   Study (back, left, right)
+3-5:   Living (front, left, right)
+6-8:   Bedroom (front, left, right)
+9-11:  Kitchen (back, left, right)
+12-15: Bathroom (back, front, left, right)
+16:    Interior - Study↔Living horizontal divider
+17:    Interior - Kitchen↔Bedroom horizontal divider
+```
+
+**Prevention:** Always verify execution order by reading the actual code flow. Don't assume based on code comments or naming. When debugging visual elements, cross-reference with the actual rendered output (screenshots) rather than relying solely on code tracing.

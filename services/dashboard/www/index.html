@@ -4850,6 +4850,7 @@
           this.initRenderer(container);
           this.initLighting();
           this.buildFloorPlan();
+          this.addWallNumbers();
           this.createDevices();
           this.createLabels(container);
           this.setupPanControls(container);
@@ -4897,100 +4898,115 @@
           networkState.scene.add(fill);
         },
 
+        addWallNumbers() {
+          // Add number labels at start, middle, end of each wall for precise identification
+          const createNumberSprite = (text, color = '#FF0000') => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(32, 32, 28, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(text), 32, 32);
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(0.4, 0.4, 1);
+            return sprite;
+          };
+
+          networkState.wallMeshes.forEach((wall, index) => {
+            const geom = wall.geometry;
+            const params = geom.parameters;
+            const wx = wall.position.x;
+            const wy = wall.position.y + 0.5;
+            const wz = wall.position.z;
+
+            // Determine if wall is horizontal (along X) or vertical (along Z)
+            const isHorizontal = params.width > params.depth;
+            const wallLength = isHorizontal ? params.width : params.depth;
+            const halfLen = wallLength / 2 * 0.8; // 80% to stay within wall bounds
+
+            // Create 3 sprites: start, middle, end
+            const positions = isHorizontal
+              ? [[wx - halfLen, wy, wz], [wx, wy, wz], [wx + halfLen, wy, wz]]
+              : [[wx, wy, wz - halfLen], [wx, wy, wz], [wx, wy, wz + halfLen]];
+
+            positions.forEach((pos, i) => {
+              const label = i === 1 ? index : `${index}`;
+              const color = i === 1 ? '#FF0000' : '#0066CC'; // Red for middle, blue for ends
+              const sprite = createNumberSprite(label, color);
+              sprite.position.set(pos[0], pos[1], pos[2]);
+              networkState.scene.add(sprite);
+            });
+          });
+        },
+
+        /**
+         * WALL INDEX REFERENCE (IMPORTANT - DO NOT MISREAD!)
+         * ====================================================
+         * Walls are pushed to networkState.wallMeshes in this EXACT order:
+         *
+         * FIRST: Room walls via createRoom() for each room in config order:
+         *   Study:    0=back, 1=left, 2=right (front skipped)
+         *   Living:   3=front, 4=left, 5=right (back skipped)
+         *   Bedroom:  6=front, 7=left, 8=right (back skipped)
+         *   Kitchen:  9=back, 10=left, 11=right (front skipped)
+         *   Bathroom: 12=back, 13=front, 14=left, 15=right
+         *
+         * THEN: Interior divider walls created in buildFloorPlan():
+         *   16 = Study↔Living horizontal divider
+         *   (17 was Kitchen↔Bedroom - REMOVED as redundant)
+         *
+         * TOTAL: 17 walls (indices 0-16)
+         *
+         * COMMON MISTAKE: Assuming interior walls are created BEFORE
+         * room walls. They are created AFTER! Always verify by checking the
+         * actual execution order in this function.
+         */
         buildFloorPlan() {
           networkState.wallMeshes = [];
-          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
-          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // 4.6195
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;  // 3.8325
 
-          // Build rooms with warm tones (each room has its own floor)
+          // Build rooms (each room has its own floor and outer walls)
+          // NOTE: This runs FIRST, creating walls 0-15
           FLOOR_PLAN_CONFIG.rooms.forEach(config => {
             this.createRoom(config);
           });
 
-          // Add hallway - extended to align with study/bathroom back walls at z=0
-          const hw = FLOOR_PLAN_CONFIG.hallway;
+          // Interior divider walls (created AFTER room walls, so these are walls 16-17)
           const wallHeight = 0.8;
-          const wallColor = 0xB5A080;
-          const hwX = hw.x - centerX;
+          const wallMat = new THREE.MeshStandardMaterial({ color: 0xB5A080, roughness: 0.7 });
 
-          // Calculate positions aligned with study/bathroom outer wall at z=0
-          const backWallZ = 0 - centerZ;  // z=0 in config = back of apartment
-          const frontWallZ = hw.z + hw.depth/2 - centerZ;  // Front of hallway
-          const hallwayDepth = frontWallZ - backWallZ;  // Full depth from back to hallway front
-          const hallwayCenterZ = (backWallZ + frontWallZ) / 2;
-
-          // Hallway floor - spans from study right edge to bathroom left edge
-          const studyRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
-          const bathroomRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
-          const corridorLeft = studyRoom.x + studyRoom.width/2;
-          const corridorRight = bathroomRoom.x - bathroomRoom.width/2;
-          const corridorWidth = corridorRight - corridorLeft;
-          const corridorCenterX = (corridorLeft + corridorRight) / 2 - centerX;
-          const hallwayGeom = new THREE.PlaneGeometry(corridorWidth, hallwayDepth);
-          const hallwayMat = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.8 });
-          const hallway = new THREE.Mesh(hallwayGeom, hallwayMat);
-          hallway.rotation.x = -Math.PI / 2;
-          hallway.position.set(corridorCenterX, 0.005, hallwayCenterZ);
-          hallway.receiveShadow = true;
-          networkState.scene.add(hallway);
-
-          // Add hallway walls
-          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
-
-          // Hallway west wall - at study's right edge, extends from back to hallway front
-          const studyRightEdge = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
-          const westWallX = studyRightEdge.x + studyRightEdge.width/2 - centerX;
-          const hwWestWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, hallwayDepth), wallMat);
-          hwWestWall.position.set(westWallX, wallHeight/2, hallwayCenterZ);
-          hwWestWall.castShadow = true;
-          networkState.scene.add(hwWestWall);
-          networkState.wallMeshes.push(hwWestWall);
-
-          // Hallway north wall - spans from study right edge to bathroom left edge
+          // Get room references
           const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
-          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
-          const northWallLeft = study.x + study.width/2;  // Study right edge
-          const northWallRight = bathroom.x - bathroom.width/2;  // Bathroom left edge
-          const northWallWidth = northWallRight - northWallLeft;
-          const northWallCenterX = (northWallLeft + northWallRight) / 2 - centerX;
-          const hwNorthWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
-          hwNorthWall.position.set(northWallCenterX, wallHeight/2, backWallZ);
-          hwNorthWall.castShadow = true;
-          networkState.scene.add(hwNorthWall);
-          networkState.wallMeshes.push(hwNorthWall);
+          const living = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'living');
+          const kitchen = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
+          const bedroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
 
-          // Hallway south wall (front of corridor) - same width as north wall
-          const hwSouthWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
-          hwSouthWall.position.set(northWallCenterX, wallHeight/2, frontWallZ);
-          hwSouthWall.castShadow = true;
-          networkState.scene.add(hwSouthWall);
-          networkState.wallMeshes.push(hwSouthWall);
+          // Wall 1: Study ↔ Living (horizontal wall)
+          // At z = study front edge (3.697), from x=0 to study right edge
+          const studyFrontZ = study.z + study.depth/2;  // 3.697
+          const studyRightX = study.x + study.width/2;  // 4.885
+          const wall1Width = studyRightX;  // From apartment left to study right
+          const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wall1Width, wallHeight, 0.08), wallMat);
+          wall1.position.set(wall1Width/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          wall1.castShadow = true;
+          networkState.scene.add(wall1);
+          networkState.wallMeshes.push(wall1);
 
-          // Add stepped middle wall - bedroom is caved in compared to living room
-          // Left side at z=3.697 (study/living boundary)
-          // Right side at z=4.287 (kitchen/bedroom boundary)
-          const studyFrontZ = studyRoom.z + studyRoom.depth/2;  // 3.697
-          const kitchenRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
-          const kitchenFrontZ = kitchenRoom.z + kitchenRoom.depth/2;  // 4.287
+          // Wall 2: Kitchen ↔ Bedroom - REMOVED (was wall index 17)
+          // This interior divider was redundant - bedroom's back wall already defines the boundary
 
-          // Left wall section - REMOVED (user request)
-          const leftWallZ = studyFrontZ - centerZ;
-
-          // Right wall section - REMOVED (user request)
-          const rightWallZ = kitchenFrontZ - centerZ;
-
-          // Step wall - REMOVED (user request)
-
-          // Living/Bedroom dividing wall - connects hallway south wall to apartment front
-          const bedroomRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
-          const apartmentFrontZ = bedroomRoom.z + bedroomRoom.depth/2 - centerZ;  // 7.665
-          const dividerWallDepth = apartmentFrontZ - frontWallZ;
-          const dividerWallCenterZ = (frontWallZ + apartmentFrontZ) / 2;
-          const dividerWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, dividerWallDepth), wallMat);
-          dividerWall.position.set(corridorRight - centerX, wallHeight/2, dividerWallCenterZ);
-          dividerWall.castShadow = true;
-          networkState.scene.add(dividerWall);
-          networkState.wallMeshes.push(dividerWall);
+          // Wall 3: Living ↔ Bedroom - NOT NEEDED
+          // Bedroom's left wall from createRoom() already serves as the divider
         },
 
         createRoom(config) {
@@ -5013,6 +5029,46 @@
           floor.position.set(rx, 0.01, rz);
           floor.receiveShadow = true;
           group.add(floor);
+
+          // Helipad-style room label on floor
+          const helipadSize = Math.min(config.width, config.depth) * 0.6;
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+
+          // Outer circle
+          ctx.strokeStyle = 'rgba(90, 70, 50, 0.4)';
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.arc(128, 128, 110, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner circle
+          ctx.strokeStyle = 'rgba(90, 70, 50, 0.3)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(128, 128, 85, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Room name text
+          ctx.fillStyle = 'rgba(90, 70, 50, 0.5)';
+          ctx.font = 'bold 36px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(config.name.toUpperCase(), 128, 128);
+
+          const helipadTexture = new THREE.CanvasTexture(canvas);
+          const helipadGeom = new THREE.PlaneGeometry(helipadSize, helipadSize);
+          const helipadMat = new THREE.MeshBasicMaterial({
+            map: helipadTexture,
+            transparent: true,
+            depthWrite: false
+          });
+          const helipad = new THREE.Mesh(helipadGeom, helipadMat);
+          helipad.rotation.x = -Math.PI / 2;
+          helipad.position.set(rx, 0.02, rz);
+          group.add(helipad);
 
           // Create all 4 walls automatically
           const halfW = config.width / 2;
@@ -5041,6 +5097,7 @@
           const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
           leftWall.position.set(rx - halfW, wallHeight/2, rz);
           leftWall.castShadow = true;
+          leftWall.userData = { roomId: config.id, side: 'left' };
           group.add(leftWall);
           networkState.wallMeshes.push(leftWall);
 
