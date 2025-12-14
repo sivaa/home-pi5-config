@@ -5027,11 +5027,11 @@
           const coatWallLength = (wall15Z - wall16Z) * 0.30;  // 30% of distance ≈ 1.1m
           const coatWallCenterZ = wall16Z + coatWallLength / 2;  // Start from wall 16
 
-          // Position at hallway center x
-          const hallwayCenterX = FLOOR_PLAN_CONFIG.hallway.x;  // 3.839
+          // Position towards study (middle of hallway-study boundary)
+          const coatWallX = 4.6;  // Moved from hallway center (3.839) towards study
 
           const coatWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, coatWallLength), wallMat);
-          coatWall.position.set(hallwayCenterX - centerX, wallHeight/2, coatWallCenterZ - centerZ);
+          coatWall.position.set(coatWallX - centerX, wallHeight/2, coatWallCenterZ - centerZ);
           coatWall.castShadow = true;
           networkState.scene.add(coatWall);
           networkState.wallMeshes.push(coatWall);
