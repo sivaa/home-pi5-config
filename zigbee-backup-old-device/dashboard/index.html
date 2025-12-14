@@ -721,24 +721,16 @@
               <div class="avg-section">
                 <div class="avg-label">Home Average Temperature</div>
                 <div class="avg-value">
-                  <template x-if="avgTemperature !== null">
-                    <span><span x-text="avgTemperature.toFixed(1)"></span><span class="avg-unit">°C</span></span>
-                  </template>
-                  <template x-if="avgTemperature === null">
-                    <span class="no-data">--</span>
-                  </template>
+                  <span x-show="avgTemperature !== null"><span x-text="avgTemperature?.toFixed(1) ?? '--'"></span><span class="avg-unit">°C</span></span>
+                  <span class="no-data" x-show="avgTemperature === null">--</span>
                 </div>
               </div>
               <div class="avg-divider"></div>
               <div class="avg-section">
                 <div class="avg-label">Home Average Humidity</div>
                 <div class="avg-value">
-                  <template x-if="avgHumidity !== null">
-                    <span><span x-text="avgHumidity.toFixed(0)"></span><span class="avg-unit">%</span></span>
-                  </template>
-                  <template x-if="avgHumidity === null">
-                    <span class="no-data">--</span>
-                  </template>
+                  <span x-show="avgHumidity !== null"><span x-text="avgHumidity?.toFixed(0) ?? '--'"></span><span class="avg-unit">%</span></span>
+                  <span class="no-data" x-show="avgHumidity === null">--</span>
                 </div>
               </div>
               <div class="avg-divider hidden-mobile"></div>
@@ -1171,6 +1163,48 @@
 
         get historyCount() {
           return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
+        },
+
+        get avgTemperature() {
+          const roomsWithTemp = this.list.filter(r => r.temperature !== null);
+          if (roomsWithTemp.length === 0) return null;
+          return roomsWithTemp.reduce((sum, r) => sum + r.temperature, 0) / roomsWithTemp.length;
+        },
+
+        get avgHumidity() {
+          const roomsWithHumid = this.list.filter(r => r.humidity !== null);
+          if (roomsWithHumid.length === 0) return null;
+          return roomsWithHumid.reduce((sum, r) => sum + r.humidity, 0) / roomsWithHumid.length;
+        },
+
+        get avgHistory() {
+          // Build average history from all room temperature histories
+          const allHistories = this.list.filter(r => r.tempHistory && r.tempHistory.length > 0);
+          if (allHistories.length === 0) return [];
+
+          // Get all unique timestamps
+          const timeMap = new Map();
+          allHistories.forEach(room => {
+            room.tempHistory.forEach(point => {
+              const timeKey = Math.floor(point.time / 60000) * 60000; // Round to minute
+              if (!timeMap.has(timeKey)) {
+                timeMap.set(timeKey, []);
+              }
+              timeMap.get(timeKey).push(point.value);
+            });
+          });
+
+          // Calculate average for each time point
+          const avgPoints = [];
+          timeMap.forEach((values, time) => {
+            avgPoints.push({
+              time: time,
+              value: values.reduce((a, b) => a + b, 0) / values.length
+            });
+          });
+
+          // Sort by time and return last 50 points
+          return avgPoints.sort((a, b) => a.time - b.time).slice(-50);
         },
 
         updateRoom(sensorName, data) {

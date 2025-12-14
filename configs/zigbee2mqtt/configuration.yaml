@@ -1,6 +1,7 @@
-homeassistant: true
-permit_join: false
+homeassistant:
+  enabled: true
 frontend:
+  enabled: true
   port: 8080
 mqtt:
   base_topic: zigbee2mqtt
@@ -10,36 +11,47 @@ serial:
   adapter: ember
 advanced:
   channel: 25
+  # Network key - KEEP SECRET! Stored on Pi, not in git
+  # If rebuilding: use existing key from Pi backup or generate new one
+  # To regenerate: delete network_key, restart z2m, re-pair all devices
   network_key: GENERATE
   log_level: info
   last_seen: epoch
 availability:
   enabled: true
   active:
-    timeout: 10      # minutes - for mains-powered devices (routers/lights)
+    timeout: 2
   passive:
-    timeout: 1500    # minutes - for battery devices (sensors/remotes)
+    timeout: 1500
 device_options:
   retain: true
 devices:
-  # === LIGHTS (IKEA TRADFRI) ===
   '0xd0cf5efffe25ab28':
-    friendly_name: Study Room Light
+    friendly_name: '[Study] IKEA Light'
   '0xd0cf5efffe24d093':
-    friendly_name: Living Room Light
-  # === REMOTES (IKEA) ===
+    friendly_name: '[Living] IKEA Light'
   '0x90fd9ffffef4cebf':
-    friendly_name: Study Room Light Remote
+    friendly_name: '[Study] Light Remote'
   '0x90fd9ffffee43106':
-    friendly_name: Living Room Light Remote
-  # === TRH SENSORS (Temperature/Humidity - Sonoff) ===
+    friendly_name: '[Living] Light Remote'
   '0xc09b9efffed502b9':
-    friendly_name: Living Room TRH
-  '0xc09b9efffef541a8':
-    friendly_name: Bed Room TRH
+    friendly_name: '[Living] Temperature & Humidity'
   '0xc09b9efffef541b2':
-    friendly_name: Study Room TRH
+    friendly_name: '[Study] Temperature & Humidity'
   '0xc09b9efffed502b7':
-    friendly_name: Kitchen TRH
+    friendly_name: '[Kitchen] Temperature & Humidity'
   '0xc09b9efffec0e447':
-    friendly_name: Bath Room TRH
+    friendly_name: '[Bath] Temperature & Humidity'
+  '0xa4c1380286dbffff':
+    friendly_name: '[Balcony] Temperature & Humidity'
+  '0xc09b9efffef541a8':
+    friendly_name: '[Bed] Temperature & Humidity Sensor'
+  '0xa4c138d2b1446edf':
+    friendly_name: CO2
+  '0x3425b4fffe1432aa':
+    friendly_name: Motion Detector
+  '0xa4c13802b54effff':
+    friendly_name: Smart Plug 1
+  '0xc09b9efffe4af947':
+    friendly_name: Contact Sensor 1
+version: 4

@@ -1,0 +1,15 @@
+[Unit]
+Description=Run WiFi watchdog every 2 minutes
+
+[Timer]
+# Start 2 minutes after boot
+OnBootSec=2min
+
+# Then run every 2 minutes
+OnUnitActiveSec=2min
+
+# Allow some flexibility in timing (reduces power usage)
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

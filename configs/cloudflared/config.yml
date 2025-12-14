@@ -1,0 +1,30 @@
+# =============================================================================
+# CLOUDFLARE TUNNEL CONFIGURATION
+# Purpose: Secure external access to Home Assistant for Google Home integration
+# Docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+# =============================================================================
+#
+# SETUP INSTRUCTIONS:
+# 1. Install cloudflared on Pi (see docs/08-google-home-integration.md)
+# 2. Run: cloudflared tunnel login
+# 3. Run: cloudflared tunnel create homeassistant
+# 4. Copy the tunnel ID below (e.g., a1b2c3d4-5678-90ab-cdef-ghijklmnopqr)
+# 5. Route DNS: cloudflared tunnel route dns homeassistant ha.sivaa.in
+# 6. Copy this file to Pi: ~/.cloudflared/config.yml
+# 7. Install service: sudo cloudflared service install
+#
+# =============================================================================
+
+# Tunnel ID from: cloudflared tunnel create homeassistant
+tunnel: 6600ccff-747f-4b92-b6d8-26178c8a5112
+credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
+
+ingress:
+  # Home Assistant - main endpoint for Google Home
+  - hostname: ha.sivaa.in
+    service: http://localhost:8123
+    originRequest:
+      noTLSVerify: true
+
+  # Catch-all rule (required by cloudflared)
+  - service: http_status:404

@@ -20,6 +20,9 @@ const configThreeState = {
   isInitialized: false
 };
 
+// Expose Three.js state globally for drop handlers (ES modules cache the return object)
+window._configThreeState = configThreeState;
+
 // Drag state
 const dragState = {
   isDragging: false,
@@ -769,27 +772,11 @@ export function sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, OrbitControl
       const sensor = sensorsStore.getSensor(ieeeAddress);
       if (!sensor) return;
 
-      // Create preview mesh if not exists
-      if (!configThreeState.sensorMeshes[ieeeAddress]) {
-        const visuals = SENSOR_VISUALS[sensor.sensorType] || SENSOR_VISUALS.climate;
-        const mesh = this.createSensorMesh(sensor, { x: 0, y: visuals.heightAboveFloor, z: 0 });
-        mesh.material.transparent = true;
-        mesh.material.opacity = 0.6;
-        configThreeState.scene.add(mesh);
-        configThreeState.sensorMeshes[ieeeAddress] = mesh;
-
-        // Add coverage cone if motion sensor
-        if (sensor.sensorType === 'motion') {
-          const cone = this.createCoverageCone(sensor, { x: 0, z: 0 });
-          configThreeState.scene.add(cone);
-          configThreeState.coverageMeshes[ieeeAddress] = cone;
-        }
-      }
-
-      // Start drag
+      // Just track what we're dragging - don't create mesh yet
+      // Preview dot will be shown via updateDragPreview during drag-over
       dragState.isDragging = true;
       dragState.draggedSensor = ieeeAddress;
-      dragState.draggedMesh = configThreeState.sensorMeshes[ieeeAddress];
+      dragState.draggedMesh = null;  // No mesh yet - preview handles visual
       dragState.startPosition = null; // New placement, no revert
 
       configThreeState.controls.enabled = false;
@@ -1201,6 +1188,9 @@ export function sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, OrbitControl
         configThreeState.scene.add(cone);
         configThreeState.coverageMeshes[sensor.ieee_address] = cone;
       }
-    }
+    },
+
+    // Expose Three.js state for external access (drop handlers, etc.)
+    _threeState: configThreeState
   };
 }

@@ -3,12 +3,35 @@ homeassistant:
   unit_system: metric
   time_zone: Australia/Sydney
   internal_url: "http://pi:8123"
+  external_url: "https://ha.sivaa.in"
 
 frontend:
 config:
 
 http:
   server_port: 8123
+  use_x_forwarded_for: true
+  trusted_proxies:
+    # Local/Docker
+    - 127.0.0.1
+    - ::1
+    - 172.16.0.0/12
+    # Cloudflare IPv4 ranges
+    - 173.245.48.0/20
+    - 103.21.244.0/22
+    - 103.22.200.0/22
+    - 103.31.4.0/22
+    - 141.101.64.0/18
+    - 108.162.192.0/18
+    - 190.93.240.0/20
+    - 188.114.96.0/20
+    - 197.234.240.0/22
+    - 198.41.128.0/17
+    - 162.158.0.0/15
+    - 104.16.0.0/13
+    - 104.24.0.0/14
+    - 172.64.0.0/13
+    - 131.0.72.0/22
 
 # MQTT auto-discovery enabled by default
 # Zigbee2MQTT devices appear automatically
@@ -42,3 +65,110 @@ logger:
   default: warning
   logs:
     homeassistant.components.influxdb: info
+    homeassistant.components.google_assistant: info
+
+# =============================================================================
+# GOOGLE ASSISTANT INTEGRATION
+# Purpose: Voice control via Google Home devices
+# Docs: https://www.home-assistant.io/integrations/google_assistant/
+# =============================================================================
+google_assistant:
+  project_id: siva-home-assistant-1
+  service_account: !include SERVICE_ACCOUNT.json
+  report_state: true
+  expose_by_default: false
+  exposed_domains:
+    - light
+    - switch
+    - sensor
+  entity_config:
+    # === LIGHTS (Voice controllable) ===
+    light.study_ikea_light:
+      name: "Study Light"
+      expose: true
+      room: "Study"
+      aliases:
+        - "Office Light"
+        - "Study Room Light"
+
+    light.living_ikea_light:
+      name: "Living Room Light"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Lounge Light"
+        - "Main Light"
+
+    # === SMART PLUG (Voice controllable) ===
+    switch.smart_plug_1:
+      name: "Smart Plug"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Plug"
+        - "Power Plug"
+
+    # === TEMPERATURE SENSORS (Read-only, queryable) ===
+    sensor.study_temperature_humidity_temperature:
+      name: "Study Temperature"
+      expose: true
+      room: "Study"
+
+    sensor.living_temperature_humidity_temperature:
+      name: "Living Room Temperature"
+      expose: true
+      room: "Living Room"
+
+    sensor.bed_temperature_humidity_sensor_temperature:
+      name: "Bedroom Temperature"
+      expose: true
+      room: "Bedroom"
+
+    sensor.kitchen_temperature_humidity_temperature:
+      name: "Kitchen Temperature"
+      expose: true
+      room: "Kitchen"
+
+    sensor.bath_temperature_humidity_temperature:
+      name: "Bathroom Temperature"
+      expose: true
+      room: "Bathroom"
+
+    sensor.balcony_temperature_humidity_temperature:
+      name: "Balcony Temperature"
+      expose: true
+      room: "Balcony"
+
+    # === HUMIDITY SENSORS ===
+    sensor.study_temperature_humidity_humidity:
+      name: "Study Humidity"
+      expose: true
+      room: "Study"
+
+    sensor.living_temperature_humidity_humidity:
+      name: "Living Room Humidity"
+      expose: true
+      room: "Living Room"
+
+    sensor.bed_temperature_humidity_sensor_humidity:
+      name: "Bedroom Humidity"
+      expose: true
+      room: "Bedroom"
+
+    # === CO2 SENSOR ===
+    sensor.co2_co2:
+      name: "Air Quality"
+      expose: true
+      room: "Living Room"
+
+    # === MOTION SENSOR ===
+    binary_sensor.motion_detector_occupancy:
+      name: "Motion Sensor"
+      expose: true
+      room: "Hallway"
+
+    # === CONTACT SENSOR ===
+    binary_sensor.contact_sensor_1_contact:
+      name: "Door Sensor"
+      expose: true
+      room: "Entry"

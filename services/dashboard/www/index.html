@@ -4979,14 +4979,18 @@
           // Right wall section - REMOVED (user request)
           const rightWallZ = kitchenFrontZ - centerZ;
 
-          // Step wall connecting the two levels (the cave-in)
-          const stepDepth = kitchenFrontZ - studyFrontZ;  // 0.59m
-          const stepCenterZ = (leftWallZ + rightWallZ) / 2;
-          const stepWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, stepDepth), wallMat);
-          stepWall.position.set(corridorRight - centerX, wallHeight/2, stepCenterZ);
-          stepWall.castShadow = true;
-          networkState.scene.add(stepWall);
-          networkState.wallMeshes.push(stepWall);
+          // Step wall - REMOVED (user request)
+
+          // Living/Bedroom dividing wall - connects hallway south wall to apartment front
+          const bedroomRoom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
+          const apartmentFrontZ = bedroomRoom.z + bedroomRoom.depth/2 - centerZ;  // 7.665
+          const dividerWallDepth = apartmentFrontZ - frontWallZ;
+          const dividerWallCenterZ = (frontWallZ + apartmentFrontZ) / 2;
+          const dividerWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, dividerWallDepth), wallMat);
+          dividerWall.position.set(corridorRight - centerX, wallHeight/2, dividerWallCenterZ);
+          dividerWall.castShadow = true;
+          networkState.scene.add(dividerWall);
+          networkState.wallMeshes.push(dividerWall);
         },
 
         createRoom(config) {

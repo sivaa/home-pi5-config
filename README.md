@@ -32,11 +32,12 @@
 ├─────────────────────────────────────────────────────────────┤
 │  Services (Docker):                                         │
 │    Dashboard:     http://pi:8888                            │
-│    Home Assistant:http://pi:8123                            │
+│    Home Assistant:http://pi:8123 (ext: ha.sivaa.in)         │
 │    Zigbee2MQTT:   http://pi:8080                            │
 │    InfluxDB:      http://pi:8086                            │
 │    Grafana:       http://pi:3000                            │
 │    MQTT Broker:   mqtt://pi:1883 (WS: 9001)                 │
+│    Cloudflared:   Tunnel to ha.sivaa.in                     │
 ├─────────────────────────────────────────────────────────────┤
 │  Zigbee Devices: 15 total                                   │
 │    Sensors: 9 (6x temp/humidity, 1x CO2, 1x PIR, 1x contact)│
@@ -59,12 +60,13 @@
 | 5 | [Zigbee Devices](docs/05-zigbee-devices.md) | Complete device inventory & pairing guide |
 | 6 | [WiFi Troubleshooting](docs/06-wifi-troubleshooting.md) | Metal case WiFi issues & power save fix |
 | 7 | [Dashboard & InfluxDB](docs/07-dashboard-influxdb.md) | Custom dashboard InfluxDB integration |
+| 8 | [Google Home Integration](docs/08-google-home-integration.md) | Voice control via Google Assistant |
 
 ---
 
 ## Backup Files
 
-All critical configuration files are backed up in `backups/configs/`:
+### System Configs (`backups/configs/`)
 
 | File | Description |
 |------|-------------|
@@ -75,8 +77,24 @@ All critical configuration files are backed up in `backups/configs/`:
 | `system-info.txt` | OS version, hostname, network info |
 | `zigbee-dongle-info.txt` | Zigbee dongle USB device details |
 | `sshd_config` | SSH server configuration (locale fix applied) |
-| `sshd_config.original` | Original SSH config before modifications |
 | `wifi-powersave-off.conf` | NetworkManager WiFi power save disable config |
+
+### Service Configs (`configs/`)
+
+| Path | Description | Pi Location |
+|------|-------------|-------------|
+| `zigbee2mqtt/docker-compose.yml` | All Docker services | `/opt/zigbee2mqtt/` |
+| `zigbee2mqtt/configuration.yaml` | Zigbee2MQTT config | `/opt/zigbee2mqtt/data/` |
+| `homeassistant/configuration.yaml` | Home Assistant config | `/opt/homeassistant/` |
+| `homeassistant/SERVICE_ACCOUNT.json` | GCP credentials (gitignored) | `/opt/homeassistant/` |
+| `cloudflared/config.yml` | Cloudflare tunnel config | `/etc/cloudflared/` |
+
+### Sensitive Files (Not in Git)
+
+| File | Description | How to Recover |
+|------|-------------|----------------|
+| `SERVICE_ACCOUNT.json` | GCP service account key | Download from GCP Console |
+| `cloudflared/*.json` | Tunnel credentials | Run `cloudflared tunnel login` |
 
 ---
 
