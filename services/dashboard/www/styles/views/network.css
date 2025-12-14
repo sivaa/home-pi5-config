@@ -1,0 +1,320 @@
+/* ========================================
+   ZIGBEE NETWORK VIEW
+   Warm beige monochromatic visualization
+   ======================================== */
+
+/* ---------- Color Tokens ---------- */
+:root {
+  --network-bg: #E8DFD4;
+  --network-floor: #D4C4B0;
+  --network-wall: #C9B89A;
+  --network-wall-dark: #B5A080;
+  --network-furniture: #BFA98A;
+  --network-shadow: rgba(139, 119, 90, 0.3);
+
+  /* Device type colors */
+  --device-coordinator: #FF6B6B;
+  --device-router: #4DABF7;
+  --device-end-device: #51CF66;
+}
+
+/* ---------- Main Container ---------- */
+.network-view {
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  height: calc(100vh - 140px);
+  background: var(--network-bg);
+}
+
+.network-view .network-controls,
+.network-view .network-legend {
+  align-self: center;
+}
+
+/* ---------- Canvas Container ---------- */
+.network-container {
+  width: 100%;
+  flex: 1;
+  background: linear-gradient(135deg, #E8DFD4 0%, #DDD3C5 100%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+
+.network-container:active {
+  cursor: grabbing;
+}
+
+.network-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---------- Device Labels ---------- */
+.device-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.device-label.visible {
+  opacity: 1;
+}
+
+.device-icon {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 2px 8px var(--network-shadow);
+  position: relative;
+}
+
+.device-icon::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  font-size: 8px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.device-icon.coordinator::after {
+  background: var(--device-coordinator);
+  content: 'Z';
+}
+
+.device-icon.router::after {
+  background: var(--device-router);
+  content: 'R';
+}
+
+.device-icon.end-device::after {
+  background: var(--device-end-device);
+  content: 'E';
+}
+
+.device-name {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5D4E37;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px var(--network-shadow);
+}
+
+/* ---------- Signal Range Circles ---------- */
+.signal-range {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.signal-range.coordinator {
+  background: radial-gradient(circle, rgba(255, 107, 107, 0.15) 0%, rgba(255, 107, 107, 0.05) 50%, transparent 70%);
+  border: 2px dashed rgba(255, 107, 107, 0.3);
+}
+
+.signal-range.router {
+  background: radial-gradient(circle, rgba(77, 171, 247, 0.12) 0%, rgba(77, 171, 247, 0.04) 50%, transparent 70%);
+  border: 2px dashed rgba(77, 171, 247, 0.25);
+}
+
+/* ---------- Control Bar ---------- */
+.network-controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.network-control-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--network-wall);
+  border-radius: var(--radius-md);
+  color: #5D4E37;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.network-control-btn:hover {
+  background: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--network-shadow);
+}
+
+.network-control-btn.active {
+  background: #5D4E37;
+  color: white;
+  border-color: #5D4E37;
+}
+
+/* ---------- Zoom Controls ---------- */
+.network-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-left: var(--space-md);
+  border-left: 1px solid var(--network-wall);
+}
+
+.network-zoom-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border-radius: var(--radius-sm);
+}
+
+.network-zoom-indicator {
+  font-size: var(--font-size-sm);
+  color: #5D4E37;
+  min-width: 48px;
+  text-align: center;
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Legend ---------- */
+.network-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+  padding: var(--space-md) var(--space-xl);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-lg);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: #5D4E37;
+  font-weight: var(--font-weight-medium);
+}
+
+.legend-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.legend-badge.coordinator {
+  background: var(--device-coordinator);
+}
+
+.legend-badge.router {
+  background: var(--device-router);
+}
+
+.legend-badge.end-device {
+  background: var(--device-end-device);
+}
+
+/* ---------- Device Stats ---------- */
+.network-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: #8B7756;
+}
+
+.network-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .network-view {
+    height: calc(100vh - 160px);
+  }
+
+  .network-controls {
+    gap: var(--space-sm);
+  }
+
+  .network-zoom-controls {
+    margin-top: var(--space-xs);
+    padding-left: 0;
+    border-left: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .network-legend {
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .network-view {
+    height: calc(100vh - 180px);
+  }
+
+  .device-label {
+    transform: translate(-50%, -100%) scale(0.9);
+  }
+
+  .network-control-btn {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-xs);
+  }
+
+  .network-zoom-btn {
+    width: 32px;
+    height: 32px;
+  }
+}

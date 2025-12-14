@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="styles/views/sensor-config.css">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/isometric.css">
-
+  <link rel="stylesheet" href="styles/views/network.css">
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -267,6 +267,11 @@
                 @click="setView('co2')" title="CO2 Monitor (Press 0)">
           <span class="nav-icon">💨</span>
           <span class="nav-label">CO2</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'network' }"
+                @click="setView('network')" title="Zigbee Network (Press N)">
+          <span class="nav-icon">📡</span>
+          <span class="nav-label">Network</span>
         </button>
       </div>
     </nav>
@@ -1026,6 +1031,10 @@
                       @click="toggleDarkTheme()">
                 🌙 Dark
               </button>
+              <button class="iso-control-btn" :class="{ active: autoRotate }"
+                      @click="toggleAutoRotate()">
+                🔄 <span x-text="autoRotate ? 'Stop' : 'Rotate'"></span>
+              </button>
               <button class="iso-control-btn" @click="resetView()">
                 🎯 Reset
               </button>
@@ -1335,6 +1344,70 @@
               <div class="ambient-hint">Tap anywhere to exit</div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- Zigbee Network View -->
+        <div x-show="currentView === 'network'" x-cloak x-data="networkView()" x-init="init()">
+          <div class="network-view">
+            <!-- Controls -->
+            <div class="network-controls">
+              <button class="network-control-btn" :class="{ active: showSignalRange }"
+                      @click="showSignalRange = !showSignalRange">
+                📶 <span x-text="showSignalRange ? 'Hide Range' : 'Show Range'"></span>
+              </button>
+              <button class="network-control-btn" :class="{ active: showLabels }"
+                      @click="showLabels = !showLabels">
+                🏷️ <span x-text="showLabels ? 'Hide Labels' : 'Show Labels'"></span>
+              </button>
+              <button class="network-control-btn" :class="{ active: autoRotate }"
+                      @click="toggleAutoRotate()">
+                🔄 <span x-text="autoRotate ? 'Stop' : 'Rotate'"></span>
+              </button>
+              <button class="network-control-btn" @click="resetView()">
+                🎯 Reset
+              </button>
+              <div class="network-zoom-controls">
+                <button class="network-control-btn network-zoom-btn" @click="zoomOut()">➖</button>
+                <span class="network-zoom-indicator" x-text="getZoomPercent() + '%'"></span>
+                <button class="network-control-btn network-zoom-btn" @click="zoomIn()">➕</button>
+              </div>
+            </div>
+
+            <!-- Network Canvas Container -->
+            <div class="network-container" x-ref="networkContainer"></div>
+
+            <!-- Legend -->
+            <div class="network-legend">
+              <div class="legend-item">
+                <div class="legend-badge coordinator">Z</div>
+                <span>Zigbee Coordinator</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-badge router">R</div>
+                <span>Zigbee Router</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-badge end-device">E</div>
+                <span>Zigbee End Device</span>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="network-stats">
+              <div class="network-stat">
+                <span>📡</span>
+                <span x-text="deviceCount + ' devices'"></span>
+              </div>
+              <div class="network-stat">
+                <span>🔗</span>
+                <span x-text="routerCount + ' routers'"></span>
+              </div>
+              <div class="network-stat">
+                <span>📍</span>
+                <span x-text="endDeviceCount + ' end devices'"></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2525,7 +2598,24 @@
 
           // Keyboard shortcuts for view switching
           document.addEventListener('keydown', (e) => {
-            if (e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.metaKey) {
+            if (e.ctrlKey || e.metaKey) return;
+            // 'I' key for isometric view
+            if (e.key === 'i' || e.key === 'I') {
+              this.setView('isometric');
+              return;
+            }
+            // '0' key for CO2 view
+            if (e.key === '0') {
+              this.setView('co2');
+              return;
+            }
+            // 'N' key for network view
+            if (e.key === 'n' || e.key === 'N') {
+              this.setView('network');
+              return;
+            }
+            // 1-9 keys for other views
+            if (e.key >= '1' && e.key <= '9') {
               const views = ['comfort', 'compare', 'floor', 'ambient', 'timeline', 'classic', 'lights', '3d', 'config'];
               this.setView(views[parseInt(e.key) - 1]);
             }
@@ -3250,6 +3340,21 @@
       labelElements: {},
       animationId: null,
       isInitialized: false
+    };
+
+    // Isometric view state (separate from 3D view)
+    const isoState = {
+      scene: null,
+      camera: null,
+      renderer: null,
+      roomMeshes: {},
+      wallMeshes: [],
+      labelElements: {},
+      animationId: null,
+      isInitialized: false,
+      panOffset: { x: 0, z: 0 },
+      isPanning: false,
+      lastPanPos: { x: 0, y: 0 }
     };
 
     // Floor plan configuration - exact dimensions from floor map
@@ -4178,6 +4283,930 @@
             ];
           }
         }
+      };
+    }
+
+    // ========================================
+    // ISOMETRIC FLOOR PLAN VIEW
+    // ========================================
+    function isometricView() {
+      const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+      const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+      return {
+        viewMode: 'temperature',
+        zoomLevel: 1.0,
+        wallsVisible: true,
+        darkTheme: false,
+        autoRotate: false,
+        rotationAngle: 0,
+
+        init() {
+          this.waitForContainer();
+        },
+
+        waitForContainer() {
+          const container = this.$refs.isoContainer;
+          if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+            setTimeout(() => this.waitForContainer(), 100);
+            return;
+          }
+
+          if (isoState.isInitialized && isoState.renderer) {
+            if (!container.contains(isoState.renderer.domElement)) {
+              container.appendChild(isoState.renderer.domElement);
+            }
+            this.createLabels(container);
+            this.onResize();
+            return;
+          }
+
+          if (isoState.renderer) isoState.renderer.dispose();
+          if (isoState.scene) isoState.scene.clear();
+          if (isoState.animationId) cancelAnimationFrame(isoState.animationId);
+
+          this.initScene();
+          this.initCamera(container);
+          this.initRenderer(container);
+          this.initLighting();
+          this.buildFloorPlan();
+          this.createLabels(container);
+          this.setupPanControls(container);
+          this.animate();
+          isoState.isInitialized = true;
+
+          window.addEventListener('resize', () => this.onResize());
+        },
+
+        initScene() {
+          isoState.scene = new THREE.Scene();
+          isoState.scene.background = new THREE.Color(0xE8E8EA);
+        },
+
+        initCamera(container) {
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15;
+          isoState.camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2, frustumSize * aspect / 2,
+            frustumSize / 2, frustumSize / -2, 0.1, 1000
+          );
+          isoState.camera.position.set(10, 10, 10);
+          isoState.camera.lookAt(0, 0, 0);
+        },
+
+        initRenderer(container) {
+          isoState.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          isoState.renderer.setSize(container.clientWidth, container.clientHeight);
+          isoState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          isoState.renderer.shadowMap.enabled = true;
+          isoState.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(isoState.renderer.domElement);
+        },
+
+        initLighting() {
+          const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+          isoState.scene.add(ambient);
+          const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+          directional.position.set(15, 20, 15);
+          directional.castShadow = true;
+          isoState.scene.add(directional);
+          const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+          fill.position.set(-10, 10, -10);
+          isoState.scene.add(fill);
+        },
+
+        buildFloorPlan() {
+          isoState.wallMeshes = [];
+          const apW = FLOOR_PLAN_CONFIG.apartmentWidth;
+          const apD = FLOOR_PLAN_CONFIG.apartmentDepth;
+
+          // Base floor
+          const floorGeometry = new THREE.PlaneGeometry(apW + 2, apD + 2);
+          const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xC0C0C2, roughness: 0.8 });
+          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(0, -0.01, 0);
+          floor.receiveShadow = true;
+          isoState.scene.add(floor);
+
+          // Rooms
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const roomGroup = this.createRoom(config);
+            isoState.roomMeshes[config.id] = roomGroup;
+            isoState.scene.add(roomGroup);
+          });
+
+          // Hallway
+          const hw = FLOOR_PLAN_CONFIG.hallway;
+          const hallway = new THREE.Mesh(
+            new THREE.PlaneGeometry(hw.width, hw.depth),
+            new THREE.MeshStandardMaterial({ color: 0xD0D0D0, roughness: 0.7 })
+          );
+          hallway.rotation.x = -Math.PI / 2;
+          hallway.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
+          isoState.scene.add(hallway);
+
+          // Balcony
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const balcony = new THREE.Mesh(
+            new THREE.PlaneGeometry(bal.width, bal.depth),
+            new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.5 })
+          );
+          balcony.rotation.x = -Math.PI / 2;
+          balcony.position.set(bal.x - centerX, 0.003, bal.z - centerZ);
+          isoState.scene.add(balcony);
+
+          // Doors, windows, railing, furniture
+          FLOOR_PLAN_CONFIG.doors.forEach(door => this.createDoor(door));
+          FLOOR_PLAN_CONFIG.windows.forEach(win => this.createWindow(win));
+          this.createBalconyRailing();
+          this.createFurniture();
+        },
+
+        createRoom(config) {
+          const group = new THREE.Group();
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+          const halfW = config.width / 2, halfD = config.depth / 2;
+          const rx = config.x - centerX, rz = config.z - centerZ;
+
+          // Floor
+          const floorMaterial = new THREE.MeshStandardMaterial({
+            color: config.color, transparent: true, opacity: 0.3, roughness: 0.6, metalness: 0.1
+          });
+          const roomFloor = new THREE.Mesh(new THREE.BoxGeometry(config.width, 0.05, config.depth), floorMaterial);
+          roomFloor.position.set(rx, 0.025, rz);
+          roomFloor.receiveShadow = true;
+          roomFloor.name = 'floor_' + config.id;
+          group.add(roomFloor);
+
+          // Walls
+          const wallMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.25, metalness: 0.4, roughness: 0.08, side: THREE.DoubleSide
+          });
+          const walls = [
+            { geo: [config.width, wallHeight, 0.15], pos: [rx, wallHeight/2, rz - halfD] },
+            { geo: [config.width, wallHeight, 0.15], pos: [rx, wallHeight/2, rz + halfD] },
+            { geo: [0.15, wallHeight, config.depth], pos: [rx - halfW, wallHeight/2, rz] },
+            { geo: [0.15, wallHeight, config.depth], pos: [rx + halfW, wallHeight/2, rz] }
+          ];
+          walls.forEach(w => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(...w.geo), wallMaterial);
+            wall.position.set(...w.pos);
+            wall.castShadow = true;
+            group.add(wall);
+            isoState.wallMeshes.push(wall);
+          });
+          return group;
+        },
+
+        createDoor(doorConfig) {
+          const doorWidth = 0.9, doorHeight = FLOOR_PLAN_CONFIG.wallHeight * 0.85;
+          const posX = doorConfig.x - centerX, posZ = doorConfig.z - centerZ;
+
+          if (doorConfig.type === 'french') {
+            const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.4 });
+            const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+            const rot = doorConfig.rotation || 0;
+            const offset = doorWidth/2 + 0.01;
+
+            [-1, 1].forEach(side => {
+              const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth - 0.02, doorHeight, 0.06), glassMaterial);
+              const ox = offset * Math.cos(rot + side * Math.PI/2);
+              const oz = offset * Math.sin(rot + side * Math.PI/2);
+              door.position.set(posX + ox, doorHeight/2, posZ + oz);
+              door.rotation.y = rot;
+              isoState.scene.add(door);
+            });
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.05, doorHeight, 0.08), frameMaterial);
+            frame.position.set(posX, doorHeight/2, posZ);
+            frame.rotation.y = rot;
+            isoState.scene.add(frame);
+          } else {
+            const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.7 });
+            const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.08), doorMaterial);
+            door.position.set(posX, doorHeight/2, posZ);
+            door.rotation.y = doorConfig.rotation || 0;
+            isoState.scene.add(door);
+          }
+        },
+
+        createWindow(winConfig) {
+          const winWidth = winConfig.size || 2.0, winHeight = 1.3;
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+          const posX = winConfig.x - centerX, posZ = winConfig.z - centerZ;
+
+          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
+          const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.4 });
+
+          const frame = new THREE.Mesh(new THREE.BoxGeometry(winWidth, winHeight, 0.15), frameMaterial);
+          frame.position.set(posX, wallHeight * 0.55, posZ);
+          frame.rotation.y = winConfig.rotation || 0;
+          isoState.scene.add(frame);
+
+          const glass = new THREE.Mesh(new THREE.BoxGeometry(winWidth * 0.9, winHeight * 0.85, 0.06), glassMaterial);
+          glass.position.set(posX, wallHeight * 0.55, posZ);
+          glass.rotation.y = winConfig.rotation || 0;
+          isoState.scene.add(glass);
+        },
+
+        createBalconyRailing() {
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const railingHeight = 1.0;
+          const railingMaterial = new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.7 });
+
+          const front = new THREE.Mesh(new THREE.BoxGeometry(bal.width, railingHeight, 0.05), railingMaterial);
+          front.position.set(bal.x - centerX, railingHeight/2, bal.z - centerZ + bal.depth/2);
+          isoState.scene.add(front);
+
+          const left = new THREE.Mesh(new THREE.BoxGeometry(0.05, railingHeight, bal.depth), railingMaterial);
+          left.position.set(bal.x - centerX - bal.width/2, railingHeight/2, bal.z - centerZ);
+          isoState.scene.add(left);
+
+          const glassMaterial = new THREE.MeshStandardMaterial({ color: 0xccf0ff, transparent: true, opacity: 0.3 });
+          const glassPanel = new THREE.Mesh(new THREE.BoxGeometry(bal.width, railingHeight * 0.7, 0.02), glassMaterial);
+          glassPanel.position.set(bal.x - centerX, railingHeight * 0.4, bal.z - centerZ + bal.depth/2);
+          isoState.scene.add(glassPanel);
+        },
+
+        createFurniture() {
+          const furnitureMaterial = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
+          FLOOR_PLAN_CONFIG.furniture.forEach(item => {
+            const roomConfig = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === item.room);
+            if (!roomConfig) return;
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(item.width, item.height, item.depth), furnitureMaterial);
+            mesh.position.set(roomConfig.x - centerX, item.height/2, roomConfig.z - centerZ);
+            mesh.castShadow = true;
+            isoState.scene.add(mesh);
+            if (item.type === 'bed') {
+              const bedding = new THREE.Mesh(
+                new THREE.BoxGeometry(item.width * 0.95, 0.1, item.depth * 0.8),
+                new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+              );
+              bedding.position.set(roomConfig.x - centerX, item.height + 0.05, roomConfig.z - centerZ);
+              isoState.scene.add(bedding);
+            }
+          });
+        },
+
+        setupPanControls(container) {
+          container.addEventListener('pointerdown', (e) => {
+            isoState.isPanning = true;
+            isoState.lastPanPos = { x: e.clientX, y: e.clientY };
+            container.setPointerCapture(e.pointerId);
+            container.style.cursor = 'grabbing';
+          });
+          container.addEventListener('pointermove', (e) => {
+            if (!isoState.isPanning) return;
+            const dx = e.clientX - isoState.lastPanPos.x;
+            const dy = e.clientY - isoState.lastPanPos.y;
+            const panSpeed = 0.02 / this.zoomLevel;
+            isoState.panOffset.x -= (dx - dy) * panSpeed * 0.7;
+            isoState.panOffset.z -= (dx + dy) * panSpeed * 0.7;
+            isoState.camera.lookAt(isoState.panOffset.x, 0, isoState.panOffset.z);
+            isoState.lastPanPos = { x: e.clientX, y: e.clientY };
+          });
+          container.addEventListener('pointerup', (e) => {
+            isoState.isPanning = false;
+            container.releasePointerCapture(e.pointerId);
+            container.style.cursor = 'grab';
+          });
+          container.addEventListener('pointerleave', () => {
+            isoState.isPanning = false;
+            container.style.cursor = 'grab';
+          });
+          container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.setZoom(this.zoomLevel * zoomDelta);
+          }, { passive: false });
+        },
+
+        setZoom(level) {
+          this.zoomLevel = Math.max(0.5, Math.min(3.0, level));
+          this.updateCameraZoom();
+        },
+
+        updateCameraZoom() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          isoState.camera.left = frustumSize * aspect / -2;
+          isoState.camera.right = frustumSize * aspect / 2;
+          isoState.camera.top = frustumSize / 2;
+          isoState.camera.bottom = frustumSize / -2;
+          isoState.camera.updateProjectionMatrix();
+        },
+
+        zoomIn() { this.setZoom(this.zoomLevel * 1.2); },
+        zoomOut() { this.setZoom(this.zoomLevel / 1.2); },
+
+        resetView() {
+          this.zoomLevel = 1.0;
+          this.autoRotate = false;
+          this.rotationAngle = Math.PI / 4; // 45 degrees (default isometric angle)
+          isoState.panOffset = { x: 0, z: 0 };
+          isoState.camera.position.set(10, 10, 10);
+          isoState.camera.lookAt(0, 0, 0);
+          this.updateCameraZoom();
+        },
+
+        createLabels(container) {
+          Object.values(isoState.labelElements).forEach(label => {
+            if (label && label.parentNode) label.parentNode.removeChild(label);
+          });
+          isoState.labelElements = {};
+          container.querySelectorAll('.iso-label').forEach(el => el.remove());
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'iso-label';
+            labelDiv.innerHTML = `
+              <div class="label-name">${config.icon} ${config.name}</div>
+              <div class="label-value" data-room="${config.id}">--</div>
+              <div class="label-secondary" data-room-secondary="${config.id}">--</div>
+            `;
+            container.appendChild(labelDiv);
+            isoState.labelElements[config.id] = labelDiv;
+          });
+        },
+
+        updateLabels() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera) return;
+          const rooms = Alpine.store('rooms')?.list || [];
+          const viewMode = this.viewMode;
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const label = isoState.labelElements[config.id];
+            if (!label) return;
+            const roomData = rooms.find(r => r.id === config.id);
+            const valueEl = label.querySelector(`[data-room="${config.id}"]`);
+            const secondaryEl = label.querySelector(`[data-room-secondary="${config.id}"]`);
+
+            if (valueEl && roomData) {
+              if (viewMode === 'temperature') {
+                valueEl.textContent = roomData.temperature !== null ? `${roomData.temperature.toFixed(1)}°` : '--';
+                if (secondaryEl) secondaryEl.textContent = roomData.humidity !== null ? `${roomData.humidity.toFixed(0)}%` : '';
+              } else {
+                valueEl.textContent = roomData.humidity !== null ? `${roomData.humidity.toFixed(0)}%` : '--';
+                if (secondaryEl) secondaryEl.textContent = roomData.temperature !== null ? `${roomData.temperature.toFixed(1)}°` : '';
+              }
+            }
+
+            const position = new THREE.Vector3(config.x - centerX, config.labelY || 3, config.z - centerZ);
+            position.project(isoState.camera);
+            const x = (position.x * 0.5 + 0.5) * container.clientWidth;
+            const y = (-position.y * 0.5 + 0.5) * container.clientHeight;
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+
+            const margin = 20;
+            const isVisible = container.clientWidth > 0 && x > margin && x < container.clientWidth - margin && y > margin && y < container.clientHeight - margin;
+            label.classList.toggle('visible', isVisible);
+          });
+        },
+
+        updateRoomColors() {
+          const rooms = Alpine.store('rooms')?.list || [];
+          rooms.forEach(roomData => {
+            const meshGroup = isoState.roomMeshes[roomData.id];
+            if (!meshGroup) return;
+            const floorMesh = meshGroup.children.find(child => child.name === 'floor_' + roomData.id);
+            if (floorMesh && floorMesh.material) {
+              floorMesh.material.color.setHex(this.getRoomColor(roomData, this.viewMode));
+            }
+          });
+        },
+
+        getRoomColor(room, viewMode) {
+          if (!room) return 0xE0E0E0;
+          const value = viewMode === 'temperature' ? room.temperature : room.humidity;
+          if (value === null || value === undefined) return 0xE0E0E0;
+          const scale = viewMode === 'temperature' ? TEMP_COLORS : HUMIDITY_COLORS;
+          return this.interpolateColor(value, scale);
+        },
+
+        interpolateColor(value, scale) {
+          if (value <= scale[0].value) return scale[0].color;
+          if (value >= scale[scale.length - 1].value) return scale[scale.length - 1].color;
+          let lower = scale[0], upper = scale[scale.length - 1];
+          for (let i = 0; i < scale.length - 1; i++) {
+            if (value >= scale[i].value && value <= scale[i + 1].value) {
+              lower = scale[i];
+              upper = scale[i + 1];
+              break;
+            }
+          }
+          const factor = (value - lower.value) / (upper.value - lower.value);
+          const lowerColor = new THREE.Color(lower.color);
+          const upperColor = new THREE.Color(upper.color);
+          const result = new THREE.Color();
+          result.lerpColors(lowerColor, upperColor, factor);
+          return result.getHex();
+        },
+
+        toggleWalls() {
+          this.wallsVisible = !this.wallsVisible;
+          isoState.wallMeshes.forEach(wall => { wall.visible = this.wallsVisible; });
+        },
+
+        toggleDarkTheme() {
+          this.darkTheme = !this.darkTheme;
+          if (this.darkTheme) {
+            isoState.scene.background = new THREE.Color(0x0f172a);
+            isoState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
+          } else {
+            isoState.scene.background = new THREE.Color(0xE8E8EA);
+            isoState.scene.fog = null;
+          }
+        },
+
+        animate() {
+          const self = this;
+          const radius = 17.32; // Distance from center (sqrt(10^2 + 10^2 + 10^2) ≈ 17.32)
+          const height = 10;    // Camera height
+
+          function loop() {
+            isoState.animationId = requestAnimationFrame(loop);
+
+            // Auto-rotate camera around the center
+            if (self.autoRotate && isoState.camera) {
+              self.rotationAngle += 0.005; // ~0.3 degrees per frame
+              const x = Math.sin(self.rotationAngle) * radius;
+              const z = Math.cos(self.rotationAngle) * radius;
+              isoState.camera.position.set(x, height, z);
+              isoState.camera.lookAt(isoState.panOffset.x, 0, isoState.panOffset.z);
+            }
+
+            self.updateRoomColors();
+            self.updateLabels();
+            if (isoState.renderer && isoState.scene && isoState.camera) {
+              isoState.renderer.render(isoState.scene, isoState.camera);
+            }
+          }
+          loop();
+        },
+
+        toggleAutoRotate() {
+          this.autoRotate = !this.autoRotate;
+          if (this.autoRotate) {
+            // Calculate current angle from camera position
+            const pos = isoState.camera.position;
+            this.rotationAngle = Math.atan2(pos.x, pos.z);
+          }
+        },
+
+        onResize() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera || !isoState.renderer) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          isoState.camera.left = frustumSize * aspect / -2;
+          isoState.camera.right = frustumSize * aspect / 2;
+          isoState.camera.top = frustumSize / 2;
+          isoState.camera.bottom = frustumSize / -2;
+          isoState.camera.updateProjectionMatrix();
+          isoState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        setViewMode(mode) { this.viewMode = mode; },
+        getZoomPercent() { return Math.round(this.zoomLevel * 100); }
+      };
+    }
+
+    // ========================================
+    // ZIGBEE NETWORK VIEW
+    // Warm beige monochromatic visualization
+    // ========================================
+
+    const networkState = {
+      scene: null,
+      camera: null,
+      renderer: null,
+      roomMeshes: {},
+      wallMeshes: [],
+      deviceMeshes: {},
+      labelElements: {},
+      signalElements: {},
+      animationId: null,
+      isInitialized: false,
+      panOffset: { x: 0, z: 0 },
+      isPanning: false,
+      lastPanPos: { x: 0, y: 0 }
+    };
+
+    // Device configuration with types and icons
+    const ZIGBEE_DEVICES = [
+      { id: 'coordinator', name: 'ZBBridge-P', type: 'coordinator', icon: '📡', room: 'living', x: 0.5, z: 0.4 },
+      { id: 'router1', name: 'S60ZBTPF', type: 'router', icon: '📢', room: 'study', x: 0.8, z: 0.2 },
+      { id: 'router2', name: 'S60ZBTPF', type: 'router', icon: '📢', room: 'living', x: 0.3, z: 0.3 },
+      { id: 'sensor1', name: 'SNZB-02P', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.2, z: 0.15 },
+      { id: 'sensor2', name: 'SNZB-03P', type: 'end-device', icon: '🚶', room: 'kitchen', x: 0.5, z: 0.1 },
+      { id: 'sensor3', name: 'SNZB-04P', type: 'end-device', icon: '🚪', room: 'bathroom', x: 0.85, z: 0.1 },
+      { id: 'trv', name: 'TRVZB', type: 'end-device', icon: '🔥', room: 'bedroom', x: 0.1, z: 0.25 },
+    ];
+
+    function networkView() {
+      const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+      const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+      return {
+        showSignalRange: true,
+        showLabels: true,
+        autoRotate: false,
+        rotationAngle: 0,
+        zoomLevel: 1.0,
+        deviceCount: ZIGBEE_DEVICES.length,
+        routerCount: ZIGBEE_DEVICES.filter(d => d.type === 'router').length,
+        endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
+
+        init() {
+          this.waitForContainer();
+        },
+
+        waitForContainer() {
+          const container = this.$refs.networkContainer;
+          if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+            setTimeout(() => this.waitForContainer(), 100);
+            return;
+          }
+
+          if (networkState.isInitialized && networkState.renderer) {
+            if (!container.contains(networkState.renderer.domElement)) {
+              container.appendChild(networkState.renderer.domElement);
+            }
+            this.createLabels(container);
+            this.onResize();
+            return;
+          }
+
+          if (networkState.renderer) networkState.renderer.dispose();
+          if (networkState.scene) networkState.scene.clear();
+          if (networkState.animationId) cancelAnimationFrame(networkState.animationId);
+
+          this.initScene();
+          this.initCamera(container);
+          this.initRenderer(container);
+          this.initLighting();
+          this.buildFloorPlan();
+          this.createDevices();
+          this.createLabels(container);
+          this.setupPanControls(container);
+          this.animate();
+          networkState.isInitialized = true;
+
+          window.addEventListener('resize', () => this.onResize());
+        },
+
+        initScene() {
+          networkState.scene = new THREE.Scene();
+          // Warm beige gradient background
+          networkState.scene.background = new THREE.Color(0xE8DFD4);
+        },
+
+        initCamera(container) {
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15;
+          networkState.camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2, frustumSize * aspect / 2,
+            frustumSize / 2, frustumSize / -2, 0.1, 1000
+          );
+          networkState.camera.position.set(10, 10, 10);
+          networkState.camera.lookAt(0, 0, 0);
+        },
+
+        initRenderer(container) {
+          networkState.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          networkState.renderer.setSize(container.clientWidth, container.clientHeight);
+          networkState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          networkState.renderer.shadowMap.enabled = true;
+          networkState.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(networkState.renderer.domElement);
+        },
+
+        initLighting() {
+          const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+          networkState.scene.add(ambient);
+          const directional = new THREE.DirectionalLight(0xffffff, 0.6);
+          directional.position.set(15, 20, 15);
+          directional.castShadow = true;
+          networkState.scene.add(directional);
+          const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+          fill.position.set(-10, 10, -10);
+          networkState.scene.add(fill);
+        },
+
+        buildFloorPlan() {
+          networkState.wallMeshes = [];
+          const apW = FLOOR_PLAN_CONFIG.apartmentWidth;
+          const apD = FLOOR_PLAN_CONFIG.apartmentDepth;
+
+          // Warm beige floor
+          const floorGeometry = new THREE.PlaneGeometry(apW + 2, apD + 2);
+          const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.9 });
+          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(0, -0.01, 0);
+          floor.receiveShadow = true;
+          networkState.scene.add(floor);
+
+          // Build rooms with warm tones
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            this.createRoom(config);
+          });
+        },
+
+        createRoom(config) {
+          const group = new THREE.Group();
+          const floorColor = 0xC9B89A;  // Warm beige
+          const wallColor = 0xB5A080;
+          const wallHeight = 0.8;
+
+          // Correct center coordinates (x,z are already center positions)
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+          const rx = config.x - centerX;
+          const rz = config.z - centerZ;
+
+          // Room floor at correct position
+          const floorGeom = new THREE.PlaneGeometry(config.width, config.depth);
+          const floorMat = new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.8 });
+          const floor = new THREE.Mesh(floorGeom, floorMat);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(rx, 0.01, rz);
+          floor.receiveShadow = true;
+          group.add(floor);
+
+          // Create all 4 walls automatically
+          const halfW = config.width / 2;
+          const halfD = config.depth / 2;
+          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
+
+          // Back wall (north)
+          const backWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+          backWall.position.set(rx, wallHeight/2, rz - halfD);
+          backWall.castShadow = true;
+          group.add(backWall);
+          networkState.wallMeshes.push(backWall);
+
+          // Front wall (south)
+          const frontWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+          frontWall.position.set(rx, wallHeight/2, rz + halfD);
+          frontWall.castShadow = true;
+          group.add(frontWall);
+          networkState.wallMeshes.push(frontWall);
+
+          // Left wall (west)
+          const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+          leftWall.position.set(rx - halfW, wallHeight/2, rz);
+          leftWall.castShadow = true;
+          group.add(leftWall);
+          networkState.wallMeshes.push(leftWall);
+
+          // Right wall (east)
+          const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+          rightWall.position.set(rx + halfW, wallHeight/2, rz);
+          rightWall.castShadow = true;
+          group.add(rightWall);
+          networkState.wallMeshes.push(rightWall);
+
+          // Furniture
+          this.createFurniture(group, config, rx, rz);
+
+          networkState.scene.add(group);
+          networkState.roomMeshes[config.id] = { group, floor, config };
+        },
+
+        createFurniture(group, config, rx, rz) {
+          const furnitureColor = 0xBFA98A;
+          const furnitureMat = new THREE.MeshStandardMaterial({ color: furnitureColor, roughness: 0.6 });
+
+          if (config.id === 'bedroom') {
+            // Bed
+            const bedGeom = new THREE.BoxGeometry(1.4, 0.3, 2.0);
+            const bed = new THREE.Mesh(bedGeom, furnitureMat);
+            bed.position.set(rx - config.width/4, 0.15, rz);
+            bed.castShadow = true;
+            group.add(bed);
+          } else if (config.id === 'living') {
+            // Sofa
+            const sofaGeom = new THREE.BoxGeometry(2.0, 0.4, 0.8);
+            const sofa = new THREE.Mesh(sofaGeom, furnitureMat);
+            sofa.position.set(rx, 0.2, rz + config.depth/4);
+            sofa.castShadow = true;
+            group.add(sofa);
+          } else if (config.id === 'study') {
+            // Desk
+            const deskGeom = new THREE.BoxGeometry(1.2, 0.5, 0.6);
+            const desk = new THREE.Mesh(deskGeom, furnitureMat);
+            desk.position.set(rx + config.width/4, 0.25, rz - config.depth/4);
+            desk.castShadow = true;
+            group.add(desk);
+          }
+        },
+
+        createDevices() {
+          networkState.deviceMeshes = {};
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+          ZIGBEE_DEVICES.forEach(device => {
+            // Create device marker (sphere)
+            const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+            let color;
+            switch (device.type) {
+              case 'coordinator': color = 0xFF6B6B; break;
+              case 'router': color = 0x4DABF7; break;
+              default: color = 0x51CF66;
+            }
+            const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+            const mesh = new THREE.Mesh(geometry, material);
+
+            // Position based on room (room.x, room.z are center coords)
+            const room = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === device.room);
+            if (room) {
+              const roomCenterX = room.x - centerX;
+              const roomCenterZ = room.z - centerZ;  // FIX: use z not y
+              mesh.position.set(
+                roomCenterX + (device.x - 0.5) * room.width * 0.8,
+                0.5,
+                roomCenterZ + (device.z - 0.5) * room.depth * 0.8
+              );
+            }
+
+            mesh.castShadow = true;
+            networkState.scene.add(mesh);
+            networkState.deviceMeshes[device.id] = { mesh, config: device };
+          });
+        },
+
+        createLabels(container) {
+          // Clear existing labels
+          Object.values(networkState.labelElements).forEach(el => el?.remove());
+          Object.values(networkState.signalElements).forEach(el => el?.remove());
+          networkState.labelElements = {};
+          networkState.signalElements = {};
+
+          ZIGBEE_DEVICES.forEach(device => {
+            // Device label
+            const label = document.createElement('div');
+            label.className = 'device-label visible';
+            label.innerHTML = `
+              <div class="device-icon ${device.type}">${device.icon}</div>
+              <div class="device-name">${device.name}</div>
+            `;
+            container.appendChild(label);
+            networkState.labelElements[device.id] = label;
+
+            // Signal range circle (for coordinator and routers)
+            if (device.type === 'coordinator' || device.type === 'router') {
+              const signal = document.createElement('div');
+              signal.className = `signal-range ${device.type}`;
+              signal.style.width = device.type === 'coordinator' ? '200px' : '150px';
+              signal.style.height = device.type === 'coordinator' ? '200px' : '150px';
+              container.appendChild(signal);
+              networkState.signalElements[device.id] = signal;
+            }
+          });
+        },
+
+        updateLabels() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera) return;
+
+          ZIGBEE_DEVICES.forEach(device => {
+            const deviceData = networkState.deviceMeshes[device.id];
+            const label = networkState.labelElements[device.id];
+            const signal = networkState.signalElements[device.id];
+
+            if (!deviceData || !label) return;
+
+            const pos = deviceData.mesh.position.clone();
+            pos.y += 0.3;
+            pos.project(networkState.camera);
+
+            const x = (pos.x * 0.5 + 0.5) * container.clientWidth;
+            const y = (-pos.y * 0.5 + 0.5) * container.clientHeight;
+
+            label.style.left = x + 'px';
+            label.style.top = y + 'px';
+            label.style.display = this.showLabels ? 'flex' : 'none';
+
+            if (signal) {
+              signal.style.left = x + 'px';
+              signal.style.top = (y + 40) + 'px';
+              signal.style.display = this.showSignalRange ? 'block' : 'none';
+            }
+          });
+        },
+
+        setupPanControls(container) {
+          container.addEventListener('pointerdown', (e) => {
+            if (this.autoRotate) return;
+            networkState.isPanning = true;
+            networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+            container.style.cursor = 'grabbing';
+          });
+
+          container.addEventListener('pointermove', (e) => {
+            if (!networkState.isPanning) return;
+            const dx = e.clientX - networkState.lastPanPos.x;
+            const dy = e.clientY - networkState.lastPanPos.y;
+            networkState.panOffset.x -= dx * 0.02;
+            networkState.panOffset.z -= dy * 0.02;
+            networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
+            networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+          });
+
+          container.addEventListener('pointerup', () => {
+            networkState.isPanning = false;
+            container.style.cursor = 'grab';
+          });
+
+          container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.setZoom(this.zoomLevel * delta);
+          }, { passive: false });
+        },
+
+        setZoom(level) {
+          this.zoomLevel = Math.max(0.5, Math.min(3.0, level));
+          this.updateCameraZoom();
+        },
+
+        updateCameraZoom() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          networkState.camera.left = frustumSize * aspect / -2;
+          networkState.camera.right = frustumSize * aspect / 2;
+          networkState.camera.top = frustumSize / 2;
+          networkState.camera.bottom = frustumSize / -2;
+          networkState.camera.updateProjectionMatrix();
+        },
+
+        zoomIn() { this.setZoom(this.zoomLevel * 1.2); },
+        zoomOut() { this.setZoom(this.zoomLevel / 1.2); },
+
+        resetView() {
+          this.zoomLevel = 1.0;
+          this.autoRotate = false;
+          this.rotationAngle = Math.PI / 4;
+          networkState.panOffset = { x: 0, z: 0 };
+          networkState.camera.position.set(10, 10, 10);
+          networkState.camera.lookAt(0, 0, 0);
+          this.updateCameraZoom();
+        },
+
+        toggleAutoRotate() {
+          this.autoRotate = !this.autoRotate;
+          if (this.autoRotate) {
+            const pos = networkState.camera.position;
+            this.rotationAngle = Math.atan2(pos.x, pos.z);
+          }
+        },
+
+        animate() {
+          const self = this;
+          const radius = 17.32;
+          const height = 10;
+
+          function loop() {
+            networkState.animationId = requestAnimationFrame(loop);
+
+            if (self.autoRotate && networkState.camera) {
+              self.rotationAngle += 0.003;
+              const x = Math.sin(self.rotationAngle) * radius;
+              const z = Math.cos(self.rotationAngle) * radius;
+              networkState.camera.position.set(x, height, z);
+              networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
+            }
+
+            self.updateLabels();
+            if (networkState.renderer && networkState.scene && networkState.camera) {
+              networkState.renderer.render(networkState.scene, networkState.camera);
+            }
+          }
+          loop();
+        },
+
+        onResize() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera || !networkState.renderer) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          networkState.camera.left = frustumSize * aspect / -2;
+          networkState.camera.right = frustumSize * aspect / 2;
+          networkState.camera.top = frustumSize / 2;
+          networkState.camera.bottom = frustumSize / -2;
+          networkState.camera.updateProjectionMatrix();
+          networkState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        getZoomPercent() { return Math.round(this.zoomLevel * 100); }
       };
     }
   </script>
