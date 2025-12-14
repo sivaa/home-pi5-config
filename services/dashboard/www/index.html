@@ -5101,12 +5101,28 @@
           group.add(leftWall);
           networkState.wallMeshes.push(leftWall);
 
-          // Right wall (east)
-          const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
-          rightWall.position.set(rx + halfW, wallHeight/2, rz);
-          rightWall.castShadow = true;
-          group.add(rightWall);
-          networkState.wallMeshes.push(rightWall);
+          // Right wall (east) - special handling for kitchen to stop at wall 16
+          if (config.id === 'kitchen') {
+            // Kitchen's right wall should stop at Study↔Living boundary (z=3.697)
+            // instead of extending to kitchen's front edge (z=4.287)
+            const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+            const wall16Z = study.z + study.depth/2;  // 3.697
+            const kitchenBackZ = config.z - config.depth/2;  // 2.149
+            const shortenedDepth = wall16Z - kitchenBackZ;  // 1.548
+            const shortenedCenterZ = (kitchenBackZ + wall16Z) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, shortenedDepth), wallMat);
+            rightWall.position.set(rx + halfW, wallHeight/2, shortenedCenterZ);
+            rightWall.castShadow = true;
+            group.add(rightWall);
+            networkState.wallMeshes.push(rightWall);
+          } else {
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+            rightWall.position.set(rx + halfW, wallHeight/2, rz);
+            rightWall.castShadow = true;
+            group.add(rightWall);
+            networkState.wallMeshes.push(rightWall);
+          }
 
           // Furniture
           this.createFurniture(group, config, rx, rz);
