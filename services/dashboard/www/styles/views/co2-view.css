@@ -1,0 +1,531 @@
+/* ========================================
+   CO2 MONITOR VIEW
+   Dedicated view for CO2 air quality monitoring
+   ======================================== */
+
+/* ---------- Color Tokens ---------- */
+:root {
+  --color-co2-excellent: #34C759;
+  --color-co2-good: #30D158;
+  --color-co2-moderate: #FFD60A;
+  --color-co2-poor: #FF9500;
+  --color-co2-bad: #FF3B30;
+  --color-co2-base: #ff6b6b;
+}
+
+/* ---------- Main Container ---------- */
+.co2-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-lg);
+  gap: var(--space-xl);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---------- Giant Circular Gauge ---------- */
+.co2-gauge-section {
+  text-align: center;
+  width: 100%;
+}
+
+.co2-gauge-header {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: var(--space-md);
+}
+
+.co2-gauge {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+}
+
+.co2-gauge-ring {
+  width: 100%;
+  height: 100%;
+}
+
+.co2-gauge-bg {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 12;
+}
+
+.co2-gauge-arc {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease, stroke 0.4s ease;
+}
+
+.co2-gauge-arc.pulse {
+  animation: gauge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gauge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.co2-gauge-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.co2-value {
+  font-size: 64px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.co2-unit {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: var(--space-xs);
+}
+
+.co2-status {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  margin-top: var(--space-sm);
+  text-transform: capitalize;
+  transition: color 0.3s ease;
+}
+
+.co2-trend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-sm);
+}
+
+.co2-trend.rising {
+  color: var(--color-co2-poor);
+}
+
+.co2-trend.falling {
+  color: var(--color-co2-good);
+}
+
+.co2-trend-arrow {
+  font-size: var(--font-size-lg);
+}
+
+/* ---------- Air Quality Dashboard (3-Card Grid) ---------- */
+.air-quality-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.air-quality-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.air-quality-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.air-quality-card.highlight {
+  border: 2px solid var(--color-co2-base);
+}
+
+.air-quality-icon {
+  font-size: var(--font-size-2xl);
+  margin-bottom: var(--space-sm);
+}
+
+.air-quality-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-xs);
+}
+
+.air-quality-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-sm);
+}
+
+.air-quality-bar {
+  height: 6px;
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.air-quality-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.air-quality-status {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-sm);
+  text-transform: capitalize;
+}
+
+/* ---------- History Chart Section ---------- */
+.co2-chart-section {
+  width: 100%;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.chart-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.time-range-selector {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.time-range-btn {
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.time-range-btn:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.time-range-btn.active {
+  background: var(--color-co2-base);
+  color: white;
+}
+
+.co2-chart-container {
+  position: relative;
+  margin-top: var(--space-md);
+}
+
+.co2-chart {
+  width: 100%;
+  height: 240px;
+  display: block;
+}
+
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  color: var(--color-text-tertiary);
+}
+
+.chart-no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 240px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* Threshold zone backgrounds in chart */
+.threshold-zone-excellent { fill: rgba(52, 199, 89, 0.08); }
+.threshold-zone-good { fill: rgba(48, 209, 88, 0.06); }
+.threshold-zone-moderate { fill: rgba(255, 214, 10, 0.08); }
+.threshold-zone-poor { fill: rgba(255, 149, 0, 0.08); }
+.threshold-zone-bad { fill: rgba(255, 59, 48, 0.08); }
+
+/* Chart stats footer */
+.chart-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.chart-stat {
+  text-align: center;
+}
+
+.chart-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chart-stat-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin-top: var(--space-xs);
+}
+
+/* ---------- Legend / Threshold Scale ---------- */
+.co2-legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ---------- Ambient Mode Overlay ---------- */
+.co2-ambient-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.co2-ambient-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ambient-co2-value {
+  font-size: clamp(120px, 30vw, 280px);
+  font-weight: 200;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1;
+  transition: color 0.5s ease;
+}
+
+.ambient-co2-unit {
+  font-size: clamp(24px, 5vw, 48px);
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  margin-top: var(--space-sm);
+}
+
+.ambient-status {
+  font-size: clamp(18px, 4vw, 32px);
+  font-weight: var(--font-weight-medium);
+  margin-top: var(--space-lg);
+  text-transform: capitalize;
+  transition: color 0.5s ease;
+}
+
+.ambient-trend {
+  font-size: clamp(32px, 7vw, 64px);
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: var(--space-md);
+}
+
+.ambient-room {
+  font-size: clamp(12px, 2.5vw, 18px);
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-top: var(--space-xl);
+}
+
+.ambient-hint {
+  position: absolute;
+  bottom: var(--space-xl);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.15);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ---------- Ambient Toggle Button ---------- */
+.ambient-toggle {
+  position: fixed;
+  bottom: var(--space-lg);
+  right: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+}
+
+.ambient-toggle:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+  transform: scale(1.05);
+}
+
+/* ---------- Last Update Footer ---------- */
+.co2-footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  flex-wrap: wrap;
+}
+
+.co2-footer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.stale-indicator {
+  color: var(--color-warning);
+}
+
+/* ---------- Responsive Design ---------- */
+@media (max-width: 768px) {
+  .co2-view {
+    padding: var(--space-md);
+    gap: var(--space-lg);
+  }
+
+  .co2-gauge {
+    width: 220px;
+    height: 220px;
+  }
+
+  .co2-value {
+    font-size: 48px;
+  }
+
+  .co2-status {
+    font-size: var(--font-size-lg);
+  }
+
+  .air-quality-dashboard {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .air-quality-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    text-align: left;
+    padding: var(--space-md);
+  }
+
+  .air-quality-icon {
+    font-size: var(--font-size-xl);
+    margin-bottom: 0;
+  }
+
+  .air-quality-content {
+    flex: 1;
+  }
+
+  .air-quality-value {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--space-xs);
+  }
+
+  .co2-chart {
+    height: 180px;
+  }
+
+  .chart-stats {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .time-range-selector {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ambient-toggle {
+    bottom: var(--space-md);
+    right: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .co2-gauge {
+    width: 180px;
+    height: 180px;
+  }
+
+  .co2-gauge-bg,
+  .co2-gauge-arc {
+    stroke-width: 10;
+  }
+
+  .co2-value {
+    font-size: 40px;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .time-range-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}

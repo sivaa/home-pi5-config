@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Sensitive credentials - NEVER commit
+configs/homeassistant/SERVICE_ACCOUNT.json
+configs/cloudflared/*.json

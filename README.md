@@ -160,6 +160,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-13 | Added CO2 Monitor dashboard view (view #10) with gauge, history chart, ambient mode |
 | 2025-12-13 | Fixed dashboard history modal - InfluxDB queries & entity ID mapping |
 | 2025-12-12 | Added contact sensor (SNZB-04P) |
 | 2025-12-12 | Added PIR motion sensor (SNZB-03P) and smart plug (S60ZBTPF) |

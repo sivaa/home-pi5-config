@@ -24,6 +24,8 @@ influxdb:
       - sensor.*temperature*
       - sensor.*humidity*
       - sensor.*battery*
+      - sensor.*co2*
+      - sensor.*air_quality*
 
 # Recorder for local history
 recorder:
@@ -33,6 +35,8 @@ recorder:
     entity_globs:
       - sensor.*temperature*
       - sensor.*humidity*
+      - sensor.*co2*
+      - sensor.*air_quality*
 
 logger:
   default: warning

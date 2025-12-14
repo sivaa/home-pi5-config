@@ -24,6 +24,8 @@
   <link rel="stylesheet" href="styles/views/lights.css">
   <link rel="stylesheet" href="styles/views/3d-view.css">
   <link rel="stylesheet" href="styles/views/sensor-config.css">
+  <link rel="stylesheet" href="styles/views/co2-view.css">
+  <link rel="stylesheet" href="styles/views/isometric.css">
 
 
   <!-- Three.js for 3D Floor Plan -->
@@ -251,10 +253,20 @@
           <span class="nav-icon">🏠</span>
           <span class="nav-label">3D</span>
         </button>
+        <button class="nav-tab" :class="{ active: currentView === 'isometric' }"
+                @click="setView('isometric')" title="Isometric View (Press I)">
+          <span class="nav-icon">🔷</span>
+          <span class="nav-label">Iso</span>
+        </button>
         <button class="nav-tab" :class="{ active: currentView === 'config' }"
                 @click="setView('config')" title="Sensor Config (Press 9)">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">Config</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'co2' }"
+                @click="setView('co2')" title="CO2 Monitor (Press 0)">
+          <span class="nav-icon">💨</span>
+          <span class="nav-label">CO2</span>
         </button>
       </div>
     </nav>
@@ -995,6 +1007,52 @@
           </div>
         </div>
 
+        <!-- Isometric Floor Plan View -->
+        <div x-show="currentView === 'isometric'" x-cloak x-data="isometricView()" x-init="init()">
+          <div class="isometric-view">
+            <!-- Controls -->
+            <div class="iso-controls">
+              <div class="iso-view-toggle">
+                <button class="iso-control-btn" :class="{ active: viewMode === 'temperature' }"
+                        @click="setViewMode('temperature')">🌡️ Temp</button>
+                <button class="iso-control-btn" :class="{ active: viewMode === 'humidity' }"
+                        @click="setViewMode('humidity')">💧 Humid</button>
+              </div>
+              <button class="iso-control-btn" :class="{ active: !wallsVisible }"
+                      @click="toggleWalls()">
+                🧱 <span x-text="wallsVisible ? 'Hide Walls' : 'Show Walls'"></span>
+              </button>
+              <button class="iso-control-btn" :class="{ active: darkTheme }"
+                      @click="toggleDarkTheme()">
+                🌙 Dark
+              </button>
+              <button class="iso-control-btn" @click="resetView()">
+                🎯 Reset
+              </button>
+              <div class="iso-zoom-controls">
+                <button class="iso-control-btn iso-zoom-btn" @click="zoomOut()">➖</button>
+                <span class="iso-zoom-indicator" x-text="getZoomPercent() + '%'"></span>
+                <button class="iso-control-btn iso-zoom-btn" @click="zoomIn()">➕</button>
+              </div>
+            </div>
+
+            <!-- Isometric Canvas Container -->
+            <div class="iso-container" x-ref="isoContainer"></div>
+
+            <!-- Legend -->
+            <div class="iso-legend">
+              <span class="iso-legend-label" x-text="viewMode === 'temperature' ? 'Cold' : 'Dry'"></span>
+              <div class="iso-legend-gradient" :class="{ humidity: viewMode === 'humidity' }"></div>
+              <span class="iso-legend-label" x-text="viewMode === 'temperature' ? 'Hot' : 'Humid'"></span>
+            </div>
+
+            <!-- Tip -->
+            <div class="iso-tip">
+              🔷 Isometric view • Drag to pan, scroll to zoom • Press I for quick access
+            </div>
+          </div>
+        </div>
+
         <!-- Vision 9: Sensor Configuration -->
         <div x-show="currentView === 'config'" x-cloak x-data="sensorConfigView()" x-init="init()">
           <div class="sensor-config-container">
@@ -1115,6 +1173,171 @@
           </div>
         </div>
 
+        <!-- Vision 10: CO2 Monitor -->
+        <div x-show="currentView === 'co2'" x-cloak x-data="co2View()" x-init="init()">
+          <div class="co2-view">
+
+            <!-- Giant Circular Gauge -->
+            <div class="co2-gauge-section">
+              <div class="co2-gauge-header">AIR QUALITY</div>
+              <div class="co2-gauge">
+                <svg viewBox="0 0 200 200" class="co2-gauge-ring">
+                  <circle cx="100" cy="100" r="90" class="co2-gauge-bg"/>
+                  <circle cx="100" cy="100" r="90"
+                          class="co2-gauge-arc"
+                          :class="{ pulse: !isStale }"
+                          :stroke="co2Color"
+                          :stroke-dasharray="gaugeArc"
+                          transform="rotate(-90 100 100)"/>
+                </svg>
+                <div class="co2-gauge-content">
+                  <span class="co2-value" :style="{ color: co2Color }" x-text="co2Value ?? '--'"></span>
+                  <span class="co2-unit">ppm</span>
+                  <span class="co2-status" :style="{ color: co2Color }" x-text="airQualityLevel"></span>
+                  <div class="co2-trend" :class="trendDirection" x-show="trendDirection !== 'stable'">
+                    <span class="co2-trend-arrow" x-text="trendArrow"></span>
+                    <span x-text="trendValue + ' ppm'"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Air Quality Dashboard (3 Cards) -->
+            <div class="air-quality-dashboard">
+              <!-- CO2 Card -->
+              <div class="air-quality-card highlight">
+                <div class="air-quality-icon">💨</div>
+                <div class="air-quality-label">CO2</div>
+                <div class="air-quality-value" :style="{ color: co2Color }" x-text="(co2Value ?? '--') + ' ppm'"></div>
+                <div class="air-quality-bar">
+                  <div class="air-quality-fill" :style="{ width: co2Percent + '%', background: co2Color }"></div>
+                </div>
+                <div class="air-quality-status" x-text="airQualityLevel"></div>
+              </div>
+
+              <!-- Temperature Card -->
+              <div class="air-quality-card">
+                <div class="air-quality-icon">🌡️</div>
+                <div class="air-quality-label">Temperature</div>
+                <div class="air-quality-value" :style="{ color: tempColor }" x-text="temperature !== null ? temperature.toFixed(1) + '°C' : '--'"></div>
+                <div class="air-quality-bar">
+                  <div class="air-quality-fill" :style="{ width: tempPercent + '%', background: tempColor }"></div>
+                </div>
+                <div class="air-quality-status" x-text="tempLevel"></div>
+              </div>
+
+              <!-- Humidity Card -->
+              <div class="air-quality-card">
+                <div class="air-quality-icon">💧</div>
+                <div class="air-quality-label">Humidity</div>
+                <div class="air-quality-value" :style="{ color: humidityColor }" x-text="humidity !== null ? Math.round(humidity) + '%' : '--'"></div>
+                <div class="air-quality-bar">
+                  <div class="air-quality-fill" :style="{ width: humidityPercent + '%', background: humidityColor }"></div>
+                </div>
+                <div class="air-quality-status" x-text="humidityLevel"></div>
+              </div>
+            </div>
+
+            <!-- History Chart -->
+            <div class="co2-chart-section">
+              <div class="chart-header">
+                <div class="chart-title">CO2 History</div>
+                <div class="time-range-selector">
+                  <template x-for="range in timeRanges" :key="range">
+                    <button class="time-range-btn"
+                            :class="{ active: timeRange === range }"
+                            @click="setTimeRange(range)"
+                            x-text="range"></button>
+                  </template>
+                </div>
+              </div>
+
+              <div class="co2-chart-container">
+                <div class="chart-loading" x-show="loading">
+                  <span class="loading-indicator"></span>
+                  Loading history...
+                </div>
+                <div class="chart-no-data" x-show="!loading && co2History.length === 0">
+                  No data in this time range
+                </div>
+                <svg id="co2-history-chart" class="co2-chart" x-show="!loading && co2History.length > 0"></svg>
+              </div>
+
+              <!-- Chart Stats -->
+              <div class="chart-stats" x-show="co2History.length > 0">
+                <div class="chart-stat">
+                  <div class="chart-stat-label">Min</div>
+                  <div class="chart-stat-value" x-text="minMax.min + ' ppm'"></div>
+                </div>
+                <div class="chart-stat">
+                  <div class="chart-stat-label">Avg</div>
+                  <div class="chart-stat-value" x-text="avgCo2 + ' ppm'"></div>
+                </div>
+                <div class="chart-stat">
+                  <div class="chart-stat-label">Max</div>
+                  <div class="chart-stat-value" x-text="minMax.max + ' ppm'"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="co2-legend">
+              <div class="legend-item">
+                <div class="legend-dot" style="background: #34C759;"></div>
+                <span>Excellent (&lt;600)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: #30D158;"></div>
+                <span>Good (600-1000)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: #FFD60A;"></div>
+                <span>Moderate (1000-1500)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: #FF9500;"></div>
+                <span>Poor (1500-2000)</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-dot" style="background: #FF3B30;"></div>
+                <span>Bad (&gt;2000)</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="co2-footer">
+              <div class="co2-footer-item" :class="{ 'stale-indicator': isStale }">
+                <span x-text="isStale ? '⚠️' : '✓'"></span>
+                <span x-text="'Last update: ' + formatLastUpdate()"></span>
+              </div>
+              <div class="co2-footer-item">
+                <span>📍</span>
+                <span x-text="sensorRoom"></span>
+              </div>
+              <div class="co2-footer-item" x-show="co2History.length > 0">
+                <span>📊</span>
+                <span x-text="co2History.length + ' readings'"></span>
+              </div>
+            </div>
+
+            <!-- Ambient Mode Toggle Button -->
+            <button class="ambient-toggle" @click="toggleAmbient()">
+              🌙 Ambient Mode
+            </button>
+
+            <!-- Ambient Mode Overlay -->
+            <div class="co2-ambient-overlay" :class="{ hidden: !ambientMode }" @click="ambientMode = false">
+              <div class="ambient-co2-value" :style="{ color: co2Color }" x-text="co2Value ?? '--'"></div>
+              <div class="ambient-co2-unit">ppm</div>
+              <div class="ambient-status" :style="{ color: co2Color }" x-text="airQualityLevel"></div>
+              <div class="ambient-trend" x-text="trendArrow"></div>
+              <div class="ambient-room" x-text="sensorRoom"></div>
+              <div class="ambient-hint">Tap anywhere to exit</div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -1205,50 +1428,556 @@
   </div>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- Stub for co2View - provides initial state and reactive getters -->
+  <script>
+    window.co2View = function() {
+      return {
+        // CO2 Thresholds (ppm)
+        thresholds: { excellent: 600, good: 1000, moderate: 1500, poor: 2000 },
+
+        // State
+        timeRange: '6h',
+        timeRanges: ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '3d', '7d'],
+        loading: false,
+        co2History: [],
+        tempHistory: [],
+        humidHistory: [],
+        trendDirection: 'stable',
+        trendValue: 0,
+        ambientMode: false,
+        _moduleLoaded: false,
+
+        // Reactive getters that access the store directly
+        get co2Sensor() {
+          const sensors = this.$store?.sensors;
+          if (!sensors?.devices) return null;
+          return sensors.devices.find(d =>
+            d.friendly_name?.toLowerCase().includes('co2') && d.sensorType === 'co2'
+          );
+        },
+        get liveData() {
+          if (!this.co2Sensor) return null;
+          return this.$store?.sensors?.getLiveData?.(this.co2Sensor.ieee_address) ?? null;
+        },
+        get co2Value() { return this.liveData?.co2 ?? null; },
+        get temperature() { return this.liveData?.temperature ?? null; },
+        get humidity() { return this.liveData?.humidity ?? null; },
+        get airQualityLevel() {
+          const co2 = this.co2Value;
+          if (co2 === null) return 'unknown';
+          if (co2 < this.thresholds.excellent) return 'excellent';
+          if (co2 < this.thresholds.good) return 'good';
+          if (co2 < this.thresholds.moderate) return 'moderate';
+          if (co2 < this.thresholds.poor) return 'poor';
+          return 'bad';
+        },
+        get co2Color() {
+          const colors = { excellent: '#34C759', good: '#30D158', moderate: '#FFD60A', poor: '#FF9500', bad: '#FF3B30', unknown: '#AEAEB2' };
+          return colors[this.airQualityLevel];
+        },
+        get gaugeArc() {
+          const maxPPM = 2500;
+          const value = Math.min(this.co2Value || 0, maxPPM);
+          const percent = value / maxPPM;
+          const circumference = 2 * Math.PI * 90;
+          return `${percent * circumference} ${circumference}`;
+        },
+        get tempLevel() {
+          const temp = this.temperature;
+          if (temp === null) return 'unknown';
+          if (temp < 18) return 'cold';
+          if (temp < 20) return 'cool';
+          if (temp <= 26) return 'comfortable';
+          if (temp <= 28) return 'warm';
+          return 'hot';
+        },
+        get tempColor() {
+          const colors = { cold: '#90CAF9', cool: '#A5D6A7', comfortable: '#81C784', warm: '#FFE082', hot: '#EF5350', unknown: '#AEAEB2' };
+          return colors[this.tempLevel];
+        },
+        get humidityLevel() {
+          const h = this.humidity;
+          if (h === null) return 'unknown';
+          if (h < 30) return 'dry';
+          if (h < 40) return 'low';
+          if (h <= 60) return 'optimal';
+          if (h <= 70) return 'high';
+          return 'humid';
+        },
+        get humidityColor() {
+          const colors = { dry: '#FFCC80', low: '#A5D6A7', optimal: '#81C784', high: '#90CAF9', humid: '#5C6BC0', unknown: '#AEAEB2' };
+          return colors[this.humidityLevel];
+        },
+        get isStale() {
+          if (!this.co2Sensor) return true;
+          return this.$store?.sensors?.isStale?.(this.co2Sensor.ieee_address) ?? true;
+        },
+        get trendArrow() {
+          if (this.trendDirection === 'rising') return '\u2191';
+          if (this.trendDirection === 'falling') return '\u2193';
+          return '\u2192';
+        },
+        get sensorRoom() {
+          if (!this.co2Sensor) return 'Unknown';
+          const name = this.co2Sensor.friendly_name || '';
+          const match = name.match(/\[([^\]]+)\]/);
+          return match ? match[1] + ' Room' : 'Room';
+        },
+        get minMax() {
+          if (this.co2History.length === 0) return { min: '--', max: '--' };
+          const values = this.co2History.map(d => d.value);
+          return { min: Math.round(Math.min(...values)), max: Math.round(Math.max(...values)) };
+        },
+        get avgCo2() {
+          if (this.co2History.length === 0) return '--';
+          const sum = this.co2History.reduce((acc, d) => acc + d.value, 0);
+          return Math.round(sum / this.co2History.length);
+        },
+        get co2Percent() { return Math.min(100, ((this.co2Value || 0) / 2500) * 100); },
+        get tempPercent() { return Math.min(100, Math.max(0, ((this.temperature || 20) - 15) / 20 * 100)); },
+        get humidityPercent() { return Math.min(100, Math.max(0, this.humidity || 0)); },
+
+        // Methods
+        init() {
+          console.log('[co2-view] Stub initialized, waiting for module...');
+          window._co2ViewComponent = this;
+          this._checkForModule();
+        },
+
+        _checkForModule() {
+          if (window._co2ViewMethods && !this._moduleLoaded) {
+            console.log('[co2-view] Module methods available, enhancing...');
+            this._moduleLoaded = true;
+            // Only copy methods, not getters (getters are already defined above)
+            const methods = window._co2ViewMethods;
+            if (methods.loadHistoricalData) this.loadHistoricalData = methods.loadHistoricalData.bind(this);
+            if (methods.queryInflux) this.queryInflux = methods.queryInflux.bind(this);
+            if (methods.setTimeRange) this.setTimeRange = methods.setTimeRange.bind(this);
+            if (methods.drawChart) this.drawChart = methods.drawChart.bind(this);
+            if (methods.drawThresholdZones) this.drawThresholdZones = methods.drawThresholdZones.bind(this);
+            if (methods.formatTimeLabel) this.formatTimeLabel = methods.formatTimeLabel.bind(this);
+            if (methods.calculateTrend) this.calculateTrend = methods.calculateTrend.bind(this);
+            if (methods.formatLastUpdate) this.formatLastUpdate = methods.formatLastUpdate.bind(this);
+            // Load historical data now
+            this.loadHistoricalData();
+          } else if (!this._moduleLoaded) {
+            setTimeout(() => this._checkForModule(), 100);
+          }
+        },
+
+        loadHistoricalData() { console.log('[co2-view] Stub loadHistoricalData (waiting for module)'); },
+        setTimeRange(range) { this.timeRange = range; },
+        drawChart() {},
+        calculateTrend() {},
+        formatLastUpdate() { return 'No data'; },
+        toggleAmbient() { this.ambientMode = !this.ambientMode; },
+        destroy() {}
+      };
+    };
+  </script>
+
+  <!-- Stub for sensorConfigView - reactive stub that pulls from Alpine store -->
+  <script>
+    window.sensorConfigView = function() {
+      return {
+        searchQuery: '',
+        expandedTypes: { climate: true, co2: true, motion: true, contact: true },
+        showHelp: false,
+        isTopView: false,
+        showCoverage: false,
+        tooltip: { text: '', visible: false, x: 0, y: 0 },
+        selectedSensor: null,
+
+        init() {
+          console.log('[sensor-config] Stub initialized, waiting for Three.js module...');
+          // Store reference for module to find and enhance
+          window._sensorConfigComponent = this;
+          this._checkForThreeJS();
+        },
+
+        _checkForThreeJS() {
+          if (window._initSensorConfigThreeJS) {
+            console.log('[sensor-config] Three.js module ready, initializing 3D view...');
+            window._initSensorConfigThreeJS(this);
+          } else {
+            // Keep checking until module loads
+            setTimeout(() => this._checkForThreeJS(), 100);
+          }
+        },
+
+        // Reactive getters that pull from sensors store
+        get loading() { return Alpine.store('sensors')?.loading ?? true; },
+        get placedCount() { return Alpine.store('sensors')?.placedCount ?? 0; },
+        get totalCount() { return Alpine.store('sensors')?.totalCount ?? 0; },
+        get sensors() { return Alpine.store('sensors')?.devices ?? []; },
+        get positions() { return Alpine.store('sensors')?.positions ?? {}; },
+        get selectedRoom() {
+          if (!this.selectedSensor) return null;
+          return Alpine.store('sensors')?.getPosition(this.selectedSensor.ieee_address)?.roomId || null;
+        },
+        get hasCoverageToggle() {
+          return this.sensors.some(s => s.sensorType === 'motion');
+        },
+        get sensorsByType() {
+          const sensors = this.sensors;
+          const grouped = { climate: [], co2: [], motion: [], contact: [] };
+          sensors.forEach(sensor => {
+            const type = sensor.sensorType || 'climate';
+            if (grouped[type]) {
+              if (!this.searchQuery ||
+                  sensor.friendly_name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                  type.includes(this.searchQuery.toLowerCase())) {
+                grouped[type].push(sensor);
+              }
+            }
+          });
+          return grouped;
+        },
+
+        // Helper methods
+        getTypeIcon(type) { return { climate: '🌡️', co2: '💨', motion: '👁️', contact: '🚪' }[type] || '📡'; },
+        getTypeLabel(type) { return { climate: 'Temperature & Humidity', co2: 'CO₂ Sensors', motion: 'Motion Sensors', contact: 'Contact Sensors' }[type] || 'Unknown'; },
+        getTypeColor(type) { return { climate: '#34d399', co2: '#ff6b6b', motion: '#ffd93d', contact: '#38bdf8' }[type] || '#888'; },
+
+        formatLiveValue(sensor) {
+          const data = Alpine.store('sensors')?.getLiveData(sensor.ieee_address);
+          if (!data) return '--';
+          switch (sensor.sensorType) {
+            case 'climate':
+              const temp = data.temperature !== undefined ? `${data.temperature.toFixed(1)}°` : '--';
+              const hum = data.humidity !== undefined ? `${Math.round(data.humidity)}%` : '';
+              return `${temp} ${hum}`.trim();
+            case 'co2': return data.co2 !== undefined ? `${data.co2} ppm` : '--';
+            case 'motion': return data.occupancy !== undefined ? (data.occupancy ? '🔴 Motion' : '⚪ Clear') : '--';
+            case 'contact': return data.contact !== undefined ? (data.contact ? '🔒 Closed' : '🔓 Open') : '--';
+            default: return '--';
+          }
+        },
+        isPlaced(ieee) { return Alpine.store('sensors')?.isPlaced(ieee) || false; },
+        isStale(ieee) { return Alpine.store('sensors')?.isStale(ieee) || false; },
+
+        selectSensor(sensor) {
+          this.selectedSensor = this.selectedSensor?.ieee_address === sensor.ieee_address ? null : sensor;
+          if (window._sensorConfigController) {
+            window._sensorConfigController.selectedSensor = this.selectedSensor?.ieee_address;
+          }
+        },
+        startDrag(e, sensor) {
+          e.dataTransfer?.setData('sensor-ieee', sensor.ieee_address);
+          this.selectedSensor = sensor;
+          // Start drag in Three.js controller
+          if (window._sensorConfigController?.startDragFromPalette) {
+            window._sensorConfigController.startDragFromPalette(sensor.ieee_address);
+          }
+        },
+        onDragOver(e) {
+          e.preventDefault();
+          // Check if dragging a sensor
+          if (!e.dataTransfer?.types?.includes('sensor-ieee')) return;
+
+          const controller = window._sensorConfigController;
+          const container = e.currentTarget;
+          if (!controller || !container) return;
+
+          // Calculate normalized mouse position
+          const rect = container.getBoundingClientRect();
+          const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+          // Update preview position
+          if (controller.updateDragPreview) {
+            controller.updateDragPreview(x, y);
+          }
+        },
+        onDragLeave(e) {
+          // Hide preview when leaving canvas
+          const threeState = window._configThreeState;
+          if (threeState?.dragPreview) {
+            threeState.dragPreview.visible = false;
+          }
+        },
+        onDrop(e) {
+          e.preventDefault();
+          const ieee = e.dataTransfer?.getData('sensor-ieee');
+          if (!ieee) return;
+
+          const controller = window._sensorConfigController;
+          const container = e.currentTarget;
+          if (!controller || !container) return;
+
+          // Calculate normalized mouse position for raycasting
+          const rect = container.getBoundingClientRect();
+          const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+          // Use controller to handle the drop
+          if (controller.handlePaletteDrop) {
+            controller.handlePaletteDrop(ieee, x, y);
+          }
+        },
+        resetView() {
+          if (window._sensorConfigController?.onResize) {
+            window._sensorConfigController.onResize();
+          }
+        },
+        toggleTopView() {
+          this.isTopView = !this.isTopView;
+          // Could adjust camera angle via controller
+        },
+        zoomIn() {
+          // Zoom via Three.js camera if available
+          console.log('[stub] zoomIn');
+        },
+        zoomOut() {
+          console.log('[stub] zoomOut');
+        },
+        resetAllPositions() { Alpine.store('sensors')?.resetAllPositions(); },
+        toggleCoverage() {
+          this.showCoverage = !this.showCoverage;
+          if (window._sensorConfigController?.toggleCoverage) {
+            window._sensorConfigController.toggleCoverage();
+          }
+        }
+      };
+    };
+  </script>
+
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
-  <!-- Sensor Config Module (imports from modular files) -->
+  <!-- CO2 Monitor Module - enhances the stub with methods -->
   <script type="module">
-    import { sensorConfigView } from './views/sensor-config.js';
+    import { co2View } from './views/co2-monitor.js?v=3';
+
+    // Get the module object and extract only the methods (not getters)
+    const moduleObj = co2View();
+    window._co2ViewMethods = {
+      loadHistoricalData: moduleObj.loadHistoricalData,
+      queryInflux: moduleObj.queryInflux,
+      setTimeRange: moduleObj.setTimeRange,
+      drawChart: moduleObj.drawChart,
+      drawThresholdZones: moduleObj.drawThresholdZones,
+      formatTimeLabel: moduleObj.formatTimeLabel,
+      calculateTrend: moduleObj.calculateTrend,
+      formatLastUpdate: moduleObj.formatLastUpdate
+    };
+    console.log('[co2-monitor] Module loaded, methods ready');
+
+    // If stub component exists, trigger enhancement
+    if (window._co2ViewComponent && !window._co2ViewComponent._moduleLoaded) {
+      console.log('[co2-monitor] Stub found, enhancing with methods...');
+      window._co2ViewComponent._checkForModule();
+    }
+  </script>
+
+  <!-- Sensor Config Module - loads after Alpine, enhances the stub -->
+  <script type="module">
+    import { sensorConfigView } from './views/sensor-config.js?v=3';
     import { initSensorsStore } from './js/stores/sensors-store.js';
     import { FLOOR_PLAN_CONFIG, SENSOR_VISUALS } from './js/config.js';
 
-    // Make sensorConfigView available globally with config bound
+    // Create a Three.js controller that will manage the 3D view
+    // This is separate from Alpine's reactive system to avoid proxy issues
+    const threeJSController = sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, THREE.OrbitControls);
+
+    // Store controller globally for stub access
+    window._sensorConfigThreeJS = threeJSController;
+
+    // Expose initialization function for stub to call
+    // Guard against multiple initializations
+    let initializationComplete = false;
+
+    window._initSensorConfigThreeJS = function(alpineComponent) {
+      // Prevent multiple initializations
+      if (initializationComplete) {
+        console.log('[sensor-config] Already initialized, skipping');
+        return;
+      }
+      console.log('[sensor-config] Initializing Three.js controller...');
+
+      // The controller needs access to Alpine component for $refs
+      const container = alpineComponent.$refs?.configCanvas;
+      if (!container) {
+        console.error('[sensor-config] Container ref not found, retrying...');
+        setTimeout(() => window._initSensorConfigThreeJS(alpineComponent), 100);
+        return;
+      }
+
+      // Create proxy object that gives controller access to container
+      const controllerContext = {
+        $refs: { configCanvas: container },
+        tooltip: alpineComponent.tooltip,
+        selectedSensor: null,
+        showMotionCoverage: false
+      };
+
+      // Bind all controller methods to the proxy context
+      Object.keys(threeJSController).forEach(key => {
+        if (typeof threeJSController[key] === 'function') {
+          controllerContext[key] = threeJSController[key].bind(controllerContext);
+        }
+      });
+
+      // Store the bound controller for stub methods to use
+      window._sensorConfigController = controllerContext;
+
+      // Add custom drop handler for palette drops
+      controllerContext.handlePaletteDrop = function(ieee, mouseX, mouseY) {
+        const threeState = window._configThreeState;
+
+        // Hide drag preview
+        if (threeState?.dragPreview) {
+          threeState.dragPreview.visible = false;
+        }
+
+        // Re-enable controls
+        if (threeState?.controls) {
+          threeState.controls.enabled = true;
+        }
+
+        if (!threeState?.raycaster || !threeState?.camera || !threeState?.floorPlane) {
+          console.error('[sensor-config] Three.js state not ready for drop', {
+            raycaster: !!threeState?.raycaster,
+            camera: !!threeState?.camera,
+            floorPlane: !!threeState?.floorPlane
+          });
+          return;
+        }
+
+        // Set mouse position for raycaster
+        const mouse = new THREE.Vector2(mouseX, mouseY);
+        threeState.raycaster.setFromCamera(mouse, threeState.camera);
+
+        // Raycast to floor plane
+        const intersects = threeState.raycaster.intersectObject(threeState.floorPlane);
+        if (intersects.length === 0) {
+          console.log('[sensor-config] Drop missed floor plane');
+          return;
+        }
+
+        const point = intersects[0].point;
+        const sensor = Alpine.store('sensors').getSensor(ieee);
+        if (!sensor) {
+          console.error('[sensor-config] Sensor not found:', ieee);
+          return;
+        }
+
+        const visuals = window.SENSOR_VISUALS?.[sensor.sensorType] || window.SENSOR_VISUALS?.climate;
+        const position = {
+          x: point.x,
+          y: visuals?.heightAboveFloor || 1.5,
+          z: point.z
+        };
+
+        // Detect which room using bound detectRoom method
+        const roomId = controllerContext.detectRoom ? controllerContext.detectRoom(point.x, point.z) : null;
+
+        // Save position to store (persists via MQTT)
+        Alpine.store('sensors').savePosition(ieee, position, roomId);
+        console.log('[sensor-config] Sensor placed:', ieee, 'at', position, 'in', roomId);
+      };
+
+      // Update preview position during drag-over
+      controllerContext.updateDragPreview = function(mouseX, mouseY) {
+        const threeState = window._configThreeState;
+        if (!threeState?.raycaster || !threeState?.camera || !threeState?.floorPlane) return;
+
+        // Raycast to floor plane
+        const mouse = new THREE.Vector2(mouseX, mouseY);
+        threeState.raycaster.setFromCamera(mouse, threeState.camera);
+        const intersects = threeState.raycaster.intersectObject(threeState.floorPlane);
+
+        if (intersects.length === 0) {
+          // Hide preview if not over floor
+          if (threeState.dragPreview) threeState.dragPreview.visible = false;
+          return;
+        }
+
+        const point = intersects[0].point;
+
+        // Create preview sphere if not exists
+        if (!threeState.dragPreview) {
+          const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+          const material = new THREE.MeshBasicMaterial({
+            color: 0x34d399,  // Green
+            transparent: true,
+            opacity: 0.8
+          });
+          threeState.dragPreview = new THREE.Mesh(geometry, material);
+          threeState.scene.add(threeState.dragPreview);
+        }
+
+        // Update preview position
+        threeState.dragPreview.visible = true;
+        threeState.dragPreview.position.set(point.x, 1.5, point.z);
+
+        // Color based on validity (green = valid room, red = invalid)
+        const roomId = controllerContext.detectRoom ? controllerContext.detectRoom(point.x, point.z) : null;
+        threeState.dragPreview.material.color.setHex(roomId ? 0x34d399 : 0xff6b6b);
+      };
+
+      // Custom initialization that waits for container to be visible
+      function initThreeJS() {
+        const c = container;
+        if (!c || c.clientWidth === 0 || c.clientHeight === 0) {
+          // Container not visible yet (view hidden), retry
+          setTimeout(initThreeJS, 200);
+          return;
+        }
+
+        console.log('[sensor-config] Container ready, initializing Three.js...');
+        try {
+          controllerContext.initScene();
+          controllerContext.initCamera(c, THREE.OrbitControls);
+          controllerContext.initRenderer(c);
+          controllerContext.initLighting();
+          controllerContext.initRaycaster();
+          controllerContext.buildFloorPlan();
+          controllerContext.setupEventListeners(c);
+          controllerContext.animate();
+          initializationComplete = true;
+          console.log('[sensor-config] Three.js initialization complete!');
+        } catch (e) {
+          console.error('[sensor-config] Three.js init error:', e);
+        }
+      }
+
+      initThreeJS();
+    };
+    console.log('[sensor-config] Module loaded, _initSensorConfigThreeJS ready');
+
+    // Replace stub for any future component creations
     window.sensorConfigView = function() {
       return sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, THREE.OrbitControls);
     };
 
-    // Initialize sensors store - handle both early and late loading scenarios
+    // Initialize sensors store
     function initSensors() {
       const CONFIG = window.CONFIG;
-      if (typeof Alpine !== 'undefined' && CONFIG && !Alpine.store('sensors')) {
-        initSensorsStore(Alpine, CONFIG);
-        console.log('[sensor-config] Sensors store initialized');
-      }
-      // Initialize the store's MQTT subscriptions after a short delay
-      setTimeout(() => {
-        if (Alpine.store('sensors') && Alpine.store('mqtt')?.client) {
-          Alpine.store('sensors').init();
-          console.log('[sensor-config] Sensors MQTT subscriptions initialized');
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('sensors')) {
+          initSensorsStore(Alpine, CONFIG);
+          console.log('[sensor-config] Sensors store initialized');
         }
-      }, 2000);
+        // Initialize MQTT subscriptions
+        setTimeout(() => {
+          const sensorsStore = Alpine.store('sensors');
+          if (sensorsStore && Alpine.store('mqtt')?.client) {
+            sensorsStore.init();
+            console.log('[sensor-config] Sensors MQTT subscriptions initialized');
+          }
+        }, 2000);
+      }
     }
 
-    // Try to initialize on alpine:init
-    document.addEventListener('alpine:init', () => {
-      const CONFIG = window.CONFIG;
-      if (CONFIG) {
-        initSensorsStore(Alpine, CONFIG);
-        console.log('[sensor-config] Sensors store registered in alpine:init');
-      }
-    });
-
-    // Also try after DOMContentLoaded (in case alpine:init already fired)
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initSensors);
+    // Try to initialize
+    if (typeof Alpine !== 'undefined') {
+      initSensors();
     } else {
-      // DOM already loaded, run now
-      setTimeout(initSensors, 100);
+      document.addEventListener('alpine:init', () => {
+        initSensorsStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initSensors);
     }
   </script>
 

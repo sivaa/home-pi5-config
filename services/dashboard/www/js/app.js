@@ -21,6 +21,8 @@ import { classicView } from '../views/classic.js';
 import { lightsView } from '../views/lights.js';
 import { threeDView } from '../views/floor-plan-3d.js';
 import { sensorConfigView } from '../views/sensor-config.js';
+import { co2View } from '../views/co2-monitor.js';
+import { isometricView } from '../views/isometric.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -83,11 +85,16 @@ window.app = function() {
       Alpine.store('rooms').loadHistorical();
       Alpine.store('mqtt').connect();
 
-      // Keyboard shortcuts for view switching (1-9)
+      // Keyboard shortcuts for view switching (1-9, 0 for CO2, I for Isometric)
       document.addEventListener('keydown', (e) => {
-        if (e.key >= '1' && e.key <= '9' && !e.ctrlKey && !e.metaKey) {
-          const views = ['comfort', 'compare', 'floor', '3d', 'ambient', 'timeline', 'classic', 'lights', 'config'];
-          const index = parseInt(e.key) - 1;
+        // 'I' key for isometric view
+        if ((e.key === 'i' || e.key === 'I') && !e.ctrlKey && !e.metaKey) {
+          this.setView('isometric');
+          return;
+        }
+        if ((e.key >= '1' && e.key <= '9' || e.key === '0') && !e.ctrlKey && !e.metaKey) {
+          const views = ['comfort', 'compare', 'floor', '3d', 'ambient', 'timeline', 'classic', 'lights', 'config', 'co2'];
+          const index = e.key === '0' ? 9 : parseInt(e.key) - 1;
           if (index < views.length) {
             this.setView(views[index]);
           }
@@ -133,6 +140,14 @@ window.threeDView = function() {
 // Sensor config view is also a factory function
 window.sensorConfigView = function() {
   return sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, OrbitControls);
+};
+
+// CO2 monitor view
+window.co2View = co2View;
+
+// Isometric view is a factory function
+window.isometricView = function() {
+  return isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS);
 };
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');
