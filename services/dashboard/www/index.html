@@ -4963,8 +4963,9 @@
          * THEN: Interior divider walls created in buildFloorPlan():
          *   15 = Study↔Living horizontal divider
          *   16 = North wall connector (Study back to Bathroom back)
+         *   17 = Coat hanging wall (hallway, 30% from north)
          *
-         * TOTAL: 17 walls (indices 0-16)
+         * TOTAL: 18 walls (indices 0-17)
          *
          * COMMON MISTAKE: Assuming interior walls are created BEFORE
          * room walls. They are created AFTER! Always verify by checking the
@@ -5019,6 +5020,21 @@
           connectorWall.castShadow = true;
           networkState.scene.add(connectorWall);
           networkState.wallMeshes.push(connectorWall);
+
+          // Wall 17: Coat hanging wall in hallway (30% from wall 16 towards wall 15)
+          const wall16Z = 0;  // North connector position
+          const wall15Z = study.z + study.depth/2;  // 3.697 (Study↔Living divider)
+          const coatWallLength = (wall15Z - wall16Z) * 0.30;  // 30% of distance ≈ 1.1m
+          const coatWallCenterZ = wall16Z + coatWallLength / 2;  // Start from wall 16
+
+          // Position at hallway center x
+          const hallwayCenterX = FLOOR_PLAN_CONFIG.hallway.x;  // 3.839
+
+          const coatWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, coatWallLength), wallMat);
+          coatWall.position.set(hallwayCenterX - centerX, wallHeight/2, coatWallCenterZ - centerZ);
+          coatWall.castShadow = true;
+          networkState.scene.add(coatWall);
+          networkState.wallMeshes.push(coatWall);
 
           // Wall 4: Living ↔ Bedroom - NOT NEEDED
           // Bedroom's left wall from createRoom() already serves as the divider
