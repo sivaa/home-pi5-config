@@ -4907,40 +4907,47 @@
             this.createRoom(config);
           });
 
-          // Add hallway floor
+          // Add hallway - extended to align with study/bathroom back walls at z=0
           const hw = FLOOR_PLAN_CONFIG.hallway;
-          const hallwayGeom = new THREE.PlaneGeometry(hw.width, hw.depth);
+          const wallHeight = 0.8;
+          const wallColor = 0xB5A080;
+          const hwX = hw.x - centerX;
+
+          // Calculate positions aligned with study/bathroom outer wall at z=0
+          const backWallZ = 0 - centerZ;  // z=0 in config = back of apartment
+          const frontWallZ = hw.z + hw.depth/2 - centerZ;  // Front of hallway
+          const hallwayDepth = frontWallZ - backWallZ;  // Full depth from back to hallway front
+          const hallwayCenterZ = (backWallZ + frontWallZ) / 2;
+
+          // Hallway floor - extended from back wall to front
+          const hallwayGeom = new THREE.PlaneGeometry(hw.width, hallwayDepth);
           const hallwayMat = new THREE.MeshStandardMaterial({ color: 0xD4C4B0, roughness: 0.8 });
           const hallway = new THREE.Mesh(hallwayGeom, hallwayMat);
           hallway.rotation.x = -Math.PI / 2;
-          hallway.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
+          hallway.position.set(hwX, 0.005, hallwayCenterZ);
           hallway.receiveShadow = true;
           networkState.scene.add(hallway);
 
-          // Add hallway walls (close the corridor)
-          const wallHeight = 0.8;
-          const wallColor = 0xB5A080;
+          // Add hallway walls
           const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7 });
-          const hwX = hw.x - centerX;
-          const hwZ = hw.z - centerZ;
 
-          // Hallway west wall (between study and living)
-          const hwWestWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, hw.depth), wallMat);
-          hwWestWall.position.set(hwX - hw.width/2, wallHeight/2, hwZ);
+          // Hallway west wall - extends from back wall to hallway front
+          const hwWestWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, hallwayDepth), wallMat);
+          hwWestWall.position.set(hwX - hw.width/2, wallHeight/2, hallwayCenterZ);
           hwWestWall.castShadow = true;
           networkState.scene.add(hwWestWall);
           networkState.wallMeshes.push(hwWestWall);
 
-          // Hallway north wall (top of corridor)
+          // Hallway north wall - at the back, aligned with study/bathroom outer walls
           const hwNorthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
-          hwNorthWall.position.set(hwX, wallHeight/2, hwZ - hw.depth/2);
+          hwNorthWall.position.set(hwX, wallHeight/2, backWallZ);
           hwNorthWall.castShadow = true;
           networkState.scene.add(hwNorthWall);
           networkState.wallMeshes.push(hwNorthWall);
 
-          // Hallway south wall (bottom of corridor)
+          // Hallway south wall (front of corridor)
           const hwSouthWall = new THREE.Mesh(new THREE.BoxGeometry(hw.width, wallHeight, 0.08), wallMat);
-          hwSouthWall.position.set(hwX, wallHeight/2, hwZ + hw.depth/2);
+          hwSouthWall.position.set(hwX, wallHeight/2, frontWallZ);
           hwSouthWall.castShadow = true;
           networkState.scene.add(hwSouthWall);
           networkState.wallMeshes.push(hwSouthWall);
