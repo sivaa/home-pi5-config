@@ -4955,16 +4955,16 @@
          *
          * FIRST: Room walls via createRoom() for each room in config order:
          *   Study:    0=back, 1=left, 2=right (front skipped)
-         *   Living:   3=front, 4=left, 5=right (back skipped)
-         *   Bedroom:  6=front, 7=left, 8=right (back skipped)
-         *   Kitchen:  9=back, 10=left, 11=right (front skipped)
-         *   Bathroom: 12=back, 13=front, 14=left, 15=right
+         *   Living:   3=front, 4=right (back and left skipped)
+         *   Bedroom:  5=front, 6=left, 7=right (back skipped)
+         *   Kitchen:  8=back, 9=left, 10=right (front skipped)
+         *   Bathroom: 11=back, 12=front, 13=left, 14=right
          *
          * THEN: Interior divider walls created in buildFloorPlan():
-         *   16 = Study↔Living horizontal divider
-         *   17 = North wall connector (Study back to Bathroom back)
+         *   15 = Study↔Living horizontal divider
+         *   16 = North wall connector (Study back to Bathroom back)
          *
-         * TOTAL: 18 walls (indices 0-17)
+         * TOTAL: 17 walls (indices 0-16)
          *
          * COMMON MISTAKE: Assuming interior walls are created BEFORE
          * room walls. They are created AFTER! Always verify by checking the
@@ -5108,13 +5108,15 @@
             networkState.wallMeshes.push(frontWall);
           }
 
-          // Left wall (west)
-          const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
-          leftWall.position.set(rx - halfW, wallHeight/2, rz);
-          leftWall.castShadow = true;
-          leftWall.userData = { roomId: config.id, side: 'left' };
-          group.add(leftWall);
-          networkState.wallMeshes.push(leftWall);
+          // Left wall (west) - skip for living room (wall 4 removed)
+          if (config.id !== 'living') {
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+            leftWall.position.set(rx - halfW, wallHeight/2, rz);
+            leftWall.castShadow = true;
+            leftWall.userData = { roomId: config.id, side: 'left' };
+            group.add(leftWall);
+            networkState.wallMeshes.push(leftWall);
+          }
 
           // Right wall (east) - special handling for kitchen to stop at wall 16
           if (config.id === 'kitchen') {
