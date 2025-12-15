@@ -4817,12 +4817,12 @@
       const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
 
       return {
-        showSignalRange: true,
-        showLabels: true,
-        showWallNumbers: true,
+        showSignalRange: false,
+        showLabels: false,
+        showWallNumbers: false,
         autoRotate: false,
         rotationAngle: 0,
-        zoomLevel: 1.0,
+        zoomLevel: 2.0,
         deviceCount: ZIGBEE_DEVICES.length,
         routerCount: ZIGBEE_DEVICES.filter(d => d.type === 'router').length,
         endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
@@ -4935,12 +4935,48 @@
             return sprite;
           };
 
+          // Direction labels by POSITION (reliable regardless of wall creation order)
+          // Outer walls are identified by: edge position + full length
+          const getOuterWallDirection = (wall) => {
+            const apartmentWidth = FLOOR_PLAN_CONFIG.apartmentWidth;   // 9.239
+            const apartmentDepth = FLOOR_PLAN_CONFIG.apartmentDepth;   // 7.665
+            const halfW = apartmentWidth / 2;  // 4.6195
+            const halfD = apartmentDepth / 2;  // 3.8325
+            const tolerance = 0.05;  // Position tolerance (5cm) - outer walls are at exact edges
+            const lengthTolerance = 0.2;  // Length must be within 20cm of full apartment dimension
+
+            const params = wall.geometry.parameters;
+            const isHorizontal = params.width > params.depth;  // Runs along X axis
+            const isVertical = params.depth > params.width;    // Runs along Z axis
+
+            let result = null;
+
+            // Check for full-length horizontal walls (North/South)
+            // In isometric view: z=-halfD appears at TOP (North), z=+halfD at BOTTOM (South)
+            if (isHorizontal && Math.abs(params.width - apartmentWidth) < lengthTolerance) {
+              if (Math.abs(wall.position.z - (-halfD)) < tolerance) result = 'N';  // Top edge
+              else if (Math.abs(wall.position.z - halfD) < tolerance) result = 'S';  // Bottom edge
+            }
+
+            // Check for full-length vertical walls (West/East)
+            // In isometric view: x=-halfW appears at LEFT (West), x=+halfW at RIGHT (East)
+            if (isVertical && Math.abs(params.depth - apartmentDepth) < lengthTolerance) {
+              if (Math.abs(wall.position.x - (-halfW)) < tolerance) result = 'W';  // Left edge
+              else if (Math.abs(wall.position.x - halfW) < tolerance) result = 'E';  // Right edge
+            }
+
+            return result;
+          };
+
           networkState.wallMeshes.forEach((wall, index) => {
             const geom = wall.geometry;
             const params = geom.parameters;
             const wx = wall.position.x;
             const wy = wall.position.y + 0.5;
             const wz = wall.position.z;
+
+            // Check if this is an outer wall with direction label (by position)
+            const directionLabel = getOuterWallDirection(wall);
 
             // Determine if wall is horizontal (along X) or vertical (along Z)
             const isHorizontal = params.width > params.depth;
@@ -4953,8 +4989,10 @@
               : [[wx, wy, wz - halfLen], [wx, wy, wz], [wx, wy, wz + halfLen]];
 
             positions.forEach((pos, i) => {
-              const label = i === 1 ? index : `${index}`;
-              const color = i === 1 ? '#FF0000' : '#0066CC'; // Red for middle, blue for ends
+              // Use direction label (N/S/E/W) for outer walls, index number for inner walls
+              const label = directionLabel || index.toString();
+              // Green for direction labels, Red/Blue for numbered walls
+              const color = directionLabel ? '#228B22' : (i === 1 ? '#FF0000' : '#0066CC');
               const sprite = createNumberSprite(label, color);
               sprite.position.set(pos[0], pos[1], pos[2]);
               networkState.scene.add(sprite);
@@ -5027,15 +5065,40 @@
           const bedroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
           const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
 
-          // Wall 3: Study ↔ Living (horizontal divider wall)
+          // Wall 3: Study ↔ Living (horizontal divider wall with 2 door openings)
           // Moved 0.5m towards study (into study area)
           const studyFrontZ = study.z + study.depth/2 - 0.5;  // 3.197 (moved towards study)
-          const studyRightX = study.x + study.width/2;  // 4.885
-          const wall1Width = studyRightX;  // From apartment left to study right
-          const wall1 = new THREE.Mesh(new THREE.BoxGeometry(wall1Width, wallHeight, 0.08), wallMat);
-          wall1.position.set(wall1Width/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
-          networkState.scene.add(wall1);
-          networkState.wallMeshes.push(wall1);
+
+          // Door openings (0.42m wide each - reduced 30%)
+          const doorWidth = 0.42;
+          const door4X = 3.8;  // Bedroom ↔ Hallway (west door)
+          const door2X = 4.8;  // Living ↔ Hallway (east door)
+
+          const door4Left = door4X - doorWidth/2;   // 3.2
+          const door4Right = door4X + doorWidth/2;  // 3.8
+          const door2Left = door2X - doorWidth/2;   // 4.5
+          const door2Right = door2X + doorWidth/2;  // 5.1
+
+          // Left segment: from west edge (0) to door4 left edge
+          const wall3LeftWidth = door4Left;
+          const wall3Left = new THREE.Mesh(new THREE.BoxGeometry(wall3LeftWidth, wallHeight, 0.08), wallMat);
+          wall3Left.position.set(door4Left/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Left);
+          networkState.wallMeshes.push(wall3Left);
+
+          // Middle segment: from door4 right edge to door2 left edge
+          const wall3MidWidth = door2Left - door4Right;  // 4.5 - 3.8 = 0.7
+          const wall3Mid = new THREE.Mesh(new THREE.BoxGeometry(wall3MidWidth, wallHeight, 0.08), wallMat);
+          wall3Mid.position.set(door4Right + wall3MidWidth/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Mid);
+          networkState.wallMeshes.push(wall3Mid);
+
+          // Right segment: from door2 right edge to east edge
+          const wall3RightWidth = FLOOR_PLAN_CONFIG.apartmentWidth - door2Right;
+          const wall3Right = new THREE.Mesh(new THREE.BoxGeometry(wall3RightWidth, wallHeight, 0.08), wallMat);
+          wall3Right.position.set(door2Right + wall3RightWidth/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Right);
+          networkState.wallMeshes.push(wall3Right);
 
           // Wall 2: Kitchen ↔ Bedroom - REMOVED (was wall index 17)
           // This interior divider was redundant - bedroom's back wall already defines the boundary
@@ -5062,11 +5125,10 @@
           networkState.scene.add(northWall);
           networkState.wallMeshes.push(northWall);
 
-          // Wall 6: West apartment wall (single wall to avoid overlaps)
-          // Spans from z=0 to z=7.665 (entire apartment depth) at x=0
-          const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          // Wall 7: West wall (full depth, equal to Wall 9)
+          const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665 (same as Wall 9)
           const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
-          westWall.position.set(-centerX, wallHeight/2, 0);  // x=0, centered in z
+          westWall.position.set(-centerX, wallHeight/2, 0);  // Centered in z
           networkState.scene.add(westWall);
           networkState.wallMeshes.push(westWall);
 
@@ -5096,6 +5158,42 @@
           southWall.position.set(0, wallHeight/2, wall10Z - centerZ);  // x centered, z at south edge
           networkState.scene.add(southWall);
           networkState.wallMeshes.push(southWall);
+
+          // Door X markers - adding from FLOOR_PLAN_CONFIG.doors
+          const doorMarkerMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+          const markerSize = 0.3;
+          const markerThickness = 0.05;
+          const markerHeight = 0.02;
+
+          // Helper function to add door marker
+          const addDoorMarker = (x, z) => {
+            const posX = x - centerX;
+            const posZ = z - centerZ;
+
+            // Bar 1 (diagonal \)
+            const bar1 = new THREE.Mesh(
+              new THREE.BoxGeometry(markerSize, markerHeight, markerThickness),
+              doorMarkerMat
+            );
+            bar1.rotation.y = Math.PI / 4;
+            bar1.position.set(posX, markerHeight/2, posZ);
+            networkState.scene.add(bar1);
+
+            // Bar 2 (diagonal /)
+            const bar2 = new THREE.Mesh(
+              new THREE.BoxGeometry(markerSize, markerHeight, markerThickness),
+              doorMarkerMat
+            );
+            bar2.rotation.y = -Math.PI / 4;
+            bar2.position.set(posX, markerHeight/2, posZ);
+            networkState.scene.add(bar2);
+          };
+
+          // Door 2: Living ↔ Hallway - on Wall 3 (Study↔Living divider at z=3.197)
+          addDoorMarker(4.8, 3.197);
+
+          // Door 4: Bedroom ↔ Hallway - on Wall 3 (at x=3.8)
+          addDoorMarker(3.8, 3.197);
         },
 
         createRoom(config) {
