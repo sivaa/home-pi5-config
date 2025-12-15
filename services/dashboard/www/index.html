@@ -5118,12 +5118,26 @@
           networkState.wallMeshes.push(coatWall);
 
           // Wall 5: North wall (consolidated from Study back + connector + Bathroom back)
-          // Full apartment width at z=0 (north edge)
-          const northWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
-          const northWall = new THREE.Mesh(new THREE.BoxGeometry(northWallWidth, wallHeight, 0.08), wallMat);
-          northWall.position.set(0, wallHeight/2, -centerZ);  // x centered, z at north edge
-          networkState.scene.add(northWall);
-          networkState.wallMeshes.push(northWall);
+          // Split into 2 segments with main entry door at x=3.5
+          const mainDoorX = 4.0;
+          const mainDoorWidth = 0.42;
+          const mainDoorLeft = mainDoorX - mainDoorWidth/2;  // 3.29
+          const mainDoorRight = mainDoorX + mainDoorWidth/2;  // 3.71
+
+          // Segment 1: x=0 to door left edge (west side)
+          const northSeg1Width = mainDoorLeft;  // 3.29
+          const northWall1 = new THREE.Mesh(new THREE.BoxGeometry(northSeg1Width, wallHeight, 0.08), wallMat);
+          northWall1.position.set(northSeg1Width/2 - centerX, wallHeight/2, -centerZ);
+          networkState.scene.add(northWall1);
+          networkState.wallMeshes.push(northWall1);
+
+          // Segment 2: door right edge to apartment east edge (east side)
+          const northSeg2Width = FLOOR_PLAN_CONFIG.apartmentWidth - mainDoorRight;  // 9.239 - 3.71 = 5.529
+          const northSeg2CenterX = (mainDoorRight + FLOOR_PLAN_CONFIG.apartmentWidth) / 2 - centerX;
+          const northWall2 = new THREE.Mesh(new THREE.BoxGeometry(northSeg2Width, wallHeight, 0.08), wallMat);
+          northWall2.position.set(northSeg2CenterX, wallHeight/2, -centerZ);
+          networkState.scene.add(northWall2);
+          networkState.wallMeshes.push(northWall2);
 
           // Wall 7: West wall (full depth, equal to Wall 9)
           const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665 (same as Wall 9)
@@ -5132,14 +5146,43 @@
           networkState.scene.add(westWall);
           networkState.wallMeshes.push(westWall);
 
-          // Wall 7: East wall upper (Bathroom+Kitchen right consolidated)
-          // From z=0 to studyFrontZ (3.197) at x = bathroom/kitchen right edge
-          const wall8Depth = studyFrontZ;  // 0 to 3.197 (joins Wall 3)
-          const wall8X = bathroom.x + bathroom.width/2;  // Right edge of bathroom/kitchen area
-          const eastWallUpper = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall8Depth), wallMat);
-          eastWallUpper.position.set(wall8X - centerX, wallHeight/2, wall8Depth/2 - centerZ);
-          networkState.scene.add(eastWallUpper);
-          networkState.wallMeshes.push(eastWallUpper);
+          // Wall 10: East wall upper (Bathroom+Kitchen right consolidated)
+          // Split into 3 segments with 2 door openings: bathroom (z=0.7) and kitchen (z=2.5)
+          const wall10X = bathroom.x + bathroom.width/2;  // Right edge of bathroom/kitchen area (3.15)
+          const wall10DoorWidth = 0.42;
+
+          // Bathroom door at z=0.7
+          const bathDoorZ = 0.7;
+          const bathDoorTop = bathDoorZ - wall10DoorWidth/2;  // 0.49
+          const bathDoorBottom = bathDoorZ + wall10DoorWidth/2;  // 0.91
+
+          // Kitchen door at z=2.5
+          const kitchenDoorZ = 2.5;
+          const kitchenDoorTop = kitchenDoorZ - wall10DoorWidth/2;  // 2.29
+          const kitchenDoorBottom = kitchenDoorZ + wall10DoorWidth/2;  // 2.71
+
+          // Segment 1: z=0 to bathroom door top
+          const wall10Seg1Depth = bathDoorTop;  // 0.49
+          const eastWallUpper1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg1Depth), wallMat);
+          eastWallUpper1.position.set(wall10X - centerX, wallHeight/2, wall10Seg1Depth/2 - centerZ);
+          networkState.scene.add(eastWallUpper1);
+          networkState.wallMeshes.push(eastWallUpper1);
+
+          // Segment 2: bathroom door bottom to kitchen door top
+          const wall10Seg2Depth = kitchenDoorTop - bathDoorBottom;  // 2.29 - 0.91 = 1.38
+          const wall10Seg2CenterZ = (bathDoorBottom + kitchenDoorTop) / 2 - centerZ;
+          const eastWallUpper2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg2Depth), wallMat);
+          eastWallUpper2.position.set(wall10X - centerX, wallHeight/2, wall10Seg2CenterZ);
+          networkState.scene.add(eastWallUpper2);
+          networkState.wallMeshes.push(eastWallUpper2);
+
+          // Segment 3: kitchen door bottom to studyFrontZ
+          const wall10Seg3Depth = studyFrontZ - kitchenDoorBottom;  // 3.197 - 2.71 = 0.487
+          const wall10Seg3CenterZ = (kitchenDoorBottom + studyFrontZ) / 2 - centerZ;
+          const eastWallUpper3 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg3Depth), wallMat);
+          eastWallUpper3.position.set(wall10X - centerX, wallHeight/2, wall10Seg3CenterZ);
+          networkState.scene.add(eastWallUpper3);
+          networkState.wallMeshes.push(eastWallUpper3);
 
           // Wall 9: East wall lower (Study+Living right consolidated)
           // From z=0 to z=7.665 (full depth) at x = study/living right edge (apartment east edge)
@@ -5197,6 +5240,15 @@
 
           // Door 4: Bedroom ↔ Hallway - on Wall 3 (at x=3.8)
           addDoorMarker(3.8, 3.197);
+
+          // Door 5: Kitchen door - on wall 10 (east wall upper at x=3.15)
+          addDoorMarker(3.15, 2.5);
+
+          // Door 6: Bathroom door - on wall 10 (east wall upper at x=3.15)
+          addDoorMarker(3.15, 0.7);
+
+          // Door 7: Main Entry - on north wall (z=0)
+          addDoorMarker(4.0, 0);
         },
 
         createRoom(config) {
