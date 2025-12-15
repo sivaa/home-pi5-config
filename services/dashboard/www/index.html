@@ -4995,6 +4995,7 @@
               const color = directionLabel ? '#228B22' : (i === 1 ? '#FF0000' : '#0066CC');
               const sprite = createNumberSprite(label, color);
               sprite.position.set(pos[0], pos[1], pos[2]);
+              sprite.visible = false;  // Hidden by default
               networkState.scene.add(sprite);
               networkState.wallNumberSprites.push(sprite);
             });
@@ -5037,16 +5038,15 @@
           const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;  // 3.8325
           const floorColor = 0xC9B89A;  // Warm beige (same as rooms)
 
-          // Hallway floor (same color as rooms for consistency)
-          const hw = FLOOR_PLAN_CONFIG.hallway;
-          const hallwayFloor = new THREE.Mesh(
-            new THREE.PlaneGeometry(hw.width, hw.depth),
+          // Base floor covering entire apartment (fills all gaps)
+          const baseFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(FLOOR_PLAN_CONFIG.apartmentWidth + 2, FLOOR_PLAN_CONFIG.apartmentDepth + 2),
             new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.8 })
           );
-          hallwayFloor.rotation.x = -Math.PI / 2;
-          hallwayFloor.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
-          hallwayFloor.receiveShadow = true;
-          networkState.scene.add(hallwayFloor);
+          baseFloor.rotation.x = -Math.PI / 2;
+          baseFloor.position.set(0, 0.001, 0);  // Lowest level, centered
+          baseFloor.receiveShadow = true;
+          networkState.scene.add(baseFloor);
 
           // Build rooms (each room has its own floor and outer walls)
           // NOTE: This runs FIRST, creating walls 0-15
