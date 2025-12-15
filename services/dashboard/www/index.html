@@ -5192,6 +5192,9 @@
           // Door 2: Living ↔ Hallway - on Wall 3 (Study↔Living divider at z=3.197)
           addDoorMarker(4.8, 3.197);
 
+          // Door 3: Study door - on Wall 0 (study's left wall at x=5.331)
+          addDoorMarker(5.331, 2.5);
+
           // Door 4: Bedroom ↔ Hallway - on Wall 3 (at x=3.8)
           addDoorMarker(3.8, 3.197);
         },
@@ -5284,16 +5287,35 @@
           const roomAtWestEdge = ['bathroom', 'kitchen', 'bedroom'].includes(config.id);
           if (config.id !== 'living' && !roomAtWestEdge) {
             // For study, use studyFrontZ (3.197) to join Wall 3
+            // Split into 2 segments with door opening at z=1.85
             if (config.id === 'study') {
               const studyObj = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
               const studyFrontZ = studyObj.z + studyObj.depth/2 - 0.5;  // 3.197 (joins Wall 3)
-              const wall0Depth = studyFrontZ;  // From z=0 to z=3.197
-              const wall0CenterZ = studyFrontZ/2 - FLOOR_PLAN_CONFIG.apartmentDepth/2;  // Center of wall
-              const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall0Depth), wallMat);
-              leftWall.position.set(rx - halfW, wallHeight/2, wall0CenterZ);
-              leftWall.userData = { roomId: config.id, side: 'left' };
-              group.add(leftWall);
-              networkState.wallMeshes.push(leftWall);
+              const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+              // Door opening parameters
+              const doorZ = 2.5;  // Door center position (towards living room)
+              const doorWidth = 0.42;  // Same as other doors
+              const doorTop = doorZ - doorWidth/2;  // 1.64
+              const doorBottom = doorZ + doorWidth/2;  // 2.06
+
+              // Segment 1: from z=0 to door top edge
+              const seg1Depth = doorTop;  // 1.64
+              const seg1CenterZ = seg1Depth/2 - centerZ;
+              const leftWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, seg1Depth), wallMat);
+              leftWall1.position.set(rx - halfW, wallHeight/2, seg1CenterZ);
+              leftWall1.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall1);
+              networkState.wallMeshes.push(leftWall1);
+
+              // Segment 2: from door bottom edge to studyFrontZ
+              const seg2Depth = studyFrontZ - doorBottom;  // 3.197 - 2.06 = 1.137
+              const seg2CenterZ = (doorBottom + studyFrontZ)/2 - centerZ;
+              const leftWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, seg2Depth), wallMat);
+              leftWall2.position.set(rx - halfW, wallHeight/2, seg2CenterZ);
+              leftWall2.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall2);
+              networkState.wallMeshes.push(leftWall2);
             } else {
               const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
               leftWall.position.set(rx - halfW, wallHeight/2, rz);
