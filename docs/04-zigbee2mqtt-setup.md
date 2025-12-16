@@ -1,7 +1,7 @@
 # Zigbee2MQTT Setup via Docker
 
-> **Last Updated:** December 12, 2025
-> **Status:** Running and verified
+> **Last Updated:** December 16, 2025
+> **Status:** Running and verified (5 Docker services)
 
 ---
 
@@ -33,27 +33,33 @@ We're using **Docker** to run Zigbee2MQTT because:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        DOCKER STACK ON PI                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  Container: mosquitto              Container: zigbee2mqtt               │
-│  ┌─────────────────────┐          ┌─────────────────────────────────┐  │
-│  │  Eclipse Mosquitto  │◄─────────│         Zigbee2MQTT             │  │
-│  │    MQTT Broker      │   MQTT   │                                 │  │
-│  │                     │          │  ┌─────────────────────────┐    │  │
-│  │  Port: 1883         │          │  │    Web Frontend         │    │  │
-│  └─────────────────────┘          │  │    Port: 8080           │    │  │
-│           │                        │  └─────────────────────────┘    │  │
-│           │                        │              │                  │  │
-│           ▼                        │              ▼                  │  │
-│  ┌─────────────────────┐          │  ┌─────────────────────────┐    │  │
-│  │  External Apps      │          │  │  /dev/ttyUSB0           │    │  │
-│  │  (Home Assistant)   │          │  │  (Sonoff Zigbee Dongle) │    │  │
-│  └─────────────────────┘          │  └─────────────────────────┘    │  │
-│                                    └─────────────────────────────────┘  │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          DOCKER STACK ON PI (5 SERVICES)                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                   │
+│  │  Mosquitto   │◄───│ Zigbee2MQTT  │    │  InfluxDB    │                   │
+│  │  MQTT Broker │    │   :8080      │    │   :8086      │                   │
+│  │  :1883/:9001 │    └──────┬───────┘    └──────▲───────┘                   │
+│  └──────┬───────┘           │                   │                           │
+│         │                   ▼                   │                           │
+│         │           ┌─────────────┐             │                           │
+│         │           │ /dev/ttyUSB0│             │                           │
+│         │           │ Zigbee Dongl│             │                           │
+│         │           └─────────────┘             │                           │
+│         │                                       │                           │
+│         ▼                                       │                           │
+│  ┌──────────────┐                       ┌──────┴───────┐                   │
+│  │Home Assistant│──────────────────────►│  Dashboard   │                   │
+│  │   :8123      │  writes sensor data   │  (Nginx)     │                   │
+│  │              │                       │   :8888      │                   │
+│  └──────────────┘                       └──────────────┘                   │
+│                                                                              │
+│  Data Flow:                                                                  │
+│    Zigbee Devices → Zigbee2MQTT → MQTT → Home Assistant → InfluxDB         │
+│    Dashboard reads from: MQTT (live) + InfluxDB (historical)               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -147,6 +153,8 @@ ssh pi@pi "curl -s http://localhost:8080 | head -5"
 
 Location: `configs/zigbee2mqtt/docker-compose.yml`
 
+> **Note:** This is the full stack with all 5 services. Deploy to `/opt/docker-compose.yml` on Pi.
+
 ```yaml
 services:
   mosquitto:
@@ -155,6 +163,7 @@ services:
     restart: unless-stopped
     ports:
       - "1883:1883"
+      - "9001:9001"  # WebSocket for dashboard
     volumes:
       - /opt/mosquitto/config:/mosquitto/config
       - /opt/mosquitto/data:/mosquitto/data
@@ -173,7 +182,48 @@ services:
     devices:
       - /dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0:/dev/ttyUSB0
     environment:
-      - TZ=Europe/Berlin
+      - TZ=Australia/Sydney
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8123:8123"
+    volumes:
+      - /opt/homeassistant:/config
+    environment:
+      - TZ=Australia/Sydney
+    privileged: true
+
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - /opt/influxdb/data:/var/lib/influxdb
+    environment:
+      - INFLUXDB_DB=homeassistant
+      - INFLUXDB_HTTP_AUTH_ENABLED=false
+      - INFLUXDB_REPORTING_DISABLED=true
+
+  dashboard:
+    image: nginx:alpine
+    container_name: dashboard
+    restart: unless-stopped
+    ports:
+      - "8888:80"
+    volumes:
+      - /opt/dashboard/www:/usr/share/nginx/html:ro
+      - /opt/dashboard/nginx/dashboard.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/dashboard/nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - mosquitto
+      - influxdb
 ```
 
 ### configuration.yaml
@@ -215,7 +265,11 @@ log_dest stdout
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Zigbee2MQTT Web UI | http://pi:8080 | Manage devices, view network |
-| MQTT Broker | mqtt://pi:1883 | Connect Home Assistant |
+| Home Assistant | http://pi:8123 | Smart home automation |
+| Dashboard | http://pi:8888 | Custom sensor visualization |
+| InfluxDB | http://pi:8086 | Time-series database |
+| MQTT Broker | mqtt://pi:1883 | Message broker |
+| MQTT WebSocket | ws://pi:9001 | WebSocket for dashboard |
 
 ---
 
@@ -318,7 +372,7 @@ To rebuild this setup from scratch:
 
 **Important:** The Zigbee network key is auto-generated on first run. After devices are paired, backup the `configuration.yaml` from the Pi which contains the actual network key.
 
-> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 12 devices with pairing procedures.
+> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 22 devices with pairing procedures.
 
 ---
 
@@ -326,5 +380,7 @@ To rebuild this setup from scratch:
 
 | Date | Change |
 |------|--------|
+| 2025-12-16 | Updated docker-compose to show full 5-service stack |
+| 2025-12-16 | Updated architecture diagram, access points, device count (22) |
 | 2025-12-12 | Added reference to device inventory (docs/05-zigbee-devices.md) |
 | 2025-12-12 | Initial setup |

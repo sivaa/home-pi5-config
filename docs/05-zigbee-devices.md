@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** December 12, 2025
-> **Total Devices:** 15 (including coordinator)
+> **Last Updated:** December 16, 2025
+> **Total Devices:** 22 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -19,21 +19,15 @@
 │                        │   Channel: 25    │                                  │
 │                        └────────┬─────────┘                                  │
 │                                 │                                            │
-│     ┌───────────────┬───────────┼───────────┬───────────────┐               │
-│     │               │           │           │               │               │
-│ ┌───▼───┐  ┌─────▼─────┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐ ┌─────▼─────┐       │
-│ │ IKEA  │  │  SONOFF   │ │ NOUS  │ │SONOFF │ │SONOFF │ │  SONOFF   │       │
-│ │Lights │  │  Sensors  │ │  E10  │ │  PIR  │ │Contact│ │Smart Plug │       │
-│ │ (2x)  │  │   (6x)    │ │  CO2  │ │Motion │ │ Door  │ │  S60ZB    │       │
-│ └───┬───┘  └───────────┘ └───────┘ └───────┘ └───────┘ └───────────┘       │
-│     │                                                                       │
-│ ┌───▼───┐                                                                   │
-│ │ IKEA  │                                                                   │
-│ │Remotes│                                                                   │
-│ │ (2x)  │                                                                   │
-│ └───────┘                                                                   │
+│  ┌──────────┬──────────┬───────┼───────┬──────────┬──────────┬──────────┐  │
+│  │          │          │       │       │          │          │          │  │
+│┌─▼──┐ ┌───▼───┐ ┌───▼───┐ ┌──▼──┐ ┌──▼──┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐│  │
+││IKEA│ │SONOFF │ │ NOUS  │ │ PIR │ │Door │ │ Plug  │ │Mailbox│ │ IKEA  ││  │
+││Lite│ │ Temp  │ │  E10  │ │ Mtn │ │ Cnt │ │ S60ZB │ │ Vibra │ │Remote ││  │
+││(2x)│ │ (12x) │ │  CO2  │ │     │ │     │ │       │ │       │ │ (2x)  ││  │
+│└────┘ └───────┘ └───────┘ └─────┘ └─────┘ └───────┘ └───────┘ └───────┘│  │
 │                                                                              │
-│              Rooms: Balcony, Study, Living, Kitchen, Bath, Bed              │
+│        Rooms: Balcony, Study, Living, Kitchen, Bath, Bed, Mailbox           │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -59,6 +53,13 @@
 | 12 | - | Motion Detector | SNZB-03P | SONOFF | PIR Motion Sensor |
 | 13 | - | Smart Plug 1 | S60ZBTPF | SONOFF | Smart Plug (Energy) |
 | 14 | - | Contact Sensor 1 | SNZB-04P | SONOFF | Door/Window Sensor |
+| 15 | Mailbox | Vibration Sensor | ZG-102ZM | HOBEIAN | Vibration Sensor |
+| 16 | Living | Temperature & Humidity 6 | SNZB-02P | SONOFF | Sensor |
+| 17 | Living | Temperature & Humidity 7 | SNZB-02P | SONOFF | Sensor |
+| 18 | Study | Temperature & Humidity 8 | SNZB-02P | SONOFF | Sensor |
+| 19 | Bed | Temperature & Humidity 9 | SNZB-02P | SONOFF | Sensor |
+| 20 | Kitchen | Temperature & Humidity 10 | SNZB-02P | SONOFF | Sensor |
+| 21 | Bath | Temperature & Humidity 11 | SNZB-02P | SONOFF | Sensor |
 
 ---
 
@@ -136,7 +137,8 @@
 │    2. LED blinks rapidly (3 times)                          │
 │    3. Release and device enters pairing mode                │
 │                                                             │
-│  Locations: Study, Living, Kitchen, Bath, Bed (5 units)    │
+│  Locations: Study(2), Living(3), Kitchen(2), Bath(2),      │
+│             Bed(2) = 11 units total                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -369,6 +371,59 @@
 
 ---
 
+### HOBEIAN ZG-102ZM - Mailbox Vibration Sensor
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              HOBEIAN ZG-102ZM VIBRATION SENSOR               │
+├─────────────────────────────────────────────────────────────┤
+│  Manufacturer: HOBEIAN                                       │
+│  Model: ZG-102ZM                                             │
+│  Protocol: Zigbee 3.0                                        │
+│  Power: CR2032 battery                                       │
+│  Use: Mailbox notification / vibration detection             │
+├─────────────────────────────────────────────────────────────┤
+│  Sensors:                                                    │
+│    - Vibration (true/false)                                  │
+│    - Sensitivity (0-100, adjustable)                         │
+│    - Battery level (%)                                       │
+│    - Battery voltage (mV)                                    │
+├─────────────────────────────────────────────────────────────┤
+│  How it Works:                                               │
+│    - Detects vibration when mailbox lid opens/closes         │
+│    - Triggers vibration=true event                           │
+│    - Auto-resets after motion stops                          │
+│                                                              │
+│  Sensitivity Tuning:                                         │
+│    - Higher value = more sensitive                           │
+│    - Default: 50                                              │
+│    - Adjust via Zigbee2MQTT web UI                           │
+├─────────────────────────────────────────────────────────────┤
+│  Pairing Procedure:                                          │
+│    1. Press and hold button for 5+ seconds                   │
+│    2. LED blinks rapidly                                     │
+│    3. Device enters pairing mode                             │
+│                                                              │
+│  Factory Reset:                                              │
+│    Hold button 10+ seconds until LED blinks 3 times          │
+│                                                              │
+│  Installation:                                               │
+│    Mount inside mailbox lid using adhesive                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "battery": 100,
+  "vibration": false,
+  "sensitivity": 50,
+  "linkquality": 152
+}
+```
+
+---
+
 ## Disaster Recovery Checklist
 
 If rebuilding the Zigbee network from scratch:
@@ -388,13 +443,14 @@ If rebuilding the Zigbee network from scratch:
 │                                                             │
 │  Step 3: Pair battery devices (end devices)                 │
 │    [ ] SONOFF SNZB-02WD Balcony                             │
-│    [ ] SONOFF SNZB-02P Study                                │
-│    [ ] SONOFF SNZB-02P Living                               │
-│    [ ] SONOFF SNZB-02P Kitchen                              │
-│    [ ] SONOFF SNZB-02P Bath                                 │
-│    [ ] SONOFF SNZB-02P Bed                                  │
+│    [ ] SONOFF SNZB-02P Study (x2)                           │
+│    [ ] SONOFF SNZB-02P Living (x3)                          │
+│    [ ] SONOFF SNZB-02P Kitchen (x2)                         │
+│    [ ] SONOFF SNZB-02P Bath (x2)                            │
+│    [ ] SONOFF SNZB-02P Bed (x2)                             │
 │    [ ] SONOFF SNZB-03P Motion Detector                      │
 │    [ ] SONOFF SNZB-04P Contact Sensor                       │
+│    [ ] HOBEIAN ZG-102ZM Mailbox Vibration Sensor            │
 │    [ ] IKEA Remote Study                                    │
 │    [ ] IKEA Remote Living                                   │
 │                                                             │
@@ -431,6 +487,9 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2025-12-16 | Added HOBEIAN ZG-102ZM mailbox vibration sensor |
+| 2025-12-16 | Added 6 new SNZB-02P temperature sensors (total now 11) |
+| 2025-12-16 | Updated device count: 15 → 22 devices |
 | 2025-12-12 | Added SONOFF SNZB-04P contact sensor |
 | 2025-12-12 | Added SONOFF SNZB-03P PIR sensor, SONOFF S60ZBTPF smart plug |
 | 2025-12-12 | Added NOUS E10 CO2 sensor |
