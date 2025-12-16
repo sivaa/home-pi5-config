@@ -3,6 +3,10 @@
  * Smart Home Climate Dashboard
  */
 
+// Import Alpine as ES module (ensures proper load order)
+import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
+window.Alpine = Alpine;
+
 import { CONFIG, FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, SENSOR_VISUALS } from './config.js';
 import { initMqttStore } from './stores/mqtt-store.js';
 import { initRoomsStore } from './stores/rooms-store.js';
@@ -30,23 +34,21 @@ if (typeof THREE !== 'undefined') {
 }
 
 // ========================================
-// ALPINE INITIALIZATION
+// ALPINE STORE REGISTRATION
 // ========================================
-document.addEventListener('alpine:init', () => {
-  // Register stores
-  Alpine.store('config', CONFIG);
-  initMqttStore(Alpine, CONFIG);
-  initRoomsStore(Alpine, CONFIG);
-  initLightsStore(Alpine, CONFIG);
-  initRoomDetailStore(Alpine, CONFIG);
-  initSensorsStore(Alpine, CONFIG);
+// Register stores directly (before Alpine.start())
+Alpine.store('config', CONFIG);
+initMqttStore(Alpine, CONFIG);
+initRoomsStore(Alpine, CONFIG);
+initLightsStore(Alpine, CONFIG);
+initRoomDetailStore(Alpine, CONFIG);
+initSensorsStore(Alpine, CONFIG);
 
-  // Make config available for 3D views
-  window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
-  window.TEMP_COLORS = TEMP_COLORS;
-  window.HUMIDITY_COLORS = HUMIDITY_COLORS;
-  window.SENSOR_VISUALS = SENSOR_VISUALS;
-});
+// Make config available for 3D views
+window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
+window.TEMP_COLORS = TEMP_COLORS;
+window.HUMIDITY_COLORS = HUMIDITY_COLORS;
+window.SENSOR_VISUALS = SENSOR_VISUALS;
 
 // ========================================
 // MAIN APP COMPONENT
@@ -151,3 +153,8 @@ window.isometricView = function() {
 };
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');
+
+// ========================================
+// START ALPINE (after all registrations)
+// ========================================
+Alpine.start();
