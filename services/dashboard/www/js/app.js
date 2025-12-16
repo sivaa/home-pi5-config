@@ -27,6 +27,7 @@ import { threeDView } from '../views/floor-plan-3d.js';
 import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
 import { isometricView } from '../views/isometric.js';
+import { networkView } from '../views/network.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -150,6 +151,11 @@ window.co2View = co2View;
 // Isometric view is a factory function
 window.isometricView = function() {
   return isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS);
+};
+
+// Network view is a factory function
+window.networkView = function() {
+  return networkView(FLOOR_PLAN_CONFIG);
 };
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');
