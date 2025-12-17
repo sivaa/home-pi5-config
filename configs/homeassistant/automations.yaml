@@ -1,0 +1,35 @@
+# =============================================================================
+# HOME ASSISTANT AUTOMATIONS
+# Purpose: Event-driven actions for smart home
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# BATHROOM MOTION ANNOUNCEMENT
+# Trigger: Motion detected in bathroom
+# Action: TTS announcement on Kitchen Display
+# Cooldown: 30 seconds (prevents spam from continuous motion)
+# -----------------------------------------------------------------------------
+- id: bathroom_motion_announcement
+  alias: "Bathroom Motion TTS Announcement"
+  description: "Announces when someone enters the bathroom"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.motion_detector_occupancy
+      to: "on"
+
+  condition:
+    # 30-second cooldown to prevent spam
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.bathroom_motion_tts_announcement', 'last_triggered')).total_seconds() > 30
+           if state_attr('automation.bathroom_motion_tts_announcement', 'last_triggered') is not none
+           else true }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id: media_player.kitchen_display
+        message: "Someone is in the bathroom"
+        language: "en"

@@ -2,7 +2,7 @@ homeassistant:
   name: Home
   unit_system: metric
   time_zone: Australia/Sydney
-  internal_url: "http://pi:8123"
+  internal_url: "https://pi:8123"
   external_url: "https://ha.sivaa.in"
 
 frontend:
@@ -10,6 +10,8 @@ config:
 
 http:
   server_port: 8123
+  ssl_certificate: /config/fullchain.pem
+  ssl_key: /config/privkey.pem
   use_x_forwarded_for: true
   trusted_proxies:
     # Local/Docker
@@ -32,6 +34,14 @@ http:
     - 104.24.0.0/14
     - 172.64.0.0/13
     - 131.0.72.0/22
+    # Cloudflare IPv6 ranges
+    - 2400:cb00::/32
+    - 2606:4700::/32
+    - 2803:f800::/32
+    - 2405:b500::/32
+    - 2405:8100::/32
+    - 2a06:98c0::/29
+    - 2c0f:f248::/32
 
 # MQTT auto-discovery enabled by default
 # Zigbee2MQTT devices appear automatically
@@ -66,6 +76,20 @@ logger:
   logs:
     homeassistant.components.influxdb: info
     homeassistant.components.google_assistant: info
+
+# =============================================================================
+# MEDIA SOURCE (Required for TTS)
+# =============================================================================
+media_source:
+
+# =============================================================================
+# TEXT-TO-SPEECH (TTS)
+# Purpose: Voice announcements via Google Home speakers
+# Docs: https://www.home-assistant.io/integrations/google_translate/
+# =============================================================================
+tts:
+  - platform: google_translate
+    language: 'en'
 
 # =============================================================================
 # GOOGLE ASSISTANT INTEGRATION
@@ -163,12 +187,18 @@ google_assistant:
 
     # === MOTION SENSOR ===
     binary_sensor.motion_detector_occupancy:
-      name: "Motion Sensor"
+      name: "Bathroom Motion Sensor"
       expose: true
-      room: "Hallway"
+      room: "Bathroom"
 
     # === CONTACT SENSOR ===
     binary_sensor.contact_sensor_1_contact:
       name: "Door Sensor"
       expose: true
       room: "Entry"
+
+# =============================================================================
+# AUTOMATIONS
+# Purpose: Event-driven actions for smart home
+# =============================================================================
+automation: !include automations.yaml
