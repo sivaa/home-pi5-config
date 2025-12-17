@@ -51,6 +51,10 @@
       above: 1200
 
   condition:
+    # Only announce during waking hours (7 AM to 11 PM)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
     # 10-minute cooldown to prevent spam
     - condition: template
       value_template: >
@@ -83,6 +87,10 @@
       above: 1600
 
   condition:
+    # Only announce during waking hours (7 AM to 11 PM)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
     # 5-minute cooldown (shorter due to urgency)
     - condition: template
       value_template: >
@@ -115,6 +123,10 @@
       below: 500
 
   condition:
+    # Only announce during waking hours (7 AM to 11 PM)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
     # 30-minute cooldown
     - condition: template
       value_template: >
