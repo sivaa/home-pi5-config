@@ -223,8 +223,9 @@
 
 # -----------------------------------------------------------------------------
 # MAILBOX VIBRATION ALERT
-# Trigger: Vibration detected (mail dropped in)
+# Trigger: Vibration detected OR attribute update (fires even on on→on)
 # Action: TTS announcement on ALL Google Home devices
+# Quiet Hours: 23:00 - 06:00 (no announcements)
 # Cooldown: 30 seconds
 # -----------------------------------------------------------------------------
 - id: mailbox_vibration_alert
@@ -233,11 +234,25 @@
   mode: single
 
   trigger:
+    # State trigger - fires on any state change to "on"
     - platform: state
       entity_id: binary_sensor.mailbox_vibration_sensor_vibration
       to: "on"
+    # Also trigger on any attribute change when state is "on"
+    - platform: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      attribute: last_seen
 
   condition:
+    # Must be in vibration state
+    - condition: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      state: "on"
+    # Quiet hours: no announcements between 23:00 and 06:00
+    - condition: time
+      after: "06:00:00"
+      before: "23:00:00"
+    # 30-second cooldown to prevent spam
     - condition: template
       value_template: >
         {{ (now() - state_attr('automation.mailbox_vibration_alert', 'last_triggered')).total_seconds() > 30
@@ -255,26 +270,30 @@
         language: "en"
 
 # -----------------------------------------------------------------------------
-# MAILBOX VIBRATION STOPPED
-# Trigger: Vibration sensor returns to off (cooled off)
+# MAILBOX SENSOR ONLINE ALERT
+# Trigger: Sensor becomes available (comes back online)
 # Action: TTS announcement on ALL Google Home devices
-# Only announces if vibration alert triggered in last 5 minutes
+# Quiet Hours: 23:00 - 06:00 (no announcements)
 # -----------------------------------------------------------------------------
-- id: mailbox_vibration_stopped
-  alias: "Mailbox Vibration Stopped"
-  description: "Announces when mailbox vibration has stopped"
+- id: mailbox_sensor_online
+  alias: "Mailbox Sensor Online"
+  description: "Announces when mailbox sensor comes back online"
   mode: single
 
   trigger:
+    # Trigger when sensor availability changes to online
     - platform: state
       entity_id: binary_sensor.mailbox_vibration_sensor_vibration
-      to: "off"
+      from: "unavailable"
+    - platform: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      from: "unknown"
 
   condition:
-    - condition: template
-      value_template: >
-        {% set last = state_attr('automation.mailbox_vibration_alert', 'last_triggered') %}
-        {{ last is not none and (now() - last).total_seconds() < 300 }}
+    # Quiet hours: no announcements between 23:00 and 06:00
+    - condition: time
+      after: "06:00:00"
+      before: "23:00:00"
 
   action:
     - service: tts.google_translate_say
@@ -283,13 +302,14 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: "Mailbox vibration has stopped."
+        message: "Mailbox sensor is now online."
         language: "en"
 
 # -----------------------------------------------------------------------------
 # MAILBOX OPENED ALERT
-# Trigger: Mailbox lid opened
+# Trigger: Mailbox lid opened (contact sensor)
 # Action: TTS announcement on ALL Google Home devices
+# Quiet Hours: 23:00 - 06:00 (no announcements)
 # Cooldown: 30 seconds
 # -----------------------------------------------------------------------------
 - id: mailbox_opened_alert
@@ -303,6 +323,11 @@
       to: "on"
 
   condition:
+    # Quiet hours: no announcements between 23:00 and 06:00
+    - condition: time
+      after: "06:00:00"
+      before: "23:00:00"
+    # 30-second cooldown
     - condition: template
       value_template: >
         {{ (now() - state_attr('automation.mailbox_opened_alert', 'last_triggered')).total_seconds() > 30

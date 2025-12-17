@@ -1,7 +1,7 @@
 homeassistant:
   name: Home
   unit_system: metric
-  time_zone: Australia/Sydney
+  time_zone: Europe/Berlin
   internal_url: "http://pi:8123"
   external_url: "https://ha.sivaa.in"
   customize:
@@ -10,6 +10,7 @@ homeassistant:
 
 frontend:
 config:
+mobile_app:
 
 http:
   server_port: 8123
