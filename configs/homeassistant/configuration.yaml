@@ -106,6 +106,7 @@ google_assistant:
     - light
     - switch
     - sensor
+    - climate
   entity_config:
     # === LIGHTS (Voice controllable) ===
     light.study_ikea_light:
@@ -197,6 +198,39 @@ google_assistant:
       name: "Door Sensor"
       expose: true
       room: "Entry"
+
+    # === THERMOSTATS (Climate control) ===
+    climate.study_thermostat:
+      name: "Study Thermostat"
+      expose: true
+      room: "Study"
+      aliases:
+        - "Study Heater"
+        - "Office Thermostat"
+
+    climate.living_thermostat_inner:
+      name: "Living Inner"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Living Inner Thermostat"
+        - "Living Inner Heater"
+
+    climate.living_thermostat_outer:
+      name: "Living Outer"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Living Outer Thermostat"
+        - "Living Outer Heater"
+
+    climate.bed_thermostat:
+      name: "Bedroom Thermostat"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bedroom Heater"
+        - "Bed Heater"
 
 # =============================================================================
 # AUTOMATIONS
