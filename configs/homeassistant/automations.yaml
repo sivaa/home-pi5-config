@@ -33,3 +33,35 @@
         entity_id: media_player.kitchen_display
         message: "Someone is in the bathroom"
         language: "en"
+
+# -----------------------------------------------------------------------------
+# CO2 LEVEL ALERT
+# Trigger: CO2 level rises above 1200 ppm
+# Action: TTS announcement to ventilate
+# Cooldown: 10 minutes (prevents repeated announcements)
+# -----------------------------------------------------------------------------
+- id: co2_high_alert
+  alias: "CO2 High Level Alert"
+  description: "Announces when CO2 levels are too high and ventilation is needed"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.co2_co2
+      above: 1200
+
+  condition:
+    # 10-minute cooldown to prevent spam
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.co2_high_level_alert', 'last_triggered')).total_seconds() > 600
+           if state_attr('automation.co2_high_level_alert', 'last_triggered') is not none
+           else true }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id: media_player.kitchen_display
+        message: >
+          Nithya, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
+        language: "en"
