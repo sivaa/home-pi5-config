@@ -140,3 +140,71 @@
           {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
           Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
         language: "en"
+
+# -----------------------------------------------------------------------------
+# BATHROOM WINDOW OPEN TOO LONG
+# Trigger: Window open for more than 10 minutes
+# Action: TTS announcement every minute until closed
+# -----------------------------------------------------------------------------
+- id: bath_window_open_too_long
+  alias: "Bathroom Window Open Too Long"
+  description: "Alerts when bathroom window is open for more than 10 minutes"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.bath_window_contact_sensor_contact
+      to: "on"
+      for:
+        minutes: 10
+
+  action:
+    - repeat:
+        while:
+          - condition: state
+            entity_id: binary_sensor.bath_window_contact_sensor_contact
+            state: "on"
+        sequence:
+          - service: tts.google_translate_say
+            data:
+              entity_id: media_player.kitchen_display
+              message: >
+                {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
+                Bathroom window has been open for {{ minutes }} minutes.
+              language: "en"
+          - delay:
+              minutes: 1
+
+# -----------------------------------------------------------------------------
+# BEDROOM WINDOW OPEN TOO LONG
+# Trigger: Window open for more than 10 minutes
+# Action: TTS announcement every minute until closed
+# -----------------------------------------------------------------------------
+- id: bed_window_open_too_long
+  alias: "Bedroom Window Open Too Long"
+  description: "Alerts when bedroom window is open for more than 10 minutes"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.bed_window_contact_sensor_contact
+      to: "on"
+      for:
+        minutes: 10
+
+  action:
+    - repeat:
+        while:
+          - condition: state
+            entity_id: binary_sensor.bed_window_contact_sensor_contact
+            state: "on"
+        sequence:
+          - service: tts.google_translate_say
+            data:
+              entity_id: media_player.kitchen_display
+              message: >
+                {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
+                Bedroom window has been open for {{ minutes }} minutes.
+              language: "en"
+          - delay:
+              minutes: 1
