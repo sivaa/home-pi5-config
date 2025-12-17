@@ -97,3 +97,46 @@
         message: >
           Warning! CO2 level is very high at {{ (states('sensor.co2_co2') | int // 100) * 100 }}. Please open windows immediately!
         language: "en"
+
+# -----------------------------------------------------------------------------
+# CO2 GOOD LEVEL NOTIFICATION
+# Trigger: CO2 level drops below 500 ppm (good air quality)
+# Action: Thank Nithya and announce ventilation complete
+# Cooldown: 30 minutes (stable good level)
+# -----------------------------------------------------------------------------
+- id: co2_good_level
+  alias: "CO2 Good Level Notification"
+  description: "Announces when air quality is good after ventilation"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.co2_co2
+      below: 500
+
+  condition:
+    # 30-minute cooldown
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.co2_good_level_notification', 'last_triggered')).total_seconds() > 1800
+           if state_attr('automation.co2_good_level_notification', 'last_triggered') is not none
+           else true }}
+    # Only announce if there was a recent high alert (within last 2 hours)
+    - condition: template
+      value_template: >
+        {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
+        {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}
+        {% set alerts = [high_alert, critical_alert] | select('ne', none) | list %}
+        {{ alerts | length > 0 and (now() - alerts | max).total_seconds() < 7200 }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id: media_player.kitchen_display
+        message: >
+          {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
+          {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}
+          {% set alerts = [high_alert, critical_alert] | select('ne', none) | list %}
+          {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
+          Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
+        language: "en"
