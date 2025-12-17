@@ -63,7 +63,7 @@
       data:
         entity_id: media_player.kitchen_display
         message: >
-          Nithya, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
+          Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
         language: "en"
 
 # -----------------------------------------------------------------------------
