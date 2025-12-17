@@ -65,3 +65,35 @@
         message: >
           Nithya, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
         language: "en"
+
+# -----------------------------------------------------------------------------
+# CO2 CRITICAL ALERT
+# Trigger: CO2 level rises above 1600 ppm (very high)
+# Action: Urgent TTS announcement
+# Cooldown: 5 minutes (more frequent due to urgency)
+# -----------------------------------------------------------------------------
+- id: co2_critical_alert
+  alias: "CO2 Critical Level Alert"
+  description: "Urgent announcement when CO2 levels are dangerously high"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.co2_co2
+      above: 1600
+
+  condition:
+    # 5-minute cooldown (shorter due to urgency)
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.co2_critical_level_alert', 'last_triggered')).total_seconds() > 300
+           if state_attr('automation.co2_critical_level_alert', 'last_triggered') is not none
+           else true }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id: media_player.kitchen_display
+        message: >
+          Warning! CO2 level is very high at {{ (states('sensor.co2_co2') | int // 100) * 100 }}. Please open windows immediately!
+        language: "en"
