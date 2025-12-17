@@ -4,6 +4,9 @@ homeassistant:
   time_zone: Australia/Sydney
   internal_url: "http://pi:8123"
   external_url: "https://ha.sivaa.in"
+  customize:
+    media_player.broken_display:
+      friendly_name: "Broken Display"
 
 frontend:
 config:
