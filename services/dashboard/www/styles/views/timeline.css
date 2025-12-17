@@ -501,3 +501,353 @@
       }
     }
 
+    /* ========================================
+       PRIORITY-BASED TIMELINE (UX Overhaul)
+       3-tier: Important → Activity → Background
+       ======================================== */
+
+    /* ─────────────────────────────────────────
+       DAILY SUMMARY CARD
+       ───────────────────────────────────────── */
+    .timeline-summary {
+      background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-bg) 100%);
+      border-radius: var(--radius-xl);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      border: 1px solid var(--color-border);
+    }
+
+    .summary-text {
+      font-size: var(--font-size-lg);
+      color: var(--color-text-primary);
+      margin: 0 0 var(--space-md) 0;
+      line-height: 1.5;
+    }
+
+    .summary-stats {
+      display: flex;
+      gap: var(--space-lg);
+      font-size: var(--font-size-md);
+      flex-wrap: wrap;
+    }
+
+    .summary-stat {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      color: var(--color-text-tertiary);
+      transition: color var(--transition-fast);
+    }
+
+    .summary-stat.has-value {
+      color: var(--color-text-primary);
+    }
+
+    .summary-stat.air-status {
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+    }
+
+    /* ─────────────────────────────────────────
+       SECTION HEADERS
+       ───────────────────────────────────────── */
+    .timeline-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-md);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-icon {
+      font-size: var(--font-size-xs);
+    }
+
+    .section-count {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-normal);
+      color: var(--color-text-tertiary);
+      background: var(--color-bg);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    /* ─────────────────────────────────────────
+       IMPORTANT EVENTS - Full Cards
+       Door opened, Mail arrived, Air: Poor
+       ───────────────────────────────────────── */
+    .important-events {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .event-important {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md) var(--space-lg);
+      border-left: 4px solid var(--color-danger);
+      box-shadow: var(--shadow-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .event-important:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateX(4px);
+    }
+
+    .important-icon {
+      font-size: var(--font-size-2xl);
+      line-height: 1;
+    }
+
+    .important-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .important-title {
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .important-device {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .important-room {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+      text-transform: capitalize;
+      margin-top: var(--space-xs);
+    }
+
+    .important-time {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .time-absolute {
+      display: block;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-primary);
+    }
+
+    .time-relative {
+      display: block;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+    }
+
+    /* ─────────────────────────────────────────
+       ACTIVITY EVENTS - Compact Lines
+       Motion, Lights, Door closed, Plugs
+       ───────────────────────────────────────── */
+    .activity-events {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .event-line {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm);
+      border-bottom: 1px solid var(--color-border);
+      transition: background var(--transition-fast);
+    }
+
+    .event-line:last-child {
+      border-bottom: none;
+    }
+
+    .event-line:hover {
+      background: var(--color-surface-hover);
+    }
+
+    .line-time {
+      width: 60px;
+      color: var(--color-text-tertiary);
+      font-size: var(--font-size-xs);
+      flex-shrink: 0;
+    }
+
+    .line-icon {
+      width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .line-label {
+      flex: 1;
+      min-width: 100px;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .line-room {
+      color: var(--color-text-secondary);
+      text-transform: capitalize;
+      min-width: 60px;
+    }
+
+    .line-detail {
+      color: var(--color-text-tertiary);
+      font-size: var(--font-size-xs);
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .activity-more {
+      padding: var(--space-sm) var(--space-md);
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+      background: var(--color-bg);
+      border-top: 1px solid var(--color-border);
+    }
+
+    /* Event type colors for activity lines */
+    .event-line.event-motion .line-label { color: #ffd93d; }
+    .event-line.event-contact .line-label { color: #22c55e; }
+    .event-line.event-light .line-label { color: #fbbf24; }
+    .event-line.event-plug .line-label { color: #22c55e; }
+
+    /* ─────────────────────────────────────────
+       BACKGROUND EVENTS - Collapsed Groups
+       Device online, Air quality readings
+       ───────────────────────────────────────── */
+    .background-section {
+      background: var(--color-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border);
+      overflow: hidden;
+    }
+
+    .section-header-btn {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: var(--space-md);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      transition: background var(--transition-fast);
+    }
+
+    .section-header-btn:hover {
+      background: var(--color-surface);
+    }
+
+    .section-header-btn .section-title {
+      margin-bottom: 0;
+    }
+
+    .expand-icon {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+    }
+
+    .background-groups {
+      padding: 0 var(--space-md) var(--space-md);
+    }
+
+    .background-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-text-secondary);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .background-group:last-child {
+      border-bottom: none;
+    }
+
+    .group-icon {
+      font-size: var(--font-size-md);
+    }
+
+    .group-count {
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      min-width: 35px;
+    }
+
+    .group-label {
+      font-weight: var(--font-weight-medium);
+    }
+
+    .group-detail {
+      color: var(--color-text-tertiary);
+      font-size: var(--font-size-xs);
+      margin-left: auto;
+    }
+
+    /* ─────────────────────────────────────────
+       RESPONSIVE - Mobile Priority View
+       ───────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .timeline-summary {
+        padding: var(--space-md);
+      }
+
+      .summary-text {
+        font-size: var(--font-size-md);
+      }
+
+      .summary-stats {
+        gap: var(--space-md);
+        font-size: var(--font-size-sm);
+      }
+
+      .event-important {
+        flex-wrap: wrap;
+        padding: var(--space-md);
+      }
+
+      .important-time {
+        width: 100%;
+        text-align: left;
+        margin-top: var(--space-sm);
+        display: flex;
+        gap: var(--space-sm);
+      }
+
+      .event-line {
+        flex-wrap: wrap;
+      }
+
+      .line-time {
+        width: 50px;
+      }
+
+      .line-detail {
+        width: 100%;
+        text-align: left;
+        margin-top: var(--space-xs);
+        padding-left: 74px;
+      }
+    }
+

@@ -9,6 +9,7 @@ import { initRoomsStore } from './stores/rooms-store.js';
 import { initLightsStore } from './stores/lights-store.js';
 import { initRoomDetailStore } from './stores/room-detail-store.js';
 import { initSensorsStore } from './stores/sensors-store.js';
+import { initEventsStore } from './stores/events-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
@@ -23,6 +24,7 @@ import { threeDView } from '../views/floor-plan-3d.js';
 import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
 import { isometricView } from '../views/isometric.js';
+import { networkView } from '../views/network.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -40,6 +42,12 @@ document.addEventListener('alpine:init', () => {
   initLightsStore(Alpine, CONFIG);
   initRoomDetailStore(Alpine, CONFIG);
   initSensorsStore(Alpine, CONFIG);
+  initEventsStore(Alpine, CONFIG);
+
+  // Load historical events on startup
+  setTimeout(() => {
+    Alpine.store('events')?.loadHistorical(24);
+  }, 1000);
 
   // Make config available for 3D views
   window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
@@ -85,11 +93,16 @@ window.app = function() {
       Alpine.store('rooms').loadHistorical();
       Alpine.store('mqtt').connect();
 
-      // Keyboard shortcuts for view switching (1-9, 0 for CO2, I for Isometric)
+      // Keyboard shortcuts for view switching (1-9, 0 for CO2, I for Isometric, N for Network)
       document.addEventListener('keydown', (e) => {
         // 'I' key for isometric view
         if ((e.key === 'i' || e.key === 'I') && !e.ctrlKey && !e.metaKey) {
           this.setView('isometric');
+          return;
+        }
+        // 'N' key for network view
+        if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
+          this.setView('network');
           return;
         }
         if ((e.key >= '1' && e.key <= '9' || e.key === '0') && !e.ctrlKey && !e.metaKey) {
@@ -149,5 +162,8 @@ window.co2View = co2View;
 window.isometricView = function() {
   return isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS);
 };
+
+// Network view
+window.networkView = networkView;
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');

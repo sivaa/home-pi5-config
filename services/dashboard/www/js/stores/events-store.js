@@ -22,42 +22,33 @@ export function initEventsStore(Alpine, CONFIG) {
     lastQuery: null,
     maxEvents: 500,
 
-    // Event type definitions with icons and colors
+    // Event type definitions with icons, colors, and priority
+    // Priority: 'important' (full card), 'activity' (compact line), 'background' (collapsed)
     eventTypes: {
-      // Motion
-      motion_detected: { icon: '👁️', color: '#ffd93d', label: 'Motion Detected', category: 'motion' },
-      motion_cleared: { icon: '👁️', color: '#94a3b8', label: 'Motion Cleared', category: 'motion' },
+      // IMPORTANT - Security & alerts (full card display)
+      door_opened: { icon: '🚪', color: '#ef4444', label: 'Door Opened', category: 'contact', priority: 'important' },
+      vibration_detected: { icon: '📬', color: '#8b5cf6', label: 'Mail Arrived', category: 'vibration', priority: 'important' },
+      air_quality_poor: { icon: '⚠️', color: '#ef4444', label: 'Air: Poor', category: 'co2', priority: 'important' },
+      device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', category: 'availability', priority: 'important' },
 
-      // Doors
-      door_opened: { icon: '🚪', color: '#ef4444', label: 'Door Opened', category: 'contact' },
-      door_closed: { icon: '🚪', color: '#22c55e', label: 'Door Closed', category: 'contact' },
+      // ACTIVITY - Interesting but routine (compact line display)
+      motion_detected: { icon: '👁️', color: '#ffd93d', label: 'Motion Detected', category: 'motion', priority: 'activity' },
+      motion_cleared: { icon: '👁️', color: '#94a3b8', label: 'Motion Cleared', category: 'motion', priority: 'activity' },
+      door_closed: { icon: '🚪', color: '#22c55e', label: 'Door Closed', category: 'contact', priority: 'activity' },
+      light_on: { icon: '💡', color: '#fbbf24', label: 'Light On', category: 'light', priority: 'activity' },
+      light_off: { icon: '💡', color: '#64748b', label: 'Light Off', category: 'light', priority: 'activity' },
+      plug_on: { icon: '🔌', color: '#22c55e', label: 'Plug On', category: 'plug', priority: 'activity' },
+      plug_off: { icon: '🔌', color: '#ef4444', label: 'Plug Off', category: 'plug', priority: 'activity' },
+      vibration_cleared: { icon: '📬', color: '#94a3b8', label: 'Vibration Stopped', category: 'vibration', priority: 'activity' },
+      remote_toggle: { icon: '🎮', color: '#8b5cf6', label: 'Remote: Toggle', category: 'remote', priority: 'activity' },
+      remote_brightness_up: { icon: '🎮', color: '#fbbf24', label: 'Remote: Bright+', category: 'remote', priority: 'activity' },
+      remote_brightness_down: { icon: '🎮', color: '#64748b', label: 'Remote: Bright-', category: 'remote', priority: 'activity' },
 
-      // Mailbox
-      vibration_detected: { icon: '📬', color: '#8b5cf6', label: 'Mail Arrived', category: 'vibration' },
-      vibration_cleared: { icon: '📬', color: '#94a3b8', label: 'Vibration Stopped', category: 'vibration' },
-
-      // Lights
-      light_on: { icon: '💡', color: '#fbbf24', label: 'Light On', category: 'light' },
-      light_off: { icon: '💡', color: '#64748b', label: 'Light Off', category: 'light' },
-
-      // Plugs
-      plug_on: { icon: '🔌', color: '#22c55e', label: 'Plug On', category: 'plug' },
-      plug_off: { icon: '🔌', color: '#ef4444', label: 'Plug Off', category: 'plug' },
-
-      // CO2
-      co2_reading: { icon: '💨', color: '#f97316', label: 'CO2 Reading', category: 'co2' },
-      air_quality_excellent: { icon: '🌿', color: '#22c55e', label: 'Air: Excellent', category: 'co2' },
-      air_quality_moderate: { icon: '💨', color: '#fbbf24', label: 'Air: Moderate', category: 'co2' },
-      air_quality_poor: { icon: '⚠️', color: '#ef4444', label: 'Air: Poor', category: 'co2' },
-
-      // Availability
-      device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', category: 'availability' },
-      device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', category: 'availability' },
-
-      // Remote
-      remote_toggle: { icon: '🎮', color: '#8b5cf6', label: 'Remote: Toggle', category: 'remote' },
-      remote_brightness_up: { icon: '🎮', color: '#fbbf24', label: 'Remote: Bright+', category: 'remote' },
-      remote_brightness_down: { icon: '🎮', color: '#64748b', label: 'Remote: Bright-', category: 'remote' }
+      // BACKGROUND - Noise, collapse into groups
+      device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', category: 'availability', priority: 'background', group: 'devices' },
+      air_quality_excellent: { icon: '🌿', color: '#22c55e', label: 'Air: Excellent', category: 'co2', priority: 'background', group: 'air' },
+      air_quality_moderate: { icon: '💨', color: '#fbbf24', label: 'Air: Moderate', category: 'co2', priority: 'background', group: 'air' },
+      co2_reading: { icon: '💨', color: '#f97316', label: 'CO2 Reading', category: 'co2', priority: 'background', group: 'air' }
     },
 
     // Get event info with defaults
@@ -66,7 +57,9 @@ export function initEventsStore(Alpine, CONFIG) {
         icon: '📍',
         color: '#94a3b8',
         label: eventType,
-        category: 'unknown'
+        category: 'unknown',
+        priority: 'activity',
+        group: 'other'
       };
     },
 

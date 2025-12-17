@@ -649,88 +649,118 @@
                       x-show="selectedRoom || selectedDeviceType || selectedDevice">Clear</button>
             </div>
 
-            <!-- Stats Summary -->
-            <div class="timeline-stats">
-              <div class="stat-item">
-                <span class="stat-value" x-text="stats.total"></span>
-                <span class="stat-label">Events</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value" x-text="stats.lastHour"></span>
-                <span class="stat-label">Last Hour</span>
-              </div>
-              <div class="stat-item" x-show="stats.motionCount > 0">
-                <span class="stat-icon">👁️</span>
-                <span class="stat-value" x-text="stats.motionCount"></span>
-              </div>
-              <div class="stat-item" x-show="stats.doorCount > 0">
-                <span class="stat-icon">🚪</span>
-                <span class="stat-value" x-text="stats.doorCount"></span>
-              </div>
-              <div class="stat-item" x-show="stats.mailboxCount > 0">
-                <span class="stat-icon">📬</span>
-                <span class="stat-value" x-text="stats.mailboxCount"></span>
+            <!-- ═══════════════════════════════════════════════════════════════
+                 DAILY SUMMARY CARD
+                 "A quiet morning. Front door opened once, air quality excellent."
+                 ═══════════════════════════════════════════════════════════════ -->
+            <div class="timeline-summary">
+              <p class="summary-text" x-text="dailySummary"></p>
+              <div class="summary-stats">
+                <span class="summary-stat" :class="{ 'has-value': stats.doorCount > 0 }">
+                  🚪 <span x-text="stats.doorCount"></span>
+                </span>
+                <span class="summary-stat" :class="{ 'has-value': stats.motionCount > 0 }">
+                  👁️ <span x-text="stats.motionCount"></span>
+                </span>
+                <span class="summary-stat" :class="{ 'has-value': stats.mailboxCount > 0 }">
+                  📬 <span x-text="stats.mailboxCount"></span>
+                </span>
+                <span class="summary-stat air-status" x-text="airQualityStatus"></span>
               </div>
             </div>
 
-            <!-- Events List -->
-            <div class="timeline-content">
-              <!-- NOW marker -->
-              <div class="timeline-now" x-show="currentDateRange === 'today'">
-                <div class="now-marker">NOW</div>
-                <div class="now-line"></div>
+            <!-- Loading State -->
+            <template x-if="$store.events.loading">
+              <div class="loading-events">
+                <span class="loading-indicator"></span>
+                <span>Loading events...</span>
               </div>
+            </template>
 
-              <!-- No Events -->
-              <template x-if="events.length === 0 && !$store.events.loading">
-                <div class="no-events">
-                  <span class="no-events-icon">📭</span>
-                  <span class="no-events-text">No events found</span>
-                  <span class="no-events-hint">Events will appear here as devices report activity</span>
-                </div>
-              </template>
+            <!-- No Events State -->
+            <template x-if="events.length === 0 && !$store.events.loading">
+              <div class="no-events">
+                <span class="no-events-icon">📭</span>
+                <span class="no-events-text">No events found</span>
+                <span class="no-events-hint">Events will appear here as devices report activity</span>
+              </div>
+            </template>
 
-              <!-- Loading -->
-              <template x-if="$store.events.loading">
-                <div class="loading-events">
-                  <span class="loading-indicator"></span>
-                  <span>Loading events...</span>
-                </div>
-              </template>
-
-              <!-- Event List -->
-              <div class="timeline-events">
-                <template x-for="event in events.slice(0, 50)" :key="event.time + event.deviceName + event.eventType">
-                  <div class="timeline-event" :class="getEventClass(event.eventType)">
-                    <div class="event-time-marker">
-                      <span class="event-time" x-text="formatTime(event.time)"></span>
-                      <div class="event-dot" :style="{ background: getEventInfo(event.eventType).color }"></div>
+            <!-- ═══════════════════════════════════════════════════════════════
+                 IMPORTANT EVENTS - Security & Alerts (Full Cards)
+                 Door opened, Mail arrived, Air: Poor, Device offline
+                 ═══════════════════════════════════════════════════════════════ -->
+            <div class="timeline-section" x-show="groupedEvents.important.length > 0">
+              <h3 class="section-title section-important">
+                <span class="section-icon">🔴</span> Important
+                <span class="section-count" x-text="groupedEvents.important.length"></span>
+              </h3>
+              <div class="important-events">
+                <template x-for="event in groupedEvents.important" :key="event.time + event.deviceName">
+                  <div class="event-important" :style="{ borderLeftColor: getEventInfo(event.eventType).color }">
+                    <div class="important-icon" x-text="getEventInfo(event.eventType).icon"></div>
+                    <div class="important-content">
+                      <div class="important-title" x-text="getEventInfo(event.eventType).label"></div>
+                      <div class="important-device" x-text="getHumanDescription(event) || formatDeviceName(event.deviceName)"></div>
+                      <div class="important-room" x-show="event.room && event.room !== 'unknown'" x-text="event.room"></div>
                     </div>
-                    <div class="event-card">
-                      <div class="event-header">
-                        <span class="event-icon" x-text="getEventInfo(event.eventType).icon"></span>
-                        <span class="event-label" x-text="getEventInfo(event.eventType).label"></span>
-                      </div>
-                      <div class="event-details">
-                        <span class="event-device" x-text="event.deviceName"></span>
-                        <span class="event-room" x-show="event.room && event.room !== 'unknown'" x-text="'(' + event.room + ')'"></span>
-                      </div>
-                      <div class="event-meta">
-                        <span class="event-relative-time" x-text="formatRelativeTime(event.time)"></span>
-                        <span class="event-raw-values" x-show="event.state || event.value !== undefined">
-                          · <code x-text="event.state !== undefined ? 'state: ' + event.state : ''"></code>
-                          <code x-show="event.value !== undefined" x-text="(event.state !== undefined ? ', ' : '') + 'value: ' + event.value"></code>
-                        </span>
-                      </div>
+                    <div class="important-time">
+                      <span class="time-absolute" x-text="formatTime(event.time)"></span>
+                      <span class="time-relative" x-text="formatRelativeTime(event.time)"></span>
                     </div>
                   </div>
                 </template>
               </div>
+            </div>
 
-              <!-- MIDNIGHT marker -->
-              <div class="timeline-midnight" x-show="currentDateRange === 'today'">
-                <div class="midnight-line"></div>
-                <div class="midnight-label">MIDNIGHT</div>
+            <!-- ═══════════════════════════════════════════════════════════════
+                 ACTIVITY EVENTS - Routine but Interesting (Compact Lines)
+                 Motion, Lights, Door closed, Plugs
+                 ═══════════════════════════════════════════════════════════════ -->
+            <div class="timeline-section" x-show="groupedEvents.activity.length > 0">
+              <h3 class="section-title section-activity">
+                <span class="section-icon">🟡</span> Activity
+                <span class="section-count" x-text="groupedEvents.activity.length"></span>
+              </h3>
+              <div class="activity-events">
+                <template x-for="event in groupedEvents.activity.slice(0, 20)" :key="event.time + event.deviceName + event.eventType">
+                  <div class="event-line" :class="getEventClass(event.eventType)">
+                    <span class="line-time" x-text="formatTime(event.time)"></span>
+                    <span class="line-icon" x-text="getEventInfo(event.eventType).icon"></span>
+                    <span class="line-label" x-text="getEventInfo(event.eventType).label"></span>
+                    <span class="line-room" x-text="event.room !== 'unknown' ? event.room : ''"></span>
+                    <span class="line-detail" x-text="getHumanDescription(event)"></span>
+                  </div>
+                </template>
+                <!-- Show more indicator -->
+                <div class="activity-more" x-show="groupedEvents.activity.length > 20">
+                  <span x-text="'+ ' + (groupedEvents.activity.length - 20) + ' more activity events'"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════
+                 BACKGROUND EVENTS - Noise (Collapsed Groups)
+                 Device online, Air quality readings
+                 ═══════════════════════════════════════════════════════════════ -->
+            <div class="timeline-section background-section" x-show="backgroundCount > 0">
+              <button class="section-header-btn" @click="showBackground = !showBackground">
+                <h3 class="section-title section-background">
+                  <span class="section-icon">⚪</span> Background
+                  <span class="section-count" x-text="backgroundCount + ' events'"></span>
+                </h3>
+                <span class="expand-icon" x-text="showBackground ? '▲' : '▼'"></span>
+              </button>
+
+              <div class="background-groups" x-show="showBackground" x-transition>
+                <template x-for="(events, group) in groupedEvents.background" :key="group">
+                  <div class="background-group" x-show="events.length > 0">
+                    <span class="group-icon" x-text="getGroupIcon(group)"></span>
+                    <span class="group-count" x-text="events.length + '×'"></span>
+                    <span class="group-label" x-text="getGroupLabel(group)"></span>
+                    <span class="group-detail" x-text="getGroupSummary(group, events)"></span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
