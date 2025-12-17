@@ -1,6 +1,6 @@
-# Google Home Integration
+# Google Home Integration & External Access
 
-> **Last Updated:** December 14, 2025
+> **Last Updated:** December 17, 2025
 > **Status:** Active
 > **Purpose:** Voice control via Google Home/Nest speakers
 
@@ -40,6 +40,8 @@
 | Component | Status | Details |
 |-----------|--------|---------|
 | Cloudflare Tunnel | Active | Tunnel ID: `6600ccff-747f-4b92-b6d8-26178c8a5112` |
+| Cloudflare SSL Mode | **Full** | Dashboard → SSL/TLS → Overview |
+| HA SSL Certificates | Active | Self-signed, 10-year validity |
 | External URL | Active | `https://ha.sivaa.in` |
 | GCP Project | Active | `siva-home-assistant-1` |
 | HomeGraph API | Enabled | For device state sync |
@@ -116,9 +118,9 @@ credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
 
 ingress:
   - hostname: ha.sivaa.in
-    service: http://localhost:8123
+    service: https://localhost:8123    # MUST be HTTPS for WebSocket to work
     originRequest:
-      noTLSVerify: true
+      noTLSVerify: true                # Accept self-signed cert
   - service: http_status:404
 ```
 
@@ -126,6 +128,47 @@ ingress:
 - Config: `/etc/cloudflared/config.yml`
 - Credentials: `/etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json`
 - Service: `systemctl status cloudflared`
+
+### Home Assistant SSL Certificates
+
+**Location:** `/opt/homeassistant/` on Pi
+
+```
+/opt/homeassistant/
+├── fullchain.pem    # Self-signed SSL certificate
+├── privkey.pem      # Private key
+└── configuration.yaml
+```
+
+**Why SSL is required:** cloudflared doesn't forward `X-Forwarded-Proto` header properly
+when connecting to HTTP origins. Home Assistant then can't detect HTTPS requests, causing
+WebSocket connections to fail with 301 redirects.
+
+**Generate new certs (if needed):**
+```bash
+sudo openssl req -x509 -newkey rsa:4096 \
+  -keyout /opt/homeassistant/privkey.pem \
+  -out /opt/homeassistant/fullchain.pem \
+  -days 3650 -nodes -subj '/CN=ha.sivaa.in'
+sudo chmod 644 /opt/homeassistant/*.pem
+```
+
+### Cloudflare Dashboard Settings
+
+**CRITICAL:** SSL/TLS encryption mode must be set to **"Full"**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Cloudflare Dashboard → SSL/TLS → Overview                      │
+│                                                                 │
+│  Encryption mode: Full  ← REQUIRED                              │
+│                                                                 │
+│  ❌ Off         - Breaks WebSocket, causes 301 redirects        │
+│  ❌ Flexible    - May cause redirect loops                      │
+│  ✅ Full        - Works with self-signed cert                   │
+│  ✅ Full(strict)- Requires CA-signed cert                       │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Home Assistant Google Integration
 
@@ -174,13 +217,24 @@ google_assistant:
 
 3. **Restore Home Assistant config:**
    ```bash
+   # Generate SSL certificates (required for external access)
+   ssh pi@pi "sudo openssl req -x509 -newkey rsa:4096 \
+     -keyout /opt/homeassistant/privkey.pem \
+     -out /opt/homeassistant/fullchain.pem \
+     -days 3650 -nodes -subj '/CN=ha.sivaa.in'"
+   ssh pi@pi "sudo chmod 644 /opt/homeassistant/*.pem"
+
    # Copy from this repo to Pi
    scp configs/homeassistant/configuration.yaml pi@pi:/opt/homeassistant/
    scp configs/homeassistant/SERVICE_ACCOUNT.json pi@pi:/opt/homeassistant/
    docker restart homeassistant
    ```
 
-4. **Re-link Google Home:**
+4. **Verify Cloudflare Dashboard Settings:**
+   - Go to Cloudflare Dashboard → SSL/TLS → Overview
+   - Set encryption mode to **"Full"**
+
+5. **Re-link Google Home:**
    - Unlink old integration in Google Home app
    - Re-link: Add device > Works with Google > [test] Home Assistant
    - Sync devices
@@ -196,34 +250,138 @@ google_assistant:
 
 ## Troubleshooting
 
-### "Could not reach device"
+### "Unable to connect to Home Assistant" (WebSocket Error)
+
+**Symptoms:**
+- Login page loads, authentication succeeds
+- After redirect, shows "Unable to connect to Home Assistant. Retrying..."
+- Browser console shows: `WebSocket connection to 'wss://ha.sivaa.in/api/websocket' failed: 301`
+
+**Root Cause Analysis:**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  THE PROBLEM: cloudflared + HTTP origin = broken WebSocket                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  When cloudflared connects to HTTP origin:                                  │
+│  1. Browser requests wss://ha.sivaa.in/api/websocket                       │
+│  2. Cloudflare forwards to cloudflared                                      │
+│  3. cloudflared connects to http://localhost:8123  ← Problem!               │
+│  4. HA sees HTTP request, but external_url is HTTPS                         │
+│  5. HA redirects to "correct" protocol → 301 to http://                    │
+│  6. WebSocket upgrade fails                                                 │
+│                                                                             │
+│  THE FIX:                                                                   │
+│  • HA must run HTTPS (with self-signed cert)                               │
+│  • cloudflared must connect to https://localhost:8123                      │
+│  • Cloudflare SSL mode must be "Full"                                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Diagnosis Steps:**
+
+```bash
+# 1. Test WebSocket through tunnel
+curl -v --http1.1 \
+  -H "Upgrade: websocket" \
+  -H "Connection: Upgrade" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  "https://ha.sivaa.in/api/websocket" 2>&1 | grep -E "(HTTP|101|301)"
+
+# Expected (working):  HTTP/1.1 101 Switching Protocols
+# Broken:              HTTP/1.1 301 Moved Permanently
+
+# 2. Test WebSocket locally on Pi
+ssh pi@pi "curl -k -H 'Upgrade: websocket' -H 'Connection: Upgrade' \
+  -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+  -H 'Sec-WebSocket-Version: 13' \
+  'https://localhost:8123/api/websocket' 2>&1 | grep -E '(HTTP|101|301)'"
+
+# 3. Check HA logs for auth warnings
+ssh pi@pi "docker logs homeassistant --tail 50 2>&1 | grep -i auth"
+```
+
+**Fix Checklist:**
+
+| Check | Command | Expected |
+|-------|---------|----------|
+| HA has SSL certs | `ssh pi@pi "ls /opt/homeassistant/*.pem"` | fullchain.pem, privkey.pem |
+| HA config has SSL | `ssh pi@pi "grep ssl_ /opt/homeassistant/configuration.yaml"` | ssl_certificate, ssl_key |
+| cloudflared uses HTTPS | `ssh pi@pi "sudo grep service /etc/cloudflared/config.yml"` | `https://localhost:8123` |
+| Cloudflare SSL mode | Check dashboard | "Full" |
+
+### "Could not reach device" (Google Home)
 
 ```bash
 # Check cloudflared tunnel
 ssh pi@pi "sudo systemctl status cloudflared"
 
-# Check Home Assistant
+# Check Home Assistant accessible
 curl -I https://ha.sivaa.in
 
-# Check HA logs
+# Check HA logs for Google errors
 ssh pi@pi "docker logs homeassistant --tail 50 | grep -i google"
 ```
 
-### Devices Not Appearing
+### Devices Not Appearing in Google Home
 
 1. Verify entity IDs in Home Assistant match config
 2. Check entities have `expose: true`
 3. Restart Home Assistant
 4. Re-sync: "Hey Google, sync my devices"
 
-### Authentication Errors
+### "Login attempt with invalid authentication" in HA logs
+
+**Cause:** Missing Cloudflare IP ranges in `trusted_proxies`
 
 ```bash
-# Check SERVICE_ACCOUNT.json exists
+# Check trusted_proxies config
+ssh pi@pi "grep -A30 trusted_proxies /opt/homeassistant/configuration.yaml"
+```
+
+**Required ranges (in configuration.yaml):**
+```yaml
+trusted_proxies:
+  # Local/Docker
+  - 127.0.0.1
+  - ::1
+  - 172.16.0.0/12
+  # Cloudflare IPv4
+  - 173.245.48.0/20
+  - 103.21.244.0/22
+  - 103.22.200.0/22
+  - 103.31.4.0/22
+  - 141.101.64.0/18
+  - 108.162.192.0/18
+  - 190.93.240.0/20
+  - 188.114.96.0/20
+  - 197.234.240.0/22
+  - 198.41.128.0/17
+  - 162.158.0.0/15
+  - 104.16.0.0/13
+  - 104.24.0.0/14
+  - 172.64.0.0/13
+  - 131.0.72.0/22
+  # Cloudflare IPv6 (REQUIRED for IPv6 users!)
+  - 2400:cb00::/32
+  - 2606:4700::/32
+  - 2803:f800::/32
+  - 2405:b500::/32
+  - 2405:8100::/32
+  - 2a06:98c0::/29
+  - 2c0f:f248::/32
+```
+
+### SERVICE_ACCOUNT.json Errors
+
+```bash
+# Check file exists
 ssh pi@pi "ls -la /opt/homeassistant/SERVICE_ACCOUNT.json"
 
-# Verify trusted_proxies includes Cloudflare IPs
-ssh pi@pi "grep -A20 trusted_proxies /opt/homeassistant/configuration.yaml"
+# Verify file is valid JSON
+ssh pi@pi "python3 -m json.tool /opt/homeassistant/SERVICE_ACCOUNT.json > /dev/null && echo 'Valid JSON'"
 ```
 
 ---
