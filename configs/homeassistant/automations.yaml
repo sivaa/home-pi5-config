@@ -208,3 +208,101 @@
               language: "en"
           - delay:
               minutes: 1
+
+# -----------------------------------------------------------------------------
+# MAILBOX VIBRATION ALERT
+# Trigger: Vibration detected (mail dropped in)
+# Action: TTS announcement on ALL Google Home devices
+# Cooldown: 30 seconds
+# -----------------------------------------------------------------------------
+- id: mailbox_vibration_alert
+  alias: "Mailbox Vibration Alert"
+  description: "Announces when mailbox vibration is detected"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      to: "on"
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.mailbox_vibration_alert', 'last_triggered')).total_seconds() > 30
+           if state_attr('automation.mailbox_vibration_alert', 'last_triggered') is not none
+           else true }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "You've got mail! Mailbox vibration detected."
+        language: "en"
+
+# -----------------------------------------------------------------------------
+# MAILBOX VIBRATION STOPPED
+# Trigger: Vibration sensor returns to off (cooled off)
+# Action: TTS announcement on ALL Google Home devices
+# Only announces if vibration alert triggered in last 5 minutes
+# -----------------------------------------------------------------------------
+- id: mailbox_vibration_stopped
+  alias: "Mailbox Vibration Stopped"
+  description: "Announces when mailbox vibration has stopped"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      to: "off"
+
+  condition:
+    - condition: template
+      value_template: >
+        {% set last = state_attr('automation.mailbox_vibration_alert', 'last_triggered') %}
+        {{ last is not none and (now() - last).total_seconds() < 300 }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "Mailbox vibration has stopped."
+        language: "en"
+
+# -----------------------------------------------------------------------------
+# MAILBOX OPENED ALERT
+# Trigger: Mailbox lid opened
+# Action: TTS announcement on ALL Google Home devices
+# Cooldown: 30 seconds
+# -----------------------------------------------------------------------------
+- id: mailbox_opened_alert
+  alias: "Mailbox Opened Alert"
+  description: "Announces when mailbox is opened"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.mailbox_vibration_sensor_contact
+      to: "on"
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ (now() - state_attr('automation.mailbox_opened_alert', 'last_triggered')).total_seconds() > 30
+           if state_attr('automation.mailbox_opened_alert', 'last_triggered') is not none
+           else true }}
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "Mailbox has been opened."
+        language: "en"
