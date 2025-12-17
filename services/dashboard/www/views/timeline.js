@@ -1,149 +1,281 @@
 /**
- * Vision 5: Timeline Story View
- * Data is a story - tell it that way
+ * Timeline View
+ * Displays all Zigbee events in a filterable timeline
  */
 
 export function timelineView() {
   return {
-    events: [],
-    selectedDate: 'today',
-    loading: false,
+    showFilters: false,
+    selectedCategories: [],  // For category-based filtering
+    selectedRoom: '',
+    selectedDeviceType: '',
+    selectedDevice: '',
 
     init() {
-      this.loadEvents();
-      this.$watch('$store.rooms.list', () => this.loadEvents());
+      // Events are loaded by app.js on init
+      // Set up real-time MQTT listener for live events
+      this.setupMqttListener();
     },
 
-    loadEvents() {
-      this.loading = true;
-      const rooms = this.$store.rooms.list;
-      const allEvents = [];
-
-      const now = Date.now();
-      let startTime;
-      if (this.selectedDate === 'yesterday') {
-        const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); yesterday.setHours(0, 0, 0, 0);
-        startTime = yesterday.getTime();
-      } else if (this.selectedDate === 'week') {
-        startTime = now - 7 * 24 * 60 * 60 * 1000;
-      } else {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        startTime = today.getTime();
+    // Set up MQTT listener for real-time events
+    setupMqttListener() {
+      const mqtt = this.$store.mqtt;
+      if (!mqtt?.client) {
+        // Retry after MQTT connects
+        setTimeout(() => this.setupMqttListener(), 2000);
+        return;
       }
 
-      rooms.forEach(room => {
-        if (room.tempHistory && room.tempHistory.length > 0) {
-          const filtered = room.tempHistory.filter(h => h.time >= startTime);
-          allEvents.push(...this.detectEvents(filtered, room.name, room.icon));
+      // Listen for zigbee device messages
+      mqtt.client.on('message', (topic, message) => {
+        if (!topic.startsWith('zigbee2mqtt/') || topic.includes('/bridge/')) return;
+
+        try {
+          const payload = JSON.parse(message.toString());
+          const deviceName = topic.replace('zigbee2mqtt/', '');
+
+          // Process relevant events
+          const event = this.processLiveEvent(deviceName, payload);
+          if (event) {
+            this.$store.events.addRealTimeEvent(event);
+          }
+        } catch (e) {
+          // Ignore parse errors
         }
       });
-
-      this.events = allEvents.sort((a, b) => b.time - a.time).slice(0, 20);
-      this.loading = false;
     },
 
-    detectEvents(history, roomName, roomIcon) {
-      if (history.length < 10) return [];
-      const events = [];
-      const sorted = [...history].sort((a, b) => a.time - b.time);
+    // Process live MQTT message into event
+    processLiveEvent(deviceName, payload) {
+      const now = Date.now();
+      const room = this.extractRoom(deviceName);
 
-      // Detect rapid changes
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const windowMs = 30 * 60 * 1000;
-        const start = sorted[i];
-        const endIdx = sorted.findIndex(p => p.time >= start.time + windowMs && p.time <= start.time + windowMs * 1.2);
-        if (endIdx === -1) continue;
-
-        const end = sorted[endIdx];
-        const delta = end.value - start.value;
-
-        if (Math.abs(delta) >= 3) {
-          events.push({
-            type: delta > 0 ? 'RAPID_RISE' : 'RAPID_DROP',
-            time: start.time, room: roomName, icon: roomIcon,
-            value: start.value, endValue: end.value, delta: Math.abs(delta),
-            duration: Math.round((end.time - start.time) / 60000),
-            eventIcon: delta > 0 ? '🔥' : '❄️',
-            title: `${roomName} ${delta > 0 ? 'rose' : 'dropped'} ${Math.abs(delta).toFixed(1)}° in ${Math.round((end.time - start.time) / 60000)} mins`,
-            cause: this.inferCause(delta > 0 ? 'RAPID_RISE' : 'RAPID_DROP', roomName, start.time)
-          });
-        }
+      // Motion
+      if (payload.occupancy !== undefined) {
+        return {
+          time: now,
+          deviceName,
+          deviceType: 'motion',
+          room,
+          eventType: payload.occupancy ? 'motion_detected' : 'motion_cleared',
+          value: payload.occupancy ? 1 : 0,
+          state: String(payload.occupancy)
+        };
       }
 
-      // Detect peaks
-      const windowSize = 6;
-      for (let i = windowSize; i < sorted.length - windowSize; i++) {
-        const point = sorted[i];
-        const before = sorted.slice(i - windowSize, i);
-        const after = sorted.slice(i + 1, i + windowSize + 1);
-        const maxBefore = Math.max(...before.map(p => p.value));
-        const maxAfter = Math.max(...after.map(p => p.value));
-
-        if (point.value > maxBefore && point.value > maxAfter && point.value - Math.min(maxBefore, maxAfter) >= 2) {
-          events.push({
-            type: 'PEAK', time: point.time, room: roomName, icon: roomIcon,
-            value: point.value, eventIcon: '📈',
-            title: `${roomName} peaked at ${point.value.toFixed(1)}°`,
-            cause: this.inferCause('PEAK', roomName, point.time)
-          });
-        }
+      // Contact (door/window)
+      if (payload.contact !== undefined) {
+        return {
+          time: now,
+          deviceName,
+          deviceType: 'contact',
+          room,
+          eventType: payload.contact ? 'door_closed' : 'door_opened',
+          value: payload.contact ? 0 : 1,
+          state: String(payload.contact)
+        };
       }
 
-      return events;
-    },
+      // Vibration (mailbox)
+      if (payload.vibration !== undefined && payload.vibration === true) {
+        return {
+          time: now,
+          deviceName,
+          deviceType: 'vibration',
+          room,
+          eventType: 'vibration_detected',
+          value: 1,
+          state: 'true'
+        };
+      }
 
-    inferCause(type, roomName, time) {
-      const hour = new Date(time).getHours();
-      const room = roomName.toLowerCase();
+      // Light/plug state changes (only on actual change)
+      if (payload.state !== undefined) {
+        const isLight = payload.brightness !== undefined || deviceName.toLowerCase().includes('light');
+        return {
+          time: now,
+          deviceName,
+          deviceType: isLight ? 'light' : 'plug',
+          room,
+          eventType: payload.state === 'ON'
+            ? (isLight ? 'light_on' : 'plug_on')
+            : (isLight ? 'light_off' : 'plug_off'),
+          value: payload.state === 'ON' ? 1 : 0,
+          state: payload.state
+        };
+      }
 
-      if (room.includes('bathroom') && type === 'PEAK' && hour >= 6 && hour <= 9)
-        return { text: 'Morning shower' };
-      if (room.includes('kitchen') && type === 'RAPID_RISE' && hour >= 18 && hour <= 21)
-        return { text: 'Cooking dinner' };
-      if (type === 'RAPID_RISE' && hour >= 10 && hour <= 15)
-        return { text: 'Sun exposure' };
       return null;
     },
 
-    setDate(date) { this.selectedDate = date; this.loadEvents(); },
+    // Extract room from device name
+    extractRoom(deviceName) {
+      const match = deviceName.match(/^\[([^\]]+)\]/);
+      return match ? match[1].toLowerCase() : 'unknown';
+    },
 
+    // Get filtered events from store
+    get events() {
+      return this.$store.events.filteredEvents;
+    },
+
+    // Get event info (icon, color, label)
+    getEventInfo(eventType) {
+      return this.$store.events.getEventInfo(eventType);
+    },
+
+    // Format timestamp
     formatTime(timestamp) {
-      return new Date(timestamp).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+      const date = new Date(timestamp);
+      const now = new Date();
+      const isToday = date.toDateString() === now.toDateString();
+
+      if (isToday) {
+        return date.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+      }
+      return date.toLocaleDateString('en-AU', {
+        weekday: 'short', hour: 'numeric', minute: '2-digit'
+      });
     },
 
-    getEventClass(type) {
-      return { 'PEAK': 'event-peak', 'VALLEY': 'event-valley', 'RAPID_RISE': 'event-rise', 'RAPID_DROP': 'event-drop' }[type] || '';
+    // Format relative time
+    formatRelativeTime(timestamp) {
+      const seconds = Math.floor((Date.now() - timestamp) / 1000);
+      if (seconds < 60) return 'Just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      return `${Math.floor(seconds / 86400)}d ago`;
     },
 
-    getTodaySummary() {
-      const rooms = this.$store.rooms.list.filter(r => r.tempHistory && r.tempHistory.length > 0);
-      if (rooms.length === 0) return null;
+    // Get event CSS class
+    getEventClass(eventType) {
+      const info = this.getEventInfo(eventType);
+      return `event-${info.category || 'default'}`;
+    },
 
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      let allTemps = [], mostStable = null, minVar = Infinity, mostVolatile = null, maxVar = 0;
+    // Filter toggles
+    toggleCategory(category) {
+      const idx = this.selectedCategories.indexOf(category);
+      if (idx === -1) {
+        this.selectedCategories.push(category);
+        // Also update store filters
+        const types = Object.entries(this.$store.events.eventTypes)
+          .filter(([, info]) => info.category === category)
+          .map(([type]) => type);
+        types.forEach(t => {
+          if (!this.$store.events.filters.eventTypes.includes(t)) {
+            this.$store.events.filters.eventTypes.push(t);
+          }
+        });
+      } else {
+        this.selectedCategories.splice(idx, 1);
+        // Remove from store filters
+        const types = Object.entries(this.$store.events.eventTypes)
+          .filter(([, info]) => info.category === category)
+          .map(([type]) => type);
+        this.$store.events.filters.eventTypes = this.$store.events.filters.eventTypes
+          .filter(t => !types.includes(t));
+      }
+    },
 
-      rooms.forEach(room => {
-        const todayHistory = room.tempHistory.filter(h => h.time >= today.getTime());
-        if (todayHistory.length < 2) return;
-        const temps = todayHistory.map(h => h.value);
-        allTemps.push(...temps);
-        const variation = Math.max(...temps) - Math.min(...temps);
-        if (variation < minVar) { minVar = variation; mostStable = room.name; }
-        if (variation > maxVar) { maxVar = variation; mostVolatile = room.name; }
+    toggleRoom(room) {
+      this.$store.events.toggleRoom(room);
+    },
+
+    setDateRange(range) {
+      this.$store.events.setDateRange(range);
+    },
+
+    clearFilters() {
+      this.selectedCategories = [];
+      this.selectedRoom = '';
+      this.selectedDeviceType = '';
+      this.selectedDevice = '';
+      this.$store.events.clearFilters();
+    },
+
+    // Dropdown filter methods
+    setRoom(room) {
+      this.selectedRoom = room;
+      this.$store.events.setRoom(room);
+    },
+
+    setDeviceType(type) {
+      this.selectedDeviceType = type;
+      this.$store.events.setDeviceType(type);
+    },
+
+    setDevice(device) {
+      this.selectedDevice = device;
+      this.$store.events.setDevice(device);
+    },
+
+    // Get available device types from store
+    get availableDeviceTypes() {
+      return this.$store.events.availableDeviceTypes;
+    },
+
+    // Get available devices from store
+    get availableDevices() {
+      return this.$store.events.availableDevices;
+    },
+
+    // Get available categories with counts
+    get categories() {
+      const counts = {};
+      this.$store.events.list.forEach(e => {
+        const info = this.getEventInfo(e.eventType);
+        const cat = info.category || 'unknown';
+        counts[cat] = (counts[cat] || 0) + 1;
       });
 
-      if (allTemps.length === 0) return null;
-      return {
-        minTemp: Math.min(...allTemps).toFixed(1),
-        maxTemp: Math.max(...allTemps).toFixed(1),
-        mostStable, mostVolatile,
-        eventCount: this.events.length
-      };
+      return [
+        { id: 'motion', icon: '👁️', label: 'Motion', count: counts.motion || 0 },
+        { id: 'contact', icon: '🚪', label: 'Doors', count: counts.contact || 0 },
+        { id: 'vibration', icon: '📬', label: 'Mailbox', count: counts.vibration || 0 },
+        { id: 'light', icon: '💡', label: 'Lights', count: counts.light || 0 },
+        { id: 'plug', icon: '🔌', label: 'Plugs', count: counts.plug || 0 },
+        { id: 'co2', icon: '💨', label: 'CO2', count: counts.co2 || 0 },
+        { id: 'availability', icon: '📡', label: 'Devices', count: counts.availability || 0 }
+      ].filter(c => c.count > 0);
     },
 
+    // Get stats
+    get stats() {
+      return this.$store.events.stats;
+    },
+
+    // Get available rooms
+    get availableRooms() {
+      return this.$store.events.availableRooms;
+    },
+
+    // Check if category is selected
+    isCategorySelected(category) {
+      return this.selectedCategories.includes(category);
+    },
+
+    // Check if room is selected
+    isRoomSelected(room) {
+      return this.$store.events.filters.rooms.includes(room);
+    },
+
+    // Get current date range
+    get currentDateRange() {
+      return this.$store.events.filters.dateRange;
+    },
+
+    // Open room detail (for temperature events)
     openRoom(roomName) {
-      const room = this.$store.rooms.list.find(r => r.name === roomName);
+      const room = this.$store.rooms.list.find(r =>
+        r.name.toLowerCase() === roomName.toLowerCase()
+      );
       if (room) this.$store.roomDetail.open(room);
+    },
+
+    // Reload events
+    refresh() {
+      this.$store.events.loadHistorical(24);
     }
   };
 }

@@ -3,10 +3,6 @@
  * Smart Home Climate Dashboard
  */
 
-// Import Alpine as ES module (ensures proper load order)
-import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
-window.Alpine = Alpine;
-
 import { CONFIG, FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, SENSOR_VISUALS } from './config.js';
 import { initMqttStore } from './stores/mqtt-store.js';
 import { initRoomsStore } from './stores/rooms-store.js';
@@ -27,7 +23,6 @@ import { threeDView } from '../views/floor-plan-3d.js';
 import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
 import { isometricView } from '../views/isometric.js';
-import { networkView } from '../views/network.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -35,21 +30,23 @@ if (typeof THREE !== 'undefined') {
 }
 
 // ========================================
-// ALPINE STORE REGISTRATION
+// ALPINE INITIALIZATION
 // ========================================
-// Register stores directly (before Alpine.start())
-Alpine.store('config', CONFIG);
-initMqttStore(Alpine, CONFIG);
-initRoomsStore(Alpine, CONFIG);
-initLightsStore(Alpine, CONFIG);
-initRoomDetailStore(Alpine, CONFIG);
-initSensorsStore(Alpine, CONFIG);
+document.addEventListener('alpine:init', () => {
+  // Register stores
+  Alpine.store('config', CONFIG);
+  initMqttStore(Alpine, CONFIG);
+  initRoomsStore(Alpine, CONFIG);
+  initLightsStore(Alpine, CONFIG);
+  initRoomDetailStore(Alpine, CONFIG);
+  initSensorsStore(Alpine, CONFIG);
 
-// Make config available for 3D views
-window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
-window.TEMP_COLORS = TEMP_COLORS;
-window.HUMIDITY_COLORS = HUMIDITY_COLORS;
-window.SENSOR_VISUALS = SENSOR_VISUALS;
+  // Make config available for 3D views
+  window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
+  window.TEMP_COLORS = TEMP_COLORS;
+  window.HUMIDITY_COLORS = HUMIDITY_COLORS;
+  window.SENSOR_VISUALS = SENSOR_VISUALS;
+});
 
 // ========================================
 // MAIN APP COMPONENT
@@ -153,14 +150,4 @@ window.isometricView = function() {
   return isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS);
 };
 
-// Network view is a factory function
-window.networkView = function() {
-  return networkView(FLOOR_PLAN_CONFIG);
-};
-
 console.log('🏠 Smart Home Dashboard loaded (modular)');
-
-// ========================================
-// START ALPINE (after all registrations)
-// ========================================
-Alpine.start();

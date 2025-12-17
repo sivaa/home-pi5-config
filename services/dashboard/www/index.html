@@ -30,10 +30,163 @@
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- OrbitControls is now loaded via js/three/orbit-controls.js module in app.js -->
+  <script>
+    // OrbitControls for Three.js r128 (inline to ensure compatibility)
+    THREE.OrbitControls = function(object, domElement) {
+      this.object = object;
+      this.domElement = domElement;
+      this.target = new THREE.Vector3();
+      this.minDistance = 0;
+      this.maxDistance = Infinity;
+      this.minPolarAngle = 0;
+      this.maxPolarAngle = Math.PI;
+      this.enableDamping = false;
+      this.dampingFactor = 0.05;
+      this.autoRotate = false;
+      this.autoRotateSpeed = 2.0;
 
-  <!-- Main app module (imports Alpine as ES module and starts it) -->
-  <script type="module" src="./js/app.js"></script>
+      var scope = this;
+      var spherical = new THREE.Spherical();
+      var sphericalDelta = new THREE.Spherical();
+      var scale = 1;
+      var panOffset = new THREE.Vector3();
+      var rotateStart = new THREE.Vector2();
+      var rotateEnd = new THREE.Vector2();
+      var rotateDelta = new THREE.Vector2();
+      var panStart = new THREE.Vector2();
+      var panEnd = new THREE.Vector2();
+      var panDelta = new THREE.Vector2();
+      var dollyStart = new THREE.Vector2();
+      var dollyEnd = new THREE.Vector2();
+      var dollyDelta = new THREE.Vector2();
+
+      var STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2, TOUCH_ROTATE: 3, TOUCH_PAN: 4, TOUCH_DOLLY_PAN: 5, TOUCH_DOLLY_ROTATE: 6 };
+      var state = STATE.NONE;
+
+      this.update = function() {
+        var offset = new THREE.Vector3();
+        var quat = new THREE.Quaternion().setFromUnitVectors(object.up, new THREE.Vector3(0, 1, 0));
+        var quatInverse = quat.clone().invert();
+        var lastPosition = new THREE.Vector3();
+        var lastQuaternion = new THREE.Quaternion();
+
+        return function update() {
+          var position = scope.object.position;
+          offset.copy(position).sub(scope.target);
+          offset.applyQuaternion(quat);
+          spherical.setFromVector3(offset);
+          if (scope.autoRotate && state === STATE.NONE) sphericalDelta.theta -= 2 * Math.PI / 60 / 60 * scope.autoRotateSpeed;
+          if (scope.enableDamping) {
+            spherical.theta += sphericalDelta.theta * scope.dampingFactor;
+            spherical.phi += sphericalDelta.phi * scope.dampingFactor;
+          } else {
+            spherical.theta += sphericalDelta.theta;
+            spherical.phi += sphericalDelta.phi;
+          }
+          spherical.phi = Math.max(scope.minPolarAngle, Math.min(scope.maxPolarAngle, spherical.phi));
+          spherical.makeSafe();
+          spherical.radius *= scale;
+          spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+          if (scope.enableDamping) scope.target.addScaledVector(panOffset, scope.dampingFactor);
+          else scope.target.add(panOffset);
+          offset.setFromSpherical(spherical);
+          offset.applyQuaternion(quatInverse);
+          position.copy(scope.target).add(offset);
+          scope.object.lookAt(scope.target);
+          if (scope.enableDamping) {
+            sphericalDelta.theta *= (1 - scope.dampingFactor);
+            sphericalDelta.phi *= (1 - scope.dampingFactor);
+            panOffset.multiplyScalar(1 - scope.dampingFactor);
+          } else {
+            sphericalDelta.set(0, 0, 0);
+            panOffset.set(0, 0, 0);
+          }
+          scale = 1;
+          return false;
+        };
+      }();
+
+      function onPointerDown(event) {
+        if (event.pointerType === 'touch') {
+          // Skip for now - simplified
+        } else {
+          onMouseDown(event);
+        }
+      }
+
+      function onPointerMove(event) {
+        if (event.pointerType === 'touch') {
+          // Skip for now - simplified
+        } else {
+          onMouseMove(event);
+        }
+      }
+
+      function onPointerUp(event) {
+        state = STATE.NONE;
+        scope.domElement.releasePointerCapture(event.pointerId);
+        scope.domElement.removeEventListener('pointermove', onPointerMove);
+        scope.domElement.removeEventListener('pointerup', onPointerUp);
+      }
+
+      function onMouseDown(event) {
+        event.preventDefault();
+        scope.domElement.setPointerCapture(event.pointerId);
+        scope.domElement.addEventListener('pointermove', onPointerMove);
+        scope.domElement.addEventListener('pointerup', onPointerUp);
+        if (event.button === 0) {
+          state = STATE.ROTATE;
+          rotateStart.set(event.clientX, event.clientY);
+        } else if (event.button === 2) {
+          state = STATE.PAN;
+          panStart.set(event.clientX, event.clientY);
+        }
+      }
+
+      function onMouseMove(event) {
+        if (state === STATE.ROTATE) {
+          rotateEnd.set(event.clientX, event.clientY);
+          rotateDelta.subVectors(rotateEnd, rotateStart).multiplyScalar(0.005);
+          sphericalDelta.theta -= rotateDelta.x;
+          sphericalDelta.phi -= rotateDelta.y;
+          rotateStart.copy(rotateEnd);
+        } else if (state === STATE.PAN) {
+          panEnd.set(event.clientX, event.clientY);
+          panDelta.subVectors(panEnd, panStart).multiplyScalar(0.02);
+          var v = new THREE.Vector3();
+          v.setFromMatrixColumn(scope.object.matrix, 0);
+          v.multiplyScalar(-panDelta.x);
+          panOffset.add(v);
+          v.setFromMatrixColumn(scope.object.matrix, 1);
+          v.multiplyScalar(panDelta.y);
+          panOffset.add(v);
+          panStart.copy(panEnd);
+        }
+      }
+
+      function onMouseWheel(event) {
+        event.preventDefault();
+        if (event.deltaY < 0) scale /= 0.95;
+        else if (event.deltaY > 0) scale *= 0.95;
+      }
+
+      function onContextMenu(event) {
+        event.preventDefault();
+      }
+
+      this.domElement.addEventListener('pointerdown', onPointerDown);
+      this.domElement.addEventListener('wheel', onMouseWheel, { passive: false });
+      this.domElement.addEventListener('contextmenu', onContextMenu);
+
+      this.dispose = function() {
+        scope.domElement.removeEventListener('pointerdown', onPointerDown);
+        scope.domElement.removeEventListener('wheel', onMouseWheel);
+        scope.domElement.removeEventListener('contextmenu', onContextMenu);
+      };
+
+      this.update();
+    };
+  </script>
 </head>
 <body>
   <div class="app-container" x-data="app()" x-init="init()">
@@ -444,97 +597,138 @@
           </div>
         </div>
 
-        <!-- Vision 5: Timeline -->
+        <!-- Vision 5: Timeline (All Zigbee Events) -->
         <div x-show="currentView === 'timeline'" x-cloak x-data="timelineView()">
           <div class="timeline-view">
+            <!-- Header -->
             <div class="timeline-header">
-              <h2 class="timeline-title">📖 Today's Climate Story</h2>
+              <div class="timeline-title-row">
+                <h2 class="timeline-title">Event Timeline</h2>
+                <button class="btn btn-icon" @click="refresh()">Refresh</button>
+              </div>
+
+              <!-- Date Range Selector -->
               <div class="date-selector">
-                <button class="btn btn-secondary" :class="{ active: selectedDate === 'today' }"
-                        @click="setDate('today')">Today</button>
-                <button class="btn btn-secondary" :class="{ active: selectedDate === 'yesterday' }"
-                        @click="setDate('yesterday')">Yesterday</button>
-                <button class="btn btn-secondary" :class="{ active: selectedDate === 'week' }"
-                        @click="setDate('week')">This Week</button>
+                <button class="btn btn-secondary" :class="{ active: currentDateRange === 'today' }"
+                        @click="setDateRange('today')">Today</button>
+                <button class="btn btn-secondary" :class="{ active: currentDateRange === 'yesterday' }"
+                        @click="setDateRange('yesterday')">Yesterday</button>
+                <button class="btn btn-secondary" :class="{ active: currentDateRange === 'week' }"
+                        @click="setDateRange('week')">This Week</button>
               </div>
             </div>
 
-            <template x-if="getTodaySummary()">
-              <div class="summary-card">
-                <div class="summary-title">📊 Summary</div>
-                <div class="summary-grid">
-                  <div class="summary-item">
-                    <span class="summary-label">Temperature Range</span>
-                    <span class="summary-value" x-text="getTodaySummary().minTemp + '° — ' + getTodaySummary().maxTemp + '°'"></span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="summary-label">Most Stable</span>
-                    <span class="summary-value" x-text="getTodaySummary().mostStable || '--'"></span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="summary-label">Most Variable</span>
-                    <span class="summary-value" x-text="getTodaySummary().mostVolatile || '--'"></span>
-                  </div>
-                  <div class="summary-item">
-                    <span class="summary-label">Events Detected</span>
-                    <span class="summary-value" x-text="getTodaySummary().eventCount"></span>
-                  </div>
-                </div>
-              </div>
-            </template>
+            <!-- Filter Bar (Always Visible) -->
+            <div class="timeline-filter-bar">
+              <!-- Room Dropdown -->
+              <select class="filter-select" x-model="selectedRoom" @change="setRoom($event.target.value)">
+                <option value="">All Rooms</option>
+                <template x-for="room in availableRooms" :key="room">
+                  <option :value="room" x-text="room"></option>
+                </template>
+              </select>
 
+              <!-- Device Type Dropdown -->
+              <select class="filter-select" x-model="selectedDeviceType" @change="setDeviceType($event.target.value)">
+                <option value="">All Types</option>
+                <template x-for="type in availableDeviceTypes" :key="type.id">
+                  <option :value="type.id" x-text="type.label"></option>
+                </template>
+              </select>
+
+              <!-- Device Dropdown -->
+              <select class="filter-select" x-model="selectedDevice" @change="setDevice($event.target.value)">
+                <option value="">All Devices</option>
+                <template x-for="device in availableDevices" :key="device">
+                  <option :value="device" x-text="device"></option>
+                </template>
+              </select>
+
+              <!-- Clear Filters -->
+              <button class="btn btn-secondary btn-small" @click="clearFilters()"
+                      x-show="selectedRoom || selectedDeviceType || selectedDevice">Clear</button>
+            </div>
+
+            <!-- Stats Summary -->
+            <div class="timeline-stats">
+              <div class="stat-item">
+                <span class="stat-value" x-text="stats.total"></span>
+                <span class="stat-label">Events</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" x-text="stats.lastHour"></span>
+                <span class="stat-label">Last Hour</span>
+              </div>
+              <div class="stat-item" x-show="stats.motionCount > 0">
+                <span class="stat-icon">👁️</span>
+                <span class="stat-value" x-text="stats.motionCount"></span>
+              </div>
+              <div class="stat-item" x-show="stats.doorCount > 0">
+                <span class="stat-icon">🚪</span>
+                <span class="stat-value" x-text="stats.doorCount"></span>
+              </div>
+              <div class="stat-item" x-show="stats.mailboxCount > 0">
+                <span class="stat-icon">📬</span>
+                <span class="stat-value" x-text="stats.mailboxCount"></span>
+              </div>
+            </div>
+
+            <!-- Events List -->
             <div class="timeline-content">
-              <div class="timeline-now" x-show="selectedDate === 'today'">
+              <!-- NOW marker -->
+              <div class="timeline-now" x-show="currentDateRange === 'today'">
                 <div class="now-marker">NOW</div>
                 <div class="now-line"></div>
               </div>
 
-              <template x-if="events.length === 0 && !loading">
+              <!-- No Events -->
+              <template x-if="events.length === 0 && !$store.events.loading">
                 <div class="no-events">
                   <span class="no-events-icon">📭</span>
-                  <span class="no-events-text">No significant events detected</span>
-                  <span class="no-events-hint">Events appear when temperature changes rapidly or reaches peaks</span>
+                  <span class="no-events-text">No events found</span>
+                  <span class="no-events-hint">Events will appear here as devices report activity</span>
                 </div>
               </template>
 
-              <template x-if="loading">
+              <!-- Loading -->
+              <template x-if="$store.events.loading">
                 <div class="loading-events">
                   <span class="loading-indicator"></span>
-                  <span>Analyzing climate data...</span>
+                  <span>Loading events...</span>
                 </div>
               </template>
 
+              <!-- Event List -->
               <div class="timeline-events">
-                <template x-for="event in events" :key="event.time + event.room">
-                  <div class="timeline-event" :class="getEventClass(event.type)" @click="openRoom(event.room)">
+                <template x-for="event in events.slice(0, 50)" :key="event.time + event.deviceName + event.eventType">
+                  <div class="timeline-event" :class="getEventClass(event.eventType)">
                     <div class="event-time-marker">
                       <span class="event-time" x-text="formatTime(event.time)"></span>
-                      <div class="event-dot"></div>
+                      <div class="event-dot" :style="{ background: getEventInfo(event.eventType).color }"></div>
                     </div>
                     <div class="event-card">
                       <div class="event-header">
-                        <span class="event-icon" x-text="event.eventIcon"></span>
-                        <span class="event-room-icon" x-text="event.icon"></span>
-                        <span class="event-title" x-text="event.title"></span>
+                        <span class="event-icon" x-text="getEventInfo(event.eventType).icon"></span>
+                        <span class="event-label" x-text="getEventInfo(event.eventType).label"></span>
                       </div>
-                      <template x-if="event.cause">
-                        <div class="event-cause">
-                          <span class="cause-icon">💡</span>
-                          <span class="cause-text" x-text="'Likely: ' + event.cause.text"></span>
-                        </div>
-                      </template>
-                      <template x-if="event.type === 'RAPID_RISE' || event.type === 'RAPID_DROP'">
-                        <div class="event-details">
-                          <span x-text="event.value.toFixed(1) + '° → ' + event.endValue.toFixed(1) + '°'"></span>
-                          <span class="event-duration" x-text="'(' + event.duration + ' min)'"></span>
-                        </div>
-                      </template>
+                      <div class="event-details">
+                        <span class="event-device" x-text="event.deviceName"></span>
+                        <span class="event-room" x-show="event.room && event.room !== 'unknown'" x-text="'(' + event.room + ')'"></span>
+                      </div>
+                      <div class="event-meta">
+                        <span class="event-relative-time" x-text="formatRelativeTime(event.time)"></span>
+                        <span class="event-raw-values" x-show="event.state || event.value !== undefined">
+                          · <code x-text="event.state !== undefined ? 'state: ' + event.state : ''"></code>
+                          <code x-show="event.value !== undefined" x-text="(event.state !== undefined ? ', ' : '') + 'value: ' + event.value"></code>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </template>
               </div>
 
-              <div class="timeline-midnight" x-show="selectedDate === 'today'">
+              <!-- MIDNIGHT marker -->
+              <div class="timeline-midnight" x-show="currentDateRange === 'today'">
                 <div class="midnight-line"></div>
                 <div class="midnight-label">MIDNIGHT</div>
               </div>
@@ -1667,7 +1861,7 @@
     };
   </script>
 
-  <!-- Alpine.js is now imported as ES module in js/app.js -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
   <!-- CO2 Monitor Module - enhances the stub with methods -->
   <script type="module">
@@ -1929,16 +2123,3568 @@
     // Make CONFIG globally available for modules
     window.CONFIG = CONFIG;
 
-    // Alpine stores and app() are now in js/app.js (imports from js/stores/*.js)
-    // CONFIG is kept here for compatibility with inline view components
+    // ========================================
+    // ALPINE STORES
+    // ========================================
+    document.addEventListener('alpine:init', () => {
+
+      // Config store
+      Alpine.store('config', CONFIG);
+
+      // MQTT connection store
+      Alpine.store('mqtt', {
+        connected: false,
+        connecting: true,
+        client: null,
+
+        connect() {
+          this.connecting = true;
+
+          this.client = mqtt.connect(CONFIG.mqttUrl, {
+            clientId: 'climate-' + Math.random().toString(16).substr(2, 8),
+            reconnectPeriod: 3000,
+            connectTimeout: 10000
+          });
+
+          this.client.on('connect', () => {
+            this.connected = true;
+            this.connecting = false;
+
+            // Subscribe to room sensors
+            CONFIG.rooms.forEach(room => {
+              this.client.subscribe(`${CONFIG.baseTopic}/${room.sensor}`, { qos: 0 });
+            });
+
+            // Subscribe to light topics (state and availability)
+            Alpine.store('lights').list.forEach(light => {
+              this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}`, { qos: 0 });
+              this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}/availability`, { qos: 0 });
+            });
+          });
+
+          this.client.on('message', (topic, message) => {
+            try {
+              const msgStr = message.toString();
+              const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+
+              // Check if it's an availability message
+              if (topic.endsWith('/availability')) {
+                const lightTopic = deviceName.replace('/availability', '');
+                // Handle both JSON {"state":"online"} and plain string "online"
+                let isOnline;
+                try {
+                  const data = JSON.parse(msgStr);
+                  isOnline = data.state === 'online';
+                } catch {
+                  isOnline = msgStr === 'online';
+                }
+                Alpine.store('lights').setAvailability(lightTopic, isOnline);
+                return;
+              }
+
+              const data = JSON.parse(msgStr);
+
+              // Check if it's a room sensor
+              const roomConfig = CONFIG.rooms.find(r => r.sensor === deviceName);
+              if (roomConfig) {
+                Alpine.store('rooms').updateRoom(deviceName, data);
+                return;
+              }
+
+              // Check if it's a light
+              Alpine.store('lights').updateLight(deviceName, data);
+            } catch (e) {
+              console.error('MQTT parse error:', e);
+            }
+          });
+
+          this.client.on('error', (err) => console.error('MQTT Error:', err));
+          this.client.on('close', () => { this.connected = false; this.connecting = true; });
+          this.client.on('reconnect', () => { this.connecting = true; });
+        }
+      });
+
+      // Rooms data store
+      Alpine.store('rooms', {
+        list: CONFIG.rooms.map(r => ({
+          ...r,
+          temperature: null,
+          humidity: null,
+          lastSeen: null,
+          stale: false,
+          tempHistory: [],
+          humidHistory: []
+        })),
+        lastUpdate: null,
+        loading: false,
+
+        get historyCount() {
+          return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
+        },
+
+        updateRoom(sensorName, data) {
+          const roomIndex = this.list.findIndex(r => r.sensor === sensorName);
+          if (roomIndex === -1) return;
+
+          const room = this.list[roomIndex];
+          const now = Date.now();
+
+          let sensorTime = now;
+          if (data.last_seen) {
+            sensorTime = typeof data.last_seen === 'number' ? data.last_seen : new Date(data.last_seen).getTime();
+          }
+
+          if (data.temperature !== undefined) {
+            room.temperature = data.temperature;
+            room.tempHistory.push({ time: sensorTime, value: data.temperature });
+            if (room.tempHistory.length > CONFIG.maxHistoryPoints) room.tempHistory.shift();
+          }
+
+          if (data.humidity !== undefined) {
+            room.humidity = data.humidity;
+            room.humidHistory.push({ time: sensorTime, value: data.humidity });
+            if (room.humidHistory.length > CONFIG.maxHistoryPoints) room.humidHistory.shift();
+          }
+
+          room.lastSeen = sensorTime;
+          room.stale = false;
+          this.lastUpdate = now;
+        },
+
+        async loadHistorical() {
+          this.loading = true;
+          for (const room of this.list) {
+            try {
+              const tempQuery = `SELECT value FROM "°C" WHERE entity_id = '${room.entityId.replace('sensor.', '')}_temperature' AND time > now() - ${CONFIG.historyHours}h ORDER BY time ASC`;
+              const tempUrl = `${CONFIG.influxUrl}/query?db=${CONFIG.influxDb}&q=${encodeURIComponent(tempQuery)}`;
+              const tempRes = await fetch(tempUrl);
+              const tempData = await tempRes.json();
+
+              if (tempData.results?.[0]?.series?.[0]?.values) {
+                const values = tempData.results[0].series[0].values;
+                room.tempHistory = values.map(v => ({ time: new Date(v[0]).getTime(), value: v[1] }));
+                room.temperature = values[values.length - 1][1];
+                room.lastSeen = new Date(values[values.length - 1][0]).getTime();
+              }
+
+              const humidQuery = `SELECT value FROM "%" WHERE entity_id = '${room.entityId.replace('sensor.', '')}_humidity' AND time > now() - ${CONFIG.historyHours}h ORDER BY time ASC`;
+              const humidUrl = `${CONFIG.influxUrl}/query?db=${CONFIG.influxDb}&q=${encodeURIComponent(humidQuery)}`;
+              const humidRes = await fetch(humidUrl);
+              const humidData = await humidRes.json();
+
+              if (humidData.results?.[0]?.series?.[0]?.values) {
+                const values = humidData.results[0].series[0].values;
+                room.humidHistory = values.map(v => ({ time: new Date(v[0]).getTime(), value: v[1] }));
+                room.humidity = values[values.length - 1][1];
+              }
+            } catch (e) {
+              console.error(`Failed to load history for ${room.name}:`, e);
+            }
+          }
+          this.lastUpdate = Date.now();
+          this.loading = false;
+        },
+
+        checkStale() {
+          const now = Date.now();
+          this.list.forEach(room => {
+            if (room.lastSeen && (now - room.lastSeen) > CONFIG.staleThreshold) {
+              room.stale = true;
+            }
+          });
+        }
+      });
+
+      // Lights store
+      Alpine.store('lights', {
+        list: [
+          {
+            id: 'study_light',
+            name: 'Study Light',
+            icon: '📚',
+            topic: '[Study] IKEA Light',
+            state: 'OFF',
+            brightness: 254,
+            colorTemp: 370,
+            linkquality: null,
+            lastSeen: null,
+            syncing: false,
+            available: true
+          },
+          {
+            id: 'living_light',
+            name: 'Living Room Light',
+            icon: '🛋️',
+            topic: '[Living] IKEA Light',
+            state: 'OFF',
+            brightness: 254,
+            colorTemp: 370,
+            linkquality: null,
+            lastSeen: null,
+            syncing: false,
+            available: true
+          }
+        ],
+        syncing: false,
+        initializing: true,
+
+        get anyLightSyncing() {
+          return this.list.some(l => l.syncing);
+        },
+
+        get lightsOnCount() {
+          return this.list.filter(l => l.state === 'ON').length;
+        },
+
+        presets: {
+          reading: { brightness: 254, colorTemp: 300 },
+          relax: { brightness: 150, colorTemp: 400 },
+          bright: { brightness: 254, colorTemp: 250 },
+          night: { brightness: 30, colorTemp: 454 }
+        },
+
+        scenes: {
+          movie: { state: 'ON', brightness: 50, colorTemp: 400 },
+          work: { state: 'ON', brightness: 254, colorTemp: 280 },
+          evening: { state: 'ON', brightness: 150, colorTemp: 380 },
+          goodnight: { state: 'OFF' }
+        },
+
+        updateLight(topic, data) {
+          const light = this.list.find(l => l.topic === topic);
+          if (light) {
+            if (data.state !== undefined) light.state = data.state;
+            if (data.brightness !== undefined) light.brightness = data.brightness;
+            if (data.color_temp !== undefined) light.colorTemp = data.color_temp;
+            if (data.linkquality !== undefined) light.linkquality = data.linkquality;
+            light.lastSeen = Date.now();
+            light.syncing = false;
+            this.initializing = false;
+            this.syncing = this.anyLightSyncing;
+          }
+        },
+
+        setAvailability(topic, isOnline) {
+          const light = this.list.find(l => l.topic === topic);
+          if (light) {
+            light.available = isOnline;
+            console.log(`Light ${light.name} availability: ${isOnline ? 'online' : 'offline'}`);
+          }
+        },
+
+        publishCommand(light, payload) {
+          const client = Alpine.store('mqtt').client;
+          if (!client || !Alpine.store('mqtt').connected) {
+            console.error('MQTT not connected');
+            return;
+          }
+
+          // Set syncing state
+          light.syncing = true;
+          this.syncing = true;
+
+          const topic = `zigbee2mqtt/${light.topic}/set`;
+          client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
+            if (err) {
+              console.error('Failed to publish:', err);
+              light.syncing = false;
+              this.syncing = this.anyLightSyncing;
+            } else {
+              // Syncing will be cleared when we receive the state update
+              // Set a timeout to clear syncing if no response
+              setTimeout(() => {
+                if (light.syncing) {
+                  light.syncing = false;
+                  this.syncing = this.anyLightSyncing;
+                }
+              }, 3000);
+            }
+          });
+        },
+
+        toggleLight(light) {
+          const newState = light.state === 'ON' ? 'OFF' : 'ON';
+          this.publishCommand(light, { state: newState });
+          light.state = newState; // Optimistic update
+        },
+
+        toggleAllLights() {
+          const allOn = this.list.every(l => l.state === 'ON');
+          const newState = allOn ? 'OFF' : 'ON';
+          this.list.forEach(light => {
+            this.publishCommand(light, { state: newState });
+            light.state = newState;
+          });
+        },
+
+        setBrightness(light, value) {
+          const brightness = parseInt(value);
+          this.publishCommand(light, { brightness });
+          // Local state already updated by x-model
+        },
+
+        setColorTemp(light, value) {
+          const colorTemp = parseInt(value);
+          this.publishCommand(light, { color_temp: colorTemp });
+          // Local state already updated by x-model
+        },
+
+        applyPreset(light, presetName) {
+          const preset = this.presets[presetName];
+          if (preset) {
+            this.publishCommand(light, {
+              brightness: preset.brightness,
+              color_temp: preset.colorTemp
+            });
+            light.brightness = preset.brightness;
+            light.colorTemp = preset.colorTemp;
+          }
+        },
+
+        applyScene(sceneName) {
+          const scene = this.scenes[sceneName];
+          if (scene) {
+            this.list.forEach(light => {
+              this.publishCommand(light, scene);
+              if (scene.state !== undefined) light.state = scene.state;
+              if (scene.brightness !== undefined) light.brightness = scene.brightness;
+              if (scene.colorTemp !== undefined) light.colorTemp = scene.colorTemp;
+            });
+          }
+        }
+      });
+
+      // Room detail modal store
+      Alpine.store('roomDetail', {
+        selectedRoom: null,
+        timeRange: '6h',
+        loading: false,
+        tempHistory: [],
+        humidHistory: [],
+        timeRanges: ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '3d', '7d'],
+
+        open(room) {
+          this.selectedRoom = room;
+          this.timeRange = '6h';
+          this.loadData();
+        },
+
+        close() {
+          this.selectedRoom = null;
+        },
+
+        async setTimeRange(range) {
+          this.timeRange = range;
+          await this.loadData();
+        },
+
+        async loadData() {
+          if (!this.selectedRoom) return;
+          this.loading = true;
+
+          try {
+            const room = this.selectedRoom;
+
+            const tempQuery = `SELECT value FROM "°C" WHERE entity_id = '${room.entityId.replace('sensor.', '')}_temperature' AND time > now() - ${this.timeRange} ORDER BY time ASC`;
+            const tempUrl = `${CONFIG.influxUrl}/query?db=${CONFIG.influxDb}&q=${encodeURIComponent(tempQuery)}`;
+            const tempRes = await fetch(tempUrl);
+            const tempData = await tempRes.json();
+
+            if (tempData.results?.[0]?.series?.[0]?.values) {
+              this.tempHistory = tempData.results[0].series[0].values.map(v => ({
+                time: new Date(v[0]).getTime(),
+                value: v[1]
+              }));
+            } else {
+              this.tempHistory = [];
+            }
+
+            const humidQuery = `SELECT value FROM "%" WHERE entity_id = '${room.entityId.replace('sensor.', '')}_humidity' AND time > now() - ${this.timeRange} ORDER BY time ASC`;
+            const humidUrl = `${CONFIG.influxUrl}/query?db=${CONFIG.influxDb}&q=${encodeURIComponent(humidQuery)}`;
+            const humidRes = await fetch(humidUrl);
+            const humidData = await humidRes.json();
+
+            if (humidData.results?.[0]?.series?.[0]?.values) {
+              this.humidHistory = humidData.results[0].series[0].values.map(v => ({
+                time: new Date(v[0]).getTime(),
+                value: v[1]
+              }));
+            } else {
+              this.humidHistory = [];
+            }
+
+            console.log(`Loaded ${this.tempHistory.length} temp, ${this.humidHistory.length} humid points for ${this.timeRange}`);
+          } catch (e) {
+            console.error('Failed to load modal data:', e);
+          }
+
+          this.loading = false;
+          setTimeout(() => this.drawCharts(), 50);
+        },
+
+        drawCharts() {
+          this.drawChart('modal-chart-temp', this.tempHistory, '°C', 'var(--color-primary)');
+          this.drawChart('modal-chart-humid', this.humidHistory, '%', 'var(--color-success)');
+        },
+
+        drawChart(id, data, unit, color) {
+          const svg = document.getElementById(id);
+          if (!svg || data.length === 0) return;
+
+          const width = svg.clientWidth || 700;
+          const height = svg.clientHeight || 180;
+          const padding = { top: 20, right: 50, bottom: 30, left: 50 };
+          const chartWidth = width - padding.left - padding.right;
+          const chartHeight = height - padding.top - padding.bottom;
+
+          const values = data.map(d => d.value);
+          const times = data.map(d => d.time);
+          const minVal = Math.floor(Math.min(...values) - 1);
+          const maxVal = Math.ceil(Math.max(...values) + 1);
+          const minTime = Math.min(...times);
+          const maxTime = Math.max(...times);
+          const valueRange = maxVal - minVal || 1;
+          const timeRange = maxTime - minTime || 1;
+
+          let svgContent = '';
+
+          const ySteps = 5;
+          for (let i = 0; i <= ySteps; i++) {
+            const y = padding.top + (i / ySteps) * chartHeight;
+            const val = maxVal - (i / ySteps) * valueRange;
+            svgContent += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#e0e0e0" stroke-dasharray="3,3"/>`;
+            svgContent += `<text x="${padding.left - 8}" y="${y + 4}" text-anchor="end" fill="var(--color-text-tertiary)" font-size="10">${val.toFixed(1)}${unit}</text>`;
+          }
+
+          const xSteps = Math.min(6, data.length);
+          for (let i = 0; i <= xSteps; i++) {
+            const x = padding.left + (i / xSteps) * chartWidth;
+            const time = new Date(minTime + (i / xSteps) * timeRange);
+            const label = time.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+            svgContent += `<line x1="${x}" y1="${padding.top}" x2="${x}" y2="${height - padding.bottom}" stroke="#e0e0e0" stroke-dasharray="3,3"/>`;
+            svgContent += `<text x="${x}" y="${height - 8}" text-anchor="middle" fill="var(--color-text-tertiary)" font-size="10">${label}</text>`;
+          }
+
+          svgContent += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="var(--color-text-tertiary)"/>`;
+          svgContent += `<line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="var(--color-text-tertiary)"/>`;
+
+          if (data.length >= 2) {
+            const points = data.map(d => {
+              const x = padding.left + ((d.time - minTime) / timeRange) * chartWidth;
+              const y = padding.top + ((maxVal - d.value) / valueRange) * chartHeight;
+              return `${x},${y}`;
+            }).join(' ');
+
+            const areaPoints = `${padding.left},${height - padding.bottom} ${points} ${width - padding.right},${height - padding.bottom}`;
+            svgContent += `<polygon fill="${color}" opacity="0.15" points="${areaPoints}"/>`;
+            svgContent += `<polyline fill="none" stroke="${color}" stroke-width="2.5" points="${points}"/>`;
+
+            const lastPoint = data[data.length - 1];
+            const lastX = padding.left + ((lastPoint.time - minTime) / timeRange) * chartWidth;
+            const lastY = padding.top + ((maxVal - lastPoint.value) / valueRange) * chartHeight;
+            svgContent += `<circle cx="${lastX}" cy="${lastY}" r="5" fill="${color}"/>`;
+          }
+
+          svg.innerHTML = svgContent;
+        },
+
+        getMinMax() {
+          if (!this.tempHistory.length) return '--';
+          const temps = this.tempHistory.map(d => d.value);
+          return `${Math.min(...temps).toFixed(1)}° / ${Math.max(...temps).toFixed(1)}°`;
+        },
+
+        formatUpdate(lastSeen) {
+          if (!lastSeen) return 'No data';
+          const seconds = Math.floor((Date.now() - lastSeen) / 1000);
+          if (seconds < 60) return 'Just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          return `${Math.floor(seconds / 3600)}h ago`;
+        }
+      });
+    });
 
     // ========================================
-    // VIEW COMPONENTS (to be extracted in Phase 4)
+    // MAIN APP COMPONENT
+    // ========================================
+    function app() {
+      return {
+        currentView: 'comfort',
+        currentDateTime: '',
+        now: Date.now(),
+
+        get lastUpdateText() {
+          const lastUpdate = Alpine.store('rooms').lastUpdate;
+          if (!lastUpdate) return 'Waiting...';
+          const seconds = Math.floor((this.now - lastUpdate) / 1000);
+          if (seconds < 5) return 'Just now';
+          if (seconds < 60) return `${seconds}s ago`;
+          return `${Math.floor(seconds / 60)}m ago`;
+        },
+
+        init() {
+          // Restore last view
+          const saved = localStorage.getItem('dashboard-view');
+          if (saved) this.currentView = saved;
+
+          // Update time
+          this.updateDateTime();
+          setInterval(() => {
+            this.updateDateTime();
+            this.now = Date.now();
+          }, 1000);
+
+          // Check stale
+          setInterval(() => Alpine.store('rooms').checkStale(), 10000);
+
+          // Load historical data and connect MQTT
+          Alpine.store('rooms').loadHistorical();
+          Alpine.store('mqtt').connect();
+
+          // Keyboard shortcuts for view switching
+          document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) return;
+            // 'I' key for isometric view
+            if (e.key === 'i' || e.key === 'I') {
+              this.setView('isometric');
+              return;
+            }
+            // '0' key for CO2 view
+            if (e.key === '0') {
+              this.setView('co2');
+              return;
+            }
+            // 'N' key for network view
+            if (e.key === 'n' || e.key === 'N') {
+              this.setView('network');
+              return;
+            }
+            // 1-9 keys for other views
+            if (e.key >= '1' && e.key <= '9') {
+              const views = ['comfort', 'compare', 'floor', 'ambient', 'timeline', 'classic', 'lights', '3d', 'config'];
+              this.setView(views[parseInt(e.key) - 1]);
+            }
+          });
+        },
+
+        setView(view) {
+          this.currentView = view;
+          localStorage.setItem('dashboard-view', view);
+        },
+
+        updateDateTime() {
+          const now = new Date();
+          this.currentDateTime = now.toLocaleDateString('en-AU', {
+            weekday: 'short', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+          });
+        }
+      };
+    }
+
+    // ========================================
+    // COMFORT SCORE VIEW (Vision 1)
+    // ========================================
+    function comfortScoreView() {
+      return {
+        homeScore: 0,
+        roomScores: [],
+        suggestions: [],
+        showBreakdown: false,
+
+        init() {
+          this.updateScores();
+          this.$watch('$store.rooms.list', () => this.updateScores());
+        },
+
+        updateScores() {
+          const rooms = this.$store.rooms.list;
+
+          this.roomScores = rooms
+            .filter(r => r.temperature !== null && r.humidity !== null)
+            .map(room => ({
+              ...room,
+              score: this.calculateComfort(room.temperature, room.humidity)
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          this.homeScore = this.calculateHomeScore(rooms);
+          this.suggestions = this.generateSuggestions(rooms).slice(0, 2);
+        },
+
+        calculateComfort(temp, humidity) {
+          if (temp === null || humidity === null) return 0;
+          let tempScore = 70;
+          if (temp < 20) tempScore = Math.max(0, 70 - (20 - temp) * 10);
+          else if (temp > 26) tempScore = Math.max(0, 70 - (temp - 26) * 10);
+          else tempScore = 70 - Math.abs(temp - 23) * 2;
+
+          let humidScore = 30;
+          if (humidity < 40) humidScore = Math.max(0, 30 - (40 - humidity));
+          else if (humidity > 60) humidScore = Math.max(0, 30 - (humidity - 60) * 1.5);
+          else humidScore = 30 - Math.abs(humidity - 50) * 0.3;
+
+          return Math.round(Math.max(0, Math.min(100, tempScore + humidScore)));
+        },
+
+        calculateHomeScore(rooms) {
+          const weights = { 'Living Room': 1.5, 'Bedroom': 1.3, 'Study': 1.0, 'Kitchen': 0.8, 'Bathroom': 0.5 };
+          const valid = rooms.filter(r => r.temperature !== null);
+          if (valid.length === 0) return 0;
+
+          let sum = 0, total = 0;
+          valid.forEach(r => {
+            const w = weights[r.name] || 1;
+            sum += this.calculateComfort(r.temperature, r.humidity) * w;
+            total += w;
+          });
+          return Math.round(sum / total);
+        },
+
+        generateSuggestions(rooms) {
+          const valid = rooms.filter(r => r.temperature !== null && r.humidity !== null);
+          if (valid.length === 0) return [];
+
+          const suggestions = [];
+          const hottest = valid.reduce((a, b) => a.temperature > b.temperature ? a : b);
+          const mostHumid = valid.reduce((a, b) => a.humidity > b.humidity ? a : b);
+
+          if (mostHumid.humidity > 65) {
+            suggestions.push({ type: 'action', icon: '💨', title: 'Improve ventilation',
+              message: `${mostHumid.name} humidity is high (${mostHumid.humidity}%)` });
+          }
+          if (hottest.temperature > 28) {
+            const coldest = valid.reduce((a, b) => a.temperature < b.temperature ? a : b);
+            suggestions.push({ type: 'tip', icon: '🏃', title: 'Go to cooler room',
+              message: `${coldest.name} is ${(hottest.temperature - coldest.temperature).toFixed(1)}° cooler` });
+          }
+          return suggestions;
+        },
+
+        getLabel() {
+          if (this.homeScore >= 90) return 'Perfect';
+          if (this.homeScore >= 75) return 'Comfortable';
+          if (this.homeScore >= 60) return 'Okay';
+          if (this.homeScore >= 40) return 'Uncomfortable';
+          return 'Poor';
+        },
+
+        getColor() {
+          if (this.homeScore >= 90) return '#34C759';
+          if (this.homeScore >= 75) return '#30D158';
+          if (this.homeScore >= 60) return '#FFD60A';
+          if (this.homeScore >= 40) return '#FF9500';
+          return '#FF3B30';
+        },
+
+        getRoomColor(score) {
+          if (score >= 75) return 'var(--color-success)';
+          if (score >= 50) return 'var(--color-warning)';
+          return 'var(--color-danger)';
+        },
+
+        getScoreArc() {
+          const percent = this.homeScore / 100;
+          const circumference = 2 * Math.PI * 90;
+          return `${percent * circumference} ${circumference}`;
+        },
+
+        openRoom(room) { this.$store.roomDetail.open(room); }
+      };
+    }
+
+    // ========================================
+    // BAR COMPARE VIEW (Vision 2)
+    // ========================================
+    function barCompareView() {
+      return {
+        sortBy: 'temperature',
+        sortDirection: 'desc',
+        viewMode: 'both',
+        insights: [],
+        tempScale: { min: 18, max: 32 },
+        humidityScale: { min: 0, max: 100 },
+        comfortZone: { temp: { min: 22, max: 26 }, humidity: { min: 40, max: 60 } },
+
+        init() {
+          const saved = localStorage.getItem('bar-sort');
+          if (saved) this.sortBy = saved;
+          const savedView = localStorage.getItem('bar-view');
+          if (savedView) this.viewMode = savedView;
+          this.updateInsights();
+          this.$watch('$store.rooms.list', () => this.updateInsights());
+        },
+
+        get rooms() { return this.$store.rooms.list.filter(r => r.temperature !== null); },
+
+        get sortedRooms() {
+          return [...this.rooms].sort((a, b) => {
+            let cmp = 0;
+            if (this.sortBy === 'temperature') cmp = a.temperature - b.temperature;
+            else if (this.sortBy === 'humidity') cmp = a.humidity - b.humidity;
+            else if (this.sortBy === 'name') cmp = a.name.localeCompare(b.name);
+            return this.sortDirection === 'desc' ? -cmp : cmp;
+          });
+        },
+
+        updateInsights() {
+          const rooms = this.rooms;
+          if (rooms.length === 0) { this.insights = []; return; }
+
+          const insights = [];
+          const temps = rooms.map(r => r.temperature);
+          const spread = Math.max(...temps) - Math.min(...temps);
+
+          if (spread >= 2) {
+            const hottest = rooms.find(r => r.temperature === Math.max(...temps));
+            const coldest = rooms.find(r => r.temperature === Math.min(...temps));
+            insights.push({ type: spread > 4 ? 'warning' : 'info', icon: '🔺', title: 'TEMPERATURE GAP',
+              message: `${hottest.name} is ${spread.toFixed(1)}° warmer than ${coldest.name}` });
+          }
+
+          rooms.forEach(r => {
+            if (r.humidity > 70) {
+              insights.push({ type: 'alert', icon: '💧', title: 'HIGH HUMIDITY',
+                message: `${r.name} at ${r.humidity}% — risk of mold` });
+            }
+          });
+
+          const comfortable = rooms.filter(r => r.temperature >= 22 && r.temperature <= 26 && r.humidity >= 40 && r.humidity <= 60);
+          if (comfortable.length > 0) {
+            insights.push({ type: 'success', icon: '✓', title: 'COMFORT ZONES',
+              message: `${comfortable.map(r => r.name).join(', ')} ${comfortable.length === 1 ? 'is' : 'are'} comfortable` });
+          }
+
+          this.insights = insights.slice(0, 4);
+        },
+
+        setViewMode(mode) { this.viewMode = mode; localStorage.setItem('bar-view', mode); },
+
+        getBarWidth(value, type) {
+          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
+          return Math.max(0, Math.min(100, ((value - scale.min) / (scale.max - scale.min)) * 100));
+        },
+
+        getBarColor(value, type) {
+          const zone = type === 'temperature' ? this.comfortZone.temp : this.comfortZone.humidity;
+          if (type === 'temperature') {
+            if (value < zone.min) return 'var(--color-cold)';
+            if (value > zone.max) return 'var(--color-hot)';
+            return 'var(--color-comfortable)';
+          } else {
+            if (value < zone.min) return 'var(--color-warning)';
+            if (value > zone.max) return 'var(--color-info)';
+            return 'var(--color-comfortable)';
+          }
+        },
+
+        getComfortZoneStyle(type) {
+          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
+          const zone = type === 'temperature' ? this.comfortZone.temp : this.comfortZone.humidity;
+          const left = ((zone.min - scale.min) / (scale.max - scale.min)) * 100;
+          const width = ((zone.max - zone.min) / (scale.max - scale.min)) * 100;
+          return { left: left + '%', width: width + '%' };
+        },
+
+        getScaleLabels(type) {
+          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
+          const unit = type === 'temperature' ? '°' : '%';
+          return [scale.min + unit, ((scale.min + scale.max) / 2) + unit, scale.max + unit];
+        },
+
+        getInsightClass(type) {
+          return { success: 'insight-success', warning: 'insight-warning', alert: 'insight-alert', info: 'insight-info' }[type] || 'insight-info';
+        },
+
+        openRoom(room) { this.$store.roomDetail.open(room); }
+      };
+    }
+
+    // ========================================
+    // FLOOR PLAN VIEW (Vision 3)
+    // ========================================
+    function floorPlanView() {
+      return {
+        viewType: 'temperature',
+        // Layout based on actual floor plan measurements
+        // Scale: ~55px per meter for good visualization
+        layout: {
+          width: 620, height: 470,
+          rooms: [
+            // Top row: Living Room (left with balcony) + Bedroom (right with main door)
+            { id: 'living', x: 70, y: 20, width: 260, height: 200 },      // 4.75m × 3.968m
+            { id: 'bedroom', x: 340, y: 20, width: 250, height: 200 },    // 4.489m × 3.378m
+            // Bottom row: Study (left) + Kitchen/Bathroom (right), Hallway in center
+            { id: 'study', x: 20, y: 235, width: 216, height: 220 },      // 3.908m × 3.697m (20% reduced)
+            { id: 'kitchen', x: 430, y: 235, width: 175, height: 115 },   // 3.203m × 2.138m
+            { id: 'bathroom', x: 430, y: 355, width: 175, height: 95 }    // 3.15m × 1.424m
+          ]
+        },
+        tempColors: [
+          { value: 18, color: '#90CAF9' }, { value: 22, color: '#A5D6A7' },
+          { value: 24, color: '#81C784' }, { value: 26, color: '#FFE082' },
+          { value: 28, color: '#FFAB91' }, { value: 32, color: '#EF5350' }
+        ],
+        humidityColors: [
+          { value: 30, color: '#FFCC80' }, { value: 40, color: '#A5D6A7' },
+          { value: 50, color: '#81C784' }, { value: 60, color: '#A5D6A7' },
+          { value: 70, color: '#90CAF9' }, { value: 85, color: '#5C6BC0' }
+        ],
+
+        get rooms() {
+          const roomsList = this.$store.rooms.list;
+          return this.layout.rooms.map(lr => {
+            const dr = roomsList.find(r => r.id === lr.id);
+            return { ...lr, ...dr, color: this.getRoomColor(dr) };
+          });
+        },
+
+        setViewType(type) { this.viewType = type; },
+
+        getRoomColor(room) {
+          if (!room || room.temperature === null) return '#E0E0E0';
+          const value = this.viewType === 'temperature' ? room.temperature : room.humidity;
+          const scale = this.viewType === 'temperature' ? this.tempColors : this.humidityColors;
+          return this.interpolateColor(value, scale);
+        },
+
+        interpolateColor(value, scale) {
+          if (value < scale[0].value) return scale[0].color;
+          if (value > scale[scale.length - 1].value) return scale[scale.length - 1].color;
+
+          let lower = scale[0], upper = scale[scale.length - 1];
+          for (let i = 0; i < scale.length - 1; i++) {
+            if (value >= scale[i].value && value <= scale[i + 1].value) {
+              lower = scale[i]; upper = scale[i + 1]; break;
+            }
+          }
+
+          const factor = (value - lower.value) / (upper.value - lower.value);
+          const lRGB = this.hexToRgb(lower.color), uRGB = this.hexToRgb(upper.color);
+          const r = Math.round(lRGB.r + factor * (uRGB.r - lRGB.r));
+          const g = Math.round(lRGB.g + factor * (uRGB.g - lRGB.g));
+          const b = Math.round(lRGB.b + factor * (uRGB.b - lRGB.b));
+          return `rgb(${r},${g},${b})`;
+        },
+
+        hexToRgb(hex) {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : { r: 200, g: 200, b: 200 };
+        },
+
+        getLegendItems() {
+          return this.viewType === 'temperature'
+            ? [{ label: '< 20°', color: '#90CAF9' }, { label: '20-24°', color: '#81C784' }, { label: '24-28°', color: '#FFE082' }, { label: '> 28°', color: '#EF5350' }]
+            : [{ label: '< 40%', color: '#FFCC80' }, { label: '40-60%', color: '#81C784' }, { label: '60-70%', color: '#90CAF9' }, { label: '> 70%', color: '#5C6BC0' }];
+        },
+
+        getValue(room) {
+          if (!room) return '--';
+          return this.viewType === 'temperature'
+            ? (room.temperature !== null ? room.temperature.toFixed(1) + '°' : '--')
+            : (room.humidity !== null ? room.humidity.toFixed(0) + '%' : '--');
+        },
+
+        openRoom(room) { this.$store.roomDetail.open(room); }
+      };
+    }
+
+    // ========================================
+    // AMBIENT VIEW (Vision 4)
+    // ========================================
+    function ambientView() {
+      return {
+        currentRoomIndex: 0,
+        isDarkMode: false,
+        autoRotate: false,
+        showDetails: false,
+        detailsTimeout: null,
+        touchStartX: 0,
+
+        init() {
+          const hour = new Date().getHours();
+          this.isDarkMode = hour >= 22 || hour < 6;
+
+          this.$el.addEventListener('touchstart', (e) => { this.touchStartX = e.touches[0].clientX; }, { passive: true });
+          this.$el.addEventListener('touchend', (e) => {
+            const deltaX = e.changedTouches[0].clientX - this.touchStartX;
+            if (Math.abs(deltaX) > 50) deltaX > 0 ? this.previousRoom() : this.nextRoom();
+          }, { passive: true });
+
+          let lastTap = 0;
+          this.$el.addEventListener('touchend', () => {
+            const now = Date.now();
+            if (now - lastTap < 300) this.isDarkMode = !this.isDarkMode;
+            lastTap = now;
+          }, { passive: true });
+        },
+
+        get rooms() { return this.$store.rooms.list.filter(r => r.temperature !== null); },
+
+        get currentRoom() {
+          return this.rooms.length > 0 ? this.rooms[this.currentRoomIndex % this.rooms.length]
+            : { name: 'Loading...', temperature: 0, humidity: 0, icon: '🏠' };
+        },
+
+        nextRoom() { this.currentRoomIndex = (this.currentRoomIndex + 1) % this.rooms.length; },
+        previousRoom() { this.currentRoomIndex = (this.currentRoomIndex - 1 + this.rooms.length) % this.rooms.length; },
+        selectRoom(index) { this.currentRoomIndex = index; },
+
+        showDetailsOverlay() {
+          this.showDetails = true;
+          if (this.detailsTimeout) clearTimeout(this.detailsTimeout);
+          this.detailsTimeout = setTimeout(() => { this.showDetails = false; }, 5000);
+        },
+
+        getBackgroundColor() {
+          if (this.isDarkMode) return '#000000';
+          const temp = this.currentRoom.temperature;
+          if (temp < 20) return '#E3F2FD';
+          if (temp < 23) return '#E8F5E9';
+          if (temp < 26) return '#FFFFFF';
+          if (temp < 28) return '#FFF8E1';
+          return '#FFEBEE';
+        },
+
+        getMinMaxToday() {
+          const room = this.currentRoom;
+          if (!room.tempHistory || room.tempHistory.length === 0) return '--';
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const todayHistory = room.tempHistory.filter(h => h.time >= today.getTime());
+          if (todayHistory.length === 0) return '--';
+          const temps = todayHistory.map(h => h.value);
+          return `${Math.min(...temps).toFixed(1)}° / ${Math.max(...temps).toFixed(1)}°`;
+        },
+
+        getTrend() {
+          const room = this.currentRoom;
+          if (!room.tempHistory || room.tempHistory.length < 2) return '→';
+          const recent = room.tempHistory.slice(-10);
+          const diff = recent[recent.length - 1].value - recent[0].value;
+          if (diff > 0.5) return '↑';
+          if (diff < -0.5) return '↓';
+          return '→';
+        },
+
+        formatLastUpdate() {
+          if (!this.currentRoom.lastSeen) return 'No data';
+          const seconds = Math.floor((Date.now() - this.currentRoom.lastSeen) / 1000);
+          if (seconds < 60) return 'Just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          return `${Math.floor(seconds / 3600)}h ago`;
+        }
+      };
+    }
+
+    // ========================================
+    // TIMELINE VIEW (Vision 5)
+    // ========================================
+    function timelineView() {
+      return {
+        events: [],
+        selectedDate: 'today',
+        loading: false,
+
+        init() {
+          this.loadEvents();
+          this.$watch('$store.rooms.list', () => this.loadEvents());
+        },
+
+        loadEvents() {
+          this.loading = true;
+          const rooms = this.$store.rooms.list;
+          const allEvents = [];
+
+          const now = Date.now();
+          let startTime;
+          if (this.selectedDate === 'yesterday') {
+            const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); yesterday.setHours(0, 0, 0, 0);
+            startTime = yesterday.getTime();
+          } else if (this.selectedDate === 'week') {
+            startTime = now - 7 * 24 * 60 * 60 * 1000;
+          } else {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            startTime = today.getTime();
+          }
+
+          rooms.forEach(room => {
+            if (room.tempHistory && room.tempHistory.length > 0) {
+              const filtered = room.tempHistory.filter(h => h.time >= startTime);
+              allEvents.push(...this.detectEvents(filtered, room.name, room.icon));
+            }
+          });
+
+          this.events = allEvents.sort((a, b) => b.time - a.time).slice(0, 20);
+          this.loading = false;
+        },
+
+        detectEvents(history, roomName, roomIcon) {
+          if (history.length < 10) return [];
+          const events = [];
+          const sorted = [...history].sort((a, b) => a.time - b.time);
+
+          // Detect rapid changes
+          for (let i = 0; i < sorted.length - 1; i++) {
+            const windowMs = 30 * 60 * 1000;
+            const start = sorted[i];
+            const endIdx = sorted.findIndex(p => p.time >= start.time + windowMs && p.time <= start.time + windowMs * 1.2);
+            if (endIdx === -1) continue;
+
+            const end = sorted[endIdx];
+            const delta = end.value - start.value;
+
+            if (Math.abs(delta) >= 3) {
+              events.push({
+                type: delta > 0 ? 'RAPID_RISE' : 'RAPID_DROP',
+                time: start.time, room: roomName, icon: roomIcon,
+                value: start.value, endValue: end.value, delta: Math.abs(delta),
+                duration: Math.round((end.time - start.time) / 60000),
+                eventIcon: delta > 0 ? '🔥' : '❄️',
+                title: `${roomName} ${delta > 0 ? 'rose' : 'dropped'} ${Math.abs(delta).toFixed(1)}° in ${Math.round((end.time - start.time) / 60000)} mins`,
+                cause: this.inferCause(delta > 0 ? 'RAPID_RISE' : 'RAPID_DROP', roomName, start.time)
+              });
+            }
+          }
+
+          // Detect peaks
+          const windowSize = 6;
+          for (let i = windowSize; i < sorted.length - windowSize; i++) {
+            const point = sorted[i];
+            const before = sorted.slice(i - windowSize, i);
+            const after = sorted.slice(i + 1, i + windowSize + 1);
+            const maxBefore = Math.max(...before.map(p => p.value));
+            const maxAfter = Math.max(...after.map(p => p.value));
+
+            if (point.value > maxBefore && point.value > maxAfter && point.value - Math.min(maxBefore, maxAfter) >= 2) {
+              events.push({
+                type: 'PEAK', time: point.time, room: roomName, icon: roomIcon,
+                value: point.value, eventIcon: '📈',
+                title: `${roomName} peaked at ${point.value.toFixed(1)}°`,
+                cause: this.inferCause('PEAK', roomName, point.time)
+              });
+            }
+          }
+
+          return events;
+        },
+
+        inferCause(type, roomName, time) {
+          const hour = new Date(time).getHours();
+          const room = roomName.toLowerCase();
+
+          if (room.includes('bathroom') && type === 'PEAK' && hour >= 6 && hour <= 9)
+            return { text: 'Morning shower' };
+          if (room.includes('kitchen') && type === 'RAPID_RISE' && hour >= 18 && hour <= 21)
+            return { text: 'Cooking dinner' };
+          if (type === 'RAPID_RISE' && hour >= 10 && hour <= 15)
+            return { text: 'Sun exposure' };
+          return null;
+        },
+
+        setDate(date) { this.selectedDate = date; this.loadEvents(); },
+
+        formatTime(timestamp) {
+          return new Date(timestamp).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+        },
+
+        getEventClass(type) {
+          return { 'PEAK': 'event-peak', 'VALLEY': 'event-valley', 'RAPID_RISE': 'event-rise', 'RAPID_DROP': 'event-drop' }[type] || '';
+        },
+
+        getTodaySummary() {
+          const rooms = this.$store.rooms.list.filter(r => r.tempHistory && r.tempHistory.length > 0);
+          if (rooms.length === 0) return null;
+
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          let allTemps = [], mostStable = null, minVar = Infinity, mostVolatile = null, maxVar = 0;
+
+          rooms.forEach(room => {
+            const todayHistory = room.tempHistory.filter(h => h.time >= today.getTime());
+            if (todayHistory.length < 2) return;
+            const temps = todayHistory.map(h => h.value);
+            allTemps.push(...temps);
+            const variation = Math.max(...temps) - Math.min(...temps);
+            if (variation < minVar) { minVar = variation; mostStable = room.name; }
+            if (variation > maxVar) { maxVar = variation; mostVolatile = room.name; }
+          });
+
+          if (allTemps.length === 0) return null;
+          return {
+            minTemp: Math.min(...allTemps).toFixed(1),
+            maxTemp: Math.max(...allTemps).toFixed(1),
+            mostStable, mostVolatile,
+            eventCount: this.events.length
+          };
+        },
+
+        openRoom(roomName) {
+          const room = this.$store.rooms.list.find(r => r.name === roomName);
+          if (room) this.$store.roomDetail.open(room);
+        }
+      };
+    }
+
+    // ========================================
+    // VISION 6: CLASSIC CARDS VIEW
+    // ========================================
+    function classicView() {
+      return {
+        sparklineUpdateInterval: null,
+
+        get rooms() {
+          return this.$store.rooms.list;
+        },
+
+        get avgTemperature() {
+          return this.$store.rooms.avgTemperature;
+        },
+
+        get avgHumidity() {
+          return this.$store.rooms.avgHumidity;
+        },
+
+        init() {
+          // Initial sparkline render
+          this.$nextTick(() => this.updateSparklines());
+
+          // Update sparklines every 5 seconds
+          this.sparklineUpdateInterval = setInterval(() => this.updateSparklines(), 5000);
+
+          // Watch for room changes
+          this.$watch('$store.rooms.list', () => {
+            this.$nextTick(() => this.updateSparklines());
+          });
+        },
+
+        destroy() {
+          if (this.sparklineUpdateInterval) {
+            clearInterval(this.sparklineUpdateInterval);
+          }
+        },
+
+        isStale(room) {
+          if (!room.lastSeen) return true;
+          return Date.now() - room.lastSeen > 5 * 60 * 1000;
+        },
+
+        getComfortClass(temp) {
+          if (temp === null || temp === undefined) return '';
+          if (temp < 20) return 'cold';
+          if (temp < 23) return 'cool';
+          if (temp <= 26) return 'good';
+          if (temp <= 28) return 'warm';
+          return 'hot';
+        },
+
+        formatUpdate(lastSeen) {
+          if (!lastSeen) return 'No data';
+          const seconds = Math.floor((Date.now() - lastSeen) / 1000);
+          if (seconds < 5) return 'Just now';
+          if (seconds < 60) return `${seconds}s ago`;
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return `${minutes}m ago`;
+          const hours = Math.floor(minutes / 60);
+          return `${hours}h ${minutes % 60}m ago`;
+        },
+
+        openRoom(room) {
+          this.$store.roomDetail.open(room);
+        },
+
+        updateSparklines() {
+          // Update room sparklines
+          this.rooms.forEach(room => {
+            const svg = document.getElementById(`classic-spark-${room.id}`);
+            if (svg && room.tempHistory && room.tempHistory.length > 1) {
+              this.drawSparkline(svg, room.tempHistory.slice(-50));
+            }
+          });
+
+          // Update average sparkline
+          const avgSvg = document.getElementById('classic-spark-avg');
+          const avgHistory = this.$store.rooms.avgHistory;
+          if (avgSvg && avgHistory && avgHistory.length > 1) {
+            this.drawSparkline(avgSvg, avgHistory.slice(-50), true);
+          }
+        },
+
+        drawSparkline(svg, data, isDark = false) {
+          const width = svg.clientWidth || 200;
+          const height = svg.clientHeight || 40;
+
+          if (data.length < 2 || width === 0) return;
+
+          const values = data.map(d => d.value);
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const range = max - min || 1;
+
+          const points = data.map((d, i) => {
+            const x = (i / (data.length - 1)) * width;
+            const y = height - ((d.value - min) / range) * (height - 4) - 2;
+            return `${x},${y}`;
+          }).join(' ');
+
+          const lineColor = isDark ? 'rgba(255,255,255,0.8)' : 'var(--color-primary)';
+          const areaColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0, 122, 255, 0.1)';
+
+          svg.innerHTML = `
+            <polyline
+              points="${points}"
+              fill="none"
+              stroke="${lineColor}"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <polygon
+              points="0,${height} ${points} ${width},${height}"
+              fill="${areaColor}"
+            />
+          `;
+        }
+      };
+    }
+
+    // ========================================
+    // VISION 7: LIGHTS CONTROL VIEW
+    // ========================================
+    function lightsView() {
+      return {
+        // Helper function for color temperature label
+        getColorTempLabel(colorTemp) {
+          if (colorTemp <= 280) return 'Cool White';
+          if (colorTemp <= 350) return 'Neutral';
+          if (colorTemp <= 400) return 'Warm White';
+          return 'Warm';
+        },
+
+        // Helper function for last update formatting
+        formatLastUpdate(timestamp) {
+          if (!timestamp) return 'No data';
+          const seconds = Math.floor((Date.now() - timestamp) / 1000);
+          if (seconds < 60) return 'Just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          return `${Math.floor(seconds / 3600)}h ago`;
+        }
+      };
+    }
+
+    // ========================================
+    // VISION 8: 3D FLOOR PLAN VIEW
     // ========================================
 
-    // Placeholder - stores removed, now provided by js/stores/*.js modules
-    // Placeholder - app() removed, now provided by js/app.js
-    // Placeholder - networkView removed, now provided by views/network.js
+    // Store Three.js objects OUTSIDE Alpine to avoid proxy conflicts
+    const threeState = {
+      scene: null,
+      camera: null,
+      renderer: null,
+      controls: null,
+      roomMeshes: {},
+      wallMeshes: [],
+      labelElements: {},
+      animationId: null,
+      isInitialized: false
+    };
+
+    // Isometric view state (separate from 3D view)
+    const isoState = {
+      scene: null,
+      camera: null,
+      renderer: null,
+      roomMeshes: {},
+      wallMeshes: [],
+      labelElements: {},
+      animationId: null,
+      isInitialized: false,
+      panOffset: { x: 0, z: 0 },
+      isPanning: false,
+      lastPanPos: { x: 0, y: 0 }
+    };
+
+    // Floor plan configuration - exact dimensions from floor map
+    const FLOOR_PLAN_CONFIG = {
+      apartmentWidth: 9.239,
+      apartmentDepth: 7.665,
+      wallHeight: 2.0,
+      wallThickness: 0.15,
+      // Room positions are center coordinates (mirrored layout)
+      rooms: [
+        { id: 'study', name: 'Study', icon: '📚', x: 7.285, z: 1.8485, width: 3.908, depth: 3.697, color: 0x60a5fa, labelY: 3 },
+        { id: 'living', name: 'Living Room', icon: '🛋️', x: 6.864, z: 5.681, width: 4.750, depth: 3.968, color: 0x34d399, labelY: 3 },
+        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', x: 2.2445, z: 5.976, width: 4.489, depth: 3.378, color: 0xfbbf24, labelY: 4 },
+        { id: 'kitchen', name: 'Kitchen', icon: '🍳', x: 1.6655, z: 2.8957, width: 3.331, depth: 2.7827, color: 0xf87171, labelY: 3 },
+        { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 }
+      ],
+      balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
+      hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
+      doors: [
+        { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at east wall)
+        { x: 3.706, z: 3.697, rotation: 0, swingDirection: 'south' },           // Living ↔ Hallway
+        { x: 4.354, z: 1.848, rotation: Math.PI/2, swingDirection: 'east' },    // Study ↔ Hallway
+        { x: 3.134, z: 3.697, rotation: 0, swingDirection: 'south' },           // Bedroom ↔ Hallway
+        { x: 3.331, z: 2.818, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Kitchen
+        { x: 3.331, z: 1.338, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Bathroom
+        { x: 0, z: 4.8, rotation: Math.PI/2, type: 'entry', swingDirection: 'east' }  // Main entry door (west wall in mirrored layout)
+      ],
+      windows: [
+        { x: 9.239, z: 1.848, rotation: Math.PI/2, size: 2.5 },   // Study right (mirrored)
+        { x: 9.239, z: 5.681, rotation: Math.PI/2, size: 2.5 },   // Living right (mirrored)
+        { x: 0, z: 5.976, rotation: Math.PI/2, size: 2.5 },       // Bedroom left (mirrored)
+        { x: 0, z: 3.218, rotation: Math.PI/2, size: 1.8 },       // Kitchen left (mirrored)
+        { x: 0, z: 1.487, rotation: Math.PI/2, size: 1.2 }        // Bathroom left (mirrored)
+      ],
+      furniture: [
+        { type: 'bed', room: 'bedroom', width: 1.8, depth: 2.0, height: 0.6 }
+      ]
+    };
+
+    // Calculate center for positioning
+    const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+    const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+    // Color scales
+    const TEMP_COLORS = [
+      { value: 18, color: 0x90CAF9 },
+      { value: 22, color: 0xA5D6A7 },
+      { value: 24, color: 0x81C784 },
+      { value: 26, color: 0xFFE082 },
+      { value: 28, color: 0xFFAB91 },
+      { value: 32, color: 0xEF5350 }
+    ];
+
+    const HUMIDITY_COLORS = [
+      { value: 30, color: 0xFFCC80 },
+      { value: 40, color: 0xA5D6A7 },
+      { value: 50, color: 0x81C784 },
+      { value: 60, color: 0xA5D6A7 },
+      { value: 70, color: 0x90CAF9 },
+      { value: 85, color: 0x5C6BC0 }
+    ];
+
+    function threeDView() {
+      return {
+        // Reactive state for UI
+        viewMode: 'temperature',
+        viewMode3D: 'top',
+        wallsVisible: true,
+        autoRotate: false,
+        darkTheme: false,
+
+        init() {
+          // Wait for container to become visible and have dimensions
+          this.waitForContainer();
+        },
+
+        waitForContainer() {
+          const container = this.$refs.threeContainer;
+
+          // If container doesn't exist or has no dimensions, retry
+          if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+            setTimeout(() => this.waitForContainer(), 100);
+            return;
+          }
+
+          // If already initialized, ensure canvas is in container and resize
+          if (threeState.isInitialized && threeState.renderer) {
+            // Re-attach canvas if it's not in the container
+            if (!container.contains(threeState.renderer.domElement)) {
+              container.appendChild(threeState.renderer.domElement);
+            }
+            this.createLabels(container);  // Recreate labels
+            this.onResize();
+            return;
+          }
+
+          // Clean up any existing Three.js objects
+          if (threeState.renderer) {
+            threeState.renderer.dispose();
+          }
+          if (threeState.scene) {
+            threeState.scene.clear();
+          }
+          if (threeState.animationId) {
+            cancelAnimationFrame(threeState.animationId);
+          }
+
+          this.initScene();
+          this.initCamera(container);
+          this.initRenderer(container);
+          this.initLighting();
+          this.buildFloorPlan();
+          this.createLabels(container);
+          this.animate();
+          threeState.isInitialized = true;
+
+          window.addEventListener('resize', () => this.onResize());
+        },
+
+        initScene() {
+          threeState.scene = new THREE.Scene();
+          threeState.scene.background = new THREE.Color(0xE8E8EA);
+        },
+
+        initCamera(container) {
+          const aspect = container.clientWidth / container.clientHeight;
+
+          // Use PerspectiveCamera for 3D viewing
+          threeState.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000);
+          // Default to top view - zoomed to fill screen, rotated 180° (scene is centered at 0,0,0)
+          threeState.camera.position.set(0, 14, -0.1);
+          threeState.camera.lookAt(0, 0, 0);
+
+          // Add OrbitControls for interactive camera
+          threeState.controls = new THREE.OrbitControls(threeState.camera, container);
+          threeState.controls.enableDamping = true;
+          threeState.controls.dampingFactor = 0.05;
+          threeState.controls.maxPolarAngle = Math.PI / 2.1;  // Prevent camera below floor
+          threeState.controls.minDistance = 5;
+          threeState.controls.maxDistance = 40;
+          threeState.controls.target.set(0, 0, 0);
+          threeState.controls.update();
+        },
+
+        initRenderer(container) {
+          threeState.renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            alpha: true
+          });
+          threeState.renderer.setSize(container.clientWidth, container.clientHeight);
+          threeState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          threeState.renderer.shadowMap.enabled = true;
+          threeState.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(threeState.renderer.domElement);
+        },
+
+        initLighting() {
+          const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+          threeState.scene.add(ambient);
+
+          const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+          directional.position.set(15, 20, 15);
+          directional.castShadow = true;
+          directional.shadow.mapSize.width = 1024;
+          directional.shadow.mapSize.height = 1024;
+          directional.shadow.camera.near = 0.5;
+          directional.shadow.camera.far = 50;
+          directional.shadow.camera.left = -15;
+          directional.shadow.camera.right = 15;
+          directional.shadow.camera.top = 15;
+          directional.shadow.camera.bottom = -15;
+          threeState.scene.add(directional);
+
+          const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+          fill.position.set(-10, 10, -10);
+          threeState.scene.add(fill);
+        },
+
+        buildFloorPlan() {
+          // Clear wall meshes array for fresh build
+          threeState.wallMeshes = [];
+
+          // Base floor - uses apartment dimensions, centered at origin
+          const apW = FLOOR_PLAN_CONFIG.apartmentWidth;
+          const apD = FLOOR_PLAN_CONFIG.apartmentDepth;
+          const floorGeometry = new THREE.PlaneGeometry(apW + 2, apD + 2);
+          const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0xC0C0C2,
+            roughness: 0.8
+          });
+          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(0, -0.01, 0);
+          floor.receiveShadow = true;
+          threeState.scene.add(floor);
+
+          // Build each room
+          FLOOR_PLAN_CONFIG.rooms.forEach(roomConfig => {
+            const roomGroup = this.createRoom(roomConfig);
+            threeState.roomMeshes[roomConfig.id] = roomGroup;
+            threeState.scene.add(roomGroup);
+          });
+
+          // Hallway floor (centered coordinates)
+          const hw = FLOOR_PLAN_CONFIG.hallway;
+          const hallwayGeometry = new THREE.PlaneGeometry(hw.width, hw.depth);
+          const hallwayMaterial = new THREE.MeshStandardMaterial({
+            color: 0xD0D0D0,
+            roughness: 0.7
+          });
+          const hallway = new THREE.Mesh(hallwayGeometry, hallwayMaterial);
+          hallway.rotation.x = -Math.PI / 2;
+          hallway.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
+          hallway.receiveShadow = true;
+          threeState.scene.add(hallway);
+
+          // Balcony floor
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const balconyGeometry = new THREE.PlaneGeometry(bal.width, bal.depth);
+          const balconyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x93c5fd,
+            roughness: 0.5
+          });
+          const balcony = new THREE.Mesh(balconyGeometry, balconyMaterial);
+          balcony.rotation.x = -Math.PI / 2;
+          balcony.position.set(bal.x - centerX, 0.003, bal.z - centerZ);
+          balcony.receiveShadow = true;
+          threeState.scene.add(balcony);
+
+          // Add doors
+          FLOOR_PLAN_CONFIG.doors.forEach(door => this.createDoor(door));
+
+          // Add windows
+          FLOOR_PLAN_CONFIG.windows.forEach(win => this.createWindow(win));
+
+          // Add balcony railing
+          this.createBalconyRailing();
+
+          // Add furniture
+          this.createFurniture();
+        },
+
+        createRoom(config) {
+          const group = new THREE.Group();
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+
+          // Room floor - colored transparent box matching room color
+          const floorGeometry = new THREE.BoxGeometry(config.width, 0.05, config.depth);
+          const floorMaterial = new THREE.MeshStandardMaterial({
+            color: config.color,
+            transparent: true,
+            opacity: 0.3,
+            roughness: 0.6,
+            metalness: 0.1
+          });
+          const roomFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+          roomFloor.position.set(config.x - centerX, 0.025, config.z - centerZ);
+          roomFloor.receiveShadow = true;
+          roomFloor.name = 'floor_' + config.id;
+          group.add(roomFloor);
+
+          // Glassy wall material - semi-transparent for elegant look
+          const wallMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.25,
+            metalness: 0.4,
+            roughness: 0.08,
+            side: THREE.DoubleSide
+          });
+
+          // Calculate room boundaries
+          const halfW = config.width / 2;
+          const halfD = config.depth / 2;
+          const rx = config.x - centerX;  // room center X (relative)
+          const rz = config.z - centerZ;  // room center Z (relative)
+
+          // Back wall (north)
+          const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(config.width, wallHeight, 0.15),
+            wallMaterial
+          );
+          backWall.position.set(rx, wallHeight/2, rz - halfD);
+          backWall.castShadow = true;
+          group.add(backWall);
+          threeState.wallMeshes.push(backWall);
+
+          // Front wall (south) - full height for immersive 3D
+          const frontWall = new THREE.Mesh(
+            new THREE.BoxGeometry(config.width, wallHeight, 0.15),
+            wallMaterial
+          );
+          frontWall.position.set(rx, wallHeight/2, rz + halfD);
+          frontWall.castShadow = true;
+          group.add(frontWall);
+          threeState.wallMeshes.push(frontWall);
+
+          // Left wall (west)
+          const leftWall = new THREE.Mesh(
+            new THREE.BoxGeometry(0.15, wallHeight, config.depth),
+            wallMaterial
+          );
+          leftWall.position.set(rx - halfW, wallHeight/2, rz);
+          leftWall.castShadow = true;
+          group.add(leftWall);
+          threeState.wallMeshes.push(leftWall);
+
+          // Right wall (east)
+          const rightWall = new THREE.Mesh(
+            new THREE.BoxGeometry(0.15, wallHeight, config.depth),
+            wallMaterial
+          );
+          rightWall.position.set(rx + halfW, wallHeight/2, rz);
+          rightWall.castShadow = true;
+          group.add(rightWall);
+          threeState.wallMeshes.push(rightWall);
+
+          return group;
+        },
+
+        // Create door with handle and swing arc
+        createDoor(doorConfig) {
+          const doorWidth = 0.9;
+          const doorHeight = FLOOR_PLAN_CONFIG.wallHeight * 0.85;
+          const posX = doorConfig.x - centerX;
+          const posZ = doorConfig.z - centerZ;
+
+          // Check door type
+          if (doorConfig.type === 'french') {
+            // French doors - double glass doors opening inward
+            this.createFrenchDoor(doorConfig, posX, posZ, doorWidth, doorHeight);
+            return;
+          }
+
+          // Standard door material (brown wood)
+          const doorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8B4513,
+            roughness: 0.7,
+            metalness: 0.1
+          });
+
+          const door = new THREE.Mesh(
+            new THREE.BoxGeometry(doorWidth, doorHeight, 0.08),
+            doorMaterial
+          );
+          door.position.set(posX, doorHeight / 2, posZ);
+          door.rotation.y = doorConfig.rotation || 0;
+          door.castShadow = true;
+          threeState.scene.add(door);
+
+          // Door handle
+          const handleMaterial = new THREE.MeshStandardMaterial({
+            color: 0xC0C0C0,
+            metalness: 0.9,
+            roughness: 0.2
+          });
+          const handle = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.03, 0.03, 0.15, 16),
+            handleMaterial
+          );
+
+          // Position handle based on door rotation
+          const handleOffsetX = 0.3 * Math.cos(doorConfig.rotation || 0);
+          const handleOffsetZ = 0.3 * Math.sin(doorConfig.rotation || 0);
+          handle.position.set(
+            posX + handleOffsetX,
+            doorHeight * 0.45,
+            posZ + handleOffsetZ
+          );
+          handle.rotation.z = Math.PI / 2;
+          threeState.scene.add(handle);
+
+          // Add swing arc on floor
+          this.createSwingArc(doorConfig, posX, posZ, doorWidth);
+        },
+
+        // Create French doors (double glass doors)
+        createFrenchDoor(doorConfig, posX, posZ, doorWidth, doorHeight) {
+          const glassMaterial = new THREE.MeshStandardMaterial({
+            color: 0x87CEEB,
+            transparent: true,
+            opacity: 0.4,
+            roughness: 0.1,
+            metalness: 0.3
+          });
+
+          const frameMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2c3e50,
+            roughness: 0.5,
+            metalness: 0.2
+          });
+
+          // Total width for double doors
+          const totalWidth = doorWidth * 2;
+          const gap = 0.05;  // Small gap between doors
+
+          // Left door panel
+          const leftDoor = new THREE.Mesh(
+            new THREE.BoxGeometry(doorWidth - gap/2, doorHeight, 0.06),
+            glassMaterial
+          );
+
+          // Right door panel
+          const rightDoor = new THREE.Mesh(
+            new THREE.BoxGeometry(doorWidth - gap/2, doorHeight, 0.06),
+            glassMaterial
+          );
+
+          // Position based on rotation
+          const rot = doorConfig.rotation || 0;
+          const offsetLeft = (doorWidth/2 + gap/4) * Math.cos(rot + Math.PI/2);
+          const offsetLeftZ = (doorWidth/2 + gap/4) * Math.sin(rot + Math.PI/2);
+          const offsetRight = (doorWidth/2 + gap/4) * Math.cos(rot - Math.PI/2);
+          const offsetRightZ = (doorWidth/2 + gap/4) * Math.sin(rot - Math.PI/2);
+
+          leftDoor.position.set(posX + offsetLeft, doorHeight/2, posZ + offsetLeftZ);
+          leftDoor.rotation.y = rot;
+          rightDoor.position.set(posX + offsetRight, doorHeight/2, posZ + offsetRightZ);
+          rightDoor.rotation.y = rot;
+
+          threeState.scene.add(leftDoor);
+          threeState.scene.add(rightDoor);
+
+          // Add door frames
+          const frameThickness = 0.05;
+
+          // Vertical frame divider in center
+          const centerFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(frameThickness, doorHeight, 0.08),
+            frameMaterial
+          );
+          centerFrame.position.set(posX, doorHeight/2, posZ);
+          centerFrame.rotation.y = rot;
+          threeState.scene.add(centerFrame);
+
+          // Add TWO swing arcs (one for each door, opening inward)
+          this.createSwingArc({ ...doorConfig, swingDirection: 'inward-left' }, posX + offsetLeft, posZ + offsetLeftZ, doorWidth);
+          this.createSwingArc({ ...doorConfig, swingDirection: 'inward-right' }, posX + offsetRight, posZ + offsetRightZ, doorWidth);
+        },
+
+        // Create swing arc on floor showing door opening direction
+        createSwingArc(doorConfig, posX, posZ, doorWidth) {
+          const arcRadius = doorWidth;
+          const arcSegments = 32;
+
+          // Determine arc angles based on swing direction
+          let startAngle, endAngle;
+          const rot = doorConfig.rotation || 0;
+          const swing = doorConfig.swingDirection || 'south';
+
+          if (swing === 'inward-left') {
+            startAngle = rot;
+            endAngle = rot + Math.PI/2;
+          } else if (swing === 'inward-right') {
+            startAngle = rot - Math.PI/2;
+            endAngle = rot;
+          } else if (swing === 'south') {
+            startAngle = rot;
+            endAngle = rot + Math.PI/2;
+          } else if (swing === 'north') {
+            startAngle = rot + Math.PI/2;
+            endAngle = rot + Math.PI;
+          } else if (swing === 'east') {
+            startAngle = rot - Math.PI/2;
+            endAngle = rot;
+          } else if (swing === 'west') {
+            startAngle = rot + Math.PI;
+            endAngle = rot + Math.PI * 1.5;
+          } else {
+            startAngle = rot;
+            endAngle = rot + Math.PI/2;
+          }
+
+          // Create arc curve
+          const curve = new THREE.EllipseCurve(
+            0, 0,           // center
+            arcRadius, arcRadius,  // xRadius, yRadius
+            startAngle, endAngle,  // start and end angles
+            false,          // clockwise
+            0               // rotation
+          );
+
+          const points = curve.getPoints(arcSegments);
+          const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+          // Arc line material
+          const arcMaterial = new THREE.LineBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.6
+          });
+
+          const arc = new THREE.Line(geometry, arcMaterial);
+          arc.rotation.x = -Math.PI / 2;  // Lay flat on floor
+          arc.position.set(posX, 0.02, posZ);  // Slightly above floor
+
+          threeState.scene.add(arc);
+        },
+
+        // Create window with glass pane
+        createWindow(winConfig) {
+          const winWidth = winConfig.size || 2.0;
+          const winHeight = 1.3;
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+
+          // Window frame
+          const frameMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2c3e50,
+            roughness: 0.5,
+            metalness: 0.2
+          });
+          const frame = new THREE.Mesh(
+            new THREE.BoxGeometry(winWidth, winHeight, 0.15),
+            frameMaterial
+          );
+          frame.position.set(
+            winConfig.x - centerX,
+            wallHeight * 0.55,
+            winConfig.z - centerZ
+          );
+          frame.rotation.y = winConfig.rotation || 0;
+          threeState.scene.add(frame);
+
+          // Window glass
+          const glassMaterial = new THREE.MeshStandardMaterial({
+            color: 0x87CEEB,
+            metalness: 0.3,
+            roughness: 0.1,
+            transparent: true,
+            opacity: 0.4
+          });
+          const glass = new THREE.Mesh(
+            new THREE.BoxGeometry(winWidth * 0.9, winHeight * 0.85, 0.06),
+            glassMaterial
+          );
+          glass.position.set(
+            winConfig.x - centerX,
+            wallHeight * 0.55,
+            winConfig.z - centerZ
+          );
+          glass.rotation.y = winConfig.rotation || 0;
+          threeState.scene.add(glass);
+        },
+
+        // Create balcony railing
+        createBalconyRailing() {
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const railingHeight = 1.0;
+          const railingMaterial = new THREE.MeshStandardMaterial({
+            color: 0x374151,
+            metalness: 0.7,
+            roughness: 0.3
+          });
+
+          // Front railing (facing outward)
+          const frontRailing = new THREE.Mesh(
+            new THREE.BoxGeometry(bal.width, railingHeight, 0.05),
+            railingMaterial
+          );
+          frontRailing.position.set(
+            bal.x - centerX,
+            railingHeight / 2,
+            bal.z - centerZ + bal.depth / 2
+          );
+          threeState.scene.add(frontRailing);
+
+          // Left railing
+          const leftRailing = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, railingHeight, bal.depth),
+            railingMaterial
+          );
+          leftRailing.position.set(
+            bal.x - centerX - bal.width / 2,
+            railingHeight / 2,
+            bal.z - centerZ
+          );
+          threeState.scene.add(leftRailing);
+
+          // Vertical posts (glass panel supports)
+          const postMaterial = new THREE.MeshStandardMaterial({
+            color: 0x374151,
+            metalness: 0.8,
+            roughness: 0.2
+          });
+
+          const postPositions = [
+            { x: bal.x - bal.width / 2, z: bal.z + bal.depth / 2 },
+            { x: bal.x + bal.width / 2, z: bal.z + bal.depth / 2 },
+            { x: bal.x, z: bal.z + bal.depth / 2 }
+          ];
+
+          postPositions.forEach(pos => {
+            const post = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.03, 0.03, railingHeight, 8),
+              postMaterial
+            );
+            post.position.set(
+              pos.x - centerX,
+              railingHeight / 2,
+              pos.z - centerZ
+            );
+            threeState.scene.add(post);
+          });
+
+          // Glass panel for railing
+          const glassRailing = new THREE.MeshStandardMaterial({
+            color: 0xccf0ff,
+            transparent: true,
+            opacity: 0.3,
+            metalness: 0.2,
+            roughness: 0.1
+          });
+          const glassPanel = new THREE.Mesh(
+            new THREE.BoxGeometry(bal.width, railingHeight * 0.7, 0.02),
+            glassRailing
+          );
+          glassPanel.position.set(
+            bal.x - centerX,
+            railingHeight * 0.4,
+            bal.z - centerZ + bal.depth / 2
+          );
+          threeState.scene.add(glassPanel);
+        },
+
+        // Create furniture
+        createFurniture() {
+          const furnitureMaterial = new THREE.MeshStandardMaterial({
+            color: 0x64748b,
+            roughness: 0.6,
+            metalness: 0.1
+          });
+
+          FLOOR_PLAN_CONFIG.furniture.forEach(item => {
+            const roomConfig = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === item.room);
+            if (!roomConfig) return;
+
+            const mesh = new THREE.Mesh(
+              new THREE.BoxGeometry(item.width, item.height, item.depth),
+              furnitureMaterial
+            );
+            mesh.position.set(
+              roomConfig.x - centerX,
+              item.height / 2,
+              roomConfig.z - centerZ
+            );
+            mesh.castShadow = true;
+            threeState.scene.add(mesh);
+
+            // Add bedding for bed
+            if (item.type === 'bed') {
+              const beddingMaterial = new THREE.MeshStandardMaterial({
+                color: 0x94a3b8,
+                roughness: 0.8
+              });
+              const bedding = new THREE.Mesh(
+                new THREE.BoxGeometry(item.width * 0.95, 0.1, item.depth * 0.8),
+                beddingMaterial
+              );
+              bedding.position.set(
+                roomConfig.x - centerX,
+                item.height + 0.05,
+                roomConfig.z - centerZ
+              );
+              threeState.scene.add(bedding);
+            }
+          });
+        },
+
+        createLabels(container) {
+          // Clear any existing labels first
+          Object.values(threeState.labelElements).forEach(label => {
+            if (label && label.parentNode) {
+              label.parentNode.removeChild(label);
+            }
+          });
+          threeState.labelElements = {};
+
+          // Also remove any orphaned labels
+          container.querySelectorAll('.room-3d-label').forEach(el => el.remove());
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(roomConfig => {
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'room-3d-label';
+            labelDiv.innerHTML = `
+              <div class="label-icon">${roomConfig.icon}</div>
+              <div class="label-name">${roomConfig.name}</div>
+              <div class="label-value" data-room="${roomConfig.id}">--</div>
+              <div class="label-secondary" data-room-secondary="${roomConfig.id}">--</div>
+            `;
+            container.appendChild(labelDiv);
+            threeState.labelElements[roomConfig.id] = labelDiv;
+          });
+        },
+
+        updateLabels() {
+          const container = this.$refs.threeContainer;
+          if (!container || !threeState.camera) return;
+
+          const rooms = Alpine.store('rooms')?.list || [];
+          const viewMode = this.viewMode;
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const label = threeState.labelElements[config.id];
+            if (!label) return;
+
+            const roomData = rooms.find(r => r.id === config.id);
+            const valueEl = label.querySelector(`[data-room="${config.id}"]`);
+            const secondaryEl = label.querySelector(`[data-room-secondary="${config.id}"]`);
+
+            if (valueEl && roomData) {
+              if (viewMode === 'temperature') {
+                valueEl.textContent = roomData.temperature !== null
+                  ? `${roomData.temperature.toFixed(1)}°` : '--';
+                if (secondaryEl) {
+                  secondaryEl.textContent = roomData.humidity !== null
+                    ? `${roomData.humidity.toFixed(0)}%` : '';
+                }
+              } else {
+                valueEl.textContent = roomData.humidity !== null
+                  ? `${roomData.humidity.toFixed(0)}%` : '--';
+                if (secondaryEl) {
+                  secondaryEl.textContent = roomData.temperature !== null
+                    ? `${roomData.temperature.toFixed(1)}°` : '';
+                }
+              }
+            }
+
+            // Project 3D to 2D - use labelY offset to prevent overlap
+            // config.x, config.z are center coordinates; convert to world space
+            const position = new THREE.Vector3(
+              config.x - centerX,
+              config.labelY || 3,
+              config.z - centerZ
+            );
+            position.project(threeState.camera);
+
+            const x = (position.x * 0.5 + 0.5) * containerWidth;
+            const y = (-position.y * 0.5 + 0.5) * containerHeight;
+
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+
+            // Only show label if within container bounds and container is visible
+            const margin = 20;
+            const isVisible = containerWidth > 0 && containerHeight > 0 &&
+                              x > margin && x < containerWidth - margin &&
+                              y > margin && y < containerHeight - margin;
+
+            if (isVisible) {
+              label.classList.add('visible');
+            } else {
+              label.classList.remove('visible');
+            }
+          });
+        },
+
+        updateRoomColors() {
+          const rooms = Alpine.store('rooms')?.list || [];
+          const viewMode = this.viewMode;
+
+          rooms.forEach(roomData => {
+            const meshGroup = threeState.roomMeshes[roomData.id];
+            if (!meshGroup) return;
+
+            // Find floor mesh directly in children
+            const floorMesh = meshGroup.children.find(child =>
+              child.name === 'floor_' + roomData.id
+            );
+
+            if (floorMesh && floorMesh.material) {
+              const color = this.getRoomColor(roomData, viewMode);
+              floorMesh.material.color.setHex(color);
+            }
+          });
+        },
+
+        getRoomColor(room, viewMode) {
+          if (!room) return 0xE0E0E0;
+
+          const value = viewMode === 'temperature' ? room.temperature : room.humidity;
+          if (value === null || value === undefined) return 0xE0E0E0;
+
+          const scale = viewMode === 'temperature' ? TEMP_COLORS : HUMIDITY_COLORS;
+          return this.interpolateColor(value, scale);
+        },
+
+        interpolateColor(value, scale) {
+          if (value <= scale[0].value) return scale[0].color;
+          if (value >= scale[scale.length - 1].value) return scale[scale.length - 1].color;
+
+          let lower = scale[0], upper = scale[scale.length - 1];
+          for (let i = 0; i < scale.length - 1; i++) {
+            if (value >= scale[i].value && value <= scale[i + 1].value) {
+              lower = scale[i];
+              upper = scale[i + 1];
+              break;
+            }
+          }
+
+          const factor = (value - lower.value) / (upper.value - lower.value);
+
+          const lowerColor = new THREE.Color(lower.color);
+          const upperColor = new THREE.Color(upper.color);
+          const result = new THREE.Color();
+          result.lerpColors(lowerColor, upperColor, factor);
+
+          return result.getHex();
+        },
+
+        animate() {
+          const self = this;
+          function loop() {
+            threeState.animationId = requestAnimationFrame(loop);
+
+            // Update OrbitControls (required for damping)
+            if (threeState.controls) {
+              threeState.controls.update();
+            }
+
+            self.updateRoomColors();
+            self.updateLabels();
+
+            if (threeState.renderer && threeState.scene && threeState.camera) {
+              threeState.renderer.render(threeState.scene, threeState.camera);
+            }
+          }
+          loop();
+        },
+
+        onResize() {
+          const container = this.$refs.threeContainer;
+          if (!container || !threeState.camera || !threeState.renderer) return;
+
+          const aspect = container.clientWidth / container.clientHeight;
+
+          // Update PerspectiveCamera aspect ratio
+          threeState.camera.aspect = aspect;
+          threeState.camera.updateProjectionMatrix();
+
+          threeState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        setViewMode(mode) {
+          this.viewMode = mode;
+        },
+
+        // View control functions
+        set3DView() {
+          this.viewMode3D = '3d';
+          if (threeState.camera && threeState.controls) {
+            threeState.camera.position.set(12, 12, 12);
+            threeState.controls.target.set(0, 0, 0);
+            threeState.controls.update();
+          }
+        },
+
+        setTopView() {
+          this.viewMode3D = 'top';
+          if (threeState.camera && threeState.controls) {
+            threeState.camera.position.set(0, 14, -0.1);
+            threeState.controls.target.set(0, 0, 0);
+            threeState.controls.update();
+          }
+        },
+
+        toggleWalls() {
+          this.wallsVisible = !this.wallsVisible;
+          threeState.wallMeshes.forEach(wall => {
+            wall.visible = this.wallsVisible;
+          });
+        },
+
+        toggleAutoRotate() {
+          this.autoRotate = !this.autoRotate;
+          if (threeState.controls) {
+            threeState.controls.autoRotate = this.autoRotate;
+            threeState.controls.autoRotateSpeed = 2.0;
+          }
+        },
+
+        toggleDarkTheme() {
+          this.darkTheme = !this.darkTheme;
+          if (this.darkTheme) {
+            threeState.scene.background = new THREE.Color(0x0f172a);
+            threeState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
+          } else {
+            threeState.scene.background = new THREE.Color(0xE8E8EA);
+            threeState.scene.fog = null;
+          }
+        },
+
+        zoomIn() {
+          if (threeState.camera && threeState.controls) {
+            const direction = new THREE.Vector3();
+            direction.subVectors(threeState.controls.target, threeState.camera.position).normalize();
+            threeState.camera.position.addScaledVector(direction, 2);
+            threeState.controls.update();
+          }
+        },
+
+        zoomOut() {
+          if (threeState.camera && threeState.controls) {
+            const direction = new THREE.Vector3();
+            direction.subVectors(threeState.controls.target, threeState.camera.position).normalize();
+            threeState.camera.position.addScaledVector(direction, -2);
+            threeState.controls.update();
+          }
+        },
+
+        getLegendItems() {
+          if (this.viewMode === 'temperature') {
+            return [
+              { label: '< 20°', color: '#90CAF9' },
+              { label: '20-24°', color: '#81C784' },
+              { label: '24-28°', color: '#FFE082' },
+              { label: '> 28°', color: '#EF5350' }
+            ];
+          } else {
+            return [
+              { label: '< 40%', color: '#FFCC80' },
+              { label: '40-60%', color: '#81C784' },
+              { label: '60-70%', color: '#90CAF9' },
+              { label: '> 70%', color: '#5C6BC0' }
+            ];
+          }
+        }
+      };
+    }
+
+    // ========================================
+    // ISOMETRIC FLOOR PLAN VIEW
+    // ========================================
+    function isometricView() {
+      const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+      const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+      return {
+        viewMode: 'temperature',
+        zoomLevel: 1.0,
+        wallsVisible: true,
+        darkTheme: false,
+        autoRotate: false,
+        rotationAngle: 0,
+
+        init() {
+          this.waitForContainer();
+        },
+
+        waitForContainer() {
+          const container = this.$refs.isoContainer;
+          if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+            setTimeout(() => this.waitForContainer(), 100);
+            return;
+          }
+
+          if (isoState.isInitialized && isoState.renderer) {
+            if (!container.contains(isoState.renderer.domElement)) {
+              container.appendChild(isoState.renderer.domElement);
+            }
+            this.createLabels(container);
+            this.onResize();
+            return;
+          }
+
+          if (isoState.renderer) isoState.renderer.dispose();
+          if (isoState.scene) isoState.scene.clear();
+          if (isoState.animationId) cancelAnimationFrame(isoState.animationId);
+
+          this.initScene();
+          this.initCamera(container);
+          this.initRenderer(container);
+          this.initLighting();
+          this.buildFloorPlan();
+          this.createLabels(container);
+          this.setupPanControls(container);
+          this.animate();
+          isoState.isInitialized = true;
+
+          window.addEventListener('resize', () => this.onResize());
+        },
+
+        initScene() {
+          isoState.scene = new THREE.Scene();
+          isoState.scene.background = new THREE.Color(0xE8E8EA);
+        },
+
+        initCamera(container) {
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15;
+          isoState.camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2, frustumSize * aspect / 2,
+            frustumSize / 2, frustumSize / -2, 0.1, 1000
+          );
+          isoState.camera.position.set(10, 10, 10);
+          isoState.camera.lookAt(0, 0, 0);
+        },
+
+        initRenderer(container) {
+          isoState.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          isoState.renderer.setSize(container.clientWidth, container.clientHeight);
+          isoState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          isoState.renderer.shadowMap.enabled = true;
+          isoState.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(isoState.renderer.domElement);
+        },
+
+        initLighting() {
+          const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+          isoState.scene.add(ambient);
+          const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+          directional.position.set(15, 20, 15);
+          directional.castShadow = true;
+          isoState.scene.add(directional);
+          const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+          fill.position.set(-10, 10, -10);
+          isoState.scene.add(fill);
+        },
+
+        buildFloorPlan() {
+          isoState.wallMeshes = [];
+          const apW = FLOOR_PLAN_CONFIG.apartmentWidth;
+          const apD = FLOOR_PLAN_CONFIG.apartmentDepth;
+
+          // Base floor
+          const floorGeometry = new THREE.PlaneGeometry(apW + 2, apD + 2);
+          const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xC0C0C2, roughness: 0.8 });
+          const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(0, -0.01, 0);
+          floor.receiveShadow = true;
+          isoState.scene.add(floor);
+
+          // Rooms
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const roomGroup = this.createRoom(config);
+            isoState.roomMeshes[config.id] = roomGroup;
+            isoState.scene.add(roomGroup);
+          });
+
+          // Hallway
+          const hw = FLOOR_PLAN_CONFIG.hallway;
+          const hallway = new THREE.Mesh(
+            new THREE.PlaneGeometry(hw.width, hw.depth),
+            new THREE.MeshStandardMaterial({ color: 0xD0D0D0, roughness: 0.7 })
+          );
+          hallway.rotation.x = -Math.PI / 2;
+          hallway.position.set(hw.x - centerX, 0.005, hw.z - centerZ);
+          isoState.scene.add(hallway);
+
+          // Balcony
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const balcony = new THREE.Mesh(
+            new THREE.PlaneGeometry(bal.width, bal.depth),
+            new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.5 })
+          );
+          balcony.rotation.x = -Math.PI / 2;
+          balcony.position.set(bal.x - centerX, 0.003, bal.z - centerZ);
+          isoState.scene.add(balcony);
+
+          // Doors, windows, railing, furniture
+          FLOOR_PLAN_CONFIG.doors.forEach(door => this.createDoor(door));
+          FLOOR_PLAN_CONFIG.windows.forEach(win => this.createWindow(win));
+          this.createBalconyRailing();
+          this.createFurniture();
+        },
+
+        createRoom(config) {
+          const group = new THREE.Group();
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+          const halfW = config.width / 2, halfD = config.depth / 2;
+          const rx = config.x - centerX, rz = config.z - centerZ;
+
+          // Floor
+          const floorMaterial = new THREE.MeshStandardMaterial({
+            color: config.color, transparent: true, opacity: 0.3, roughness: 0.6, metalness: 0.1
+          });
+          const roomFloor = new THREE.Mesh(new THREE.BoxGeometry(config.width, 0.05, config.depth), floorMaterial);
+          roomFloor.position.set(rx, 0.025, rz);
+          roomFloor.receiveShadow = true;
+          roomFloor.name = 'floor_' + config.id;
+          group.add(roomFloor);
+
+          // Walls
+          const wallMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.25, metalness: 0.4, roughness: 0.08, side: THREE.DoubleSide
+          });
+          const walls = [
+            { geo: [config.width, wallHeight, 0.15], pos: [rx, wallHeight/2, rz - halfD] },
+            { geo: [config.width, wallHeight, 0.15], pos: [rx, wallHeight/2, rz + halfD] },
+            { geo: [0.15, wallHeight, config.depth], pos: [rx - halfW, wallHeight/2, rz] },
+            { geo: [0.15, wallHeight, config.depth], pos: [rx + halfW, wallHeight/2, rz] }
+          ];
+          walls.forEach(w => {
+            const wall = new THREE.Mesh(new THREE.BoxGeometry(...w.geo), wallMaterial);
+            wall.position.set(...w.pos);
+            wall.castShadow = true;
+            group.add(wall);
+            isoState.wallMeshes.push(wall);
+          });
+          return group;
+        },
+
+        createDoor(doorConfig) {
+          const doorWidth = 0.9, doorHeight = FLOOR_PLAN_CONFIG.wallHeight * 0.85;
+          const posX = doorConfig.x - centerX, posZ = doorConfig.z - centerZ;
+
+          if (doorConfig.type === 'french') {
+            const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.4 });
+            const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+            const rot = doorConfig.rotation || 0;
+            const offset = doorWidth/2 + 0.01;
+
+            [-1, 1].forEach(side => {
+              const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth - 0.02, doorHeight, 0.06), glassMaterial);
+              const ox = offset * Math.cos(rot + side * Math.PI/2);
+              const oz = offset * Math.sin(rot + side * Math.PI/2);
+              door.position.set(posX + ox, doorHeight/2, posZ + oz);
+              door.rotation.y = rot;
+              isoState.scene.add(door);
+            });
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(0.05, doorHeight, 0.08), frameMaterial);
+            frame.position.set(posX, doorHeight/2, posZ);
+            frame.rotation.y = rot;
+            isoState.scene.add(frame);
+          } else {
+            const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.7 });
+            const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.08), doorMaterial);
+            door.position.set(posX, doorHeight/2, posZ);
+            door.rotation.y = doorConfig.rotation || 0;
+            isoState.scene.add(door);
+          }
+        },
+
+        createWindow(winConfig) {
+          const winWidth = winConfig.size || 2.0, winHeight = 1.3;
+          const wallHeight = FLOOR_PLAN_CONFIG.wallHeight;
+          const posX = winConfig.x - centerX, posZ = winConfig.z - centerZ;
+
+          const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
+          const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.4 });
+
+          const frame = new THREE.Mesh(new THREE.BoxGeometry(winWidth, winHeight, 0.15), frameMaterial);
+          frame.position.set(posX, wallHeight * 0.55, posZ);
+          frame.rotation.y = winConfig.rotation || 0;
+          isoState.scene.add(frame);
+
+          const glass = new THREE.Mesh(new THREE.BoxGeometry(winWidth * 0.9, winHeight * 0.85, 0.06), glassMaterial);
+          glass.position.set(posX, wallHeight * 0.55, posZ);
+          glass.rotation.y = winConfig.rotation || 0;
+          isoState.scene.add(glass);
+        },
+
+        createBalconyRailing() {
+          const bal = FLOOR_PLAN_CONFIG.balcony;
+          const railingHeight = 1.0;
+          const railingMaterial = new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.7 });
+
+          const front = new THREE.Mesh(new THREE.BoxGeometry(bal.width, railingHeight, 0.05), railingMaterial);
+          front.position.set(bal.x - centerX, railingHeight/2, bal.z - centerZ + bal.depth/2);
+          isoState.scene.add(front);
+
+          const left = new THREE.Mesh(new THREE.BoxGeometry(0.05, railingHeight, bal.depth), railingMaterial);
+          left.position.set(bal.x - centerX - bal.width/2, railingHeight/2, bal.z - centerZ);
+          isoState.scene.add(left);
+
+          const glassMaterial = new THREE.MeshStandardMaterial({ color: 0xccf0ff, transparent: true, opacity: 0.3 });
+          const glassPanel = new THREE.Mesh(new THREE.BoxGeometry(bal.width, railingHeight * 0.7, 0.02), glassMaterial);
+          glassPanel.position.set(bal.x - centerX, railingHeight * 0.4, bal.z - centerZ + bal.depth/2);
+          isoState.scene.add(glassPanel);
+        },
+
+        createFurniture() {
+          const furnitureMaterial = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
+          FLOOR_PLAN_CONFIG.furniture.forEach(item => {
+            const roomConfig = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === item.room);
+            if (!roomConfig) return;
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(item.width, item.height, item.depth), furnitureMaterial);
+            mesh.position.set(roomConfig.x - centerX, item.height/2, roomConfig.z - centerZ);
+            mesh.castShadow = true;
+            isoState.scene.add(mesh);
+            if (item.type === 'bed') {
+              const bedding = new THREE.Mesh(
+                new THREE.BoxGeometry(item.width * 0.95, 0.1, item.depth * 0.8),
+                new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.8 })
+              );
+              bedding.position.set(roomConfig.x - centerX, item.height + 0.05, roomConfig.z - centerZ);
+              isoState.scene.add(bedding);
+            }
+          });
+        },
+
+        setupPanControls(container) {
+          container.addEventListener('pointerdown', (e) => {
+            isoState.isPanning = true;
+            isoState.lastPanPos = { x: e.clientX, y: e.clientY };
+            container.setPointerCapture(e.pointerId);
+            container.style.cursor = 'grabbing';
+          });
+          container.addEventListener('pointermove', (e) => {
+            if (!isoState.isPanning) return;
+            const dx = e.clientX - isoState.lastPanPos.x;
+            const dy = e.clientY - isoState.lastPanPos.y;
+            const panSpeed = 0.02 / this.zoomLevel;
+            isoState.panOffset.x -= (dx - dy) * panSpeed * 0.7;
+            isoState.panOffset.z -= (dx + dy) * panSpeed * 0.7;
+            isoState.camera.lookAt(isoState.panOffset.x, 0, isoState.panOffset.z);
+            isoState.lastPanPos = { x: e.clientX, y: e.clientY };
+          });
+          container.addEventListener('pointerup', (e) => {
+            isoState.isPanning = false;
+            container.releasePointerCapture(e.pointerId);
+            container.style.cursor = 'grab';
+          });
+          container.addEventListener('pointerleave', () => {
+            isoState.isPanning = false;
+            container.style.cursor = 'grab';
+          });
+          container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.setZoom(this.zoomLevel * zoomDelta);
+          }, { passive: false });
+        },
+
+        setZoom(level) {
+          this.zoomLevel = Math.max(0.5, Math.min(3.0, level));
+          this.updateCameraZoom();
+        },
+
+        updateCameraZoom() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          isoState.camera.left = frustumSize * aspect / -2;
+          isoState.camera.right = frustumSize * aspect / 2;
+          isoState.camera.top = frustumSize / 2;
+          isoState.camera.bottom = frustumSize / -2;
+          isoState.camera.updateProjectionMatrix();
+        },
+
+        zoomIn() { this.setZoom(this.zoomLevel * 1.2); },
+        zoomOut() { this.setZoom(this.zoomLevel / 1.2); },
+
+        resetView() {
+          this.zoomLevel = 1.0;
+          this.autoRotate = false;
+          this.rotationAngle = Math.PI / 4; // 45 degrees (default isometric angle)
+          isoState.panOffset = { x: 0, z: 0 };
+          isoState.camera.position.set(10, 10, 10);
+          isoState.camera.lookAt(0, 0, 0);
+          this.updateCameraZoom();
+        },
+
+        createLabels(container) {
+          Object.values(isoState.labelElements).forEach(label => {
+            if (label && label.parentNode) label.parentNode.removeChild(label);
+          });
+          isoState.labelElements = {};
+          container.querySelectorAll('.iso-label').forEach(el => el.remove());
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'iso-label';
+            labelDiv.innerHTML = `
+              <div class="label-name">${config.icon} ${config.name}</div>
+              <div class="label-value" data-room="${config.id}">--</div>
+              <div class="label-secondary" data-room-secondary="${config.id}">--</div>
+            `;
+            container.appendChild(labelDiv);
+            isoState.labelElements[config.id] = labelDiv;
+          });
+        },
+
+        updateLabels() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera) return;
+          const rooms = Alpine.store('rooms')?.list || [];
+          const viewMode = this.viewMode;
+
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            const label = isoState.labelElements[config.id];
+            if (!label) return;
+            const roomData = rooms.find(r => r.id === config.id);
+            const valueEl = label.querySelector(`[data-room="${config.id}"]`);
+            const secondaryEl = label.querySelector(`[data-room-secondary="${config.id}"]`);
+
+            if (valueEl && roomData) {
+              if (viewMode === 'temperature') {
+                valueEl.textContent = roomData.temperature !== null ? `${roomData.temperature.toFixed(1)}°` : '--';
+                if (secondaryEl) secondaryEl.textContent = roomData.humidity !== null ? `${roomData.humidity.toFixed(0)}%` : '';
+              } else {
+                valueEl.textContent = roomData.humidity !== null ? `${roomData.humidity.toFixed(0)}%` : '--';
+                if (secondaryEl) secondaryEl.textContent = roomData.temperature !== null ? `${roomData.temperature.toFixed(1)}°` : '';
+              }
+            }
+
+            const position = new THREE.Vector3(config.x - centerX, config.labelY || 3, config.z - centerZ);
+            position.project(isoState.camera);
+            const x = (position.x * 0.5 + 0.5) * container.clientWidth;
+            const y = (-position.y * 0.5 + 0.5) * container.clientHeight;
+            label.style.left = `${x}px`;
+            label.style.top = `${y}px`;
+
+            const margin = 20;
+            const isVisible = container.clientWidth > 0 && x > margin && x < container.clientWidth - margin && y > margin && y < container.clientHeight - margin;
+            label.classList.toggle('visible', isVisible);
+          });
+        },
+
+        updateRoomColors() {
+          const rooms = Alpine.store('rooms')?.list || [];
+          rooms.forEach(roomData => {
+            const meshGroup = isoState.roomMeshes[roomData.id];
+            if (!meshGroup) return;
+            const floorMesh = meshGroup.children.find(child => child.name === 'floor_' + roomData.id);
+            if (floorMesh && floorMesh.material) {
+              floorMesh.material.color.setHex(this.getRoomColor(roomData, this.viewMode));
+            }
+          });
+        },
+
+        getRoomColor(room, viewMode) {
+          if (!room) return 0xE0E0E0;
+          const value = viewMode === 'temperature' ? room.temperature : room.humidity;
+          if (value === null || value === undefined) return 0xE0E0E0;
+          const scale = viewMode === 'temperature' ? TEMP_COLORS : HUMIDITY_COLORS;
+          return this.interpolateColor(value, scale);
+        },
+
+        interpolateColor(value, scale) {
+          if (value <= scale[0].value) return scale[0].color;
+          if (value >= scale[scale.length - 1].value) return scale[scale.length - 1].color;
+          let lower = scale[0], upper = scale[scale.length - 1];
+          for (let i = 0; i < scale.length - 1; i++) {
+            if (value >= scale[i].value && value <= scale[i + 1].value) {
+              lower = scale[i];
+              upper = scale[i + 1];
+              break;
+            }
+          }
+          const factor = (value - lower.value) / (upper.value - lower.value);
+          const lowerColor = new THREE.Color(lower.color);
+          const upperColor = new THREE.Color(upper.color);
+          const result = new THREE.Color();
+          result.lerpColors(lowerColor, upperColor, factor);
+          return result.getHex();
+        },
+
+        toggleWalls() {
+          this.wallsVisible = !this.wallsVisible;
+          isoState.wallMeshes.forEach(wall => { wall.visible = this.wallsVisible; });
+        },
+
+        toggleDarkTheme() {
+          this.darkTheme = !this.darkTheme;
+          if (this.darkTheme) {
+            isoState.scene.background = new THREE.Color(0x0f172a);
+            isoState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
+          } else {
+            isoState.scene.background = new THREE.Color(0xE8E8EA);
+            isoState.scene.fog = null;
+          }
+        },
+
+        animate() {
+          const self = this;
+          const radius = 17.32; // Distance from center (sqrt(10^2 + 10^2 + 10^2) ≈ 17.32)
+          const height = 10;    // Camera height
+
+          function loop() {
+            isoState.animationId = requestAnimationFrame(loop);
+
+            // Auto-rotate camera around the center
+            if (self.autoRotate && isoState.camera) {
+              self.rotationAngle += 0.005; // ~0.3 degrees per frame
+              const x = Math.sin(self.rotationAngle) * radius;
+              const z = Math.cos(self.rotationAngle) * radius;
+              isoState.camera.position.set(x, height, z);
+              isoState.camera.lookAt(isoState.panOffset.x, 0, isoState.panOffset.z);
+            }
+
+            self.updateRoomColors();
+            self.updateLabels();
+            if (isoState.renderer && isoState.scene && isoState.camera) {
+              isoState.renderer.render(isoState.scene, isoState.camera);
+            }
+          }
+          loop();
+        },
+
+        toggleAutoRotate() {
+          this.autoRotate = !this.autoRotate;
+          if (this.autoRotate) {
+            // Calculate current angle from camera position
+            const pos = isoState.camera.position;
+            this.rotationAngle = Math.atan2(pos.x, pos.z);
+          }
+        },
+
+        onResize() {
+          const container = this.$refs.isoContainer;
+          if (!container || !isoState.camera || !isoState.renderer) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          isoState.camera.left = frustumSize * aspect / -2;
+          isoState.camera.right = frustumSize * aspect / 2;
+          isoState.camera.top = frustumSize / 2;
+          isoState.camera.bottom = frustumSize / -2;
+          isoState.camera.updateProjectionMatrix();
+          isoState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        setViewMode(mode) { this.viewMode = mode; },
+        getZoomPercent() { return Math.round(this.zoomLevel * 100); }
+      };
+    }
+
+    // ========================================
+    // ZIGBEE NETWORK VIEW
+    // Warm beige monochromatic visualization
+    // ========================================
+
+    const networkState = {
+      scene: null,
+      camera: null,
+      renderer: null,
+      roomMeshes: {},
+      wallMeshes: [],
+      wallNumberSprites: [],
+      deviceMeshes: {},
+      labelElements: {},
+      signalElements: {},
+      animationId: null,
+      isInitialized: false,
+      panOffset: { x: 0, z: 0 },
+      isPanning: false,
+      lastPanPos: { x: 0, y: 0 }
+    };
+
+    // Device configuration with types and icons
+    const ZIGBEE_DEVICES = [
+      { id: 'coordinator', name: 'ZBBridge-P', type: 'coordinator', icon: '📡', room: 'living', x: 0.5, z: 0.4 },
+      { id: 'router1', name: 'S60ZBTPF', type: 'router', icon: '📢', room: 'study', x: 0.8, z: 0.2 },
+      { id: 'router2', name: 'S60ZBTPF', type: 'router', icon: '📢', room: 'living', x: 0.3, z: 0.3 },
+      { id: 'sensor1', name: 'SNZB-02P', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.2, z: 0.15 },
+      { id: 'sensor2', name: 'SNZB-03P', type: 'end-device', icon: '🚶', room: 'kitchen', x: 0.5, z: 0.1 },
+      { id: 'sensor3', name: 'SNZB-04P', type: 'end-device', icon: '🚪', room: 'bathroom', x: 0.85, z: 0.1 },
+      { id: 'trv', name: 'TRVZB', type: 'end-device', icon: '🔥', room: 'bedroom', x: 0.1, z: 0.25 },
+    ];
+
+    function networkView() {
+      const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+      const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+      return {
+        showSignalRange: false,
+        showLabels: false,
+        showWallNumbers: false,
+        autoRotate: false,
+        rotationAngle: 0,
+        zoomLevel: 2.0,
+        deviceCount: ZIGBEE_DEVICES.length,
+        routerCount: ZIGBEE_DEVICES.filter(d => d.type === 'router').length,
+        endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
+
+        init() {
+          this.waitForContainer();
+        },
+
+        waitForContainer() {
+          const container = this.$refs.networkContainer;
+          if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+            setTimeout(() => this.waitForContainer(), 100);
+            return;
+          }
+
+          if (networkState.isInitialized && networkState.renderer) {
+            if (!container.contains(networkState.renderer.domElement)) {
+              container.appendChild(networkState.renderer.domElement);
+            }
+            this.createLabels(container);
+            this.onResize();
+            return;
+          }
+
+          if (networkState.renderer) networkState.renderer.dispose();
+          if (networkState.scene) networkState.scene.clear();
+          if (networkState.animationId) cancelAnimationFrame(networkState.animationId);
+
+          this.initScene();
+          this.initCamera(container);
+          this.initRenderer(container);
+          this.initLighting();
+          this.buildFloorPlan();
+          this.addWallNumbers();
+          this.createDevices();
+          this.createLabels(container);
+          this.setupPanControls(container);
+          this.animate();
+          networkState.isInitialized = true;
+
+          window.addEventListener('resize', () => this.onResize());
+        },
+
+        initScene() {
+          networkState.scene = new THREE.Scene();
+          // Warm beige gradient background
+          networkState.scene.background = new THREE.Color(0xE8DFD4);
+        },
+
+        initCamera(container) {
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15;
+          networkState.camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2, frustumSize * aspect / 2,
+            frustumSize / 2, frustumSize / -2, 0.1, 1000
+          );
+          networkState.camera.position.set(10, 10, 10);
+          networkState.camera.lookAt(0, 0, 0);
+        },
+
+        initRenderer(container) {
+          networkState.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          networkState.renderer.setSize(container.clientWidth, container.clientHeight);
+          networkState.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+          networkState.renderer.shadowMap.enabled = true;
+          networkState.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(networkState.renderer.domElement);
+        },
+
+        initLighting() {
+          const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+          networkState.scene.add(ambient);
+          const directional = new THREE.DirectionalLight(0xffffff, 0.6);
+          directional.position.set(15, 20, 15);
+          directional.castShadow = false;  // No shadows anywhere
+          networkState.scene.add(directional);
+          const fill = new THREE.DirectionalLight(0xffffff, 0.3);
+          fill.position.set(-10, 10, -10);
+          networkState.scene.add(fill);
+        },
+
+        addWallNumbers() {
+          // Clear existing wall number sprites
+          networkState.wallNumberSprites.forEach(sprite => {
+            networkState.scene.remove(sprite);
+            if (sprite.material.map) sprite.material.map.dispose();
+            sprite.material.dispose();
+          });
+          networkState.wallNumberSprites = [];
+
+          // Add number labels at start, middle, end of each wall for precise identification
+          const createNumberSprite = (text, color = '#FF0000') => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(32, 32, 28, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(text), 32, 32);
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(0.4, 0.4, 1);
+            return sprite;
+          };
+
+          // Direction labels by POSITION (reliable regardless of wall creation order)
+          // Outer walls are identified by: edge position + full length
+          const getOuterWallDirection = (wall) => {
+            const apartmentWidth = FLOOR_PLAN_CONFIG.apartmentWidth;   // 9.239
+            const apartmentDepth = FLOOR_PLAN_CONFIG.apartmentDepth;   // 7.665
+            const halfW = apartmentWidth / 2;  // 4.6195
+            const halfD = apartmentDepth / 2;  // 3.8325
+            const tolerance = 0.05;  // Position tolerance (5cm) - outer walls are at exact edges
+            const lengthTolerance = 0.2;  // Length must be within 20cm of full apartment dimension
+
+            const params = wall.geometry.parameters;
+            const isHorizontal = params.width > params.depth;  // Runs along X axis
+            const isVertical = params.depth > params.width;    // Runs along Z axis
+
+            let result = null;
+
+            // Check for full-length horizontal walls (North/South)
+            // In isometric view: z=-halfD appears at TOP (North), z=+halfD at BOTTOM (South)
+            if (isHorizontal && Math.abs(params.width - apartmentWidth) < lengthTolerance) {
+              if (Math.abs(wall.position.z - (-halfD)) < tolerance) result = 'N';  // Top edge
+              else if (Math.abs(wall.position.z - halfD) < tolerance) result = 'S';  // Bottom edge
+            }
+
+            // Check for full-length vertical walls (West/East)
+            // In isometric view: x=-halfW appears at LEFT (West), x=+halfW at RIGHT (East)
+            if (isVertical && Math.abs(params.depth - apartmentDepth) < lengthTolerance) {
+              if (Math.abs(wall.position.x - (-halfW)) < tolerance) result = 'W';  // Left edge
+              else if (Math.abs(wall.position.x - halfW) < tolerance) result = 'E';  // Right edge
+            }
+
+            return result;
+          };
+
+          networkState.wallMeshes.forEach((wall, index) => {
+            const geom = wall.geometry;
+            const params = geom.parameters;
+            const wx = wall.position.x;
+            const wy = wall.position.y + 0.5;
+            const wz = wall.position.z;
+
+            // Check if this is an outer wall with direction label (by position)
+            const directionLabel = getOuterWallDirection(wall);
+
+            // Determine if wall is horizontal (along X) or vertical (along Z)
+            const isHorizontal = params.width > params.depth;
+            const wallLength = isHorizontal ? params.width : params.depth;
+            const halfLen = wallLength / 2 * 0.8; // 80% to stay within wall bounds
+
+            // Create 3 sprites: start, middle, end
+            const positions = isHorizontal
+              ? [[wx - halfLen, wy, wz], [wx, wy, wz], [wx + halfLen, wy, wz]]
+              : [[wx, wy, wz - halfLen], [wx, wy, wz], [wx, wy, wz + halfLen]];
+
+            positions.forEach((pos, i) => {
+              // Use direction label (N/S/E/W) for outer walls, index number for inner walls
+              const label = directionLabel || index.toString();
+              // Green for direction labels, Red/Blue for numbered walls
+              const color = directionLabel ? '#228B22' : (i === 1 ? '#FF0000' : '#0066CC');
+              const sprite = createNumberSprite(label, color);
+              sprite.position.set(pos[0], pos[1], pos[2]);
+              sprite.visible = false;  // Hidden by default
+              networkState.scene.add(sprite);
+              networkState.wallNumberSprites.push(sprite);
+            });
+          });
+        },
+
+        toggleWallNumbers() {
+          this.showWallNumbers = !this.showWallNumbers;
+          networkState.wallNumberSprites.forEach(sprite => {
+            sprite.visible = this.showWallNumbers;
+          });
+        },
+
+        /**
+         * WALL INDEX REFERENCE (Fully consolidated walls)
+         * =================================================
+         * Walls are pushed to networkState.wallMeshes in this EXACT order:
+         *
+         * FIRST: Room walls via createRoom() for each room in config order:
+         *   Study:    0=left (back→north wall, front skipped, right→east wall)
+         *   Living:   (none - all consolidated)
+         *   Bedroom:  1=right divider (back skipped, left→west wall, front→south wall)
+         *   Kitchen:  (none - all consolidated)
+         *   Bathroom: 2=front (back→north wall, left→west wall, right→east wall)
+         *
+         * THEN: Consolidated walls created in buildFloorPlan():
+         *   3 = Study↔Living horizontal divider
+         *   4 = Coat hanging wall (hallway, 30% from north)
+         *   5 = North wall (z=0, full apartment width)
+         *   6 = West wall (x=0, full apartment depth)
+         *   7 = East wall upper (Bathroom+Kitchen right, z=0 to z=3.697)
+         *   8 = East wall lower (Study+Living right, z=0 to z=7.665)
+         *   9 = South wall (full apartment width at z=7.665)
+         *
+         * TOTAL: 10 walls (indices 0-9)
+         */
+        buildFloorPlan() {
+          networkState.wallMeshes = [];
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // 4.6195
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;  // 3.8325
+          const floorColor = 0xC9B89A;  // Warm beige (same as rooms)
+
+          // Base floor covering entire apartment (fills all gaps)
+          const baseFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(FLOOR_PLAN_CONFIG.apartmentWidth + 2, FLOOR_PLAN_CONFIG.apartmentDepth + 2),
+            new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.8 })
+          );
+          baseFloor.rotation.x = -Math.PI / 2;
+          baseFloor.position.set(0, 0.001, 0);  // Lowest level, centered
+          baseFloor.receiveShadow = true;
+          networkState.scene.add(baseFloor);
+
+          // Build rooms (each room has its own floor and outer walls)
+          // NOTE: This runs FIRST, creating walls 0-15
+          FLOOR_PLAN_CONFIG.rooms.forEach(config => {
+            this.createRoom(config);
+          });
+
+          // Interior divider walls (created AFTER room walls, so these are walls 16-17)
+          const wallHeight = 0.8;
+          const wallMat = new THREE.MeshStandardMaterial({ color: 0xB5A080, roughness: 0.7, transparent: true, opacity: 0.6 });
+
+          // Get room references
+          const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+          const living = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'living');
+          const kitchen = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'kitchen');
+          const bedroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bedroom');
+          const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+
+          // Wall 3: Study ↔ Living (horizontal divider wall with 2 door openings)
+          // Moved 0.5m towards study (into study area)
+          const studyFrontZ = study.z + study.depth/2 - 0.5;  // 3.197 (moved towards study)
+
+          // Door openings (0.42m wide each - reduced 30%)
+          const doorWidth = 0.42;
+          const door4X = 3.8;  // Bedroom ↔ Hallway (west door)
+          const door2X = 4.8;  // Living ↔ Hallway (east door)
+
+          const door4Left = door4X - doorWidth/2;   // 3.2
+          const door4Right = door4X + doorWidth/2;  // 3.8
+          const door2Left = door2X - doorWidth/2;   // 4.5
+          const door2Right = door2X + doorWidth/2;  // 5.1
+
+          // Left segment: from west edge (0) to door4 left edge
+          const wall3LeftWidth = door4Left;
+          const wall3Left = new THREE.Mesh(new THREE.BoxGeometry(wall3LeftWidth, wallHeight, 0.08), wallMat);
+          wall3Left.position.set(door4Left/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Left);
+          networkState.wallMeshes.push(wall3Left);
+
+          // Middle segment: from door4 right edge to door2 left edge
+          const wall3MidWidth = door2Left - door4Right;  // 4.5 - 3.8 = 0.7
+          const wall3Mid = new THREE.Mesh(new THREE.BoxGeometry(wall3MidWidth, wallHeight, 0.08), wallMat);
+          wall3Mid.position.set(door4Right + wall3MidWidth/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Mid);
+          networkState.wallMeshes.push(wall3Mid);
+
+          // Right segment: from door2 right edge to east edge
+          const wall3RightWidth = FLOOR_PLAN_CONFIG.apartmentWidth - door2Right;
+          const wall3Right = new THREE.Mesh(new THREE.BoxGeometry(wall3RightWidth, wallHeight, 0.08), wallMat);
+          wall3Right.position.set(door2Right + wall3RightWidth/2 - centerX, wallHeight/2, studyFrontZ - centerZ);
+          networkState.scene.add(wall3Right);
+          networkState.wallMeshes.push(wall3Right);
+
+          // Wall 2: Kitchen ↔ Bedroom - REMOVED (was wall index 17)
+          // This interior divider was redundant - bedroom's back wall already defines the boundary
+
+          // Wall 4: Coat hanging wall in hallway (30% from north towards Study↔Living divider)
+          const wall16Z = 0;  // North connector position
+          const wall15Z = study.z + study.depth/2;  // 3.697 (Study↔Living divider)
+          const coatWallLength = (wall15Z - wall16Z) * 0.30;  // 30% of distance ≈ 1.1m
+          const coatWallCenterZ = wall16Z + coatWallLength / 2;  // Start from wall 16
+
+          // Position towards study (middle of hallway-study boundary)
+          const coatWallX = 4.6;  // Moved from hallway center (3.839) towards study
+
+          const coatWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, coatWallLength), wallMat);
+          coatWall.position.set(coatWallX - centerX, wallHeight/2, coatWallCenterZ - centerZ);
+          networkState.scene.add(coatWall);
+          networkState.wallMeshes.push(coatWall);
+
+          // Wall 5: North wall (consolidated from Study back + connector + Bathroom back)
+          // Split into 2 segments with main entry door at x=3.5
+          const mainDoorX = 4.0;
+          const mainDoorWidth = 0.42;
+          const mainDoorLeft = mainDoorX - mainDoorWidth/2;  // 3.29
+          const mainDoorRight = mainDoorX + mainDoorWidth/2;  // 3.71
+
+          // Segment 1: x=0 to door left edge (west side)
+          const northSeg1Width = mainDoorLeft;  // 3.29
+          const northWall1 = new THREE.Mesh(new THREE.BoxGeometry(northSeg1Width, wallHeight, 0.08), wallMat);
+          northWall1.position.set(northSeg1Width/2 - centerX, wallHeight/2, -centerZ);
+          networkState.scene.add(northWall1);
+          networkState.wallMeshes.push(northWall1);
+
+          // Segment 2: door right edge to apartment east edge (east side)
+          const northSeg2Width = FLOOR_PLAN_CONFIG.apartmentWidth - mainDoorRight;  // 9.239 - 3.71 = 5.529
+          const northSeg2CenterX = (mainDoorRight + FLOOR_PLAN_CONFIG.apartmentWidth) / 2 - centerX;
+          const northWall2 = new THREE.Mesh(new THREE.BoxGeometry(northSeg2Width, wallHeight, 0.08), wallMat);
+          northWall2.position.set(northSeg2CenterX, wallHeight/2, -centerZ);
+          networkState.scene.add(northWall2);
+          networkState.wallMeshes.push(northWall2);
+
+          // Wall 7: West wall (full depth, equal to Wall 9)
+          const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665 (same as Wall 9)
+          const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
+          westWall.position.set(-centerX, wallHeight/2, 0);  // Centered in z
+          networkState.scene.add(westWall);
+          networkState.wallMeshes.push(westWall);
+
+          // Wall 10: East wall upper (Bathroom+Kitchen right consolidated)
+          // Split into 3 segments with 2 door openings: bathroom (z=0.7) and kitchen (z=2.5)
+          const wall10X = bathroom.x + bathroom.width/2;  // Right edge of bathroom/kitchen area (3.15)
+          const wall10DoorWidth = 0.42;
+
+          // Bathroom door at z=0.7
+          const bathDoorZ = 0.7;
+          const bathDoorTop = bathDoorZ - wall10DoorWidth/2;  // 0.49
+          const bathDoorBottom = bathDoorZ + wall10DoorWidth/2;  // 0.91
+
+          // Kitchen door at z=2.5
+          const kitchenDoorZ = 2.5;
+          const kitchenDoorTop = kitchenDoorZ - wall10DoorWidth/2;  // 2.29
+          const kitchenDoorBottom = kitchenDoorZ + wall10DoorWidth/2;  // 2.71
+
+          // Segment 1: z=0 to bathroom door top
+          const wall10Seg1Depth = bathDoorTop;  // 0.49
+          const eastWallUpper1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg1Depth), wallMat);
+          eastWallUpper1.position.set(wall10X - centerX, wallHeight/2, wall10Seg1Depth/2 - centerZ);
+          networkState.scene.add(eastWallUpper1);
+          networkState.wallMeshes.push(eastWallUpper1);
+
+          // Segment 2: bathroom door bottom to kitchen door top
+          const wall10Seg2Depth = kitchenDoorTop - bathDoorBottom;  // 2.29 - 0.91 = 1.38
+          const wall10Seg2CenterZ = (bathDoorBottom + kitchenDoorTop) / 2 - centerZ;
+          const eastWallUpper2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg2Depth), wallMat);
+          eastWallUpper2.position.set(wall10X - centerX, wallHeight/2, wall10Seg2CenterZ);
+          networkState.scene.add(eastWallUpper2);
+          networkState.wallMeshes.push(eastWallUpper2);
+
+          // Segment 3: kitchen door bottom to studyFrontZ
+          const wall10Seg3Depth = studyFrontZ - kitchenDoorBottom;  // 3.197 - 2.71 = 0.487
+          const wall10Seg3CenterZ = (kitchenDoorBottom + studyFrontZ) / 2 - centerZ;
+          const eastWallUpper3 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall10Seg3Depth), wallMat);
+          eastWallUpper3.position.set(wall10X - centerX, wallHeight/2, wall10Seg3CenterZ);
+          networkState.scene.add(eastWallUpper3);
+          networkState.wallMeshes.push(eastWallUpper3);
+
+          // Wall 9: East wall lower (Study+Living right consolidated)
+          // From z=0 to z=7.665 (full depth) at x = study/living right edge (apartment east edge)
+          const wall9X = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239 (east edge)
+          const wall9Depth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const eastWallLower = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall9Depth), wallMat);
+          eastWallLower.position.set(wall9X - centerX, wallHeight/2, 0);  // Centered in z
+          networkState.scene.add(eastWallLower);
+          networkState.wallMeshes.push(eastWallLower);
+
+          // Wall 10: South wall (Bedroom+Living front consolidated)
+          // Full apartment width at z=7.665 (south edge)
+          const wall10Z = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const wall10Width = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
+          const southWall = new THREE.Mesh(new THREE.BoxGeometry(wall10Width, wallHeight, 0.08), wallMat);
+          southWall.position.set(0, wallHeight/2, wall10Z - centerZ);  // x centered, z at south edge
+          networkState.scene.add(southWall);
+          networkState.wallMeshes.push(southWall);
+
+          // Door X markers - adding from FLOOR_PLAN_CONFIG.doors
+          const doorMarkerMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+          const markerSize = 0.3;
+          const markerThickness = 0.05;
+          const markerHeight = 0.02;
+
+          // Helper function to add door marker
+          const addDoorMarker = (x, z) => {
+            const posX = x - centerX;
+            const posZ = z - centerZ;
+
+            // Bar 1 (diagonal \)
+            const bar1 = new THREE.Mesh(
+              new THREE.BoxGeometry(markerSize, markerHeight, markerThickness),
+              doorMarkerMat
+            );
+            bar1.rotation.y = Math.PI / 4;
+            bar1.position.set(posX, markerHeight/2, posZ);
+            networkState.scene.add(bar1);
+
+            // Bar 2 (diagonal /)
+            const bar2 = new THREE.Mesh(
+              new THREE.BoxGeometry(markerSize, markerHeight, markerThickness),
+              doorMarkerMat
+            );
+            bar2.rotation.y = -Math.PI / 4;
+            bar2.position.set(posX, markerHeight/2, posZ);
+            networkState.scene.add(bar2);
+          };
+
+          // Door 2: Living ↔ Hallway - on Wall 3 (Study↔Living divider at z=3.197)
+          addDoorMarker(4.8, 3.197);
+
+          // Door 3: Study door - on Wall 0 (study's left wall at x=5.331)
+          addDoorMarker(5.331, 2.5);
+
+          // Door 4: Bedroom ↔ Hallway - on Wall 3 (at x=3.8)
+          addDoorMarker(3.8, 3.197);
+
+          // Door 5: Kitchen door - on wall 10 (east wall upper at x=3.15)
+          addDoorMarker(3.15, 2.5);
+
+          // Door 6: Bathroom door - on wall 10 (east wall upper at x=3.15)
+          addDoorMarker(3.15, 0.7);
+
+          // Door 7: Main Entry - on north wall (z=0)
+          addDoorMarker(4.0, 0);
+        },
+
+        createRoom(config) {
+          const group = new THREE.Group();
+          const floorColor = 0xC9B89A;  // Warm beige
+          const wallColor = 0xB5A080;
+          const wallHeight = 0.8;
+
+          // Correct center coordinates (x,z are already center positions)
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+          const rx = config.x - centerX;
+          const rz = config.z - centerZ;
+
+          // Room floor at correct position
+          const floorGeom = new THREE.PlaneGeometry(config.width, config.depth);
+          const floorMat = new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.8 });
+          const floor = new THREE.Mesh(floorGeom, floorMat);
+          floor.rotation.x = -Math.PI / 2;
+          floor.position.set(rx, 0.01, rz);
+          floor.receiveShadow = true;
+          group.add(floor);
+
+          // Helipad-style room label on floor
+          const helipadSize = Math.min(config.width, config.depth) * 0.6;
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+
+          // Outer circle
+          ctx.strokeStyle = 'rgba(90, 70, 50, 0.4)';
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.arc(128, 128, 110, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Inner circle
+          ctx.strokeStyle = 'rgba(90, 70, 50, 0.3)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(128, 128, 85, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Room name text
+          ctx.fillStyle = 'rgba(90, 70, 50, 0.5)';
+          ctx.font = 'bold 36px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(config.name.toUpperCase(), 128, 128);
+
+          const helipadTexture = new THREE.CanvasTexture(canvas);
+          const helipadGeom = new THREE.PlaneGeometry(helipadSize, helipadSize);
+          const helipadMat = new THREE.MeshBasicMaterial({
+            map: helipadTexture,
+            transparent: true,
+            depthWrite: false
+          });
+          const helipad = new THREE.Mesh(helipadGeom, helipadMat);
+          helipad.rotation.x = -Math.PI / 2;
+          helipad.position.set(rx, 0.02, rz);
+          group.add(helipad);
+
+          // Create all 4 walls automatically
+          const halfW = config.width / 2;
+          const halfD = config.depth / 2;
+          const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.7, transparent: true, opacity: 0.6 });
+
+          // Back wall (north) - skip for all rooms at z=0 edge (consolidated into single north wall)
+          // Only bathroom has a front wall (interior divider at z=1.504)
+          // Study, Living, Bedroom, Kitchen, Bathroom back walls are all consolidated
+          if (false) {  // All back walls consolidated into single north wall
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+            backWall.position.set(rx, wallHeight/2, rz - halfD);
+            group.add(backWall);
+            networkState.wallMeshes.push(backWall);
+          }
+
+          // Front wall (south) - skip for study, kitchen, bedroom, living (consolidated into single south wall)
+          if (config.id !== 'study' && config.id !== 'kitchen' && config.id !== 'bedroom' && config.id !== 'living') {
+            const frontWall = new THREE.Mesh(new THREE.BoxGeometry(config.width, wallHeight, 0.08), wallMat);
+            frontWall.position.set(rx, wallHeight/2, rz + halfD);
+            group.add(frontWall);
+            networkState.wallMeshes.push(frontWall);
+          }
+
+          // Left wall (west) - skip for living room and west-edge rooms (single west wall created in buildFloorPlan)
+          const roomAtWestEdge = ['bathroom', 'kitchen', 'bedroom'].includes(config.id);
+          if (config.id !== 'living' && !roomAtWestEdge) {
+            // For study, use studyFrontZ (3.197) to join Wall 3
+            // Split into 2 segments with door opening at z=1.85
+            if (config.id === 'study') {
+              const studyObj = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+              const studyFrontZ = studyObj.z + studyObj.depth/2 - 0.5;  // 3.197 (joins Wall 3)
+              const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+              // Door opening parameters
+              const doorZ = 2.5;  // Door center position (towards living room)
+              const doorWidth = 0.42;  // Same as other doors
+              const doorTop = doorZ - doorWidth/2;  // 1.64
+              const doorBottom = doorZ + doorWidth/2;  // 2.06
+
+              // Segment 1: from z=0 to door top edge
+              const seg1Depth = doorTop;  // 1.64
+              const seg1CenterZ = seg1Depth/2 - centerZ;
+              const leftWall1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, seg1Depth), wallMat);
+              leftWall1.position.set(rx - halfW, wallHeight/2, seg1CenterZ);
+              leftWall1.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall1);
+              networkState.wallMeshes.push(leftWall1);
+
+              // Segment 2: from door bottom edge to studyFrontZ
+              const seg2Depth = studyFrontZ - doorBottom;  // 3.197 - 2.06 = 1.137
+              const seg2CenterZ = (doorBottom + studyFrontZ)/2 - centerZ;
+              const leftWall2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, seg2Depth), wallMat);
+              leftWall2.position.set(rx - halfW, wallHeight/2, seg2CenterZ);
+              leftWall2.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall2);
+              networkState.wallMeshes.push(leftWall2);
+            } else {
+              const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+              leftWall.position.set(rx - halfW, wallHeight/2, rz);
+              leftWall.userData = { roomId: config.id, side: 'left' };
+              group.add(leftWall);
+              networkState.wallMeshes.push(leftWall);
+            }
+          }
+
+          // Right wall (east) - skip for rooms using consolidated east walls
+          // Bathroom, Kitchen → consolidated into east wall upper (Wall 8)
+          // Study, Living → consolidated into east wall lower (Wall 9)
+          // Only Bedroom keeps its individual right wall (divider between bedroom and living)
+          const roomsWithConsolidatedEastWall = ['bathroom', 'kitchen', 'study', 'living'];
+          if (!roomsWithConsolidatedEastWall.includes(config.id)) {
+            if (config.id === 'bedroom') {
+              // Bedroom's right wall (Wall 1) serves as divider between bedroom and living
+              // Extends from studyFrontZ (z=3.197) to south edge (z=7.665) - joins Wall 3
+              const study = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'study');
+              const wall15Z = study.z + study.depth/2 - 0.5;  // 3.197 (same as Wall 3, joins it)
+              const bedroomFrontZ = config.z + config.depth/2;  // 7.665 (apartment south edge)
+              const extendedDepth = bedroomFrontZ - wall15Z;  // 4.468 (extended to join Wall 3)
+              const extendedCenterZ = (wall15Z + bedroomFrontZ) / 2 - FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+              // Position moved towards living room (increased x by 0.8m)
+              const bathroom = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === 'bathroom');
+              const wall7X = bathroom.x + bathroom.width/2 + 0.8 - FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+
+              const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, extendedDepth), wallMat);
+              rightWall.position.set(wall7X, wallHeight/2, extendedCenterZ);
+              group.add(rightWall);
+              networkState.wallMeshes.push(rightWall);
+            } else {
+              // Default right wall for any other rooms
+              const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, config.depth), wallMat);
+              rightWall.position.set(rx + halfW, wallHeight/2, rz);
+              group.add(rightWall);
+              networkState.wallMeshes.push(rightWall);
+            }
+          }
+
+          // Furniture
+          this.createFurniture(group, config, rx, rz);
+
+          networkState.scene.add(group);
+          networkState.roomMeshes[config.id] = { group, floor, config };
+        },
+
+        createFurniture(group, config, rx, rz) {
+          const furnitureColor = 0xBFA98A;
+          const furnitureMat = new THREE.MeshStandardMaterial({ color: furnitureColor, roughness: 0.6 });
+
+          if (config.id === 'bedroom') {
+            // Bed
+            const bedGeom = new THREE.BoxGeometry(1.4, 0.3, 2.0);
+            const bed = new THREE.Mesh(bedGeom, furnitureMat);
+            bed.position.set(rx - config.width/4, 0.15, rz);
+            group.add(bed);
+          } else if (config.id === 'living') {
+            // Sofa
+            const sofaGeom = new THREE.BoxGeometry(2.0, 0.4, 0.8);
+            const sofa = new THREE.Mesh(sofaGeom, furnitureMat);
+            sofa.position.set(rx, 0.2, rz + config.depth/4);
+            group.add(sofa);
+          } else if (config.id === 'study') {
+            // Desk
+            const deskGeom = new THREE.BoxGeometry(1.2, 0.5, 0.6);
+            const desk = new THREE.Mesh(deskGeom, furnitureMat);
+            desk.position.set(rx + config.width/4, 0.25, rz - config.depth/4);
+            group.add(desk);
+          }
+        },
+
+        createDevices() {
+          networkState.deviceMeshes = {};
+          const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+
+          ZIGBEE_DEVICES.forEach(device => {
+            // Create device marker (sphere)
+            const geometry = new THREE.SphereGeometry(0.15, 16, 16);
+            let color;
+            switch (device.type) {
+              case 'coordinator': color = 0xFF6B6B; break;
+              case 'router': color = 0x4DABF7; break;
+              default: color = 0x51CF66;
+            }
+            const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+            const mesh = new THREE.Mesh(geometry, material);
+
+            // Position based on room (room.x, room.z are center coords)
+            const room = FLOOR_PLAN_CONFIG.rooms.find(r => r.id === device.room);
+            if (room) {
+              const roomCenterX = room.x - centerX;
+              const roomCenterZ = room.z - centerZ;  // FIX: use z not y
+              mesh.position.set(
+                roomCenterX + (device.x - 0.5) * room.width * 0.8,
+                0.5,
+                roomCenterZ + (device.z - 0.5) * room.depth * 0.8
+              );
+            }
+
+            mesh.castShadow = true;
+            networkState.scene.add(mesh);
+            networkState.deviceMeshes[device.id] = { mesh, config: device };
+          });
+        },
+
+        createLabels(container) {
+          // Clear existing labels
+          Object.values(networkState.labelElements).forEach(el => el?.remove());
+          Object.values(networkState.signalElements).forEach(el => el?.remove());
+          networkState.labelElements = {};
+          networkState.signalElements = {};
+
+          ZIGBEE_DEVICES.forEach(device => {
+            // Device label
+            const label = document.createElement('div');
+            label.className = 'device-label visible';
+            label.innerHTML = `
+              <div class="device-icon ${device.type}">${device.icon}</div>
+              <div class="device-name">${device.name}</div>
+            `;
+            container.appendChild(label);
+            networkState.labelElements[device.id] = label;
+
+            // Signal range circle (for coordinator and routers)
+            if (device.type === 'coordinator' || device.type === 'router') {
+              const signal = document.createElement('div');
+              signal.className = `signal-range ${device.type}`;
+              signal.style.width = device.type === 'coordinator' ? '200px' : '150px';
+              signal.style.height = device.type === 'coordinator' ? '200px' : '150px';
+              container.appendChild(signal);
+              networkState.signalElements[device.id] = signal;
+            }
+          });
+        },
+
+        updateLabels() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera) return;
+
+          ZIGBEE_DEVICES.forEach(device => {
+            const deviceData = networkState.deviceMeshes[device.id];
+            const label = networkState.labelElements[device.id];
+            const signal = networkState.signalElements[device.id];
+
+            if (!deviceData || !label) return;
+
+            const pos = deviceData.mesh.position.clone();
+            pos.y += 0.3;
+            pos.project(networkState.camera);
+
+            const x = (pos.x * 0.5 + 0.5) * container.clientWidth;
+            const y = (-pos.y * 0.5 + 0.5) * container.clientHeight;
+
+            label.style.left = x + 'px';
+            label.style.top = y + 'px';
+            label.style.display = this.showLabels ? 'flex' : 'none';
+
+            if (signal) {
+              signal.style.left = x + 'px';
+              signal.style.top = (y + 40) + 'px';
+              signal.style.display = this.showSignalRange ? 'block' : 'none';
+            }
+          });
+        },
+
+        setupPanControls(container) {
+          container.addEventListener('pointerdown', (e) => {
+            if (this.autoRotate) return;
+            networkState.isPanning = true;
+            networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+            container.style.cursor = 'grabbing';
+          });
+
+          container.addEventListener('pointermove', (e) => {
+            if (!networkState.isPanning) return;
+            const dx = e.clientX - networkState.lastPanPos.x;
+            const dy = e.clientY - networkState.lastPanPos.y;
+            networkState.panOffset.x -= dx * 0.02;
+            networkState.panOffset.z -= dy * 0.02;
+            networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
+            networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+          });
+
+          container.addEventListener('pointerup', () => {
+            networkState.isPanning = false;
+            container.style.cursor = 'grab';
+          });
+
+          container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.setZoom(this.zoomLevel * delta);
+          }, { passive: false });
+        },
+
+        setZoom(level) {
+          this.zoomLevel = Math.max(0.5, Math.min(3.0, level));
+          this.updateCameraZoom();
+        },
+
+        updateCameraZoom() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          networkState.camera.left = frustumSize * aspect / -2;
+          networkState.camera.right = frustumSize * aspect / 2;
+          networkState.camera.top = frustumSize / 2;
+          networkState.camera.bottom = frustumSize / -2;
+          networkState.camera.updateProjectionMatrix();
+        },
+
+        zoomIn() { this.setZoom(this.zoomLevel * 1.2); },
+        zoomOut() { this.setZoom(this.zoomLevel / 1.2); },
+
+        resetView() {
+          this.zoomLevel = 1.0;
+          this.autoRotate = false;
+          this.rotationAngle = Math.PI / 4;
+          networkState.panOffset = { x: 0, z: 0 };
+          networkState.camera.position.set(10, 10, 10);
+          networkState.camera.lookAt(0, 0, 0);
+          this.updateCameraZoom();
+        },
+
+        toggleAutoRotate() {
+          this.autoRotate = !this.autoRotate;
+          if (this.autoRotate) {
+            const pos = networkState.camera.position;
+            this.rotationAngle = Math.atan2(pos.x, pos.z);
+          }
+        },
+
+        animate() {
+          const self = this;
+          const radius = 17.32;
+          const height = 10;
+
+          function loop() {
+            networkState.animationId = requestAnimationFrame(loop);
+
+            if (self.autoRotate && networkState.camera) {
+              self.rotationAngle += 0.003;
+              const x = Math.sin(self.rotationAngle) * radius;
+              const z = Math.cos(self.rotationAngle) * radius;
+              networkState.camera.position.set(x, height, z);
+              networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
+            }
+
+            self.updateLabels();
+            if (networkState.renderer && networkState.scene && networkState.camera) {
+              networkState.renderer.render(networkState.scene, networkState.camera);
+            }
+          }
+          loop();
+        },
+
+        onResize() {
+          const container = this.$refs.networkContainer;
+          if (!container || !networkState.camera || !networkState.renderer) return;
+          const aspect = container.clientWidth / container.clientHeight;
+          const frustumSize = 15 / this.zoomLevel;
+          networkState.camera.left = frustumSize * aspect / -2;
+          networkState.camera.right = frustumSize * aspect / 2;
+          networkState.camera.top = frustumSize / 2;
+          networkState.camera.bottom = frustumSize / -2;
+          networkState.camera.updateProjectionMatrix();
+          networkState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        getZoomPercent() { return Math.round(this.zoomLevel * 100); }
+      };
+    }
   </script>
 </body>
 </html>

@@ -9,7 +9,10 @@ export const CONFIG = {
     ? 'ws://' + window.location.host + '/mqtt'
     : 'ws://' + window.location.hostname + ':9001',
   baseTopic: 'zigbee2mqtt',
-  influxUrl: 'http://' + window.location.hostname + ':8086',
+  // Use nginx proxy for InfluxDB to avoid CORS issues
+  influxUrl: window.location.port === '8888'
+    ? window.location.origin + '/api/influx'
+    : 'http://' + window.location.hostname + ':8086',
   influxDb: 'homeassistant',
   rooms: [
     { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity' },

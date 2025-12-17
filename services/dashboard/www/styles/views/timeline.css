@@ -233,3 +233,271 @@
       color: var(--color-text-tertiary);
     }
 
+    /* ========================================
+       TIMELINE FILTERS & STATS (Multi-Event)
+       ======================================== */
+
+    .timeline-title-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .timeline-title-row .btn-icon {
+      padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .timeline-title-row .btn-icon:hover,
+    .timeline-title-row .btn-icon.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    /* Filter Bar (Always Visible Dropdowns) */
+    .timeline-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) 0;
+      margin-bottom: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .filter-select {
+      padding: var(--space-xs) var(--space-sm);
+      padding-right: var(--space-lg);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      min-width: 120px;
+      transition: all var(--transition-fast);
+    }
+
+    .filter-select:hover {
+      border-color: var(--color-primary);
+    }
+
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .filter-select option {
+      padding: var(--space-xs);
+    }
+
+    /* Filter Panel (Legacy - keep for reference) */
+    .timeline-filters {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+      border: 1px solid var(--color-border);
+    }
+
+    .filter-section {
+      margin-bottom: var(--space-md);
+    }
+
+    .filter-section:last-of-type {
+      margin-bottom: var(--space-sm);
+    }
+
+    .filter-label {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .filter-pill {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .filter-pill:hover {
+      background: var(--color-surface-hover);
+      border-color: var(--color-primary);
+    }
+
+    .filter-pill.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    .filter-pill .pill-icon {
+      font-size: var(--font-size-md);
+    }
+
+    .filter-pill .pill-label {
+      font-weight: var(--font-weight-medium);
+    }
+
+    .filter-pill .pill-count {
+      font-size: var(--font-size-xs);
+      background: rgba(0, 0, 0, 0.1);
+      padding: 2px 6px;
+      border-radius: var(--radius-full);
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .filter-pill.active .pill-count {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-small {
+      padding: var(--space-xs) var(--space-sm);
+      font-size: var(--font-size-sm);
+    }
+
+    /* Stats Bar */
+    .timeline-stats {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-md);
+      overflow-x: auto;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      white-space: nowrap;
+    }
+
+    .stat-value {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .stat-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .stat-icon {
+      font-size: var(--font-size-md);
+    }
+
+    /* Event Card Enhancements */
+    .event-label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      flex: 1;
+    }
+
+    .event-device {
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-secondary);
+    }
+
+    .event-room {
+      color: var(--color-text-tertiary);
+      margin-left: var(--space-xs);
+    }
+
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-top: var(--space-xs);
+    }
+
+    .event-relative-time {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+    }
+
+    .event-raw-values {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-tertiary);
+    }
+
+    .event-raw-values code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 10px;
+      background: var(--color-bg);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      color: var(--color-text-secondary);
+    }
+
+    /* Event Type Colors */
+    .event-motion .event-card { border-left: 3px solid #ffd93d; }
+    .event-contact .event-card { border-left: 3px solid #ef4444; }
+    .event-vibration .event-card { border-left: 3px solid #8b5cf6; }
+    .event-light .event-card { border-left: 3px solid #fbbf24; }
+    .event-plug .event-card { border-left: 3px solid #22c55e; }
+    .event-co2 .event-card { border-left: 3px solid #f97316; }
+    .event-availability .event-card { border-left: 3px solid #06b6d4; }
+    .event-default .event-card { border-left: 3px solid var(--color-border); }
+
+    /* Responsive adjustments */
+    @media (max-width: 600px) {
+      .timeline-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .timeline-title-row {
+        justify-content: space-between;
+      }
+
+      .date-selector {
+        justify-content: center;
+      }
+
+      .timeline-stats {
+        gap: var(--space-md);
+        justify-content: space-around;
+      }
+
+      .filter-pills {
+        gap: var(--space-xs);
+      }
+
+      .filter-pill {
+        padding: var(--space-xs);
+        font-size: var(--font-size-xs);
+      }
+    }
+
