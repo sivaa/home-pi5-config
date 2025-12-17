@@ -2,7 +2,7 @@ homeassistant:
   name: Home
   unit_system: metric
   time_zone: Australia/Sydney
-  internal_url: "https://pi:8123"
+  internal_url: "http://pi:8123"
   external_url: "https://ha.sivaa.in"
 
 frontend:
@@ -10,8 +10,6 @@ config:
 
 http:
   server_port: 8123
-  ssl_certificate: /config/fullchain.pem
-  ssl_key: /config/privkey.pem
   use_x_forwarded_for: true
   trusted_proxies:
     # Local/Docker

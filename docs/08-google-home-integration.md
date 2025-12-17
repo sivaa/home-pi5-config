@@ -40,8 +40,8 @@
 | Component | Status | Details |
 |-----------|--------|---------|
 | Cloudflare Tunnel | Active | Tunnel ID: `6600ccff-747f-4b92-b6d8-26178c8a5112` |
-| Cloudflare SSL Mode | **Full** | Dashboard → SSL/TLS → Overview |
-| HA SSL Certificates | Active | Self-signed, 10-year validity |
+| Cloudflare SSL Mode | **Full** | Dashboard → SSL/TLS → Overview (CRITICAL!) |
+| Local Access | Active | `http://pi:8123` |
 | External URL | Active | `https://ha.sivaa.in` |
 | GCP Project | Active | `siva-home-assistant-1` |
 | HomeGraph API | Enabled | For device state sync |
@@ -118,9 +118,7 @@ credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
 
 ingress:
   - hostname: ha.sivaa.in
-    service: https://localhost:8123    # MUST be HTTPS for WebSocket to work
-    originRequest:
-      noTLSVerify: true                # Accept self-signed cert
+    service: http://localhost:8123
   - service: http_status:404
 ```
 
@@ -128,30 +126,6 @@ ingress:
 - Config: `/etc/cloudflared/config.yml`
 - Credentials: `/etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json`
 - Service: `systemctl status cloudflared`
-
-### Home Assistant SSL Certificates
-
-**Location:** `/opt/homeassistant/` on Pi
-
-```
-/opt/homeassistant/
-├── fullchain.pem    # Self-signed SSL certificate
-├── privkey.pem      # Private key
-└── configuration.yaml
-```
-
-**Why SSL is required:** cloudflared doesn't forward `X-Forwarded-Proto` header properly
-when connecting to HTTP origins. Home Assistant then can't detect HTTPS requests, causing
-WebSocket connections to fail with 301 redirects.
-
-**Generate new certs (if needed):**
-```bash
-sudo openssl req -x509 -newkey rsa:4096 \
-  -keyout /opt/homeassistant/privkey.pem \
-  -out /opt/homeassistant/fullchain.pem \
-  -days 3650 -nodes -subj '/CN=ha.sivaa.in'
-sudo chmod 644 /opt/homeassistant/*.pem
-```
 
 ### Cloudflare Dashboard Settings
 
@@ -217,22 +191,16 @@ google_assistant:
 
 3. **Restore Home Assistant config:**
    ```bash
-   # Generate SSL certificates (required for external access)
-   ssh pi@pi "sudo openssl req -x509 -newkey rsa:4096 \
-     -keyout /opt/homeassistant/privkey.pem \
-     -out /opt/homeassistant/fullchain.pem \
-     -days 3650 -nodes -subj '/CN=ha.sivaa.in'"
-   ssh pi@pi "sudo chmod 644 /opt/homeassistant/*.pem"
-
    # Copy from this repo to Pi
    scp configs/homeassistant/configuration.yaml pi@pi:/opt/homeassistant/
    scp configs/homeassistant/SERVICE_ACCOUNT.json pi@pi:/opt/homeassistant/
-   docker restart homeassistant
+   ssh pi@pi "docker restart homeassistant"
    ```
 
-4. **Verify Cloudflare Dashboard Settings:**
+4. **Verify Cloudflare Dashboard Settings (CRITICAL):**
    - Go to Cloudflare Dashboard → SSL/TLS → Overview
    - Set encryption mode to **"Full"**
+   - Without this, WebSocket connections will fail with 301 redirects
 
 5. **Re-link Google Home:**
    - Unlink old integration in Google Home app
@@ -260,21 +228,19 @@ google_assistant:
 **Root Cause Analysis:**
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  THE PROBLEM: cloudflared + HTTP origin = broken WebSocket                  │
+│  THE PROBLEM: Cloudflare SSL mode "Off" = broken WebSocket                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  When cloudflared connects to HTTP origin:                                  │
+│  When Cloudflare SSL mode is "Off":                                         │
 │  1. Browser requests wss://ha.sivaa.in/api/websocket                       │
-│  2. Cloudflare forwards to cloudflared                                      │
-│  3. cloudflared connects to http://localhost:8123  ← Problem!               │
-│  4. HA sees HTTP request, but external_url is HTTPS                         │
-│  5. HA redirects to "correct" protocol → 301 to http://                    │
-│  6. WebSocket upgrade fails                                                 │
+│  2. Cloudflare sends X-Forwarded-Proto: http  ← Problem!                   │
+│  3. HA thinks request is HTTP, but external_url is HTTPS                    │
+│  4. HA redirects to "correct" protocol → 301                               │
+│  5. WebSocket upgrade fails                                                 │
 │                                                                             │
 │  THE FIX:                                                                   │
-│  • HA must run HTTPS (with self-signed cert)                               │
-│  • cloudflared must connect to https://localhost:8123                      │
-│  • Cloudflare SSL mode must be "Full"                                       │
+│  • Set Cloudflare SSL mode to "Full" in dashboard                          │
+│  • That's it! No SSL needed on HA itself.                                  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -293,11 +259,8 @@ curl -v --http1.1 \
 # Expected (working):  HTTP/1.1 101 Switching Protocols
 # Broken:              HTTP/1.1 301 Moved Permanently
 
-# 2. Test WebSocket locally on Pi
-ssh pi@pi "curl -k -H 'Upgrade: websocket' -H 'Connection: Upgrade' \
-  -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
-  -H 'Sec-WebSocket-Version: 13' \
-  'https://localhost:8123/api/websocket' 2>&1 | grep -E '(HTTP|101|301)'"
+# 2. Test local access
+curl -s -o /dev/null -w "%{http_code}" http://pi:8123
 
 # 3. Check HA logs for auth warnings
 ssh pi@pi "docker logs homeassistant --tail 50 2>&1 | grep -i auth"
@@ -305,12 +268,12 @@ ssh pi@pi "docker logs homeassistant --tail 50 2>&1 | grep -i auth"
 
 **Fix Checklist:**
 
-| Check | Command | Expected |
-|-------|---------|----------|
-| HA has SSL certs | `ssh pi@pi "ls /opt/homeassistant/*.pem"` | fullchain.pem, privkey.pem |
-| HA config has SSL | `ssh pi@pi "grep ssl_ /opt/homeassistant/configuration.yaml"` | ssl_certificate, ssl_key |
-| cloudflared uses HTTPS | `ssh pi@pi "sudo grep service /etc/cloudflared/config.yml"` | `https://localhost:8123` |
-| Cloudflare SSL mode | Check dashboard | "Full" |
+| Check | Command/Action | Expected |
+|-------|----------------|----------|
+| Cloudflare SSL mode | Dashboard → SSL/TLS → Overview | **"Full"** |
+| cloudflared service | `ssh pi@pi "sudo grep service /etc/cloudflared/config.yml"` | `http://localhost:8123` |
+| Local access | `curl http://pi:8123` | 200 OK |
+| External access | `curl https://ha.sivaa.in` | 200 OK |
 
 ### "Could not reach device" (Google Home)
 

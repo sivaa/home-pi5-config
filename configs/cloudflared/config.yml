@@ -22,12 +22,7 @@ credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
 ingress:
   # Home Assistant - main endpoint for Google Home
   - hostname: ha.sivaa.in
-    service: https://localhost:8123
-    originRequest:
-      # Skip cert verification for self-signed cert
-      noTLSVerify: true
-      # Add X-Forwarded-Proto header so HA knows requests are HTTPS
-      httpHostHeader: ha.sivaa.in
+    service: http://localhost:8123
 
   # Catch-all rule (required by cloudflared)
   - service: http_status:404
