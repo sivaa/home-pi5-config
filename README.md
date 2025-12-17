@@ -61,6 +61,7 @@
 | 6 | [WiFi Troubleshooting](docs/06-wifi-troubleshooting.md) | Metal case WiFi issues & power save fix |
 | 7 | [Dashboard & InfluxDB](docs/07-dashboard-influxdb.md) | Custom dashboard InfluxDB integration |
 | 8 | [Google Home Integration](docs/08-google-home-integration.md) | Voice control via Google Assistant |
+| 9 | [Router Maintenance](docs/09-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
 
 ---
 
@@ -178,6 +179,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-17 | Added automated daily router reboot at 4 AM (prevents WiFi degradation) |
 | 2025-12-13 | Added CO2 Monitor dashboard view (view #10) with gauge, history chart, ambient mode |
 | 2025-12-13 | Fixed dashboard history modal - InfluxDB queries & entity ID mapping |
 | 2025-12-12 | Added contact sensor (SNZB-04P) |
@@ -209,7 +211,12 @@ pi-setup/
 │   ├── 04-zigbee2mqtt-setup.md
 │   ├── 05-zigbee-devices.md
 │   ├── 06-wifi-troubleshooting.md
-│   └── 07-dashboard-influxdb.md
+│   ├── 07-dashboard-influxdb.md
+│   ├── 08-google-home-integration.md
+│   └── 09-router-maintenance.md
+├── scripts/                   <- Maintenance scripts
+│   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
+│   └── .env                   <- Router credentials (gitignored)
 ├── services/                  <- Docker service configs (source of truth)
 │   ├── dashboard/             <- Custom smart home dashboard
 │   │   ├── www/index.html
