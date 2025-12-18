@@ -63,6 +63,7 @@
 | 8 | [Google Home Integration](docs/08-google-home-integration.md) | Voice control via Google Assistant |
 | 9 | [Router Maintenance](docs/09-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
 | 10 | [Display Scheduling](docs/10-display-scheduling.md) | Auto off at 22:00, on at 06:00, 5-min night idle |
+| 11 | [On-Screen Keyboard](docs/11-onscreen-keyboard.md) | Tablet-like touch keyboard (squeekboard) |
 
 ---
 
@@ -181,6 +182,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-18 | Enabled on-screen keyboard (squeekboard) for tablet-like touch input |
 | 2025-12-17 | Added display scheduler: auto-off 22:00, auto-on 06:00, 5-min night idle |
 | 2025-12-17 | Added automated daily router reboot at 4 AM (prevents WiFi degradation) |
 | 2025-12-13 | Added CO2 Monitor dashboard view (view #10) with gauge, history chart, ambient mode |
@@ -222,7 +224,8 @@ pi-setup/
 │   ├── 07-dashboard-influxdb.md
 │   ├── 08-google-home-integration.md
 │   ├── 09-router-maintenance.md
-│   └── 10-display-scheduling.md
+│   ├── 10-display-scheduling.md
+│   └── 11-onscreen-keyboard.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
