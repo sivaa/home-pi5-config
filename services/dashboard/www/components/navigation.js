@@ -1,43 +1,83 @@
 /**
  * Navigation Component
- * Tab-based navigation between dashboard views
+ * Grouped tab navigation with "More" dropdown and mobile support
  */
 
-export const VIEWS = [
-  { id: 'comfort', name: 'Score', icon: '🎯', title: 'Comfort Score' },
-  { id: 'compare', name: 'Compare', icon: '📊', title: 'Room Comparison' },
-  { id: 'floor', name: 'Floor Plan', icon: '🏠', title: 'Floor Plan' },
-  { id: '3d', name: '3D View', icon: '🏗️', title: '3D Floor Plan' },
-  { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display' },
-  { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Timeline Story' },
-  { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards' },
-  { id: 'lights', name: 'Lights', icon: '💡', title: 'Light Control' },
-  { id: 'config', name: 'Config', icon: '⚙️', title: 'Sensor Config' }
-];
+import {
+  ALL_VIEWS,
+  PRIMARY_VIEWS,
+  OVERFLOW_CATEGORIES,
+  KEYBOARD_SHORTCUTS
+} from '../js/config.js';
 
 /**
  * Navigation Alpine.js component
  */
 export function navigationComponent() {
   return {
-    views: VIEWS,
+    // State
+    moreMenuOpen: false,
+    mobileMenuOpen: false,
     currentView: 'comfort',
+
+    // Data from config
+    primaryViews: PRIMARY_VIEWS,
+    overflowCategories: OVERFLOW_CATEGORIES,
+    allViews: ALL_VIEWS,
 
     init() {
       // Restore last view from localStorage
       const saved = localStorage.getItem('dashboard-view');
-      if (saved && VIEWS.find(v => v.id === saved)) {
+      if (saved && ALL_VIEWS.find(v => v.id === saved)) {
         this.currentView = saved;
       }
 
-      // Listen for keyboard shortcuts
+      // Sync with app component if it exists
+      if (this.$root && this.$root._x_dataStack) {
+        const appData = this.$root._x_dataStack[0];
+        if (appData && appData.currentView) {
+          this.currentView = appData.currentView;
+        }
+      }
+
+      // SINGLE keyboard handler for all view shortcuts
       document.addEventListener('keydown', (e) => {
-        // Number keys 1-8 switch views
-        if (e.key >= '1' && e.key <= '8' && !e.ctrlKey && !e.metaKey) {
-          const index = parseInt(e.key) - 1;
-          if (index < VIEWS.length) {
-            this.setView(VIEWS[index].id);
-          }
+        // Ignore if typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.ctrlKey || e.metaKey) return;
+
+        const key = e.key.toUpperCase();
+
+        // Check for letter shortcuts (I, N, H, M)
+        if (KEYBOARD_SHORTCUTS[key]) {
+          e.preventDefault();
+          this.setView(KEYBOARD_SHORTCUTS[key]);
+          return;
+        }
+
+        // Check for number shortcuts (1-9, 0)
+        if (KEYBOARD_SHORTCUTS[e.key]) {
+          e.preventDefault();
+          this.setView(KEYBOARD_SHORTCUTS[e.key]);
+          return;
+        }
+      });
+
+      // Close menus on escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          this.moreMenuOpen = false;
+          this.mobileMenuOpen = false;
+        }
+      });
+
+      // Close menus on outside click
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.nav-more') && !e.target.closest('.nav-mobile-trigger')) {
+          this.moreMenuOpen = false;
+        }
+        if (!e.target.closest('.nav-mobile-drawer') && !e.target.closest('.nav-mobile-trigger')) {
+          this.mobileMenuOpen = false;
         }
       });
     },
@@ -46,109 +86,58 @@ export function navigationComponent() {
       if (this.currentView !== viewId) {
         this.currentView = viewId;
         localStorage.setItem('dashboard-view', viewId);
+
+        // Sync with app component
         this.$dispatch('view-changed', { view: viewId });
+
+        // Also try to update app directly
+        if (window.Alpine) {
+          const appEl = document.querySelector('[x-data="app()"]');
+          if (appEl && appEl._x_dataStack) {
+            appEl._x_dataStack[0].currentView = viewId;
+          }
+        }
       }
+
+      // Close menus after selection
+      this.moreMenuOpen = false;
+      this.mobileMenuOpen = false;
     },
 
     getViewTitle() {
-      const view = VIEWS.find(v => v.id === this.currentView);
+      const view = ALL_VIEWS.find(v => v.id === this.currentView);
       return view ? view.title : 'Dashboard';
     },
 
     isActive(viewId) {
       return this.currentView === viewId;
+    },
+
+    isOverflowActive() {
+      // Check if current view is in overflow (not primary)
+      return !PRIMARY_VIEWS.find(v => v.id === this.currentView) &&
+             ALL_VIEWS.find(v => v.id === this.currentView);
+    },
+
+    toggleMoreMenu() {
+      this.moreMenuOpen = !this.moreMenuOpen;
+      this.mobileMenuOpen = false;
+    },
+
+    toggleMobileMenu() {
+      this.mobileMenuOpen = !this.mobileMenuOpen;
+      this.moreMenuOpen = false;
+    },
+
+    getShortcutLabel(key) {
+      // Format shortcut for display
+      if (key.length === 1 && key >= '0' && key <= '9') {
+        return key;
+      }
+      return key;
     }
   };
 }
 
-/**
- * Generate navigation HTML
- */
-export function getNavigationHTML() {
-  return `
-    <nav class="view-nav" x-data="navigation()">
-      <div class="nav-tabs">
-        <template x-for="view in views" :key="view.id">
-          <button
-            class="nav-tab"
-            :class="{ active: isActive(view.id) }"
-            @click="setView(view.id)"
-            :title="view.title + ' (Press ' + (views.indexOf(view) + 1) + ')'"
-          >
-            <span class="nav-icon" x-text="view.icon"></span>
-            <span class="nav-label" x-text="view.name"></span>
-          </button>
-        </template>
-      </div>
-    </nav>
-  `;
-}
-
-/**
- * Navigation CSS styles
- */
-export const navigationStyles = `
-  .view-nav {
-    margin-bottom: var(--space-lg);
-  }
-
-  .nav-tabs {
-    display: flex;
-    gap: var(--space-sm);
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .nav-tab {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    border: none;
-    background: var(--color-surface);
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .nav-tab:hover {
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .nav-tab.active {
-    background: var(--color-primary);
-    color: white;
-    box-shadow: var(--shadow-md);
-  }
-
-  .nav-icon {
-    font-size: var(--font-size-md);
-  }
-
-  .nav-label {
-    display: inline;
-  }
-
-  @media (max-width: 480px) {
-    .nav-tabs {
-      gap: var(--space-xs);
-    }
-
-    .nav-tab {
-      padding: var(--space-sm);
-    }
-
-    .nav-label {
-      display: none;
-    }
-
-    .nav-icon {
-      font-size: var(--font-size-lg);
-    }
-  }
-`;
+// Export views for other modules that might need them
+export { ALL_VIEWS, PRIMARY_VIEWS, OVERFLOW_CATEGORIES };

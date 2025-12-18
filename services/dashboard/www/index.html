@@ -13,7 +13,7 @@
 
   <!-- Modularized CSS -->
   <link rel="stylesheet" href="styles/base.css">
-  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/layout.css?v=2">
   <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/views/comfort-score.css">
   <link rel="stylesheet" href="styles/views/bar-compare.css">
@@ -212,79 +212,92 @@
       </div>
     </header>
 
-    <!-- Navigation Menu -->
-    <nav class="nav-container">
-      <div class="nav-tabs">
-        <button class="nav-tab" :class="{ active: currentView === 'comfort' }"
-                @click="setView('comfort')" title="Comfort Score (Press 1)">
-          <span class="nav-icon">🎯</span>
-          <span class="nav-label">Score</span>
+    <!-- Navigation Menu (Grouped with More Dropdown) -->
+    <nav class="nav-container" x-data="navigation()" x-init="init()"
+         @keydown.window="handleKeydown($event)"
+         @keydown.escape.window="moreMenuOpen = false; mobileMenuOpen = false">
+      <div class="nav-wrapper">
+        <!-- Primary tabs (5 most used views) -->
+        <div class="nav-primary">
+          <template x-for="view in primaryViews" :key="view.id">
+            <button class="nav-tab"
+                    :class="{ active: currentView === view.id }"
+                    @click="setView(view.id)"
+                    :title="view.title + ' (' + view.key + ')'">
+              <span class="nav-icon" x-text="view.icon"></span>
+              <span class="nav-label" x-text="view.name"></span>
+            </button>
+          </template>
+        </div>
+
+        <!-- More dropdown (overflow views grouped by category) -->
+        <div class="nav-more">
+          <button class="nav-tab nav-more-trigger"
+                  :class="{ active: isOverflowActive() }"
+                  @click="toggleMoreMenu()"
+                  title="More views">
+            <span class="nav-icon">•••</span>
+            <span class="nav-label">More</span>
+            <span class="nav-chevron" :class="{ 'open': moreMenuOpen }">▼</span>
+          </button>
+
+          <!-- Dropdown menu -->
+          <div class="nav-dropdown" x-show="moreMenuOpen" x-transition:enter="dropdown-enter"
+               x-transition:leave="dropdown-leave" @click.away="moreMenuOpen = false">
+            <template x-for="category in overflowCategories" :key="category.id">
+              <div class="nav-dropdown-group">
+                <div class="nav-dropdown-header">
+                  <span x-text="category.icon"></span>
+                  <span x-text="category.name"></span>
+                </div>
+                <template x-for="view in category.views" :key="view.id">
+                  <button class="nav-dropdown-item"
+                          :class="{ active: currentView === view.id }"
+                          @click="setView(view.id)">
+                    <span class="item-icon" x-text="view.icon"></span>
+                    <span class="item-name" x-text="view.name"></span>
+                    <span class="item-shortcut" x-text="view.key"></span>
+                  </button>
+                </template>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Mobile hamburger trigger -->
+        <button class="nav-mobile-trigger" @click="toggleMobileMenu()" title="Menu">
+          <span x-text="mobileMenuOpen ? '✕' : '☰'"></span>
         </button>
-        <button class="nav-tab" :class="{ active: currentView === 'compare' }"
-                @click="setView('compare')" title="Room Comparison (Press 2)">
-          <span class="nav-icon">📊</span>
-          <span class="nav-label">Compare</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'floor' }"
-                @click="setView('floor')" title="Floor Plan (Press 3)">
-          <span class="nav-icon">🏠</span>
-          <span class="nav-label">Floor Plan</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'ambient' }"
-                @click="setView('ambient')" title="Ambient Display (Press 4)">
-          <span class="nav-icon">🌡️</span>
-          <span class="nav-label">Ambient</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'timeline' }"
-                @click="setView('timeline')" title="Timeline Story (Press 5)">
-          <span class="nav-icon">📖</span>
-          <span class="nav-label">Timeline</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'classic' }"
-                @click="setView('classic')" title="Classic Cards (Press 6)">
-          <span class="nav-icon">🃏</span>
-          <span class="nav-label">Classic</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'lights' }"
-                @click="setView('lights')" title="Light Control (Press 7)">
-          <span class="nav-icon">💡</span>
-          <span class="nav-label">Lights</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === '3d' }"
-                @click="setView('3d')" title="3D Floor Plan (Press 8)">
-          <span class="nav-icon">🏠</span>
-          <span class="nav-label">3D</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'isometric' }"
-                @click="setView('isometric')" title="Isometric View (Press I)">
-          <span class="nav-icon">🔷</span>
-          <span class="nav-label">Iso</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'config' }"
-                @click="setView('config')" title="Sensor Config (Press 9)">
-          <span class="nav-icon">⚙️</span>
-          <span class="nav-label">Config</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'co2' }"
-                @click="setView('co2')" title="CO2 Monitor (Press 0)">
-          <span class="nav-icon">💨</span>
-          <span class="nav-label">CO2</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'network' }"
-                @click="setView('network')" title="Zigbee Network (Press N)">
-          <span class="nav-icon">📡</span>
-          <span class="nav-label">Network</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'heater' }"
-                @click="setView('heater')" title="Heater Control (Press H)">
-          <span class="nav-icon">🔥</span>
-          <span class="nav-label">Heater</span>
-        </button>
-        <button class="nav-tab" :class="{ active: currentView === 'mailbox' }"
-                @click="setView('mailbox')" title="Mailbox Monitor (Press M)">
-          <span class="nav-icon">📬</span>
-          <span class="nav-label">Mailbox</span>
-        </button>
+      </div>
+
+      <!-- Mobile drawer (full screen menu) -->
+      <div class="nav-mobile-drawer" x-show="mobileMenuOpen" x-transition:enter="drawer-enter"
+           x-transition:leave="drawer-leave" @click.away="mobileMenuOpen = false">
+        <div class="mobile-drawer-content">
+          <template x-for="category in [
+            { id: 'monitor', name: 'Monitor', icon: '📈', views: allViews.filter(v => ['comfort', 'compare', 'timeline', 'co2'].includes(v.id)) },
+            { id: 'visualize', name: 'Visualize', icon: '👁️', views: allViews.filter(v => ['floor', '3d', 'isometric', 'network'].includes(v.id)) },
+            { id: 'control', name: 'Control', icon: '🎛️', views: allViews.filter(v => ['lights', 'heater', 'mailbox'].includes(v.id)) },
+            { id: 'display', name: 'Display', icon: '📺', views: allViews.filter(v => ['ambient', 'classic'].includes(v.id)) },
+            { id: 'settings', name: 'Settings', icon: '⚙️', views: allViews.filter(v => ['config'].includes(v.id)) }
+          ]" :key="category.id">
+            <div class="mobile-group">
+              <div class="mobile-group-header">
+                <span x-text="category.icon"></span>
+                <span x-text="category.name"></span>
+              </div>
+              <template x-for="view in category.views" :key="view.id">
+                <button class="mobile-item"
+                        :class="{ active: currentView === view.id }"
+                        @click="setView(view.id)">
+                  <span class="item-icon" x-text="view.icon"></span>
+                  <span class="item-name" x-text="view.name"></span>
+                  <span class="item-shortcut" x-text="view.key"></span>
+                </button>
+              </template>
+            </div>
+          </template>
+        </div>
       </div>
     </nav>
 
@@ -1250,7 +1263,7 @@
                              :style="'width: ' + getProgressPercent(t) + '%'"></div>
                       </div>
                       <div class="progress-label">
-                        <span x-text="t.runningState === 'heat' ? 'Heating...' : 'At target'"></span>
+                        <span x-text="getProgressLabel(t)"></span>
                         <span x-text="getProgressPercent(t) + '%'"></span>
                       </div>
                     </div>
@@ -2372,7 +2385,10 @@
         },
         clearFilters() { this.filterRoom = ''; this.filterEventType = ''; },
 
-        getDisplayTemp(t) { return t?.localTemp?.toFixed(1) ?? '--'; },
+        getDisplayTemp(t) {
+          const temp = t?.pendingTarget ?? t?.targetTemp;
+          return temp;
+        },
         getHeatingColor(t) {
           if (t?.systemMode === 'off') return 'var(--color-text-tertiary)';
           if (t?.runningState === 'heat') return 'var(--color-danger)';
@@ -2392,10 +2408,15 @@
         },
         getProgressPercent(t) {
           if (!t?.localTemp || !t?.targetTemp) return 0;
-          if (t?.runningState !== 'heat') return 100;
-          const baseTemp = 15;
-          const progress = (t.localTemp - baseTemp) / (t.targetTemp - baseTemp);
-          return Math.min(100, Math.max(0, Math.round(progress * 100)));
+          // Show actual temperature ratio regardless of heating state
+          const progress = (t.localTemp / t.targetTemp) * 100;
+          return Math.min(100, Math.max(0, Math.round(progress)));
+        },
+        getProgressLabel(t) {
+          if (!t?.localTemp || !t?.targetTemp) return 'Unknown';
+          if (t?.runningState === 'heat') return 'Heating...';
+          if (t?.localTemp >= t?.targetTemp - 0.5) return 'At target';
+          return 'Below target';
         },
         getBatteryColor(b) {
           if (b === null) return 'var(--color-text-tertiary)';
@@ -2475,7 +2496,7 @@
     window.mailboxView = function() {
       return {
         // State
-        deviceName: '[Mailbox] Vibration Sensor',
+        deviceName: '[Mailbox] Motion Sensor',
         dateRange: 'today',
         patternMode: 'hourly',
         mailboxEvents: [],
@@ -2536,23 +2557,23 @@
         },
 
         get deliveryEvents() {
-          return this.filteredEvents.filter(e => e.eventType === 'vibration_detected');
+          return this.filteredEvents.filter(e => e.eventType === 'motion_detected');
         },
 
         get lastDelivery() {
-          const deliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+          const deliveries = this.mailboxEvents.filter(e => e.eventType === 'motion_detected');
           return deliveries.length > 0 ? deliveries[0] : null;
         },
 
         get hasMailToday() {
           const todayStart = new Date().setHours(0, 0, 0, 0);
-          return this.mailboxEvents.some(e => e.eventType === 'vibration_detected' && e.time >= todayStart);
+          return this.mailboxEvents.some(e => e.eventType === 'motion_detected' && e.time >= todayStart);
         },
 
         get stats() {
           const todayStart = new Date().setHours(0, 0, 0, 0);
           const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const allDeliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+          const allDeliveries = this.mailboxEvents.filter(e => e.eventType === 'motion_detected');
           const todayDeliveries = allDeliveries.filter(e => e.time >= todayStart);
           const weekDeliveries = allDeliveries.filter(e => e.time >= weekStart);
           const deliveryHours = weekDeliveries.map(e => new Date(e.time).getHours());
@@ -2594,7 +2615,7 @@
         get hourlyPattern() {
           const hours = new Array(24).fill(0);
           const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          this.mailboxEvents.filter(e => e.eventType === 'vibration_detected' && e.time >= weekStart)
+          this.mailboxEvents.filter(e => e.eventType === 'motion_detected' && e.time >= weekStart)
             .forEach(e => hours[new Date(e.time).getHours()]++);
           const max = Math.max(...hours, 1);
           return hours.map((count, hour) => ({
@@ -2607,7 +2628,7 @@
           const days = new Array(7).fill(0);
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
           const monthStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
-          this.mailboxEvents.filter(e => e.eventType === 'vibration_detected' && e.time >= monthStart)
+          this.mailboxEvents.filter(e => e.eventType === 'motion_detected' && e.time >= monthStart)
             .forEach(e => days[new Date(e.time).getDay()]++);
           const max = Math.max(...days, 1);
           return days.map((count, day) => ({
@@ -2655,12 +2676,12 @@
 
         // Event helpers
         getEventIcon(eventType) {
-          const icons = { vibration_detected: '1f4ec', vibration_cleared: '1f4ed', device_online: '1f4e1', device_offline: '26a0' };
+          const icons = { motion_detected: '1f4ec', motion_cleared: '1f4ed', device_online: '1f4e1', device_offline: '26a0' };
           const code = icons[eventType] || '1f4cd';
           return String.fromCodePoint(parseInt(code, 16));
         },
         getEventLabel(eventType) {
-          const labels = { vibration_detected: 'Mail Arrived', vibration_cleared: 'Vibration Stopped', device_online: 'Sensor Online', device_offline: 'Sensor Offline' };
+          const labels = { motion_detected: 'Mail Arrived', motion_cleared: 'Motion Cleared', device_online: 'Sensor Online', device_offline: 'Sensor Offline' };
           return labels[eventType] || eventType;
         },
         getEventClass(eventType) { return eventType.replace(/_/g, '-'); },
@@ -3690,28 +3711,11 @@
           Alpine.store('rooms').loadHistorical();
           Alpine.store('mqtt').connect();
 
-          // Keyboard shortcuts for view switching
-          document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) return;
-            // 'I' key for isometric view
-            if (e.key === 'i' || e.key === 'I') {
-              this.setView('isometric');
-              return;
-            }
-            // '0' key for CO2 view
-            if (e.key === '0') {
-              this.setView('co2');
-              return;
-            }
-            // 'N' key for network view
-            if (e.key === 'n' || e.key === 'N') {
-              this.setView('network');
-              return;
-            }
-            // 1-9 keys for other views
-            if (e.key >= '1' && e.key <= '9') {
-              const views = ['comfort', 'compare', 'floor', 'ambient', 'timeline', 'classic', 'lights', '3d', 'config'];
-              this.setView(views[parseInt(e.key) - 1]);
+          // Keyboard shortcuts are now handled by navigation component (single source)
+          // Listen for view changes from navigation component
+          document.addEventListener('view-changed', (e) => {
+            if (e.detail && e.detail.view) {
+              this.currentView = e.detail.view;
             }
           });
         },
@@ -3727,6 +3731,138 @@
             weekday: 'short', month: 'short', day: 'numeric',
             hour: 'numeric', minute: '2-digit', hour12: true
           });
+        }
+      };
+    }
+
+    // ========================================
+    // NAVIGATION COMPONENT (Grouped with More Dropdown)
+    // ========================================
+    const VIEW_CATEGORIES = [
+      {
+        id: 'monitor', name: 'Monitor', icon: '📈',
+        views: [
+          { id: 'comfort', name: 'Score', icon: '🎯', title: 'Comfort Score', key: '1', primary: true },
+          { id: 'compare', name: 'Compare', icon: '📊', title: 'Room Comparison', key: '2', primary: true },
+          { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
+          { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
+        ]
+      },
+      {
+        id: 'visualize', name: 'Visualize', icon: '👁️',
+        views: [
+          { id: 'floor', name: 'Floor Plan', icon: '🏠', title: '2D Floor Plan', key: '3', primary: true },
+          { id: '3d', name: '3D', icon: '🏗️', title: '3D Floor Plan', key: '4' },
+          { id: 'isometric', name: 'Isometric', icon: '🔷', title: 'Isometric View', key: 'I' },
+          { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
+        ]
+      },
+      {
+        id: 'control', name: 'Control', icon: '🎛️',
+        views: [
+          { id: 'lights', name: 'Lights', icon: '💡', title: 'Light Control', key: '7', primary: true },
+          { id: 'heater', name: 'Heater', icon: '🔥', title: 'Heater Control', key: 'H' },
+          { id: 'mailbox', name: 'Mailbox', icon: '📬', title: 'Mailbox Monitor', key: 'M' }
+        ]
+      },
+      {
+        id: 'display', name: 'Display', icon: '📺',
+        views: [
+          { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6', primary: true },
+          { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', key: '8' }
+        ]
+      },
+      {
+        id: 'settings', name: 'Settings', icon: '⚙️',
+        views: [
+          { id: 'config', name: 'Config', icon: '⚙️', title: 'Sensor Config', key: '9' }
+        ]
+      }
+    ];
+
+    const ALL_VIEWS = VIEW_CATEGORIES.flatMap(cat => cat.views);
+    const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);
+    const OVERFLOW_CATEGORIES = VIEW_CATEGORIES.map(cat => ({
+      ...cat,
+      views: cat.views.filter(v => !v.primary)
+    })).filter(cat => cat.views.length > 0);
+    const KEYBOARD_SHORTCUTS = Object.fromEntries(ALL_VIEWS.map(v => [v.key, v.id]));
+
+    function navigation() {
+      return {
+        moreMenuOpen: false,
+        mobileMenuOpen: false,
+        currentView: 'comfort',
+        primaryViews: PRIMARY_VIEWS,
+        overflowCategories: OVERFLOW_CATEGORIES,
+        allViews: ALL_VIEWS,
+
+        init() {
+          // Restore last view from localStorage
+          const saved = localStorage.getItem('dashboard-view');
+          if (saved && ALL_VIEWS.find(v => v.id === saved)) {
+            this.currentView = saved;
+          }
+
+          // Sync with app component
+          const appEl = document.querySelector('[x-data="app()"]');
+          if (appEl && appEl._x_dataStack && appEl._x_dataStack[0]) {
+            this.currentView = appEl._x_dataStack[0].currentView || this.currentView;
+          }
+          // Keyboard shortcuts handled via @keydown.window Alpine directive
+        },
+
+        handleKeydown(e) {
+          // Ignore if typing in an input
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+          if (e.ctrlKey || e.metaKey) return;
+
+          const key = e.key.toUpperCase();
+          // Letter shortcuts (I, N, H, M)
+          if (KEYBOARD_SHORTCUTS[key]) {
+            e.preventDefault();
+            this.setView(KEYBOARD_SHORTCUTS[key]);
+            return;
+          }
+          // Number shortcuts (1-9, 0)
+          if (KEYBOARD_SHORTCUTS[e.key]) {
+            e.preventDefault();
+            this.setView(KEYBOARD_SHORTCUTS[e.key]);
+            return;
+          }
+        },
+
+        setView(viewId) {
+          if (this.currentView !== viewId) {
+            this.currentView = viewId;
+            localStorage.setItem('dashboard-view', viewId);
+            // Sync with app component
+            const appEl = document.querySelector('[x-data="app()"]');
+            if (appEl && appEl._x_dataStack && appEl._x_dataStack[0]) {
+              appEl._x_dataStack[0].currentView = viewId;
+            }
+          }
+          this.moreMenuOpen = false;
+          this.mobileMenuOpen = false;
+        },
+
+        isActive(viewId) {
+          return this.currentView === viewId;
+        },
+
+        isOverflowActive() {
+          return !PRIMARY_VIEWS.find(v => v.id === this.currentView) &&
+                 ALL_VIEWS.find(v => v.id === this.currentView);
+        },
+
+        toggleMoreMenu() {
+          this.moreMenuOpen = !this.moreMenuOpen;
+          this.mobileMenuOpen = false;
+        },
+
+        toggleMobileMenu() {
+          this.mobileMenuOpen = !this.mobileMenuOpen;
+          this.moreMenuOpen = false;
         }
       };
     }

@@ -24,7 +24,140 @@ export const CONFIG = {
   ],
   staleThreshold: 5 * 60 * 1000,  // 5 minutes
   maxHistoryPoints: 500,
-  historyHours: 6
+  historyHours: 6,
+
+  // Thermostat configuration (SONOFF TRVZB devices)
+  thermostats: [
+    {
+      id: 'study',
+      name: 'Study',
+      icon: '📚',
+      sensor: '[Study] Thermostat',
+      entityId: 'climate.study_thermostat',
+      roomId: 'study',
+      roomSensor: '[Study] Temperature & Humidity'  // Linked room temp sensor
+    },
+    {
+      id: 'living_inner',
+      name: 'Living Inner',
+      icon: '🛋️',
+      sensor: '[Living] Thermostat Inner',
+      entityId: 'climate.living_thermostat_inner',
+      roomId: 'living',
+      roomSensor: '[Living] Temperature & Humidity'
+    },
+    {
+      id: 'living_outer',
+      name: 'Living Outer',
+      icon: '🛋️',
+      sensor: '[Living] Thermostat Outer',
+      entityId: 'climate.living_thermostat_outer',
+      roomId: 'living',
+      roomSensor: '[Living] Temperature & Humidity'
+    },
+    {
+      id: 'bedroom',
+      name: 'Bedroom',
+      icon: '🛏️',
+      sensor: '[Bed] Thermostat',
+      entityId: 'climate.bed_thermostat',
+      roomId: 'bedroom',
+      roomSensor: '[Bed] Temperature & Humidity Sensor'
+    }
+  ]
+};
+
+// Thermostat event types for timeline view
+export const THERMOSTAT_EVENT_TYPES = {
+  // IMPORTANT - Full card display (heating state changes)
+  heating_started: {
+    icon: '🔥',
+    color: '#ef4444',
+    label: 'Heating Started',
+    priority: 'important',
+    category: 'heating'
+  },
+  heating_stopped: {
+    icon: '❄️',
+    color: '#3b82f6',
+    label: 'Heating Stopped',
+    priority: 'important',
+    category: 'heating'
+  },
+  target_reached: {
+    icon: '✅',
+    color: '#22c55e',
+    label: 'Target Reached',
+    priority: 'important',
+    category: 'heating'
+  },
+  device_offline: {
+    icon: '📡',
+    color: '#ef4444',
+    label: 'Device Offline',
+    priority: 'important',
+    category: 'system'
+  },
+  low_battery: {
+    icon: '🔋',
+    color: '#f59e0b',
+    label: 'Low Battery',
+    priority: 'important',
+    category: 'system'
+  },
+
+  // ACTIVITY - Compact line display (user actions)
+  setpoint_changed: {
+    icon: '🎯',
+    color: '#f59e0b',
+    label: 'Setpoint Changed',
+    priority: 'activity',
+    category: 'control'
+  },
+  mode_changed: {
+    icon: '⚙️',
+    color: '#8b5cf6',
+    label: 'Mode Changed',
+    priority: 'activity',
+    category: 'control'
+  },
+  child_lock_changed: {
+    icon: '🔒',
+    color: '#6366f1',
+    label: 'Child Lock Changed',
+    priority: 'activity',
+    category: 'control'
+  },
+  window_detected: {
+    icon: '🪟',
+    color: '#06b6d4',
+    label: 'Window Detected',
+    priority: 'activity',
+    category: 'system'
+  },
+
+  // BACKGROUND - Collapsed display (routine events)
+  device_online: {
+    icon: '📡',
+    color: '#22c55e',
+    label: 'Device Online',
+    priority: 'background',
+    category: 'system'
+  },
+  battery_ok: {
+    icon: '🔋',
+    color: '#22c55e',
+    label: 'Battery OK',
+    priority: 'background',
+    category: 'system'
+  },
+  calibration_changed: {
+    icon: '🔧',
+    color: '#94a3b8',
+    label: 'Calibration Changed',
+    priority: 'background',
+    category: 'control'
+  }
 };
 
 // Floor plan configuration for 3D view - exact apartment dimensions
@@ -82,6 +215,79 @@ export const HUMIDITY_COLORS = [
   { value: 70, color: 0x90CAF9 },  // Humid
   { value: 85, color: 0x5C6BC0 }   // Very humid
 ];
+
+// ========================================
+// VIEW CATEGORIES (Navigation)
+// Single source of truth for all dashboard views
+// ========================================
+export const VIEW_CATEGORIES = [
+  {
+    id: 'monitor',
+    name: 'Monitor',
+    icon: '📈',
+    views: [
+      { id: 'comfort', name: 'Score', icon: '🎯', title: 'Comfort Score', key: '1', primary: true },
+      { id: 'compare', name: 'Compare', icon: '📊', title: 'Room Comparison', key: '2', primary: true },
+      { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
+      { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
+    ]
+  },
+  {
+    id: 'visualize',
+    name: 'Visualize',
+    icon: '👁️',
+    views: [
+      { id: 'floor', name: 'Floor Plan', icon: '🏠', title: '2D Floor Plan', key: '3', primary: true },
+      { id: '3d', name: '3D', icon: '🏗️', title: '3D Floor Plan', key: '4' },
+      { id: 'isometric', name: 'Isometric', icon: '🔷', title: 'Isometric View', key: 'I' },
+      { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
+    ]
+  },
+  {
+    id: 'control',
+    name: 'Control',
+    icon: '🎛️',
+    views: [
+      { id: 'lights', name: 'Lights', icon: '💡', title: 'Light Control', key: '7', primary: true },
+      { id: 'heater', name: 'Heater', icon: '🔥', title: 'Heater Control', key: 'H' },
+      { id: 'mailbox', name: 'Mailbox', icon: '📬', title: 'Mailbox Monitor', key: 'M' }
+    ]
+  },
+  {
+    id: 'display',
+    name: 'Display',
+    icon: '📺',
+    views: [
+      { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6', primary: true },
+      { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', key: '8' }
+    ]
+  },
+  {
+    id: 'settings',
+    name: 'Settings',
+    icon: '⚙️',
+    views: [
+      { id: 'config', name: 'Config', icon: '⚙️', title: 'Sensor Config', key: '9' }
+    ]
+  }
+];
+
+// Flat list of all views for lookups
+export const ALL_VIEWS = VIEW_CATEGORIES.flatMap(cat => cat.views);
+
+// Primary views shown in main nav bar
+export const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);
+
+// Overflow views shown in "More" dropdown (non-primary, grouped by category)
+export const OVERFLOW_CATEGORIES = VIEW_CATEGORIES.map(cat => ({
+  ...cat,
+  views: cat.views.filter(v => !v.primary)
+})).filter(cat => cat.views.length > 0);
+
+// Keyboard shortcut map
+export const KEYBOARD_SHORTCUTS = Object.fromEntries(
+  ALL_VIEWS.map(v => [v.key, v.id])
+);
 
 // Sensor visual properties for 3D config view
 export const SENSOR_VISUALS = {

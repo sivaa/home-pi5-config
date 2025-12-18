@@ -97,34 +97,11 @@ window.app = function() {
       Alpine.store('rooms').loadHistorical();
       Alpine.store('mqtt').connect();
 
-      // Keyboard shortcuts for view switching (1-9, 0 for CO2, I for Isometric, N for Network)
-      document.addEventListener('keydown', (e) => {
-        // 'I' key for isometric view
-        if ((e.key === 'i' || e.key === 'I') && !e.ctrlKey && !e.metaKey) {
-          this.setView('isometric');
-          return;
-        }
-        // 'N' key for network view
-        if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey) {
-          this.setView('network');
-          return;
-        }
-        // 'H' key for heater view
-        if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey) {
-          this.setView('heater');
-          return;
-        }
-        // 'M' key for mailbox view
-        if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey) {
-          this.setView('mailbox');
-          return;
-        }
-        if ((e.key >= '1' && e.key <= '9' || e.key === '0') && !e.ctrlKey && !e.metaKey) {
-          const views = ['comfort', 'compare', 'floor', '3d', 'ambient', 'timeline', 'classic', 'lights', 'config', 'co2'];
-          const index = e.key === '0' ? 9 : parseInt(e.key) - 1;
-          if (index < views.length) {
-            this.setView(views[index]);
-          }
+      // Keyboard shortcuts are now handled by navigation component (single source)
+      // Listen for view changes from navigation component
+      document.addEventListener('view-changed', (e) => {
+        if (e.detail && e.detail.view) {
+          this.currentView = e.detail.view;
         }
       });
 
