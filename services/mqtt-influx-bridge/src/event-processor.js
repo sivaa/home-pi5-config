@@ -245,6 +245,11 @@ export class EventProcessor {
    * Get device type from payload
    */
   getDeviceType(payload) {
+    // Thermostat detection (check first - most specific)
+    if (payload.running_state !== undefined) return 'thermostat';
+    if (payload.occupied_heating_setpoint !== undefined) return 'thermostat';
+    if (payload.system_mode !== undefined && payload.local_temperature !== undefined) return 'thermostat';
+
     if (payload.occupancy !== undefined) return 'motion';
     if (payload.contact !== undefined) return 'contact';
     if (payload.vibration !== undefined) return 'vibration';

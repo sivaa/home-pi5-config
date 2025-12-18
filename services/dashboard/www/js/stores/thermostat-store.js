@@ -62,7 +62,10 @@ export function initThermostatStore(Alpine, CONFIG) {
     // INITIALIZATION
     // ============================================
 
-    init() {
+    async init() {
+      // Load historical events from InfluxDB first
+      await this.loadHistoricalEvents(24);
+
       const mqtt = Alpine.store('mqtt');
       if (!mqtt?.client) {
         console.log('[thermostat-store] MQTT not ready, retrying...');
@@ -103,6 +106,83 @@ export function initThermostatStore(Alpine, CONFIG) {
 
       this.initializing = false;
       console.log('[thermostat-store] Initialization complete');
+    },
+
+    // ============================================
+    // HISTORICAL DATA FROM INFLUXDB
+    // ============================================
+
+    async loadHistoricalEvents(hours = 24) {
+      try {
+        console.log(`[thermostat-store] Loading ${hours}h of historical events from InfluxDB...`);
+
+        // Query InfluxDB for thermostat events
+        const query = `SELECT * FROM zigbee_events WHERE device_type = 'thermostat' AND time > now() - ${hours}h ORDER BY time DESC LIMIT 200`;
+        const url = `http://pi:8086/query?db=homeassistant&q=${encodeURIComponent(query)}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.warn('[thermostat-store] InfluxDB query failed:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        // Parse InfluxDB response
+        if (!data.results?.[0]?.series?.[0]) {
+          console.log('[thermostat-store] No historical events found');
+          return;
+        }
+
+        const series = data.results[0].series[0];
+        const columns = series.columns;
+        const values = series.values;
+
+        // Map column indices
+        const colIdx = {};
+        columns.forEach((col, i) => colIdx[col] = i);
+
+        // Convert to our event format
+        const historicalEvents = values.map(row => {
+          const deviceName = row[colIdx.device_name];
+          const eventType = row[colIdx.event_type];
+          const time = new Date(row[colIdx.time]).getTime();
+          const state = row[colIdx.state];
+          const room = row[colIdx.room];
+
+          // Find matching thermostat config
+          const thermostat = CONFIG.thermostats.find(t => t.sensor === deviceName);
+
+          // Normalize event type (mode_changed_heat -> mode_changed)
+          let normalizedType = eventType;
+          if (eventType?.startsWith('mode_changed_')) {
+            normalizedType = 'mode_changed';
+          }
+
+          return {
+            deviceId: thermostat?.id || room,
+            deviceName: thermostat?.name || deviceName,
+            deviceIcon: thermostat?.icon || '🌡️',
+            roomId: thermostat?.roomId || room,
+            eventType: normalizedType,
+            time: time,
+            state: state,
+            info: THERMOSTAT_EVENT_TYPES[normalizedType] || {
+              icon: '📝',
+              color: '#94a3b8',
+              label: eventType,
+              priority: 'activity'
+            }
+          };
+        });
+
+        // Add historical events to the store (they're already sorted DESC)
+        this.events = historicalEvents;
+        console.log(`[thermostat-store] Loaded ${historicalEvents.length} historical events`);
+
+      } catch (err) {
+        console.warn('[thermostat-store] Failed to load historical events:', err.message);
+      }
     },
 
     // ============================================

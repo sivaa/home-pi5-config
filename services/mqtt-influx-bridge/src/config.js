@@ -19,7 +19,7 @@ export const DEVICE_ROOMS = {
   '[Bath] Temperature & Humidity 11': 'bathroom',
 
   // Special sensors
-  '[Mailbox] Vibration Sensor': 'mailbox',
+  '[Mailbox] Motion Sensor': 'mailbox',
   'CO2': 'living',
   'Motion Detector': 'unknown',
   'Contact Sensor 1': 'unknown',
@@ -27,21 +27,29 @@ export const DEVICE_ROOMS = {
 
   // Remotes
   '[Study] Light Remote': 'study',
-  '[Living] Light Remote': 'living'
+  '[Living] Light Remote': 'living',
+
+  // Thermostats (SONOFF TRVZB)
+  '[Study] Thermostat': 'study',
+  '[Living] Thermostat Inner': 'living',
+  '[Living] Thermostat Outer': 'living',
+  '[Bed] Thermostat': 'bedroom'
 };
 
 // Device type detection based on payload properties
 export const DEVICE_TYPE_DETECTORS = {
   occupancy: 'motion',
   contact: 'contact',
-  vibration: 'vibration',
   co2: 'co2',
   state: 'switch',  // Could be light or plug
   brightness: 'light',
   color_temp: 'light',
   temperature: 'climate',
   humidity: 'climate',
-  action: 'remote'
+  action: 'remote',
+  running_state: 'thermostat',
+  occupied_heating_setpoint: 'thermostat',
+  system_mode: 'thermostat'
 };
 
 // Event type mappings
@@ -58,12 +66,6 @@ export const EVENT_MAPPINGS = {
     deviceType: 'contact'
   },
 
-  // Vibration sensor (mailbox)
-  vibration: {
-    getEvent: (value) => value ? 'vibration_detected' : 'vibration_cleared',
-    deviceType: 'vibration'
-  },
-
   // CO2 sensor - only log significant changes
   co2: {
     getEvent: () => 'co2_reading',
@@ -75,6 +77,25 @@ export const EVENT_MAPPINGS = {
   air_quality: {
     getEvent: (value) => `air_quality_${value}`,
     deviceType: 'co2'
+  },
+
+  // Thermostat - heating state (most important)
+  running_state: {
+    getEvent: (value) => value === 'heat' ? 'heating_started' : 'heating_stopped',
+    deviceType: 'thermostat'
+  },
+
+  // Thermostat - setpoint changes
+  occupied_heating_setpoint: {
+    getEvent: () => 'setpoint_changed',
+    deviceType: 'thermostat',
+    minChange: 0.5  // Only log if setpoint changes by 0.5°C or more
+  },
+
+  // Thermostat - mode changes (heat/off)
+  system_mode: {
+    getEvent: (value) => `mode_changed_${value}`,
+    deviceType: 'thermostat'
   }
 };
 
@@ -92,12 +113,12 @@ export const IGNORED_TOPICS = [
 export const DEBOUNCE_MS = {
   motion: 5000,      // 5 seconds between motion events
   contact: 1000,     // 1 second between door events
-  vibration: 3000,   // 3 seconds between vibration events
   co2: 60000,        // 1 minute between CO2 readings
   climate: 60000,    // 1 minute between temp/humidity readings
   light: 500,        // 500ms between light events
   plug: 500,         // 500ms between plug events
-  remote: 100        // 100ms between remote button presses
+  remote: 100,       // 100ms between remote button presses
+  thermostat: 1000   // 1 second between thermostat events
 };
 
 // Environment config

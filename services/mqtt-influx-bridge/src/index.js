@@ -149,8 +149,6 @@ function getEventIcon(eventType) {
     motion_cleared: '👁️ ',
     door_opened: '🚪',
     door_closed: '🚪',
-    vibration_detected: '📬',
-    vibration_cleared: '📬',
     light_on: '💡',
     light_off: '💡',
     plug_on: '🔌',
@@ -163,7 +161,13 @@ function getEventIcon(eventType) {
     device_offline: '📡',
     remote_toggle: '🎮',
     remote_brightness_up_click: '🎮',
-    remote_brightness_down_click: '🎮'
+    remote_brightness_down_click: '🎮',
+    // Thermostat events
+    heating_started: '🔥',
+    heating_stopped: '❄️',
+    setpoint_changed: '🎯',
+    mode_changed_heat: '🔥',
+    mode_changed_off: '⛔'
   };
   return icons[eventType] || '📍';
 }
