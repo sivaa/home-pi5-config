@@ -4,15 +4,76 @@
    ======================================== */
 
 .thermostat-view {
-  padding: var(--space-lg);
-  max-width: 1200px;
-  margin: 0 auto;
+  padding: var(--space-md);
 }
 
 /* ========================================
-   HEADER
+   COMPACT HEADER (Single Line)
    ======================================== */
 
+.thermostat-compact-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.thermostat-compact-header h2 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.compact-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.compact-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.compact-stat.heating { color: var(--color-danger); }
+.compact-stat.idle { color: var(--color-primary); }
+.compact-stat.cycles { color: var(--color-text-secondary); }
+.compact-stat.offline { color: var(--color-warning); }
+
+.compact-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.tab-btn-sm {
+  padding: 6px 14px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--color-text-secondary);
+}
+
+.tab-btn-sm:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.tab-btn-sm.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+/* Legacy header styles (kept for compatibility) */
 .thermostat-header {
   text-align: center;
   margin-bottom: var(--space-lg);
@@ -49,7 +110,7 @@
 }
 
 /* ========================================
-   TAB NAVIGATION
+   TAB NAVIGATION (Legacy)
    ======================================== */
 
 .thermostat-tabs {
@@ -125,7 +186,7 @@
 
 .thermostats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-lg);
   margin-bottom: var(--space-xl);
 }
@@ -133,16 +194,123 @@
 .thermostat-card {
   background: var(--color-surface);
   border-radius: var(--radius-xl);
-  padding: var(--space-lg);
+  padding: var(--space-xl) var(--space-lg);
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-normal);
   border: 2px solid transparent;
   position: relative;
+  min-height: 320px;
 }
 
 .thermostat-card.heating {
   border-color: var(--color-danger);
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);
+  animation: warmGlow 2s ease-in-out infinite;
+  overflow: hidden;
+}
+
+/* Heating card warm glow pulsing animation */
+@keyframes warmGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2),
+                0 0 40px rgba(249, 115, 22, 0.1),
+                inset 0 0 30px rgba(239, 68, 68, 0.03);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(239, 68, 68, 0.4),
+                0 0 60px rgba(249, 115, 22, 0.25),
+                inset 0 0 50px rgba(239, 68, 68, 0.06);
+  }
+}
+
+/* Rising ember particles - Layer 1: Large, slow, high */
+.thermostat-card.heating::before {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 5%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ff6b00;
+  box-shadow:
+    25px 0 0 3px #ff8c00,
+    70px 2px 0 2px #ffa500,
+    120px -1px 0 4px #ff6b00,
+    175px 1px 0 3px #ff8c00,
+    230px 0 0 2px #ffa500;
+  animation: riseSlow 4s ease-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Layer 2: Medium, medium speed, medium height */
+.thermostat-card.heating::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: 10%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffa500;
+  box-shadow:
+    15px 1px 0 2px #ff6b00,
+    45px -1px 0 3px #ff8c00,
+    85px 2px 0 2px #ffa500,
+    130px 0 0 2px #ff6b00,
+    180px -2px 0 3px #ff8c00,
+    225px 1px 0 2px #ffa500;
+  animation: riseMedium 2.8s ease-out infinite 0.5s;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Layer 3: Small, fast, low - using box-shadow on the card */
+.thermostat-card.heating {
+  --ember-shadow:
+    inset 20px -10px 0 1px rgba(255, 107, 0, 0.8),
+    inset 55px -8px 0 2px rgba(255, 140, 0, 0.7),
+    inset 95px -12px 0 1px rgba(255, 165, 0, 0.8),
+    inset 140px -6px 0 2px rgba(255, 107, 0, 0.7),
+    inset 185px -10px 0 1px rgba(255, 140, 0, 0.8),
+    inset 235px -8px 0 2px rgba(255, 165, 0, 0.7),
+    inset 280px -11px 0 1px rgba(255, 107, 0, 0.8);
+}
+
+/* Slow rise - large particles, high */
+@keyframes riseSlow {
+  0% {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+}
+
+/* Medium rise */
+@keyframes riseMedium {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-70px);
+    opacity: 0;
+  }
+}
+
+/* Fast rise - small particles, low */
+@keyframes riseFast {
+  0% {
+    transform: translateY(0);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-45px);
+    opacity: 0;
+  }
 }
 
 .thermostat-card.off {
@@ -360,7 +528,7 @@
 .slider-value {
   font-weight: var(--font-weight-bold);
   color: var(--color-primary);
-  font-size: var(--font-size-lg);
+  font-size: 28px;
 }
 
 .slider-range-labels {
@@ -1066,6 +1234,12 @@
 /* ========================================
    RESPONSIVE
    ======================================== */
+
+@media (max-width: 1200px) {
+  .thermostats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
 @media (max-width: 768px) {
   .thermostat-view {
