@@ -1,6 +1,6 @@
 # Google Home Integration & External Access
 
-> **Last Updated:** December 17, 2025
+> **Last Updated:** December 19, 2025
 > **Status:** Active
 > **Purpose:** Voice control via Google Home/Nest speakers
 
@@ -103,6 +103,57 @@
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## TTS Announcements (Automations)
+
+Home Assistant announces events via Google Home speakers using Text-to-Speech.
+
+### Google Home Speakers
+
+| Speaker | Entity ID | Location |
+|---------|-----------|----------|
+| Kitchen Display | `media_player.kitchen_display` | Kitchen |
+| Broken Display | `media_player.broken_display` | Living Room |
+| Bedroom Clock | `media_player.master_bedroom_clock` | Bedroom |
+
+### Active Automations
+
+| Automation | Trigger | Message | Quiet Hours |
+|------------|---------|---------|-------------|
+| Mailbox Motion | PIR sensor detects motion | "Mailbox opened" | 23:00-06:00 |
+| CO2 High Alert | CO2 > 1200 ppm | "Please ventilate..." | 23:00-06:00 |
+| CO2 Critical | CO2 > 1600 ppm | "Warning! CO2 very high..." | 23:00-06:00 |
+| CO2 Good | CO2 < 500 ppm | "Air quality good..." | 23:00-06:00 |
+| Bath Window Open | Window open > 10 min | "Window open for X min" | None |
+| Bed Window Open | Window open > 10 min | "Window open for X min" | None |
+
+### Entity References
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  MAILBOX SENSORS                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  PIR Motion Sensor (SONOFF SNZB-03P)                                        │
+│  └─ Entity: binary_sensor.motion_detector_occupancy                         │
+│  └─ MQTT Topic: zigbee2mqtt/[Mailbox] Motion Sensor                        │
+│  └─ Friendly Name: [Mailbox] Motion Sensor                                  │
+│                                                                             │
+│  NOTE: Entity keeps old name "motion_detector" even though device was      │
+│        renamed to "[Mailbox] Motion Sensor" in zigbee2mqtt.                │
+│        Home Assistant preserves entity IDs to avoid breaking automations.  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration
+
+**File:** `configs/homeassistant/automations.yaml`
+
+All mailbox-related automations have:
+- **Quiet Hours:** 23:00-06:00 (Europe/Berlin timezone)
+- **Cooldown:** 30 seconds between announcements
+- **Speakers:** All 3 Google Home devices
 
 ---
 
