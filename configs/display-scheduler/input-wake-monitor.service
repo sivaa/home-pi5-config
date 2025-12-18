@@ -1,0 +1,13 @@
+[Unit]
+Description=Input Wake Monitor (touch/mouse/keyboard wake during night mode)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/input-wake-monitor.sh
+# WAYLAND_DISPLAY inherited from user session
+
+Restart=on-failure
+RestartSec=5
+
+# NOT in [Install] - started/stopped by display-scheduler.sh

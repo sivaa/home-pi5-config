@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** December 12, 2025
+> **Last Updated:** December 17, 2025
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -62,6 +62,7 @@
 | 7 | [Dashboard & InfluxDB](docs/07-dashboard-influxdb.md) | Custom dashboard InfluxDB integration |
 | 8 | [Google Home Integration](docs/08-google-home-integration.md) | Voice control via Google Assistant |
 | 9 | [Router Maintenance](docs/09-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
+| 10 | [Display Scheduling](docs/10-display-scheduling.md) | Auto off at 22:00, on at 06:00, 5-min night idle |
 
 ---
 
@@ -89,6 +90,7 @@
 | `homeassistant/configuration.yaml` | Home Assistant config | `/opt/homeassistant/` |
 | `homeassistant/SERVICE_ACCOUNT.json` | GCP credentials (gitignored) | `/opt/homeassistant/` |
 | `cloudflared/config.yml` | Cloudflare tunnel config | `/etc/cloudflared/` |
+| `display-scheduler/*` | Display power management | `~/.config/systemd/user/` + `~/.local/bin/` |
 
 ### Sensitive Files (Not in Git)
 
@@ -179,6 +181,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-17 | Added display scheduler: auto-off 22:00, auto-on 06:00, 5-min night idle |
 | 2025-12-17 | Added automated daily router reboot at 4 AM (prevents WiFi degradation) |
 | 2025-12-13 | Added CO2 Monitor dashboard view (view #10) with gauge, history chart, ambient mode |
 | 2025-12-13 | Fixed dashboard history modal - InfluxDB queries & entity ID mapping |
@@ -200,10 +203,15 @@ pi-setup/
 ├── README.md              <- You are here (main index)
 ├── CLAUDE.md              <- Instructions for AI assistants
 ├── configs/
-│   └── zigbee2mqtt/       <- Source of truth for Pi configs
-│       ├── docker-compose.yml
-│       ├── configuration.yaml
-│       └── mosquitto.conf
+│   ├── zigbee2mqtt/       <- Source of truth for Pi configs
+│   │   ├── docker-compose.yml
+│   │   ├── configuration.yaml
+│   │   └── mosquitto.conf
+│   └── display-scheduler/ <- Display power scheduling
+│       ├── display-scheduler.sh
+│       ├── display-on.timer
+│       ├── display-off.timer
+│       └── *.service files
 ├── docs/
 │   ├── 01-nvme-boot-setup.md
 │   ├── 02-sd-card-storage.md
@@ -213,7 +221,8 @@ pi-setup/
 │   ├── 06-wifi-troubleshooting.md
 │   ├── 07-dashboard-influxdb.md
 │   ├── 08-google-home-integration.md
-│   └── 09-router-maintenance.md
+│   ├── 09-router-maintenance.md
+│   └── 10-display-scheduling.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)

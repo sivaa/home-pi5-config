@@ -1,0 +1,11 @@
+[Unit]
+Description=Display Scheduler - Turn OFF (Night Mode)
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/display-scheduler.sh off
+# WAYLAND_DISPLAY inherited from user session (wayland-0)
+
+# No restart - timer handles scheduling
+Restart=no

@@ -1,0 +1,11 @@
+[Unit]
+Description=Display Scheduler - Turn ON (Day Mode)
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/display-scheduler.sh on
+# WAYLAND_DISPLAY inherited from user session (wayland-0)
+
+# No restart - timer handles scheduling
+Restart=no

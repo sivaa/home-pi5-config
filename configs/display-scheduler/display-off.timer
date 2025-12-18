@@ -1,0 +1,15 @@
+[Unit]
+Description=Display OFF at 22:00 (Night Mode)
+
+[Timer]
+# Every day at 10 PM
+OnCalendar=*-*-* 22:00:00
+
+# If Pi was off at 10 PM, run when it boots
+Persistent=true
+
+# Allow up to 1 minute flexibility
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

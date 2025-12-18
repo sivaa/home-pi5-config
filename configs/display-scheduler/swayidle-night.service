@@ -1,0 +1,18 @@
+[Unit]
+Description=Night Mode Idle Monitor (5-min display timeout)
+After=graphical-session.target
+
+[Service]
+Type=simple
+# WAYLAND_DISPLAY inherited from user session (wayland-0)
+
+# After 5 minutes (300s) of idle, turn display off
+# Resume handler wakes display on any input
+ExecStart=/usr/bin/swayidle -w \
+    timeout 300 'wlopm --off HDMI-A-1' \
+    resume 'wlopm --on HDMI-A-1'
+
+Restart=on-failure
+RestartSec=5
+
+# NOT in [Install] - started/stopped by display-scheduler.sh
