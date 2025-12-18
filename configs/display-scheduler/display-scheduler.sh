@@ -91,6 +91,24 @@ cmd_off() {
     log "INFO" "Display is now OFF (wake-on-input enabled, 5-min idle timeout)"
 }
 
+# Boot-time check: determine correct mode based on current hour
+cmd_boot_check() {
+    local hour
+    hour="$(date +%H)"
+
+    log "INFO" "BOOT CHECK: Current hour is $hour"
+
+    # Night mode: 22:00 (22) to 05:59 (05)
+    # Day mode: 06:00 (06) to 21:59 (21)
+    if [ "$hour" -ge 22 ] || [ "$hour" -lt 6 ]; then
+        log "INFO" "BOOT CHECK: In night hours (22:00-06:00) → activating night mode"
+        cmd_off
+    else
+        log "INFO" "BOOT CHECK: In day hours (06:00-22:00) → ensuring day mode"
+        cmd_on
+    fi
+}
+
 # Show current status
 cmd_status() {
     local output
@@ -135,13 +153,17 @@ case "${1:-status}" in
     status)
         cmd_status
         ;;
+    boot-check)
+        cmd_boot_check
+        ;;
     *)
-        echo "Usage: $0 {on|off|status}"
+        echo "Usage: $0 {on|off|status|boot-check}"
         echo ""
         echo "Commands:"
-        echo "  on      Turn display on, disable idle timeout (day mode)"
-        echo "  off     Turn display off, enable 5-min idle timeout (night mode)"
-        echo "  status  Show current display and scheduler status"
+        echo "  on          Turn display on, disable idle timeout (day mode)"
+        echo "  off         Turn display off, enable 5-min idle timeout (night mode)"
+        echo "  status      Show current display and scheduler status"
+        echo "  boot-check  Check current hour and activate appropriate mode"
         exit 1
         ;;
 esac

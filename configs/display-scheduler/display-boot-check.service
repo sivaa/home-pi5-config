@@ -1,0 +1,17 @@
+[Unit]
+Description=Display Mode Boot Check (set day/night mode based on current time)
+# Run after default.target (graphical-session.target not used on Pi OS)
+After=default.target
+
+[Service]
+Type=oneshot
+# Delay to ensure labwc is fully initialized and WAYLAND_DISPLAY is available
+ExecStartPre=/bin/sleep 10
+# Set WAYLAND_DISPLAY since user services don't inherit it automatically
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=%h/.local/bin/display-scheduler.sh boot-check
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

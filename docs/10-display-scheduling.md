@@ -49,7 +49,8 @@ systemd user timers control display power via `wlopm` (Wayland output power mana
 
 | Component | Purpose |
 |-----------|---------|
-| `display-scheduler.sh` | Main control script (on/off/status) |
+| `display-scheduler.sh` | Main control script (on/off/status/boot-check) |
+| `display-boot-check.service` | **Boot-time mode detection** (runs on startup) |
 | `display-on.timer` | Fires at 06:00 daily |
 | `display-off.timer` | Fires at 22:00 daily |
 | `swayidle-night.service` | 5-min idle timeout (night mode only) |
@@ -70,8 +71,9 @@ systemd user timers control display power via `wlopm` (Wayland output power mana
 
 ```
 configs/display-scheduler/
-├── display-scheduler.sh        # Main control script
+├── display-scheduler.sh        # Main control script (on/off/status/boot-check)
 ├── input-wake-monitor.sh       # Touch/input detection script
+├── display-boot-check.service  # Boot-time mode detection
 ├── display-on.service          # Day mode activation
 ├── display-on.timer            # Fires at 06:00
 ├── display-off.service         # Night mode activation
@@ -88,6 +90,7 @@ configs/display-scheduler/
 └── input-wake-monitor.sh
 
 ~/.config/systemd/user/
+├── display-boot-check.service   # Runs on every boot
 ├── display-on.service
 ├── display-on.timer
 ├── display-off.service
@@ -114,7 +117,7 @@ ssh pi@pi
 chmod +x ~/.local/bin/display-scheduler.sh ~/.local/bin/input-wake-monitor.sh
 loginctl enable-linger pi
 systemctl --user daemon-reload
-systemctl --user enable display-on.timer display-off.timer
+systemctl --user enable display-on.timer display-off.timer display-boot-check.service
 systemctl --user start display-on.timer display-off.timer
 ```
 
@@ -158,6 +161,25 @@ ssh pi@pi "journalctl --user -u display-off.service -n 10"
 ---
 
 ## How It Works
+
+### Boot-Time Mode Detection
+
+```
+Pi boots (any time)
+        │
+        ▼
+display-boot-check.service runs
+(after graphical-session.target + 5s delay)
+        │
+        ▼
+Check current hour
+        │
+        ├──▶ If 22:00-05:59 → Run cmd_off (night mode)
+        │
+        └──▶ If 06:00-21:59 → Run cmd_on (day mode)
+```
+
+This ensures the Pi enters the correct mode after any reboot, regardless of what time it happens.
 
 ### Day → Night Transition (22:00)
 
