@@ -5,7 +5,7 @@
 
 # -----------------------------------------------------------------------------
 # MAILBOX MOTION ALERT
-# Trigger: Motion detected at mailbox
+# Trigger: Motion detected at mailbox (PIR sensor)
 # Action: TTS announcement on ALL Google Home devices
 # Quiet Hours: 23:00 - 06:00 (no announcements)
 # Cooldown: 30 seconds (prevents spam from continuous motion)
@@ -230,54 +230,6 @@
               minutes: 1
 
 # -----------------------------------------------------------------------------
-# MAILBOX VIBRATION ALERT
-# Trigger: Vibration detected OR attribute update (fires even on on→on)
-# Action: TTS announcement on ALL Google Home devices
-# Quiet Hours: 23:00 - 06:00 (no announcements)
-# Cooldown: 30 seconds
-# -----------------------------------------------------------------------------
-- id: mailbox_vibration_alert
-  alias: "Mailbox Vibration Alert"
-  description: "Announces when mailbox vibration is detected"
-  mode: single
-
-  trigger:
-    # State trigger - fires on any state change to "on"
-    - platform: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
-      to: "on"
-    # Also trigger on any attribute change when state is "on"
-    - platform: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
-      attribute: last_seen
-
-  condition:
-    # Must be in vibration state
-    - condition: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
-      state: "on"
-    # Quiet hours: no announcements between 23:00 and 06:00
-    - condition: time
-      after: "06:00:00"
-      before: "23:00:00"
-    # 30-second cooldown to prevent spam
-    - condition: template
-      value_template: >
-        {{ (now() - state_attr('automation.mailbox_vibration_alert', 'last_triggered')).total_seconds() > 30
-           if state_attr('automation.mailbox_vibration_alert', 'last_triggered') is not none
-           else true }}
-
-  action:
-    - service: tts.google_translate_say
-      data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
-        message: "You've got mail! Mailbox vibration detected."
-        language: "en"
-
-# -----------------------------------------------------------------------------
 # MAILBOX SENSOR ONLINE ALERT
 # Trigger: Sensor becomes available (comes back online)
 # Action: TTS announcement on ALL Google Home devices
@@ -285,16 +237,16 @@
 # -----------------------------------------------------------------------------
 - id: mailbox_sensor_online
   alias: "Mailbox Sensor Online"
-  description: "Announces when mailbox sensor comes back online"
+  description: "Announces when mailbox motion sensor comes back online"
   mode: single
 
   trigger:
     # Trigger when sensor availability changes to online
     - platform: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      entity_id: binary_sensor.motion_detector_occupancy
       from: "unavailable"
     - platform: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_vibration
+      entity_id: binary_sensor.motion_detector_occupancy
       from: "unknown"
 
   condition:
@@ -311,43 +263,4 @@
           - media_player.broken_display
           - media_player.master_bedroom_clock
         message: "Mailbox sensor is now online."
-        language: "en"
-
-# -----------------------------------------------------------------------------
-# MAILBOX OPENED ALERT
-# Trigger: Mailbox lid opened (contact sensor)
-# Action: TTS announcement on ALL Google Home devices
-# Quiet Hours: 23:00 - 06:00 (no announcements)
-# Cooldown: 30 seconds
-# -----------------------------------------------------------------------------
-- id: mailbox_opened_alert
-  alias: "Mailbox Opened Alert"
-  description: "Announces when mailbox is opened"
-  mode: single
-
-  trigger:
-    - platform: state
-      entity_id: binary_sensor.mailbox_vibration_sensor_contact
-      to: "on"
-
-  condition:
-    # Quiet hours: no announcements between 23:00 and 06:00
-    - condition: time
-      after: "06:00:00"
-      before: "23:00:00"
-    # 30-second cooldown
-    - condition: template
-      value_template: >
-        {{ (now() - state_attr('automation.mailbox_opened_alert', 'last_triggered')).total_seconds() > 30
-           if state_attr('automation.mailbox_opened_alert', 'last_triggered') is not none
-           else true }}
-
-  action:
-    - service: tts.google_translate_say
-      data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
-        message: "Mailbox has been opened."
         language: "en"
