@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Pi reboot for unattended reliability
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

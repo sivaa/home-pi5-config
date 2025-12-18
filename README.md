@@ -64,6 +64,7 @@
 | 9 | [Router Maintenance](docs/09-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
 | 10 | [Display Scheduling](docs/10-display-scheduling.md) | Auto off at 22:00, on at 06:00, 5-min night idle |
 | 11 | [On-Screen Keyboard](docs/11-onscreen-keyboard.md) | Tablet-like touch keyboard (squeekboard) |
+| 12 | [Pi Maintenance](docs/12-pi-maintenance.md) | Daily 4:30 AM reboot for unattended reliability |
 
 ---
 
@@ -182,6 +183,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-18 | Added daily Pi reboot at 4:30 AM for unattended reliability |
 | 2025-12-18 | Enabled on-screen keyboard (squeekboard) for tablet-like touch input |
 | 2025-12-17 | Added display scheduler: auto-off 22:00, auto-on 06:00, 5-min night idle |
 | 2025-12-17 | Added automated daily router reboot at 4 AM (prevents WiFi degradation) |
@@ -209,11 +211,14 @@ pi-setup/
 │   │   ├── docker-compose.yml
 │   │   ├── configuration.yaml
 │   │   └── mosquitto.conf
-│   └── display-scheduler/ <- Display power scheduling
-│       ├── display-scheduler.sh
-│       ├── display-on.timer
-│       ├── display-off.timer
-│       └── *.service files
+│   ├── display-scheduler/ <- Display power scheduling
+│   │   ├── display-scheduler.sh
+│   │   ├── display-on.timer
+│   │   ├── display-off.timer
+│   │   └── *.service files
+│   └── pi-reboot/         <- Daily Pi reboot (4:30 AM)
+│       ├── daily-reboot.timer
+│       └── daily-reboot.service
 ├── docs/
 │   ├── 01-nvme-boot-setup.md
 │   ├── 02-sd-card-storage.md
@@ -225,7 +230,8 @@ pi-setup/
 │   ├── 08-google-home-integration.md
 │   ├── 09-router-maintenance.md
 │   ├── 10-display-scheduling.md
-│   └── 11-onscreen-keyboard.md
+│   ├── 11-onscreen-keyboard.md
+│   └── 12-pi-maintenance.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
