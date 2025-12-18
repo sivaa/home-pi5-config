@@ -21,7 +21,10 @@ const THERMOSTAT_EVENT_TYPES = {
   // BACKGROUND (collapsed)
   device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background', category: 'system' },
   battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background', category: 'system' },
-  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' }
+  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' },
+
+  // INITIAL STATE (activity level - shows on first connect)
+  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' }
 };
 
 // Use global CONFIG defined in index.html
@@ -197,7 +200,9 @@ export function thermostatView() {
     // ============================================
 
     getDisplayTemp(thermostat) {
-      return this.$store.thermostats.getDisplayTemp(thermostat);
+      // Return pending target (optimistic) or actual target temp
+      const temp = thermostat?.pendingTarget ?? thermostat?.targetTemp;
+      return temp;
     },
 
     getHeatingColor(thermostat) {
@@ -222,12 +227,18 @@ export function thermostatView() {
 
     getProgressPercent(thermostat) {
       if (!thermostat.localTemp || !thermostat.targetTemp) return 0;
-      if (thermostat.runningState !== 'heat') return 100;
+      // Show actual temperature ratio regardless of heating state
+      const progress = (thermostat.localTemp / thermostat.targetTemp) * 100;
+      return Math.min(100, Math.max(0, Math.round(progress)));
+    },
 
-      // Progress from base temp (15) to target
-      const baseTemp = 15;
-      const progress = (thermostat.localTemp - baseTemp) / (thermostat.targetTemp - baseTemp);
-      return Math.min(100, Math.max(0, Math.round(progress * 100)));
+    getProgressLabel(thermostat) {
+      if (!thermostat?.localTemp || !thermostat?.targetTemp) return 'Unknown';
+      if (thermostat?.runningState === 'heat') return 'Heating...';
+      // Check if within 0.5° of target (either direction)
+      if (Math.abs(thermostat.localTemp - thermostat.targetTemp) <= 0.5) return 'At target';
+      if (thermostat.localTemp > thermostat.targetTemp) return 'Above target';
+      return 'Below target';
     },
 
     getBatteryColor(battery) {

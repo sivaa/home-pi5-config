@@ -346,6 +346,154 @@
   border-color: var(--color-primary);
 }
 
+/* Temperature Slider */
+.temp-slider-container {
+  margin-bottom: var(--space-md);
+  padding: 0 var(--space-xs);
+}
+
+.slider-value-display {
+  text-align: center;
+  margin-bottom: var(--space-xs);
+}
+
+.slider-value {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+}
+
+.slider-range-labels {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 4px;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.slider-min,
+.slider-max {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
+}
+
+/* ========================================
+   TROUBLESHOOTING INFO
+   ======================================== */
+
+.thermostat-troubleshoot {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-xs);
+}
+
+.troubleshoot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 4px 0;
+}
+
+.troubleshoot-row:first-child {
+  padding-top: 0;
+}
+
+.troubleshoot-row:last-child {
+  padding-bottom: 0;
+}
+
+.troubleshoot-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.troubleshoot-label {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.troubleshoot-value {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.temp-slider {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+}
+
+.temp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: grab;
+  border: 3px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.temp-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.temp-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.temp-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: grab;
+  border: 3px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.temp-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.temp-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+  background: var(--color-text-tertiary);
+}
+
+/* Heating card slider has orange/red thumb */
+.thermostat-card.heating .temp-slider::-webkit-slider-thumb {
+  background: var(--color-danger) !important;
+}
+
+.thermostat-card.heating .temp-slider::-moz-range-thumb {
+  background: var(--color-danger) !important;
+}
+
+.thermostat-card.heating .slider-value {
+  color: var(--color-danger);
+}
+
+/* Above target - show warning color */
+.thermostat-card .progress-fill.above-target {
+  background: var(--color-warning);
+}
+
 /* Mode Buttons */
 .mode-buttons {
   display: flex;

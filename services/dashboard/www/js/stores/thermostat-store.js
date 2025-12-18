@@ -21,7 +21,10 @@ const THERMOSTAT_EVENT_TYPES = {
   // BACKGROUND (collapsed)
   device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background', category: 'system' },
   battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background', category: 'system' },
-  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' }
+  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' },
+
+  // INITIAL STATE (activity level - shows on first connect)
+  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' }
 };
 
 export function initThermostatStore(Alpine, CONFIG) {
@@ -53,6 +56,7 @@ export function initThermostatStore(Alpine, CONFIG) {
     events: [],                  // Recent events for timeline
     maxEvents: 200,
     initializing: true,
+    firstMessageReceived: {},    // Track which devices have recorded initial state
 
     // ============================================
     // INITIALIZATION
@@ -174,16 +178,35 @@ export function initThermostatStore(Alpine, CONFIG) {
       thermostat.syncing = false;
       this.initializing = false;
 
-      // Detect and log events
+      // Record initial state on first message from this device
+      if (!this.firstMessageReceived[thermostat.id]) {
+        this.firstMessageReceived[thermostat.id] = true;
+        this.addEvent({
+          deviceId: thermostat.id,
+          deviceName: thermostat.name,
+          deviceIcon: thermostat.icon,
+          roomId: thermostat.roomId,
+          eventType: 'initial_state',
+          time: Date.now(),
+          currentTemp: thermostat.localTemp,
+          targetTemp: thermostat.targetTemp,
+          runningState: thermostat.runningState,
+          systemMode: thermostat.systemMode,
+          battery: thermostat.battery
+        });
+        console.log(`[thermostat-store] Initial state recorded for ${thermostat.name}`);
+      }
+
+      // Detect and log state changes
       this.detectEvents(thermostat, prevState);
     },
 
-    updateAvailability(topic, data) {
+    updateAvailability(topic, isOnline) {
       const thermostat = this.list.find(t => t.sensor === topic);
       if (!thermostat) return;
 
       const wasAvailable = thermostat.available;
-      thermostat.available = data.state === 'online';
+      thermostat.available = isOnline;  // Direct boolean assignment
 
       // Log availability change
       if (wasAvailable !== thermostat.available) {

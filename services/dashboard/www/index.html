@@ -193,113 +193,75 @@
 <body>
   <div class="app-container" x-data="app()" x-init="init()">
 
-    <!-- Header -->
-    <header class="app-header">
+    <!-- Unified Header with Navigation -->
+    <header class="app-header" x-data="navigation()" x-init="init()"
+            @keydown.window="handleKeydown($event)"
+            @keydown.escape.window="moreMenuOpen = false">
       <div class="header-content">
-        <div class="header-left">
-          <h1 class="header-title">Home Climate</h1>
+        <!-- Left: Logo + Status + Nav -->
+        <div class="header-nav">
+          <span class="header-logo">🏠</span>
           <div class="status-badge"
                :class="{ 'disconnected': !$store.mqtt.connected && !$store.mqtt.connecting, 'connecting': $store.mqtt.connecting }">
             <span class="loading-indicator loading-sm" x-show="$store.mqtt.connecting"></span>
             <span class="status-dot-header" x-show="!$store.mqtt.connecting" :class="{ 'connected': $store.mqtt.connected }"></span>
             <span x-text="$store.mqtt.connecting ? 'Connecting' : ($store.mqtt.connected ? 'Live' : 'Offline')"></span>
           </div>
+
+          <!-- Navigation tabs -->
+          <div class="nav-primary">
+            <template x-for="view in primaryViews" :key="view.id">
+              <button class="nav-tab"
+                      :class="{ active: currentView === view.id }"
+                      @click="setView(view.id)"
+                      :title="view.title + ' (' + view.key + ')'">
+                <span class="nav-icon" x-text="view.icon"></span>
+                <span class="nav-label" x-text="view.name"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- More dropdown -->
+          <div class="nav-more">
+            <button class="nav-tab nav-more-trigger"
+                    :class="{ active: isOverflowActive() }"
+                    @click="toggleMoreMenu()"
+                    title="More views">
+              <span class="nav-icon">•••</span>
+              <span class="nav-label">More</span>
+              <span class="nav-chevron" :class="{ 'open': moreMenuOpen }">▼</span>
+            </button>
+
+            <div class="nav-dropdown" x-show="moreMenuOpen" x-transition:enter="dropdown-enter"
+                 x-transition:leave="dropdown-leave" @click.away="moreMenuOpen = false">
+              <template x-for="category in overflowCategories" :key="category.id">
+                <div class="nav-dropdown-group">
+                  <div class="nav-dropdown-header">
+                    <span x-text="category.icon"></span>
+                    <span x-text="category.name"></span>
+                  </div>
+                  <template x-for="view in category.views" :key="view.id">
+                    <button class="nav-dropdown-item"
+                            :class="{ active: currentView === view.id }"
+                            @click="setView(view.id)">
+                      <span class="item-icon" x-text="view.icon"></span>
+                      <span class="item-name" x-text="view.name"></span>
+                      <span class="item-shortcut" x-text="view.key"></span>
+                    </button>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
+
+        <!-- Right: Date/Time -->
         <div class="header-right">
           <div class="date-time" x-text="currentDateTime"></div>
           <div class="last-update" x-text="'Last update: ' + lastUpdateText"></div>
         </div>
       </div>
     </header>
-
-    <!-- Navigation Menu (Grouped with More Dropdown) -->
-    <nav class="nav-container" x-data="navigation()" x-init="init()"
-         @keydown.window="handleKeydown($event)"
-         @keydown.escape.window="moreMenuOpen = false; mobileMenuOpen = false">
-      <div class="nav-wrapper">
-        <!-- Primary tabs (5 most used views) -->
-        <div class="nav-primary">
-          <template x-for="view in primaryViews" :key="view.id">
-            <button class="nav-tab"
-                    :class="{ active: currentView === view.id }"
-                    @click="setView(view.id)"
-                    :title="view.title + ' (' + view.key + ')'">
-              <span class="nav-icon" x-text="view.icon"></span>
-              <span class="nav-label" x-text="view.name"></span>
-            </button>
-          </template>
-        </div>
-
-        <!-- More dropdown (overflow views grouped by category) -->
-        <div class="nav-more">
-          <button class="nav-tab nav-more-trigger"
-                  :class="{ active: isOverflowActive() }"
-                  @click="toggleMoreMenu()"
-                  title="More views">
-            <span class="nav-icon">•••</span>
-            <span class="nav-label">More</span>
-            <span class="nav-chevron" :class="{ 'open': moreMenuOpen }">▼</span>
-          </button>
-
-          <!-- Dropdown menu -->
-          <div class="nav-dropdown" x-show="moreMenuOpen" x-transition:enter="dropdown-enter"
-               x-transition:leave="dropdown-leave" @click.away="moreMenuOpen = false">
-            <template x-for="category in overflowCategories" :key="category.id">
-              <div class="nav-dropdown-group">
-                <div class="nav-dropdown-header">
-                  <span x-text="category.icon"></span>
-                  <span x-text="category.name"></span>
-                </div>
-                <template x-for="view in category.views" :key="view.id">
-                  <button class="nav-dropdown-item"
-                          :class="{ active: currentView === view.id }"
-                          @click="setView(view.id)">
-                    <span class="item-icon" x-text="view.icon"></span>
-                    <span class="item-name" x-text="view.name"></span>
-                    <span class="item-shortcut" x-text="view.key"></span>
-                  </button>
-                </template>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <!-- Mobile hamburger trigger -->
-        <button class="nav-mobile-trigger" @click="toggleMobileMenu()" title="Menu">
-          <span x-text="mobileMenuOpen ? '✕' : '☰'"></span>
-        </button>
-      </div>
-
-      <!-- Mobile drawer (full screen menu) -->
-      <div class="nav-mobile-drawer" x-show="mobileMenuOpen" x-transition:enter="drawer-enter"
-           x-transition:leave="drawer-leave" @click.away="mobileMenuOpen = false">
-        <div class="mobile-drawer-content">
-          <template x-for="category in [
-            { id: 'monitor', name: 'Monitor', icon: '📈', views: allViews.filter(v => ['comfort', 'compare', 'timeline', 'co2'].includes(v.id)) },
-            { id: 'visualize', name: 'Visualize', icon: '👁️', views: allViews.filter(v => ['floor', '3d', 'isometric', 'network'].includes(v.id)) },
-            { id: 'control', name: 'Control', icon: '🎛️', views: allViews.filter(v => ['lights', 'heater', 'mailbox'].includes(v.id)) },
-            { id: 'display', name: 'Display', icon: '📺', views: allViews.filter(v => ['ambient', 'classic'].includes(v.id)) },
-            { id: 'settings', name: 'Settings', icon: '⚙️', views: allViews.filter(v => ['config'].includes(v.id)) }
-          ]" :key="category.id">
-            <div class="mobile-group">
-              <div class="mobile-group-header">
-                <span x-text="category.icon"></span>
-                <span x-text="category.name"></span>
-              </div>
-              <template x-for="view in category.views" :key="view.id">
-                <button class="mobile-item"
-                        :class="{ active: currentView === view.id }"
-                        @click="setView(view.id)">
-                  <span class="item-icon" x-text="view.icon"></span>
-                  <span class="item-name" x-text="view.name"></span>
-                  <span class="item-shortcut" x-text="view.key"></span>
-                </button>
-              </template>
-            </div>
-          </template>
-        </div>
-      </div>
-    </nav>
 
     <!-- Main Content -->
     <main class="app-main">
@@ -791,45 +753,104 @@
           </div>
         </div>
 
-        <!-- Vision 6: Classic Cards View -->
+        <!-- Vision 6: Classic Cards View - Multi-Sensor -->
         <div x-show="currentView === 'classic'" x-cloak x-data="classicView()">
           <div class="classic-view">
             <!-- Room Grid -->
             <div class="classic-grid">
               <template x-for="room in rooms" :key="room.id">
-                <div class="classic-card" :class="{ 'stale': isStale(room) }" @click="openRoom(room)">
-                  <div class="classic-comfort" :class="getComfortClass(room.temperature)"></div>
+                <div class="classic-card-v2"
+                     :class="{
+                       'has-warning': getRoomBatteryStatus(room).status === 'low',
+                       'has-co2': getCO2Sensor(room)
+                     }">
 
-                  <div class="classic-header">
-                    <div class="classic-room-info">
-                      <div class="classic-icon" x-text="room.icon"></div>
-                      <div class="classic-name" x-text="room.name"></div>
-                    </div>
-                    <div class="classic-updated" x-text="formatUpdate(room.lastSeen)"></div>
-                  </div>
+                  <!-- Comfort indicator strip -->
+                  <div class="classic-comfort-strip" :class="getComfortClass(room.avgTemperature || room.temperature)"></div>
 
-                  <div class="classic-values">
-                    <div class="classic-temp">
-                      <template x-if="room.temperature !== null">
-                        <span><span x-text="room.temperature.toFixed(1)"></span><span class="unit">°</span></span>
-                      </template>
-                      <template x-if="room.temperature === null">
-                        <span class="no-data">--</span>
-                      </template>
+                  <!-- Card Header -->
+                  <div class="classic-header-v2">
+                    <div class="room-title">
+                      <span class="room-icon" x-text="room.icon"></span>
+                      <span class="room-name" x-text="room.name"></span>
                     </div>
-                    <div class="classic-humidity">
-                      <span class="humidity-icon">💧</span>
-                      <template x-if="room.humidity !== null">
-                        <span x-text="room.humidity.toFixed(0) + '%'"></span>
+                    <div class="room-avg">
+                      <template x-if="room.avgTemperature !== null">
+                        <span class="avg-temp" x-text="room.avgTemperature.toFixed(1) + '°'"></span>
                       </template>
-                      <template x-if="room.humidity === null">
-                        <span>--%</span>
+                      <template x-if="room.avgTemperature === null && room.temperature !== null">
+                        <span class="avg-temp" x-text="room.temperature.toFixed(1) + '°'"></span>
+                      </template>
+                      <template x-if="room.avgTemperature === null && room.temperature === null">
+                        <span class="avg-temp no-data">--°</span>
                       </template>
                     </div>
                   </div>
 
+                  <!-- Sensor List -->
+                  <div class="sensor-list">
+                    <template x-for="sensor in getRoomSensors(room)" :key="sensor.name">
+                      <div class="sensor-row" :class="{ 'stale': isSensorStale(sensor), 'no-data': sensor.temperature === null && sensor.co2 === null }">
+                        <!-- Sensor Icon -->
+                        <span class="sensor-icon" x-text="getSensorIcon(sensor)"></span>
+
+                        <!-- Sensor Label -->
+                        <span class="sensor-label" x-text="sensor.label"></span>
+
+                        <!-- Climate Sensor Values -->
+                        <template x-if="sensor.type === 'climate'">
+                          <div class="sensor-values">
+                            <template x-if="sensor.temperature !== null">
+                              <span class="sensor-temp" x-text="sensor.temperature.toFixed(1) + '°'"></span>
+                            </template>
+                            <template x-if="sensor.temperature === null">
+                              <span class="sensor-temp no-data">--°</span>
+                            </template>
+                            <template x-if="sensor.humidity !== null">
+                              <span class="sensor-humid">💧<span x-text="sensor.humidity.toFixed(0) + '%'"></span></span>
+                            </template>
+                          </div>
+                        </template>
+
+                        <!-- CO2 Sensor Values -->
+                        <template x-if="sensor.type === 'co2'">
+                          <div class="sensor-values">
+                            <template x-if="sensor.co2 !== null">
+                              <span class="sensor-co2" :style="{ color: getCO2StatusColor(sensor.co2) }">
+                                <span x-text="sensor.co2"></span> ppm
+                              </span>
+                            </template>
+                            <template x-if="sensor.co2 === null">
+                              <span class="sensor-co2 no-data">-- ppm</span>
+                            </template>
+                          </div>
+                        </template>
+
+                        <!-- Status Dot -->
+                        <span class="sensor-status" :class="{ 'fresh': !isSensorStale(sensor) && (sensor.temperature !== null || sensor.co2 !== null), 'stale': isSensorStale(sensor) || (sensor.temperature === null && sensor.co2 === null) }"></span>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Sparkline -->
                   <div class="classic-sparkline">
                     <svg :id="'classic-spark-' + room.id" class="sparkline-svg" preserveAspectRatio="none"></svg>
+                  </div>
+
+                  <!-- Card Footer -->
+                  <div class="card-footer-v2">
+                    <template x-if="getRoomBatteryStatus(room).message">
+                      <span class="battery-status" :class="getRoomBatteryStatus(room).status">
+                        <span x-text="getRoomBatteryStatus(room).icon"></span>
+                        <span x-text="getRoomBatteryStatus(room).message"></span>
+                      </span>
+                    </template>
+                    <template x-if="formatSpread(room)">
+                      <span class="temp-spread">
+                        Spread: <span x-text="formatSpread(room)"></span>
+                      </span>
+                    </template>
+                    <button class="detail-btn" @click.stop="openRoom(room)">Details</button>
                   </div>
                 </div>
               </template>
@@ -1250,9 +1271,6 @@
                         <span x-text="formatTemp(t.localTemp)"></span>
                         <span class="unit">°C</span>
                       </div>
-                      <div class="target-temp">
-                        Target: <span class="target-value" x-text="formatTemp(getDisplayTemp(t)) + '°C'"></span>
-                      </div>
                     </div>
 
                     <!-- Progress Bar -->
@@ -1268,15 +1286,22 @@
                       </div>
                     </div>
 
-                    <!-- Temperature Controls -->
-                    <div class="temp-controls">
-                      <button class="temp-btn" @click="adjustTemp(t.id, -0.5)" :disabled="!t.available || t.syncing">-</button>
-                      <input type="number" class="temp-input"
-                             :value="getDisplayTemp(t)"
+                    <!-- Temperature Slider -->
+                    <div class="temp-slider-container" x-data="{ sliderValue: getDisplayTemp(t) || 17 }">
+                      <div class="slider-value-display">
+                        <span class="slider-value" x-text="sliderValue + '°C'"></span>
+                      </div>
+                      <input type="range" class="temp-slider"
+                             :value="getDisplayTemp(t) || 17"
+                             x-effect="sliderValue = getDisplayTemp(t) || sliderValue"
+                             @input="sliderValue = $event.target.value"
                              @change="setTargetTemp(t.id, $event.target.value)"
                              :disabled="!t.available || t.syncing"
                              min="5" max="30" step="0.5">
-                      <button class="temp-btn" @click="adjustTemp(t.id, 0.5)" :disabled="!t.available || t.syncing">+</button>
+                      <div class="slider-range-labels">
+                        <span class="slider-min">5°C</span>
+                        <span class="slider-max">30°C</span>
+                      </div>
                     </div>
 
                     <!-- Mode Buttons -->
@@ -1293,6 +1318,20 @@
                               :disabled="!t.available || t.syncing">
                         Off
                       </button>
+                    </div>
+
+                    <!-- Troubleshooting Info -->
+                    <div class="thermostat-troubleshoot">
+                      <div class="troubleshoot-row">
+                        <span class="troubleshoot-icon">🕐</span>
+                        <span class="troubleshoot-label">Last:</span>
+                        <span class="troubleshoot-value" x-text="getLastStateChange(t)"></span>
+                      </div>
+                      <div class="troubleshoot-row">
+                        <span class="troubleshoot-icon">⏱️</span>
+                        <span class="troubleshoot-label">Today:</span>
+                        <span class="troubleshoot-value" x-text="getTodayStats(t)"></span>
+                      </div>
                     </div>
 
                     <!-- Card Meta -->
@@ -2415,7 +2454,9 @@
         getProgressLabel(t) {
           if (!t?.localTemp || !t?.targetTemp) return 'Unknown';
           if (t?.runningState === 'heat') return 'Heating...';
-          if (t?.localTemp >= t?.targetTemp - 0.5) return 'At target';
+          // Check if within 0.5° of target (either direction)
+          if (Math.abs(t.localTemp - t.targetTemp) <= 0.5) return 'At target';
+          if (t.localTemp > t.targetTemp) return 'Above target';
           return 'Below target';
         },
         getBatteryColor(b) {
@@ -2426,6 +2467,22 @@
         },
         getBatteryIcon(b) { return b === null || b < 20 ? '🪫' : '🔋'; },
         formatTemp(temp) { return temp?.toFixed(1) ?? '--'; },
+
+        // Troubleshooting helpers
+        getLastStateChange(t) {
+          const events = this.$store.thermostats?.events || [];
+          const lastEvent = events.find(e =>
+            e.deviceId === t.id &&
+            (e.eventType === 'heating_started' || e.eventType === 'heating_stopped')
+          );
+          if (!lastEvent) return 'No data';
+          const action = lastEvent.eventType === 'heating_started' ? 'Started' : 'Stopped';
+          return `${action} ${this.formatRelativeTime(lastEvent.time)}`;
+        },
+        getTodayStats(t) {
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24) || { heatingCycles: 0, heatingMinutes: 0 };
+          return `${stats.heatingCycles} cycles, ${this.formatDuration(stats.heatingMinutes)}`;
+        },
         formatTime(ts) {
           const date = new Date(ts);
           const now = new Date();
@@ -3166,10 +3223,16 @@
     // ========================================
     // CONFIGURATION
     // ========================================
+    // Detect local dev (localhost) vs Pi deployment
+    const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const CONFIG = {
-      mqttUrl: 'ws://' + window.location.hostname + ':9001',
+      mqttUrl: isLocalDev
+        ? 'ws://pi:9001'  // Local dev → connect to Pi's MQTT
+        : 'ws://' + window.location.hostname + ':9001',
       baseTopic: 'zigbee2mqtt',
-      influxUrl: '/api/influx',
+      influxUrl: isLocalDev
+        ? 'http://pi:8086'  // Local dev → connect to Pi's InfluxDB
+        : '/api/influx',
       influxDb: 'homeassistant',
       rooms: [
         { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity' },
