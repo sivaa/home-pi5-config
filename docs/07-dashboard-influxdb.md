@@ -224,12 +224,121 @@ If no data appears at all, Home Assistant MQTT integration may be missing:
 
 ---
 
+## Dashboard Views & Navigation
+
+The dashboard features **14 different views** organized into a clean navigation system.
+
+### Navigation Layout
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  🎯 Score │ 📊 Compare │ 🏠 Floor Plan │ 💡 Lights │ 🌡️ Ambient │ ••• More ▼│
+└───────────────────────────────────────────────────────────────────────────┘
+                                                                    │
+                                                    ┌───────────────┴───────────────┐
+                                                    │ 📈 MONITOR                    │
+                                                    │    📖 Timeline (5)            │
+                                                    │    💨 CO2 (0)                 │
+                                                    │ 👁️ VISUALIZE                  │
+                                                    │    🏗️ 3D (4)                  │
+                                                    │    🔷 Isometric (I)           │
+                                                    │    📡 Network (N)             │
+                                                    │ 🎛️ CONTROL                    │
+                                                    │    🔥 Heater (H)              │
+                                                    │    📬 Mailbox (M)             │
+                                                    │ 📺 DISPLAY                    │
+                                                    │    🃏 Classic (8)             │
+                                                    │ ⚙️ SETTINGS                   │
+                                                    │    ⚙️ Config (9)              │
+                                                    └───────────────────────────────┘
+```
+
+### All Views & Keyboard Shortcuts
+
+| Key | View | Category | Description |
+|-----|------|----------|-------------|
+| `1` | 🎯 Score | Monitor | Overall comfort score with room breakdown |
+| `2` | 📊 Compare | Monitor | Side-by-side room comparison bars |
+| `3` | 🏠 Floor Plan | Visualize | 2D SVG floor plan with temp overlay |
+| `4` | 🏗️ 3D | Visualize | Three.js 3D floor plan |
+| `5` | 📖 Timeline | Monitor | Event timeline (heating, setpoints, etc.) |
+| `6` | 🌡️ Ambient | Display | Minimal ambient display mode |
+| `7` | 💡 Lights | Control | IKEA FLOALT light controls |
+| `8` | 🃏 Classic | Display | Traditional card-based layout |
+| `9` | ⚙️ Config | Settings | Sensor position configuration |
+| `0` | 💨 CO2 | Monitor | CO2 monitoring with alerts |
+| `I` | 🔷 Isometric | Visualize | Isometric 3D view |
+| `N` | 📡 Network | Visualize | Zigbee network topology |
+| `H` | 🔥 Heater | Control | Thermostat controls (SONOFF TRVZB) |
+| `M` | 📬 Mailbox | Control | Mailbox vibration sensor monitor |
+
+### View Configuration
+
+Views are defined in `www/js/config.js`:
+
+```javascript
+export const VIEW_CATEGORIES = [
+  {
+    id: 'monitor',
+    name: 'Monitor',
+    icon: '📈',
+    views: [
+      { id: 'comfort', name: 'Score', icon: '🎯', key: '1', primary: true },
+      { id: 'compare', name: 'Compare', icon: '📊', key: '2', primary: true },
+      { id: 'timeline', name: 'Timeline', icon: '📖', key: '5' },
+      { id: 'co2', name: 'CO2', icon: '💨', key: '0' }
+    ]
+  },
+  // ... other categories
+];
+
+// Derived exports
+export const ALL_VIEWS = VIEW_CATEGORIES.flatMap(cat => cat.views);
+export const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);
+export const KEYBOARD_SHORTCUTS = Object.fromEntries(ALL_VIEWS.map(v => [v.key, v.id]));
+```
+
+### Adding a New View
+
+1. Add view definition to `VIEW_CATEGORIES` in `www/js/config.js`
+2. Create view component in `www/views/your-view.js`
+3. Import and register in `www/js/app.js`
+4. Add HTML template section in `www/index.html`
+5. (Optional) Add view-specific CSS in `www/styles/views/`
+
+---
+
+## Pi Display Requirements
+
+### Emoji Fonts
+
+The dashboard uses emojis extensively. Install emoji fonts on the Pi:
+
+```bash
+sudo apt-get install fonts-noto-color-emoji
+fc-cache -fv
+```
+
+### File Permissions
+
+Ensure nginx can read all dashboard files:
+
+```bash
+# Fix permissions if CSS/JS doesn't load
+find /opt/dashboard/www -type f -exec chmod 644 {} \;
+find /opt/dashboard/www -type d -exec chmod 755 {} \;
+```
+
+---
+
 ## Version History
 
 | Date | Change |
 |------|--------|
+| 2024-12-18 | Added navigation UX overhaul with grouped dropdown menu |
+| 2024-12-18 | Documented Pi display requirements (emoji fonts, permissions) |
 | 2024-12-13 | Initial documentation - fixed InfluxDB queries and entity ID mapping |
 
 ---
 
-*Last updated: December 13, 2024*
+*Last updated: December 18, 2024*
