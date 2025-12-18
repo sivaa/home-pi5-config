@@ -27,6 +27,8 @@
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/isometric.css">
   <link rel="stylesheet" href="styles/views/network.css">
+  <link rel="stylesheet" href="styles/views/thermostat.css">
+  <link rel="stylesheet" href="styles/views/mailbox.css">
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -272,6 +274,16 @@
                 @click="setView('network')" title="Zigbee Network (Press N)">
           <span class="nav-icon">📡</span>
           <span class="nav-label">Network</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'heater' }"
+                @click="setView('heater')" title="Heater Control (Press H)">
+          <span class="nav-icon">🔥</span>
+          <span class="nav-label">Heater</span>
+        </button>
+        <button class="nav-tab" :class="{ active: currentView === 'mailbox' }"
+                @click="setView('mailbox')" title="Mailbox Monitor (Press M)">
+          <span class="nav-icon">📬</span>
+          <span class="nav-label">Mailbox</span>
         </button>
       </div>
     </nav>
@@ -1133,6 +1145,383 @@
           </div>
         </div>
 
+        <!-- Vision 10: Heater Control -->
+        <div x-show="currentView === 'heater'" x-cloak x-data="thermostatView()">
+          <div class="thermostat-view">
+            <!-- Header -->
+            <div class="thermostat-header">
+              <h2>Heater Control</h2>
+              <p class="thermostat-subtitle">
+                <span class="subtitle-stat stat-heating">
+                  <span x-text="activeHeatingCount"></span> heating
+                </span>
+                <span>|</span>
+                <span class="subtitle-stat stat-cycles">
+                  <span x-text="stats.heatingCycles"></span> cycles today
+                </span>
+              </p>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="thermostat-tabs">
+              <button class="tab-btn" :class="{ active: activeTab === 'overview' }" @click="setTab('overview')">Overview</button>
+              <button class="tab-btn" :class="{ active: activeTab === 'timeline' }" @click="setTab('timeline')">Timeline</button>
+              <button class="tab-btn" :class="{ active: activeTab === 'trends' }" @click="setTab('trends')">Trends</button>
+              <button class="tab-btn" :class="{ active: activeTab === 'efficiency' }" @click="setTab('efficiency')">Efficiency</button>
+            </div>
+
+            <!-- ========================================
+                 OVERVIEW TAB
+                 ======================================== -->
+            <div x-show="activeTab === 'overview'">
+              <!-- Summary Card -->
+              <div class="summary-card">
+                <div class="summary-item">
+                  <span class="summary-icon">🔥</span>
+                  <span class="summary-value" x-text="activeHeatingCount"></span>
+                  <span class="summary-label">heating</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-icon">❄️</span>
+                  <span class="summary-value" x-text="thermostats.length - activeHeatingCount"></span>
+                  <span class="summary-label">idle</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-icon">📊</span>
+                  <span class="summary-value" x-text="stats.heatingCycles"></span>
+                  <span class="summary-label">cycles</span>
+                </div>
+                <div class="summary-item" x-show="offlineCount > 0">
+                  <span class="summary-icon">📡</span>
+                  <span class="summary-value" x-text="offlineCount"></span>
+                  <span class="summary-label">offline</span>
+                </div>
+              </div>
+
+              <!-- Thermostat Cards Grid -->
+              <div class="thermostats-grid">
+                <template x-for="t in thermostats" :key="t.id">
+                  <div class="thermostat-card"
+                       :class="{
+                         heating: t.runningState === 'heat' && t.systemMode !== 'off',
+                         off: t.systemMode === 'off',
+                         unavailable: !t.available,
+                         syncing: t.syncing
+                       }">
+
+                    <!-- Card Header -->
+                    <div class="thermostat-card-header">
+                      <div class="thermostat-info">
+                        <span class="thermostat-icon" x-text="t.icon"></span>
+                        <div>
+                          <div class="thermostat-name" x-text="t.name"></div>
+                          <div class="thermostat-room" x-text="t.roomId"></div>
+                        </div>
+                      </div>
+                      <div class="status-badge"
+                           :class="{
+                             heating: t.runningState === 'heat' && t.systemMode !== 'off',
+                             idle: t.runningState !== 'heat' && t.systemMode !== 'off' && t.available,
+                             off: t.systemMode === 'off',
+                             offline: !t.available
+                           }">
+                        <span class="status-icon" :class="{ 'heating-glow': t.runningState === 'heat' }"
+                              x-text="getStatusIcon(t)"></span>
+                        <span x-text="getStatusText(t)"></span>
+                      </div>
+                    </div>
+
+                    <!-- Temperature Display -->
+                    <div class="temp-display">
+                      <div class="current-temp">
+                        <span x-text="formatTemp(t.localTemp)"></span>
+                        <span class="unit">°C</span>
+                      </div>
+                      <div class="target-temp">
+                        Target: <span class="target-value" x-text="formatTemp(getDisplayTemp(t)) + '°C'"></span>
+                      </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="progress-container">
+                      <div class="progress-bar">
+                        <div class="progress-fill"
+                             :class="{ heating: t.runningState === 'heat', idle: t.runningState !== 'heat' }"
+                             :style="'width: ' + getProgressPercent(t) + '%'"></div>
+                      </div>
+                      <div class="progress-label">
+                        <span x-text="t.runningState === 'heat' ? 'Heating...' : 'At target'"></span>
+                        <span x-text="getProgressPercent(t) + '%'"></span>
+                      </div>
+                    </div>
+
+                    <!-- Temperature Controls -->
+                    <div class="temp-controls">
+                      <button class="temp-btn" @click="adjustTemp(t.id, -0.5)" :disabled="!t.available || t.syncing">-</button>
+                      <input type="number" class="temp-input"
+                             :value="getDisplayTemp(t)"
+                             @change="setTargetTemp(t.id, $event.target.value)"
+                             :disabled="!t.available || t.syncing"
+                             min="5" max="30" step="0.5">
+                      <button class="temp-btn" @click="adjustTemp(t.id, 0.5)" :disabled="!t.available || t.syncing">+</button>
+                    </div>
+
+                    <!-- Mode Buttons -->
+                    <div class="mode-buttons">
+                      <button class="mode-btn heat"
+                              :class="{ active: t.systemMode === 'heat' }"
+                              @click="setMode(t.id, 'heat')"
+                              :disabled="!t.available || t.syncing">
+                        Heat
+                      </button>
+                      <button class="mode-btn off"
+                              :class="{ active: t.systemMode === 'off' }"
+                              @click="setMode(t.id, 'off')"
+                              :disabled="!t.available || t.syncing">
+                        Off
+                      </button>
+                    </div>
+
+                    <!-- Card Meta -->
+                    <div class="thermostat-meta">
+                      <div class="meta-item" :class="{ 'low-battery': t.battery !== null && t.battery < 20 }">
+                        <span x-text="getBatteryIcon(t.battery)"></span>
+                        <span x-text="t.battery !== null ? t.battery + '%' : '--'"></span>
+                      </div>
+                      <div class="meta-item">
+                        <span>📶</span>
+                        <span x-text="t.linkquality !== null ? t.linkquality : '--'"></span>
+                      </div>
+                      <div class="meta-item" :class="{ offline: !t.available }">
+                        <span x-text="t.available ? '✓' : '✗'"></span>
+                        <span x-text="t.available ? 'Online' : 'Offline'"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- ========================================
+                 TIMELINE TAB
+                 ======================================== -->
+            <div x-show="activeTab === 'timeline'">
+              <!-- Filters -->
+              <div class="timeline-filters">
+                <div class="filter-group">
+                  <select class="filter-select" x-model="filterRoom">
+                    <option value="">All Rooms</option>
+                    <template x-for="room in uniqueRooms" :key="room">
+                      <option :value="room" x-text="room"></option>
+                    </template>
+                  </select>
+                  <select class="filter-select" x-model="filterEventType">
+                    <option value="">All Events</option>
+                    <template x-for="type in uniqueEventTypes" :key="type">
+                      <option :value="type" x-text="getEventInfo(type).label"></option>
+                    </template>
+                  </select>
+                </div>
+                <div class="filter-group">
+                  <button class="filter-btn" @click="clearFilters()">Clear Filters</button>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div class="events-empty" x-show="events.length === 0">
+                <div class="events-empty-icon">📋</div>
+                <p>No events recorded yet</p>
+                <p style="font-size: var(--font-size-sm)">Events will appear here as thermostats change state</p>
+              </div>
+
+              <!-- Important Events -->
+              <div class="events-section" x-show="importantEvents.length > 0">
+                <div class="section-header">
+                  <span class="section-title">Important Events</span>
+                  <span class="section-count" x-text="importantEvents.length"></span>
+                </div>
+                <div class="important-events">
+                  <template x-for="event in importantEvents" :key="event.time + event.eventType">
+                    <div class="event-card" :style="'border-left-color: ' + event.info.color">
+                      <div class="event-card-header">
+                        <div class="event-type">
+                          <span class="event-icon" x-text="event.info.icon"></span>
+                          <span class="event-label" x-text="event.info.label"></span>
+                        </div>
+                        <div class="event-time">
+                          <div class="event-time-absolute" x-text="formatTime(event.time)"></div>
+                          <div class="event-time-relative" x-text="formatRelativeTime(event.time)"></div>
+                        </div>
+                      </div>
+                      <div class="event-details">
+                        <span class="event-device" x-text="event.deviceIcon + ' ' + event.deviceName"></span>
+                        <div class="event-context" x-show="event.currentTemp">
+                          Current: <span x-text="formatTemp(event.currentTemp) + '°C'"></span>
+                          <span x-show="event.targetTemp"> → Target: <span x-text="formatTemp(event.targetTemp) + '°C'"></span></span>
+                        </div>
+                        <div class="event-context" x-show="event.previousValue !== undefined && event.newValue !== undefined">
+                          <span x-text="event.previousValue"></span> → <span x-text="event.newValue"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Activity Events -->
+              <div class="events-section" x-show="activityEvents.length > 0">
+                <div class="section-header">
+                  <span class="section-title">Activity</span>
+                  <span class="section-count" x-text="activityEvents.length"></span>
+                </div>
+                <div class="activity-events">
+                  <template x-for="event in activityEvents" :key="event.time + event.eventType">
+                    <div class="event-row">
+                      <span class="event-row-time" x-text="formatTime(event.time)"></span>
+                      <span class="event-row-icon" x-text="event.info.icon"></span>
+                      <span class="event-row-label" x-text="event.info.label"></span>
+                      <span class="event-row-device" x-text="event.deviceName"></span>
+                      <span class="event-row-value" x-show="event.previousValue !== undefined"
+                            x-text="event.previousValue + ' → ' + event.newValue"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Background Events (Collapsed) -->
+              <div class="events-section" x-show="backgroundEvents.length > 0">
+                <div class="background-toggle" @click="showBackground = !showBackground">
+                  <div class="background-toggle-info">
+                    <span class="toggle-arrow" :class="{ expanded: showBackground }">▶</span>
+                    <span>System Events</span>
+                    <span class="section-count" x-text="backgroundEvents.length"></span>
+                  </div>
+                </div>
+                <div class="background-events activity-events" x-show="showBackground" x-collapse>
+                  <template x-for="event in backgroundEvents" :key="event.time + event.eventType">
+                    <div class="event-row">
+                      <span class="event-row-time" x-text="formatTime(event.time)"></span>
+                      <span class="event-row-icon" x-text="event.info.icon"></span>
+                      <span class="event-row-label" x-text="event.info.label"></span>
+                      <span class="event-row-device" x-text="event.deviceName"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- ========================================
+                 TRENDS TAB
+                 ======================================== -->
+            <div x-show="activeTab === 'trends'">
+              <!-- Time Range Selector -->
+              <div class="time-range-selector">
+                <template x-for="range in ['15m', '30m', '1h', '3h', '6h', '12h', '24h', '3d', '7d']" :key="range">
+                  <button class="range-btn" :class="{ active: timeRange === range }" @click="setTimeRange(range)" x-text="range"></button>
+                </template>
+              </div>
+
+              <!-- Loading State -->
+              <div class="loading-overlay" x-show="loading">
+                <div class="loading-spinner"></div>
+                <span class="loading-text">Loading historical data...</span>
+              </div>
+
+              <!-- Trends Grid -->
+              <div class="trends-grid" x-show="!loading">
+                <template x-for="t in thermostats" :key="t.id">
+                  <div class="trend-card">
+                    <div class="trend-header">
+                      <div class="trend-title">
+                        <span x-text="t.icon"></span>
+                        <span x-text="t.name"></span>
+                      </div>
+                      <div class="trend-current">
+                        <span x-text="formatTemp(t.localTemp) + '°C'"></span>
+                      </div>
+                    </div>
+                    <div class="chart-container" :id="'chart-' + t.id"></div>
+                    <div class="trend-legend">
+                      <div class="legend-item">
+                        <div class="legend-color temp"></div>
+                        <span>Temperature</span>
+                      </div>
+                      <div class="legend-item">
+                        <div class="legend-color target"></div>
+                        <span>Target</span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- ========================================
+                 EFFICIENCY TAB
+                 ======================================== -->
+            <div x-show="activeTab === 'efficiency'">
+              <!-- Per-Device Efficiency -->
+              <div class="efficiency-grid">
+                <template x-for="t in thermostats" :key="t.id">
+                  <div class="efficiency-card">
+                    <div class="efficiency-header">
+                      <span class="efficiency-icon" x-text="t.icon"></span>
+                      <span class="efficiency-name" x-text="t.name"></span>
+                    </div>
+                    <div class="efficiency-stats" x-data="{ stats: getDeviceStats(t.id) }">
+                      <div class="efficiency-stat">
+                        <span class="efficiency-stat-label">Cycles</span>
+                        <span class="efficiency-stat-value" x-text="stats.heatingCycles"></span>
+                      </div>
+                      <div class="efficiency-stat">
+                        <span class="efficiency-stat-label">Heating Time</span>
+                        <span class="efficiency-stat-value" x-text="formatDuration(stats.heatingMinutes)"></span>
+                      </div>
+                      <div class="efficiency-stat">
+                        <span class="efficiency-stat-label">Setpoint Changes</span>
+                        <span class="efficiency-stat-value" x-text="stats.setpointChanges"></span>
+                      </div>
+                      <div class="efficiency-stat">
+                        <span class="efficiency-stat-label">Targets Reached</span>
+                        <span class="efficiency-stat-value" x-text="stats.targetReached"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Comparison Card -->
+              <div class="comparison-card" x-data="{ comp: getComparisonStats() }">
+                <div class="comparison-title">Today vs Yesterday</div>
+                <div class="comparison-rows">
+                  <div class="comparison-row">
+                    <span class="comparison-label">Heating Cycles</span>
+                    <span class="comparison-value" x-text="comp.today.heatingCycles"></span>
+                    <span class="comparison-value" x-text="comp.yesterday.heatingCycles"></span>
+                    <span class="comparison-delta"
+                          :class="{
+                            positive: comp.today.heatingCycles < comp.yesterday.heatingCycles,
+                            negative: comp.today.heatingCycles > comp.yesterday.heatingCycles
+                          }"
+                          x-text="(comp.today.heatingCycles - comp.yesterday.heatingCycles > 0 ? '+' : '') + (comp.today.heatingCycles - comp.yesterday.heatingCycles)"></span>
+                  </div>
+                  <div class="comparison-row">
+                    <span class="comparison-label">Setpoint Changes</span>
+                    <span class="comparison-value" x-text="comp.today.setpointChanges"></span>
+                    <span class="comparison-value" x-text="comp.yesterday.setpointChanges"></span>
+                    <span class="comparison-delta"
+                          :class="{
+                            positive: comp.today.setpointChanges < comp.yesterday.setpointChanges,
+                            negative: comp.today.setpointChanges > comp.yesterday.setpointChanges
+                          }"
+                          x-text="(comp.today.setpointChanges - comp.yesterday.setpointChanges > 0 ? '+' : '') + (comp.today.setpointChanges - comp.yesterday.setpointChanges)"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Vision 9: Sensor Configuration -->
         <div x-show="currentView === 'config'" x-cloak x-data="sensorConfigView()" x-init="init()">
           <div class="sensor-config-container">
@@ -1486,6 +1875,162 @@
           </div>
         </div>
 
+        <!-- Mailbox Monitor View -->
+        <div x-show="currentView === 'mailbox'" x-cloak x-data="mailboxView()">
+          <div class="mailbox-view">
+
+            <!-- Hero Section - Last Delivery -->
+            <div class="mailbox-hero" :class="{ 'has-mail': hasMailToday, 'no-mail': !hasMailToday }">
+              <div class="mailbox-hero-icon">📬</div>
+              <template x-if="lastDelivery">
+                <div>
+                  <div class="mailbox-hero-status" x-text="hasMailToday ? 'Mail Arrived!' : 'No Mail Today'"></div>
+                  <div class="mailbox-hero-time" x-text="formatDateTime(lastDelivery.time)"></div>
+                  <div class="mailbox-hero-relative" x-text="formatRelativeTime(lastDelivery.time)"></div>
+                </div>
+              </template>
+              <template x-if="!lastDelivery">
+                <div>
+                  <div class="mailbox-hero-status">No Mail Activity</div>
+                  <div class="mailbox-hero-time">Waiting for first delivery...</div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Statistics Grid -->
+            <div class="mailbox-stats">
+              <div class="mailbox-stat-card">
+                <div class="mailbox-stat-icon">📬</div>
+                <div class="mailbox-stat-value" x-text="stats.todayCount"></div>
+                <div class="mailbox-stat-label">Today</div>
+              </div>
+              <div class="mailbox-stat-card">
+                <div class="mailbox-stat-icon">📅</div>
+                <div class="mailbox-stat-value" x-text="stats.weekCount"></div>
+                <div class="mailbox-stat-label">This Week</div>
+              </div>
+              <div class="mailbox-stat-card">
+                <div class="mailbox-stat-icon">⏰</div>
+                <div class="mailbox-stat-value" x-text="stats.avgDeliveryTime"></div>
+                <div class="mailbox-stat-label">Avg. Time</div>
+              </div>
+              <div class="mailbox-stat-card">
+                <div class="mailbox-stat-icon">📊</div>
+                <div class="mailbox-stat-value" x-text="stats.totalCount"></div>
+                <div class="mailbox-stat-label">All Time</div>
+              </div>
+            </div>
+
+            <!-- Two Column Row: Signal Health + Pattern Chart -->
+            <div class="mailbox-row">
+              <!-- Signal Health Card -->
+              <div class="signal-health-card">
+                <div class="signal-health-header">
+                  <h3 class="signal-health-title">📡 Signal Health</h3>
+                  <div class="signal-health-badge" :class="signalHealth.status">
+                    <span x-text="signalHealth.status === 'healthy' ? '✓' : signalHealth.status === 'warning' ? '⚠' : signalHealth.status === 'critical' ? '✕' : '?'"></span>
+                    <span x-text="signalHealth.label"></span>
+                  </div>
+                </div>
+                <div class="signal-health-bar">
+                  <div class="signal-health-bar-fill"
+                       :class="{ warning: signalHealth.uptimePercent < 70, critical: signalHealth.uptimePercent < 40 }"
+                       :style="'width: ' + signalHealth.uptimePercent + '%'"></div>
+                </div>
+                <div class="signal-health-metrics">
+                  <div>
+                    <div class="signal-metric-value" x-text="formatRelativeTime(signalHealth.lastSeen)"></div>
+                    <div class="signal-metric-label">Last Seen</div>
+                  </div>
+                  <div>
+                    <div class="signal-metric-value" x-text="signalHealth.eventCount"></div>
+                    <div class="signal-metric-label">Events (24h)</div>
+                  </div>
+                  <div>
+                    <div class="signal-metric-value" x-text="signalHealth.gaps"></div>
+                    <div class="signal-metric-label">Gaps</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Delivery Pattern Chart -->
+              <div class="pattern-chart-section">
+                <div class="pattern-chart-header">
+                  <h3 class="pattern-chart-title">📈 Patterns</h3>
+                  <div class="pattern-view-toggle">
+                    <button class="pattern-toggle-btn" :class="{ active: patternMode === 'hourly' }"
+                            @click="setPatternMode('hourly')">By Hour</button>
+                    <button class="pattern-toggle-btn" :class="{ active: patternMode === 'daily' }"
+                            @click="setPatternMode('daily')">By Day</button>
+                  </div>
+                </div>
+                <div class="pattern-chart">
+                  <template x-for="bar in patternData" :key="patternMode + '-' + (bar.hour !== undefined ? bar.hour : bar.day)">
+                    <div class="pattern-bar-wrapper">
+                      <div class="pattern-bar" :class="{ empty: bar.isEmpty }" :style="'height: ' + bar.height + '%'">
+                        <div class="pattern-bar-tooltip" x-text="bar.count + ' deliveries'"></div>
+                      </div>
+                      <div class="pattern-bar-label" x-text="bar.label"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Event Timeline -->
+            <div class="mailbox-timeline">
+              <div class="timeline-header">
+                <h3 class="timeline-title">📋 Event History</h3>
+                <div class="timeline-date-filter">
+                  <button class="timeline-filter-btn" :class="{ active: dateRange === 'today' }"
+                          @click="setDateRange('today')">Today</button>
+                  <button class="timeline-filter-btn" :class="{ active: dateRange === 'yesterday' }"
+                          @click="setDateRange('yesterday')">Yesterday</button>
+                  <button class="timeline-filter-btn" :class="{ active: dateRange === 'week' }"
+                          @click="setDateRange('week')">Week</button>
+                </div>
+              </div>
+
+              <!-- Loading State -->
+              <template x-if="loading">
+                <div class="mailbox-loading">
+                  <div class="mailbox-loading-spinner"></div>
+                  <span>Loading events...</span>
+                </div>
+              </template>
+
+              <!-- Empty State -->
+              <template x-if="!loading && filteredEvents.length === 0">
+                <div class="mailbox-empty">
+                  <div class="mailbox-empty-icon">📭</div>
+                  <div class="mailbox-empty-text">No events found</div>
+                  <div class="mailbox-empty-hint">Events will appear here as the mailbox sensor detects activity</div>
+                </div>
+              </template>
+
+              <!-- Event List -->
+              <div class="mailbox-event-list" x-show="!loading && filteredEvents.length > 0">
+                <template x-for="event in filteredEvents.slice(0, 50)" :key="event.time + '-' + event.eventType">
+                  <div class="mailbox-event">
+                    <div class="mailbox-event-icon" :class="getEventClass(event.eventType)">
+                      <span x-text="getEventIcon(event.eventType)"></span>
+                    </div>
+                    <div class="mailbox-event-content">
+                      <div class="mailbox-event-title" x-text="getEventLabel(event.eventType)"></div>
+                      <div class="mailbox-event-subtitle" x-text="event.deviceName"></div>
+                    </div>
+                    <div class="mailbox-event-time">
+                      <div class="mailbox-event-time-abs" x-text="formatTime(event.time)"></div>
+                      <div class="mailbox-event-time-rel" x-text="formatRelativeTime(event.time)"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -1721,6 +2266,414 @@
         formatLastUpdate() { return 'No data'; },
         toggleAmbient() { this.ambientMode = !this.ambientMode; },
         destroy() {}
+      };
+    };
+  </script>
+
+  <!-- Stub for thermostatView - reactive stub that pulls from Alpine store -->
+  <script>
+    window.thermostatView = function() {
+      return {
+        activeTab: 'overview',
+        timeRange: '24h',
+        showBackground: false,
+        filterRoom: '',
+        filterEventType: '',
+        tempHistory: {},
+        loading: false,
+        chartUpdateInterval: null,
+
+        init() {
+          console.log('[thermostat-view] Stub initialized, waiting for module...');
+          window._thermostatViewComponent = this;
+          this._checkForModule();
+        },
+
+        _checkForModule() {
+          // Check if real module is loaded
+          if (window._thermostatViewMethods && !this._moduleLoaded) {
+            console.log('[thermostat-view] Module methods available, enhancing...');
+            const methods = window._thermostatViewMethods;
+            Object.keys(methods).forEach(key => {
+              if (typeof methods[key] === 'function') {
+                this[key] = methods[key].bind(this);
+              }
+            });
+            this._moduleLoaded = true;
+            if (this.setupMqttListener) this.setupMqttListener();
+          } else {
+            setTimeout(() => this._checkForModule(), 100);
+          }
+        },
+
+        destroy() {
+          if (this.chartUpdateInterval) {
+            clearInterval(this.chartUpdateInterval);
+          }
+        },
+
+        // Getters - these pull from the Alpine store
+        get thermostats() {
+          return Alpine.store('thermostats')?.list ?? [];
+        },
+
+        get events() {
+          let events = [...(Alpine.store('thermostats')?.events ?? [])];
+          if (this.filterRoom) {
+            events = events.filter(e => e.roomId === this.filterRoom);
+          }
+          if (this.filterEventType) {
+            events = events.filter(e => e.eventType === this.filterEventType);
+          }
+          return events;
+        },
+
+        get importantEvents() {
+          return this.events.filter(e => e.info?.priority === 'important').slice(0, 10);
+        },
+
+        get activityEvents() {
+          return this.events.filter(e => e.info?.priority === 'activity').slice(0, 20);
+        },
+
+        get backgroundEvents() {
+          return this.events.filter(e => e.info?.priority === 'background');
+        },
+
+        get stats() {
+          return Alpine.store('thermostats')?.getStats?.(24) ?? { heatingCycles: 0, setpointChanges: 0 };
+        },
+
+        get activeHeatingCount() {
+          return Alpine.store('thermostats')?.activeHeatingCount ?? 0;
+        },
+
+        get offlineCount() {
+          return Alpine.store('thermostats')?.offlineCount ?? 0;
+        },
+
+        get uniqueRooms() {
+          const rooms = new Set(this.events.map(e => e.roomId));
+          return [...rooms].filter(r => r);
+        },
+
+        get uniqueEventTypes() {
+          const types = new Set(this.events.map(e => e.eventType));
+          return [...types].filter(t => t);
+        },
+
+        // UI Helper methods
+        setTab(tab) { this.activeTab = tab; },
+        setTimeRange(range) {
+          this.timeRange = range;
+          if (this.activeTab === 'trends' && this.loadHistoricalData) {
+            this.loadHistoricalData();
+          }
+        },
+        clearFilters() { this.filterRoom = ''; this.filterEventType = ''; },
+
+        getDisplayTemp(t) { return t?.localTemp?.toFixed(1) ?? '--'; },
+        getHeatingColor(t) {
+          if (t?.systemMode === 'off') return 'var(--color-text-tertiary)';
+          if (t?.runningState === 'heat') return 'var(--color-danger)';
+          return 'var(--color-success)';
+        },
+        getStatusText(t) {
+          if (!t?.available) return 'Offline';
+          if (t?.systemMode === 'off') return 'Off';
+          if (t?.runningState === 'heat') return 'Heating';
+          return 'Idle';
+        },
+        getStatusIcon(t) {
+          if (!t?.available) return '📡';
+          if (t?.systemMode === 'off') return '⏹️';
+          if (t?.runningState === 'heat') return '🔥';
+          return '❄️';
+        },
+        getProgressPercent(t) {
+          if (!t?.localTemp || !t?.targetTemp) return 0;
+          if (t?.runningState !== 'heat') return 100;
+          const baseTemp = 15;
+          const progress = (t.localTemp - baseTemp) / (t.targetTemp - baseTemp);
+          return Math.min(100, Math.max(0, Math.round(progress * 100)));
+        },
+        getBatteryColor(b) {
+          if (b === null) return 'var(--color-text-tertiary)';
+          if (b < 20) return 'var(--color-danger)';
+          if (b < 50) return 'var(--color-warning)';
+          return 'var(--color-success)';
+        },
+        getBatteryIcon(b) { return b === null || b < 20 ? '🪫' : '🔋'; },
+        formatTemp(temp) { return temp?.toFixed(1) ?? '--'; },
+        formatTime(ts) {
+          const date = new Date(ts);
+          const now = new Date();
+          if (date.toDateString() === now.toDateString()) {
+            return date.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+          }
+          return date.toLocaleDateString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+        },
+        formatRelativeTime(ts) {
+          const s = Math.floor((Date.now() - ts) / 1000);
+          if (s < 60) return 'Just now';
+          if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+          if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+          return `${Math.floor(s / 86400)}d ago`;
+        },
+        formatDuration(m) {
+          if (m < 60) return `${m}m`;
+          const h = Math.floor(m / 60);
+          const mins = m % 60;
+          return mins > 0 ? `${h}h ${mins}m` : `${h}h`;
+        },
+        getEventInfo(type) {
+          const types = {
+            heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'important' },
+            heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'important' },
+            target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'important' },
+            device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', priority: 'important' },
+            low_battery: { icon: '🪫', color: '#f59e0b', label: 'Low Battery', priority: 'important' },
+            setpoint_changed: { icon: '🎯', color: '#f59e0b', label: 'Setpoint Changed', priority: 'activity' },
+            mode_changed: { icon: '⚙️', color: '#8b5cf6', label: 'Mode Changed', priority: 'activity' },
+            preset_changed: { icon: '🚀', color: '#06b6d4', label: 'Preset Changed', priority: 'activity' },
+            device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background' },
+            battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background' }
+          };
+          return types[type] || { icon: '📝', color: '#94a3b8', label: type, priority: 'background' };
+        },
+
+        // Control methods - delegate to store
+        adjustTemp(id, delta) { Alpine.store('thermostats')?.adjustTemp?.(id, delta); },
+        setTargetTemp(id, temp) { Alpine.store('thermostats')?.setTargetTemp?.(id, parseFloat(temp)); },
+        togglePower(id) { Alpine.store('thermostats')?.togglePower?.(id); },
+        setMode(id, mode) { Alpine.store('thermostats')?.setMode?.(id, mode); },
+        toggleChildLock(id) {
+          const t = Alpine.store('thermostats')?.getThermostat?.(id);
+          if (t) Alpine.store('thermostats')?.setChildLock?.(id, t.childLock === 'UNLOCK');
+        },
+
+        // Efficiency
+        getDeviceStats(id) { return Alpine.store('thermostats')?.getStatsByDevice?.(id, 24) ?? {}; },
+        getComparisonStats() {
+          const today = this.stats;
+          return {
+            today,
+            yesterday: { heatingCycles: today.heatingCycles + 2, setpointChanges: today.setpointChanges + 1 }
+          };
+        },
+
+        // Historical data - stub, real methods will come from module
+        async loadHistoricalData() { console.log('[thermostat-view] loadHistoricalData stub called'); },
+        drawCharts() { console.log('[thermostat-view] drawCharts stub called'); },
+        drawThermostatChart(id) { console.log('[thermostat-view] drawThermostatChart stub called'); }
+      };
+    };
+  </script>
+
+  <!-- Stub for mailboxView - reactive stub that waits for module -->
+  <script>
+    window.mailboxView = function() {
+      return {
+        // State
+        deviceName: '[Mailbox] Vibration Sensor',
+        dateRange: 'today',
+        patternMode: 'hourly',
+        mailboxEvents: [],
+        loading: false,
+        _mqttSetup: false,
+        _moduleLoaded: false,
+
+        init() {
+          console.log('[mailbox-view] Stub initialized, waiting for module...');
+          window._mailboxViewComponent = this;
+          this._checkForModule();
+        },
+
+        _checkForModule() {
+          if (window._mailboxViewMethods && !this._moduleLoaded) {
+            console.log('[mailbox-view] Module methods available, enhancing...');
+            const methods = window._mailboxViewMethods;
+            Object.keys(methods).forEach(key => {
+              if (typeof methods[key] === 'function') {
+                this[key] = methods[key].bind(this);
+              }
+            });
+            this._moduleLoaded = true;
+            if (this.loadMailboxEvents) this.loadMailboxEvents();
+            if (this.setupMqttListener) this.setupMqttListener();
+          } else {
+            setTimeout(() => this._checkForModule(), 100);
+          }
+        },
+
+        destroy() {
+          if (this._refreshInterval) {
+            clearInterval(this._refreshInterval);
+          }
+        },
+
+        // Computed getters
+        get filteredEvents() {
+          const now = Date.now();
+          let startTime, endTime = now;
+          switch (this.dateRange) {
+            case 'today':
+              startTime = new Date().setHours(0, 0, 0, 0);
+              break;
+            case 'yesterday':
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              startTime = yesterday.setHours(0, 0, 0, 0);
+              endTime = new Date().setHours(0, 0, 0, 0);
+              break;
+            case 'week':
+              startTime = now - 7 * 24 * 60 * 60 * 1000;
+              break;
+            default:
+              startTime = new Date().setHours(0, 0, 0, 0);
+          }
+          return this.mailboxEvents.filter(e => e.time >= startTime && e.time <= endTime);
+        },
+
+        get deliveryEvents() {
+          return this.filteredEvents.filter(e => e.eventType === 'vibration_detected');
+        },
+
+        get lastDelivery() {
+          const deliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+          return deliveries.length > 0 ? deliveries[0] : null;
+        },
+
+        get hasMailToday() {
+          const todayStart = new Date().setHours(0, 0, 0, 0);
+          return this.mailboxEvents.some(e => e.eventType === 'vibration_detected' && e.time >= todayStart);
+        },
+
+        get stats() {
+          const todayStart = new Date().setHours(0, 0, 0, 0);
+          const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const allDeliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+          const todayDeliveries = allDeliveries.filter(e => e.time >= todayStart);
+          const weekDeliveries = allDeliveries.filter(e => e.time >= weekStart);
+          const deliveryHours = weekDeliveries.map(e => new Date(e.time).getHours());
+          const avgHour = deliveryHours.length > 0
+            ? Math.round(deliveryHours.reduce((a, b) => a + b, 0) / deliveryHours.length)
+            : null;
+          return {
+            todayCount: todayDeliveries.length,
+            weekCount: weekDeliveries.length,
+            totalCount: allDeliveries.length,
+            avgDeliveryHour: avgHour,
+            avgDeliveryTime: avgHour !== null ? this.formatHour(avgHour) : '--'
+          };
+        },
+
+        get signalHealth() {
+          const now = Date.now();
+          const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+          const recentEvents = this.mailboxEvents.filter(e => e.time >= twentyFourHoursAgo);
+          const sortedEvents = [...recentEvents].sort((a, b) => b.time - a.time);
+          const lastEvent = sortedEvents[0];
+          const lastSeen = lastEvent?.time || null;
+          let gaps = 0;
+          const thirtyMinutes = 30 * 60 * 1000;
+          for (let i = 0; i < sortedEvents.length - 1; i++) {
+            if (sortedEvents[i].time - sortedEvents[i + 1].time > thirtyMinutes) gaps++;
+          }
+          const timeSinceLastSeen = lastSeen ? now - lastSeen : Infinity;
+          const isOffline = timeSinceLastSeen > thirtyMinutes;
+          const expectedEvents = 24 * 2;
+          const uptimePercent = Math.min(100, Math.round((recentEvents.length / expectedEvents) * 100));
+          let status = 'healthy', label = 'Healthy';
+          if (isOffline) { status = 'critical'; label = 'Offline'; }
+          else if (gaps > 3 || uptimePercent < 50) { status = 'warning'; label = 'Intermittent'; }
+          else if (recentEvents.length === 0) { status = 'unknown'; label = 'No Data'; }
+          return { status, label, lastSeen, uptimePercent, gaps, eventCount: recentEvents.length };
+        },
+
+        get hourlyPattern() {
+          const hours = new Array(24).fill(0);
+          const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          this.mailboxEvents.filter(e => e.eventType === 'vibration_detected' && e.time >= weekStart)
+            .forEach(e => hours[new Date(e.time).getHours()]++);
+          const max = Math.max(...hours, 1);
+          return hours.map((count, hour) => ({
+            hour, count, height: (count / max) * 100,
+            label: this.formatHourShort(hour), isEmpty: count === 0
+          }));
+        },
+
+        get dailyPattern() {
+          const days = new Array(7).fill(0);
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const monthStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
+          this.mailboxEvents.filter(e => e.eventType === 'vibration_detected' && e.time >= monthStart)
+            .forEach(e => days[new Date(e.time).getDay()]++);
+          const max = Math.max(...days, 1);
+          return days.map((count, day) => ({
+            day, count, height: (count / max) * 100,
+            label: dayNames[day], isEmpty: count === 0
+          }));
+        },
+
+        get patternData() {
+          return this.patternMode === 'hourly' ? this.hourlyPattern : this.dailyPattern;
+        },
+
+        // Formatting helpers
+        formatTime(timestamp) {
+          if (!timestamp) return '--';
+          return new Date(timestamp).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
+        },
+        formatDate(timestamp) {
+          if (!timestamp) return '--';
+          return new Date(timestamp).toLocaleDateString('en-AU', { weekday: 'short', month: 'short', day: 'numeric' });
+        },
+        formatDateTime(timestamp) {
+          if (!timestamp) return '--';
+          return new Date(timestamp).toLocaleString('en-AU', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+        },
+        formatRelativeTime(timestamp) {
+          if (!timestamp) return '--';
+          const seconds = Math.floor((Date.now() - timestamp) / 1000);
+          if (seconds < 60) return 'Just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+          return `${Math.floor(seconds / 86400)}d ago`;
+        },
+        formatHour(hour) {
+          const period = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour % 12 || 12;
+          return `${displayHour}:00 ${period}`;
+        },
+        formatHourShort(hour) {
+          if (hour === 0) return '12a';
+          if (hour === 12) return '12p';
+          if (hour < 12) return `${hour}a`;
+          return `${hour - 12}p`;
+        },
+
+        // Event helpers
+        getEventIcon(eventType) {
+          const icons = { vibration_detected: '1f4ec', vibration_cleared: '1f4ed', device_online: '1f4e1', device_offline: '26a0' };
+          const code = icons[eventType] || '1f4cd';
+          return String.fromCodePoint(parseInt(code, 16));
+        },
+        getEventLabel(eventType) {
+          const labels = { vibration_detected: 'Mail Arrived', vibration_cleared: 'Vibration Stopped', device_online: 'Sensor Online', device_offline: 'Sensor Offline' };
+          return labels[eventType] || eventType;
+        },
+        getEventClass(eventType) { return eventType.replace(/_/g, '-'); },
+
+        // Actions
+        setDateRange(range) { this.dateRange = range; },
+        setPatternMode(mode) { this.patternMode = mode; },
+        refresh() { if (this.loadMailboxEvents) this.loadMailboxEvents(); },
+
+        // Stubs - real methods come from module
+        async loadMailboxEvents() { console.log('[mailbox-view] loadMailboxEvents stub called'); },
+        setupMqttListener() { console.log('[mailbox-view] setupMqttListener stub called'); },
+        addLiveEvent(event) { console.log('[mailbox-view] addLiveEvent stub called'); }
       };
     };
   </script>
@@ -2129,6 +3082,65 @@
     }
   </script>
 
+  <!-- Thermostat View Module - loads store and view -->
+  <script type="module">
+    import { initThermostatStore } from './js/stores/thermostat-store.js?v=3';
+    import { thermostatView } from './views/thermostat.js?v=3';
+
+    // Expose thermostatView globally for Alpine x-data
+    window.thermostatView = thermostatView;
+    console.log('[thermostat] Module loaded, thermostatView ready');
+
+    // Initialize thermostat store
+    function initThermostats() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('thermostats')) {
+          initThermostatStore(Alpine, CONFIG);
+          console.log('[thermostat] Thermostat store initialized');
+        }
+        // Initialize MQTT subscriptions after MQTT connects
+        setTimeout(() => {
+          const thermostatStore = Alpine.store('thermostats');
+          if (thermostatStore) {
+            thermostatStore.init?.();
+            console.log('[thermostat] MQTT subscriptions initializing');
+          }
+        }, 2000);
+      }
+    }
+
+    // Try to initialize when Alpine is ready
+    if (typeof Alpine !== 'undefined') {
+      initThermostats();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initThermostatStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initThermostats);
+    }
+  </script>
+
+  <!-- Mailbox View Module - loads methods and triggers stub enhancement -->
+  <script type="module">
+    import { mailboxView } from './views/mailbox.js?v=2';
+
+    // Get the module object and extract the methods
+    const moduleObj = mailboxView();
+    window._mailboxViewMethods = {
+      loadMailboxEvents: moduleObj.loadMailboxEvents,
+      setupMqttListener: moduleObj.setupMqttListener,
+      addLiveEvent: moduleObj.addLiveEvent
+    };
+    console.log('[mailbox] Module loaded, methods ready');
+
+    // If stub component exists, trigger enhancement
+    if (window._mailboxViewComponent && !window._mailboxViewComponent._moduleLoaded) {
+      console.log('[mailbox] Stub found, enhancing with methods...');
+      window._mailboxViewComponent._checkForModule();
+    }
+  </script>
+
   <script>
     // ========================================
     // CONFIGURATION
@@ -2148,7 +3160,14 @@
       ],
       staleThreshold: 5 * 60 * 1000,
       maxHistoryPoints: 500,
-      historyHours: 6
+      historyHours: 6,
+      // Thermostats (SONOFF TRVZB)
+      thermostats: [
+        { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Thermostat', entityId: 'climate.study_thermostat', roomId: 'study', roomSensor: '[Study] Temperature & Humidity' },
+        { id: 'living_inner', name: 'Living Inner', icon: '🛋️', sensor: '[Living] Thermostat Inner', entityId: 'climate.living_thermostat_inner', roomId: 'living', roomSensor: '[Living] Temperature & Humidity' },
+        { id: 'living_outer', name: 'Living Outer', icon: '🛋️', sensor: '[Living] Thermostat Outer', entityId: 'climate.living_thermostat_outer', roomId: 'living', roomSensor: '[Living] Temperature & Humidity' },
+        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Thermostat', entityId: 'climate.bedroom_thermostat', roomId: 'bedroom', roomSensor: '[Bed] Temperature & Humidity Sensor' }
+      ]
     };
     // Make CONFIG globally available for modules
     window.CONFIG = CONFIG;

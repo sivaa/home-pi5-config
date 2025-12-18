@@ -10,6 +10,7 @@ import { initLightsStore } from './stores/lights-store.js';
 import { initRoomDetailStore } from './stores/room-detail-store.js';
 import { initSensorsStore } from './stores/sensors-store.js';
 import { initEventsStore } from './stores/events-store.js';
+import { initThermostatStore } from './stores/thermostat-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
@@ -25,6 +26,8 @@ import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
 import { isometricView } from '../views/isometric.js';
 import { networkView } from '../views/network.js';
+import { thermostatView } from '../views/thermostat.js';
+import { mailboxView } from '../views/mailbox.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -43,6 +46,7 @@ document.addEventListener('alpine:init', () => {
   initRoomDetailStore(Alpine, CONFIG);
   initSensorsStore(Alpine, CONFIG);
   initEventsStore(Alpine, CONFIG);
+  initThermostatStore(Alpine, CONFIG);
 
   // Load historical events on startup
   setTimeout(() => {
@@ -105,6 +109,16 @@ window.app = function() {
           this.setView('network');
           return;
         }
+        // 'H' key for heater view
+        if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey) {
+          this.setView('heater');
+          return;
+        }
+        // 'M' key for mailbox view
+        if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey) {
+          this.setView('mailbox');
+          return;
+        }
         if ((e.key >= '1' && e.key <= '9' || e.key === '0') && !e.ctrlKey && !e.metaKey) {
           const views = ['comfort', 'compare', 'floor', '3d', 'ambient', 'timeline', 'classic', 'lights', 'config', 'co2'];
           const index = e.key === '0' ? 9 : parseInt(e.key) - 1;
@@ -165,5 +179,11 @@ window.isometricView = function() {
 
 // Network view
 window.networkView = networkView;
+
+// Thermostat view
+window.thermostatView = thermostatView;
+
+// Mailbox view
+window.mailboxView = mailboxView;
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');

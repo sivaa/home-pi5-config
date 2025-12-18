@@ -1,0 +1,659 @@
+/* ========================================
+   MAILBOX MONITOR VIEW
+   Dedicated dashboard for mailbox vibration sensor
+   ======================================== */
+
+/* ---------- Color Tokens ---------- */
+:root {
+  --color-mailbox-primary: #8b5cf6;
+  --color-mailbox-primary-light: rgba(139, 92, 246, 0.1);
+  --color-mailbox-primary-glow: rgba(139, 92, 246, 0.3);
+  --color-mailbox-detected: #22c55e;
+  --color-mailbox-cleared: #94a3b8;
+  --color-mailbox-offline: #ef4444;
+  --color-mailbox-online: #22c55e;
+}
+
+/* ---------- Main Container ---------- */
+.mailbox-view {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  gap: var(--space-lg);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---------- Hero Section ---------- */
+.mailbox-hero {
+  background: linear-gradient(135deg, var(--color-mailbox-primary) 0%, #6d28d9 100%);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  text-align: center;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.mailbox-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  animation: hero-shimmer 8s ease-in-out infinite;
+}
+
+@keyframes hero-shimmer {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(10%, 10%); }
+}
+
+.mailbox-hero-icon {
+  font-size: 72px;
+  margin-bottom: var(--space-md);
+  position: relative;
+  display: inline-block;
+}
+
+.mailbox-hero.has-mail .mailbox-hero-icon {
+  animation: mailbox-bounce 2s ease-in-out infinite;
+}
+
+@keyframes mailbox-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.mailbox-hero-status {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-xs);
+  position: relative;
+}
+
+.mailbox-hero-time {
+  font-size: var(--font-size-lg);
+  opacity: 0.9;
+  position: relative;
+}
+
+.mailbox-hero-relative {
+  font-size: var(--font-size-sm);
+  opacity: 0.7;
+  margin-top: var(--space-xs);
+  position: relative;
+}
+
+/* No mail state */
+.mailbox-hero.no-mail {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
+.mailbox-hero.no-mail::before {
+  display: none;
+}
+
+/* ---------- Stats Grid ---------- */
+.mailbox-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+.mailbox-stat-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mailbox-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.mailbox-stat-icon {
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--space-sm);
+}
+
+.mailbox-stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-mailbox-primary);
+  line-height: 1;
+}
+
+.mailbox-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: var(--space-xs);
+}
+
+/* ---------- Two Column Layout ---------- */
+.mailbox-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+/* ---------- Signal Health Card ---------- */
+.signal-health-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.signal-health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.signal-health-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.signal-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.signal-health-badge.healthy {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--color-mailbox-online);
+}
+
+.signal-health-badge.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.signal-health-badge.critical {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-mailbox-offline);
+}
+
+.signal-health-badge.unknown {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--color-text-tertiary);
+}
+
+.signal-health-bar {
+  height: 8px;
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-md);
+}
+
+.signal-health-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-mailbox-online), #84cc16);
+  border-radius: var(--radius-full);
+  transition: width 0.5s ease;
+}
+
+.signal-health-bar-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #eab308);
+}
+
+.signal-health-bar-fill.critical {
+  background: linear-gradient(90deg, var(--color-mailbox-offline), #f97316);
+}
+
+.signal-health-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+  text-align: center;
+}
+
+.signal-metric-value {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.signal-metric-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ---------- Pattern Chart Section ---------- */
+.pattern-chart-section {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.pattern-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.pattern-chart-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pattern-view-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--color-bg);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.pattern-toggle-btn {
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pattern-toggle-btn:hover {
+  color: var(--color-text);
+}
+
+.pattern-toggle-btn.active {
+  background: var(--color-surface);
+  color: var(--color-mailbox-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.pattern-chart {
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding-top: var(--space-md);
+}
+
+.pattern-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.pattern-bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--color-mailbox-primary) 0%, #a78bfa 100%);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  min-height: 4px;
+  transition: height 0.3s ease, opacity 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.pattern-bar:hover {
+  opacity: 0.8;
+}
+
+.pattern-bar.empty {
+  background: var(--color-border);
+  min-height: 2px;
+}
+
+.pattern-bar-label {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-xs);
+  text-align: center;
+}
+
+.pattern-bar-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text);
+  color: var(--color-surface);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.pattern-bar-wrapper:hover .pattern-bar-tooltip {
+  opacity: 1;
+}
+
+/* ---------- Event Timeline ---------- */
+.mailbox-timeline {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.timeline-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.timeline-date-filter {
+  display: flex;
+  gap: 2px;
+  background: var(--color-bg);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.timeline-filter-btn {
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.timeline-filter-btn:hover {
+  color: var(--color-text);
+}
+
+.timeline-filter-btn.active {
+  background: var(--color-surface);
+  color: var(--color-mailbox-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.mailbox-event-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.mailbox-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.mailbox-event:last-child {
+  border-bottom: none;
+}
+
+.mailbox-event:hover {
+  background: var(--color-bg);
+}
+
+.mailbox-event.new-event {
+  animation: event-slide-in 0.3s ease-out;
+}
+
+@keyframes event-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.mailbox-event-icon {
+  font-size: var(--font-size-lg);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.mailbox-event-icon.vibration-detected {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.mailbox-event-icon.vibration-cleared {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.mailbox-event-icon.device-online {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.mailbox-event-icon.device-offline {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.mailbox-event-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.mailbox-event-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.mailbox-event-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mailbox-event-time {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.mailbox-event-time-abs {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.mailbox-event-time-rel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ---------- Date Separator ---------- */
+.timeline-date-separator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-bg);
+}
+
+.timeline-date-separator-line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.timeline-date-separator-text {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- Empty State ---------- */
+.mailbox-empty {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--color-text-tertiary);
+}
+
+.mailbox-empty-icon {
+  font-size: 64px;
+  margin-bottom: var(--space-md);
+  opacity: 0.5;
+}
+
+.mailbox-empty-text {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-xs);
+  color: var(--color-text-secondary);
+}
+
+.mailbox-empty-hint {
+  font-size: var(--font-size-sm);
+}
+
+/* ---------- Loading State ---------- */
+.mailbox-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  color: var(--color-text-tertiary);
+}
+
+.mailbox-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-mailbox-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .mailbox-view {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .mailbox-hero {
+    padding: var(--space-xl);
+  }
+
+  .mailbox-hero-icon {
+    font-size: 56px;
+  }
+
+  .mailbox-hero-status {
+    font-size: var(--font-size-xl);
+  }
+
+  .mailbox-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mailbox-row {
+    grid-template-columns: 1fr;
+  }
+
+  .signal-health-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pattern-chart {
+    height: 100px;
+  }
+
+  .timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .timeline-date-filter {
+    width: 100%;
+  }
+
+  .timeline-filter-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .mailbox-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .mailbox-stat-card {
+    padding: var(--space-md);
+  }
+
+  .mailbox-stat-value {
+    font-size: var(--font-size-xl);
+  }
+
+  .pattern-bar-label {
+    font-size: 8px;
+  }
+
+  .mailbox-event {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .mailbox-event-icon {
+    width: 32px;
+    height: 32px;
+    font-size: var(--font-size-md);
+  }
+}
