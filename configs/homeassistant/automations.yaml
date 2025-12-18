@@ -41,6 +41,13 @@
           - media_player.master_bedroom_clock
         message: "Mailbox opened"
         language: "en"
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "📬 Mailbox"
+        message: "Motion detected at mailbox"
+        data:
+          channel: "Alerts"
+          importance: high
 
 # -----------------------------------------------------------------------------
 # CO2 LEVEL ALERT
@@ -77,12 +84,20 @@
         message: >
           Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
         language: "en"
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "⚠️ CO2 High"
+        message: "CO2 above {{ states('sensor.co2_co2') }} ppm - please ventilate"
+        data:
+          channel: "Alerts"
+          importance: high
 
 # -----------------------------------------------------------------------------
 # CO2 CRITICAL ALERT
 # Trigger: CO2 level rises above 1600 ppm (very high)
-# Action: Urgent TTS announcement
-# Cooldown: 5 minutes (more frequent due to urgency)
+# Action: Urgent TTS announcement + mobile notification
+# Cooldown: 5 minutes (shorter due to urgency)
+# NOTE: NO quiet hours - safety critical, runs 24/7
 # -----------------------------------------------------------------------------
 - id: co2_critical_alert
   alias: "CO2 Critical Level Alert"
@@ -95,11 +110,8 @@
       above: 1600
 
   condition:
-    # Only announce during waking hours (7 AM to 11 PM)
-    - condition: time
-      after: "07:00:00"
-      before: "23:00:00"
     # 5-minute cooldown (shorter due to urgency)
+    # NOTE: No quiet hours - this is safety critical and runs 24/7
     - condition: template
       value_template: >
         {{ (now() - state_attr('automation.co2_critical_level_alert', 'last_triggered')).total_seconds() > 300
@@ -113,6 +125,14 @@
         message: >
           Warning! CO2 level is very high at {{ (states('sensor.co2_co2') | int // 100) * 100 }}. Please open windows immediately!
         language: "en"
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚨 CO2 CRITICAL"
+        message: "CO2 at {{ states('sensor.co2_co2') }} ppm - OPEN WINDOWS NOW!"
+        data:
+          channel: "Critical"
+          importance: max
+          vibrationPattern: "100, 1000, 100, 1000, 100"
 
 # -----------------------------------------------------------------------------
 # CO2 GOOD LEVEL NOTIFICATION
@@ -160,6 +180,13 @@
           {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
           Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
         language: "en"
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "✅ Air Quality Good"
+        message: "CO2 now {{ states('sensor.co2_co2') }} ppm - windows can be closed"
+        data:
+          channel: "Info"
+          importance: default
 
 # -----------------------------------------------------------------------------
 # BATHROOM WINDOW OPEN TOO LONG
@@ -192,6 +219,16 @@
                 {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
                 Bathroom window has been open for {{ minutes }} minutes.
               language: "en"
+          - service: notify.mobile_app_22111317pg
+            data:
+              title: "🪟 Bathroom Window"
+              message: >
+                {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
+                Open for {{ minutes }} minutes
+              data:
+                channel: "Alerts"
+                importance: high
+                tag: "bath_window"
           - delay:
               minutes: 1
 
@@ -226,6 +263,16 @@
                 {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
                 Bedroom window has been open for {{ minutes }} minutes.
               language: "en"
+          - service: notify.mobile_app_22111317pg
+            data:
+              title: "🪟 Bedroom Window"
+              message: >
+                {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
+                Open for {{ minutes }} minutes
+              data:
+                channel: "Alerts"
+                importance: high
+                tag: "bed_window"
           - delay:
               minutes: 1
 
@@ -264,3 +311,211 @@
           - media_player.master_bedroom_clock
         message: "Mailbox sensor is now online."
         language: "en"
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "📡 Sensor Online"
+        message: "Mailbox motion sensor is back online"
+        data:
+          channel: "Info"
+          importance: default
+
+# =============================================================================
+# HEATER NOTIFICATIONS
+# Purpose: Notify when heaters start/stop heating
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# STUDY HEATER - STARTED
+# -----------------------------------------------------------------------------
+- id: study_heater_started
+  alias: "Study Heater Started"
+  description: "Notifies when study heater starts heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.study_thermostat
+      attribute: hvac_action
+      to: "heating"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🔥 Study Heater ON"
+        message: "Target: {{ state_attr('climate.study_thermostat', 'temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_study"
+
+# -----------------------------------------------------------------------------
+# STUDY HEATER - STOPPED
+# -----------------------------------------------------------------------------
+- id: study_heater_stopped
+  alias: "Study Heater Stopped"
+  description: "Notifies when study heater stops heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.study_thermostat
+      attribute: hvac_action
+      from: "heating"
+      to: "idle"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "❄️ Study Heater OFF"
+        message: "Current: {{ state_attr('climate.study_thermostat', 'current_temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_study"
+
+# -----------------------------------------------------------------------------
+# LIVING INNER HEATER - STARTED
+# -----------------------------------------------------------------------------
+- id: living_inner_heater_started
+  alias: "Living Inner Heater Started"
+  description: "Notifies when living inner heater starts heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.living_thermostat_inner
+      attribute: hvac_action
+      to: "heating"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🔥 Living Inner Heater ON"
+        message: "Target: {{ state_attr('climate.living_thermostat_inner', 'temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_living_inner"
+
+# -----------------------------------------------------------------------------
+# LIVING INNER HEATER - STOPPED
+# -----------------------------------------------------------------------------
+- id: living_inner_heater_stopped
+  alias: "Living Inner Heater Stopped"
+  description: "Notifies when living inner heater stops heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.living_thermostat_inner
+      attribute: hvac_action
+      from: "heating"
+      to: "idle"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "❄️ Living Inner Heater OFF"
+        message: "Current: {{ state_attr('climate.living_thermostat_inner', 'current_temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_living_inner"
+
+# -----------------------------------------------------------------------------
+# LIVING OUTER HEATER - STARTED
+# -----------------------------------------------------------------------------
+- id: living_outer_heater_started
+  alias: "Living Outer Heater Started"
+  description: "Notifies when living outer heater starts heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.living_thermostat_outer
+      attribute: hvac_action
+      to: "heating"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🔥 Living Outer Heater ON"
+        message: "Target: {{ state_attr('climate.living_thermostat_outer', 'temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_living_outer"
+
+# -----------------------------------------------------------------------------
+# LIVING OUTER HEATER - STOPPED
+# -----------------------------------------------------------------------------
+- id: living_outer_heater_stopped
+  alias: "Living Outer Heater Stopped"
+  description: "Notifies when living outer heater stops heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.living_thermostat_outer
+      attribute: hvac_action
+      from: "heating"
+      to: "idle"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "❄️ Living Outer Heater OFF"
+        message: "Current: {{ state_attr('climate.living_thermostat_outer', 'current_temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_living_outer"
+
+# -----------------------------------------------------------------------------
+# BEDROOM HEATER - STARTED
+# -----------------------------------------------------------------------------
+- id: bed_heater_started
+  alias: "Bedroom Heater Started"
+  description: "Notifies when bedroom heater starts heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.bed_thermostat
+      attribute: hvac_action
+      to: "heating"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🔥 Bedroom Heater ON"
+        message: "Target: {{ state_attr('climate.bed_thermostat', 'temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_bedroom"
+
+# -----------------------------------------------------------------------------
+# BEDROOM HEATER - STOPPED
+# -----------------------------------------------------------------------------
+- id: bed_heater_stopped
+  alias: "Bedroom Heater Stopped"
+  description: "Notifies when bedroom heater stops heating"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.bed_thermostat
+      attribute: hvac_action
+      from: "heating"
+      to: "idle"
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "❄️ Bedroom Heater OFF"
+        message: "Current: {{ state_attr('climate.bed_thermostat', 'current_temperature') }}°C"
+        data:
+          channel: "Heater"
+          importance: default
+          tag: "heater_bedroom"
