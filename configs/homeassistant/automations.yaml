@@ -4,14 +4,15 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# BATHROOM MOTION ANNOUNCEMENT
-# Trigger: Motion detected in bathroom
-# Action: TTS announcement on Kitchen Display
+# MAILBOX MOTION ALERT
+# Trigger: Motion detected at mailbox
+# Action: TTS announcement on ALL Google Home devices
+# Quiet Hours: 23:00 - 06:00 (no announcements)
 # Cooldown: 30 seconds (prevents spam from continuous motion)
 # -----------------------------------------------------------------------------
-- id: bathroom_motion_announcement
-  alias: "Bathroom Motion TTS Announcement"
-  description: "Announces when someone enters the bathroom"
+- id: mailbox_motion_alert
+  alias: "Mailbox Motion Alert"
+  description: "Announces when motion is detected at the mailbox"
   mode: single
 
   trigger:
@@ -20,18 +21,25 @@
       to: "on"
 
   condition:
+    # Quiet hours: no announcements between 23:00 and 06:00
+    - condition: time
+      after: "06:00:00"
+      before: "23:00:00"
     # 30-second cooldown to prevent spam
     - condition: template
       value_template: >
-        {{ (now() - state_attr('automation.bathroom_motion_tts_announcement', 'last_triggered')).total_seconds() > 30
-           if state_attr('automation.bathroom_motion_tts_announcement', 'last_triggered') is not none
+        {{ (now() - state_attr('automation.mailbox_motion_alert', 'last_triggered')).total_seconds() > 30
+           if state_attr('automation.mailbox_motion_alert', 'last_triggered') is not none
            else true }}
 
   action:
     - service: tts.google_translate_say
       data:
-        entity_id: media_player.kitchen_display
-        message: "Someone is in the bathroom"
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "Mailbox opened"
         language: "en"
 
 # -----------------------------------------------------------------------------
