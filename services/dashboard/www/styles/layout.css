@@ -85,17 +85,26 @@
       flex-shrink: 0;
     }
 
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      justify-content: flex-end;
+    }
+
     .header-stats {
       display: flex;
       gap: var(--space-md);
-      justify-content: flex-end;
       font-size: var(--font-size-md);
       font-weight: var(--font-weight-semibold);
-      margin-bottom: 2px;
     }
 
     .header-temp {
       color: var(--color-primary);
+    }
+
+    .header-humid {
+      color: var(--color-info);
     }
 
     .header-co2 {

@@ -224,15 +224,20 @@
 
         <!-- Right: Stats + Date/Time -->
         <div class="header-right">
-          <div class="header-stats">
-            <span class="header-temp" x-show="$store.rooms.avgTemperature != null">
-              🏠 <span x-text="$store.rooms.avgTemperature?.toFixed(1)"></span>°
-            </span>
-            <span class="header-co2" x-show="$store.rooms.co2Value != null">
-              💨 <span x-text="$store.rooms.co2Value"></span>
-            </span>
+          <div class="header-top">
+            <div class="header-stats">
+              <span class="header-temp" x-show="$store.rooms.avgTemperature != null">
+                🏠 <span x-text="$store.rooms.avgTemperature?.toFixed(1)"></span>°
+              </span>
+              <span class="header-humid" x-show="$store.rooms.avgHumidity != null">
+                💧 <span x-text="$store.rooms.avgHumidity?.toFixed(0)"></span>%
+              </span>
+              <span class="header-co2" x-show="$store.rooms.co2Value != null">
+                💨 <span x-text="$store.rooms.co2Value"></span>
+              </span>
+            </div>
+            <div class="date-time" x-text="currentDateTime"></div>
           </div>
-          <div class="date-time" x-text="currentDateTime"></div>
           <div class="last-update" x-text="'Last update: ' + lastUpdateText"></div>
         </div>
       </div>
@@ -3233,6 +3238,9 @@
       hallway: {
         climate: [
           { name: 'CO2', label: 'CO2 Sensor', isPrimary: true }
+        ],
+        co2: [
+          { name: 'CO2', label: 'Air Quality' }
         ]
       }
     };
