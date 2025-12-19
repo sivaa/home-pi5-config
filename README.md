@@ -66,6 +66,7 @@
 | 11 | [On-Screen Keyboard](docs/11-onscreen-keyboard.md) | Tablet-like touch keyboard (squeekboard) |
 | 12 | [Pi Maintenance](docs/12-pi-maintenance.md) | Daily 4:30 AM reboot for unattended reliability |
 | 13 | [Browser Setup](docs/13-browser-setup.md) | Replaced Chromium with lightweight Epiphany |
+| 14 | [Brightness Control](docs/14-brightness-control.md) | Adaptive DDC/CI dimming (80% wake, 25% idle) |
 
 ---
 
@@ -184,6 +185,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-19 | Added adaptive brightness control (DDC/CI): 80% on wake, dims 10%/min to 25% idle |
 | 2025-12-19 | Replaced Chromium with Epiphany browser (440 MB → 60 MB, fixed infinite loading) |
 | 2025-12-18 | Added daily Pi reboot at 4:30 AM for unattended reliability |
 | 2025-12-18 | Enabled on-screen keyboard (squeekboard) for tablet-like touch input |
@@ -213,11 +215,11 @@ pi-setup/
 │   │   ├── docker-compose.yml
 │   │   ├── configuration.yaml
 │   │   └── mosquitto.conf
-│   ├── display-scheduler/ <- Display power scheduling
+│   ├── display-scheduler/ <- Display power & brightness
 │   │   ├── display-scheduler.sh
-│   │   ├── display-on.timer
-│   │   ├── display-off.timer
-│   │   └── *.service files
+│   │   ├── brightness-dimmer.sh
+│   │   ├── input-wake-monitor.sh
+│   │   └── *.service/*.timer files
 │   └── pi-reboot/         <- Daily Pi reboot (4:30 AM)
 │       ├── daily-reboot.timer
 │       └── daily-reboot.service
@@ -234,7 +236,8 @@ pi-setup/
 │   ├── 10-display-scheduling.md
 │   ├── 11-onscreen-keyboard.md
 │   ├── 12-pi-maintenance.md
-│   └── 13-browser-setup.md
+│   ├── 13-browser-setup.md
+│   └── 14-brightness-control.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)

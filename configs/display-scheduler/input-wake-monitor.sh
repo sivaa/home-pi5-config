@@ -24,9 +24,16 @@ log() {
 }
 
 wake_display() {
+    log "Input detected - waking display and resetting brightness"
+
+    # Turn display on if it's off
     if wlopm 2>/dev/null | grep -q "off"; then
-        log "Input detected - waking display"
         wlopm --on "$DISPLAY_OUTPUT"
+    fi
+
+    # Reset brightness to wake level (80%)
+    if [ -x "$HOME/.local/bin/brightness-dimmer.sh" ]; then
+        "$HOME/.local/bin/brightness-dimmer.sh" wake 2>/dev/null || true
     fi
 }
 

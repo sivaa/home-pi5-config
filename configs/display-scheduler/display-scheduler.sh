@@ -6,13 +6,15 @@
 # running labwc (Wayland compositor).
 #
 # Usage:
-#   display-scheduler.sh on      # Turn display on, stop idle monitoring
-#   display-scheduler.sh off     # Turn display off, start idle monitoring
-#   display-scheduler.sh status  # Show current state
+#   display-scheduler.sh on              # Turn display on, set 50% brightness
+#   display-scheduler.sh off             # Turn display off, start idle monitoring
+#   display-scheduler.sh status          # Show current state
+#   display-scheduler.sh brightness [N]  # Get or set brightness (0-100)
 #
 # Prerequisites:
 #   - wlopm (Wayland output power management)
 #   - swayidle (idle detection daemon)
+#   - ddcutil (DDC/CI monitor control)
 #   - labwc or compatible Wayland compositor
 #
 # Schedule:
@@ -24,11 +26,35 @@ set -euo pipefail
 
 # Configuration
 IDLE_TIMEOUT_SEC=300  # 5 minutes
+DAY_BRIGHTNESS=50     # Day mode brightness (0-100)
 LOG_TAG="display-scheduler"
 
 # Detect display output (typically HDMI-A-1 for Pi 5)
 get_output() {
     wlopm 2>/dev/null | head -1 | cut -d' ' -f1
+}
+
+# Set monitor brightness via DDC/CI (VCP code 0x10)
+set_brightness() {
+    local level="$1"
+    if command -v ddcutil &>/dev/null; then
+        if sudo ddcutil setvcp 10 "$level" 2>/dev/null; then
+            log "INFO" "Brightness set to ${level}%"
+        else
+            log "WARN" "Failed to set brightness (DDC/CI may not be supported)"
+        fi
+    else
+        log "WARN" "ddcutil not installed, skipping brightness control"
+    fi
+}
+
+# Get current brightness level
+get_brightness() {
+    if command -v ddcutil &>/dev/null; then
+        sudo ddcutil getvcp 10 2>/dev/null | grep -oP 'current value =\s*\K\d+' || echo "unknown"
+    else
+        echo "N/A"
+    fi
 }
 
 # Logging function (writes to both syslog and stdout)
@@ -65,7 +91,10 @@ cmd_on() {
         systemctl --user stop input-wake-monitor.service
     fi
 
-    log "INFO" "Display is now ON (no idle timeout)"
+    # Set daytime brightness
+    set_brightness "$DAY_BRIGHTNESS"
+
+    log "INFO" "Display is now ON at ${DAY_BRIGHTNESS}% brightness (no idle timeout)"
 }
 
 # Turn display OFF and enable night-mode idle
@@ -120,6 +149,7 @@ cmd_status() {
 
     if [ -n "$output" ]; then
         echo "Power state:    $(wlopm 2>/dev/null || echo 'unknown')"
+        echo "Brightness:     $(get_brightness)%"
     fi
 
     echo ""
@@ -156,14 +186,22 @@ case "${1:-status}" in
     boot-check)
         cmd_boot_check
         ;;
+    brightness)
+        if [ -z "${2:-}" ]; then
+            echo "Current brightness: $(get_brightness)%"
+        else
+            set_brightness "$2"
+        fi
+        ;;
     *)
-        echo "Usage: $0 {on|off|status|boot-check}"
+        echo "Usage: $0 {on|off|status|boot-check|brightness [0-100]}"
         echo ""
         echo "Commands:"
-        echo "  on          Turn display on, disable idle timeout (day mode)"
-        echo "  off         Turn display off, enable 5-min idle timeout (night mode)"
-        echo "  status      Show current display and scheduler status"
-        echo "  boot-check  Check current hour and activate appropriate mode"
+        echo "  on              Turn display on, set ${DAY_BRIGHTNESS}% brightness (day mode)"
+        echo "  off             Turn display off, enable 5-min idle timeout (night mode)"
+        echo "  status          Show current display and scheduler status"
+        echo "  boot-check      Check current hour and activate appropriate mode"
+        echo "  brightness [N]  Get or set brightness (0-100)"
         exit 1
         ;;
 esac

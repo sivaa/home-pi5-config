@@ -1,0 +1,14 @@
+[Unit]
+Description=Brightness Dimmer - Gradual display dimming when idle
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=%h/.local/bin/brightness-dimmer.sh run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
