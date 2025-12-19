@@ -85,10 +85,56 @@ pi-setup/
 > *"We are preparing for the worst day and we need to recover and get it up exactly the same as before."*
 
 All documentation should enable complete system restoration from scratch.
-- make sure that all teh coding agents refers to the proper documents. create agents.md based on the standard and add high level instructions on where to refer. because we are gonna use this pi for many services
-- don't use anything from zigbee-backup-old-device folder without user's explict approval. its a backup from old device and lot of things to changed. be honest with this
-- every soruce and config file should be first in this repo and later moved to      pi. eerything single time. golden rule
-- no services should run locaally (mac) never ever unless user explicts asks
+
+---
+
+## 🚨 Golden Rules (MUST FOLLOW)
+
+### 1. Dashboard Development Workflow
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🔄 LOCAL FIRST → DEPLOY ONLY WHEN USER ASKS                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. ALWAYS test dashboard changes LOCALLY first                 │
+│     - Run: python -m http.server 8888                           │
+│       (from services/dashboard/www/)                            │
+│     - Open: http://localhost:8888                               │
+│                                                                 │
+│  2. Connect to Pi services FROM local laptop:                   │
+│     - MQTT: pi:1883 (mosquitto)                                 │
+│     - InfluxDB: pi:8086                                         │
+│     - Home Assistant: pi:8123                                   │
+│     - Zigbee2MQTT: pi:8080                                      │
+│                                                                 │
+│  3. ONLY deploy to Pi when user EXPLICITLY asks                 │
+│     - scp files to /opt/dashboard/www/                          │
+│     - Fix permissions: sudo chmod -R 755 /opt/dashboard/www     │
+│                                                                 │
+│  WHY: Faster testing & iteration cycles!                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2. Source Files First
+- Every source and config file should be first in THIS REPO
+- Then moved to Pi - EVERY SINGLE TIME
+
+### 3. No Local Services
+- No services should run locally (Mac) unless user explicitly asks
+- Dashboard testing is the EXCEPTION (connects to Pi services)
+
+### 4. Old Backup Caution
+- Don't use anything from `zigbee-backup-old-device/` without user's explicit approval
+- It's a backup from old device - many things need to change
+
+### 5. Agent Documentation
+- All coding agents should refer to proper documents
+- Create agents.md for high-level instructions
+
+### 6. SSH Connection to Pi
+- **ALWAYS use `pi@pi`** for SSH/SCP connections (not just `pi`)
+- Example: `ssh pi@pi "command"` or `scp file pi@pi:/path/`
+- The hostname `pi` alone may resolve to wrong user
 
 ---
 

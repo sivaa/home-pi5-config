@@ -53,7 +53,7 @@
 | 12 | - | Motion Detector | SNZB-03P | SONOFF | PIR Motion Sensor |
 | 13 | - | Smart Plug 1 | S60ZBTPF | SONOFF | Smart Plug (Energy) |
 | 14 | - | Contact Sensor 1 | SNZB-04P | SONOFF | Door/Window Sensor |
-| 15 | Mailbox | Vibration Sensor | ZG-102ZM | HOBEIAN | Vibration Sensor |
+| 15 | Mailbox | Motion Sensor | SNZB-03P | SONOFF | PIR Motion Sensor |
 | 16 | Living | Temperature & Humidity 6 | SNZB-02P | SONOFF | Sensor |
 | 17 | Living | Temperature & Humidity 7 | SNZB-02P | SONOFF | Sensor |
 | 18 | Study | Temperature & Humidity 8 | SNZB-02P | SONOFF | Sensor |
@@ -371,33 +371,32 @@
 
 ---
 
-### HOBEIAN ZG-102ZM - Mailbox Vibration Sensor
+### SONOFF SNZB-03P - Mailbox Motion Sensor
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              HOBEIAN ZG-102ZM VIBRATION SENSOR               │
+│              SONOFF SNZB-03P MOTION SENSOR (MAILBOX)         │
 ├─────────────────────────────────────────────────────────────┤
-│  Manufacturer: HOBEIAN                                       │
-│  Model: ZG-102ZM                                             │
+│  Manufacturer: SONOFF                                        │
+│  Model: SNZB-03P                                             │
 │  Protocol: Zigbee 3.0                                        │
-│  Power: CR2032 battery                                       │
-│  Use: Mailbox notification / vibration detection             │
+│  Power: CR2477 battery                                       │
+│  Use: Mailbox motion detection                               │
 ├─────────────────────────────────────────────────────────────┤
 │  Sensors:                                                    │
-│    - Vibration (true/false)                                  │
-│    - Sensitivity (0-100, adjustable)                         │
+│    - Occupancy (true/false)                                  │
 │    - Battery level (%)                                       │
-│    - Battery voltage (mV)                                    │
+│    - Illumination (bright/dim)                               │
+├─────────────────────────────────────────────────────────────┤
+│  Detection Specs:                                            │
+│    - Detection angle: 110°                                   │
+│    - Detection range: 6 meters                               │
+│    - Motion timeout: 5 seconds (configurable)                │
 ├─────────────────────────────────────────────────────────────┤
 │  How it Works:                                               │
-│    - Detects vibration when mailbox lid opens/closes         │
-│    - Triggers vibration=true event                           │
-│    - Auto-resets after motion stops                          │
-│                                                              │
-│  Sensitivity Tuning:                                         │
-│    - Higher value = more sensitive                           │
-│    - Default: 50                                              │
-│    - Adjust via Zigbee2MQTT web UI                           │
+│    - PIR sensor detects motion at mailbox                    │
+│    - Triggers occupancy=true when motion detected            │
+│    - Auto-resets after motion timeout                        │
 ├─────────────────────────────────────────────────────────────┤
 │  Pairing Procedure:                                          │
 │    1. Press and hold button for 5+ seconds                   │
@@ -408,7 +407,7 @@
 │    Hold button 10+ seconds until LED blinks 3 times          │
 │                                                              │
 │  Installation:                                               │
-│    Mount inside mailbox lid using adhesive                   │
+│    Mount inside mailbox facing the opening                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -416,9 +415,10 @@
 ```json
 {
   "battery": 100,
-  "vibration": false,
-  "sensitivity": 50,
-  "linkquality": 152
+  "occupancy": false,
+  "illumination": "dim",
+  "motion_timeout": 5,
+  "linkquality": 180
 }
 ```
 
@@ -450,7 +450,7 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF SNZB-02P Bed (x2)                             │
 │    [ ] SONOFF SNZB-03P Motion Detector                      │
 │    [ ] SONOFF SNZB-04P Contact Sensor                       │
-│    [ ] HOBEIAN ZG-102ZM Mailbox Vibration Sensor            │
+│    [ ] SONOFF SNZB-03P Mailbox Motion Sensor                │
 │    [ ] IKEA Remote Study                                    │
 │    [ ] IKEA Remote Living                                   │
 │                                                             │
@@ -487,6 +487,7 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2025-12-18 | Replaced mailbox vibration sensor with SONOFF SNZB-03P motion sensor |
 | 2025-12-16 | Added HOBEIAN ZG-102ZM mailbox vibration sensor |
 | 2025-12-16 | Added 6 new SNZB-02P temperature sensors (total now 11) |
 | 2025-12-16 | Updated device count: 15 → 22 devices |
