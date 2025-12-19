@@ -222,8 +222,16 @@
           </div>
         </div>
 
-        <!-- Right: Date/Time -->
+        <!-- Right: Stats + Date/Time -->
         <div class="header-right">
+          <div class="header-stats">
+            <span class="header-temp" x-show="$store.rooms.avgTemperature != null">
+              🏠 <span x-text="$store.rooms.avgTemperature?.toFixed(1)"></span>°
+            </span>
+            <span class="header-co2" x-show="$store.rooms.co2Value != null">
+              💨 <span x-text="$store.rooms.co2Value"></span>
+            </span>
+          </div>
           <div class="date-time" x-text="currentDateTime"></div>
           <div class="last-update" x-text="'Last update: ' + lastUpdateText"></div>
         </div>
@@ -3374,6 +3382,29 @@
 
         get historyCount() {
           return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
+        },
+
+        // Home-wide average temperature
+        get avgTemperature() {
+          const temps = this.list.filter(r => r.avgTemperature != null).map(r => r.avgTemperature);
+          if (temps.length === 0) return null;
+          return temps.reduce((a, b) => a + b, 0) / temps.length;
+        },
+
+        // Home-wide average humidity
+        get avgHumidity() {
+          const humids = this.list.filter(r => r.avgHumidity != null).map(r => r.avgHumidity);
+          if (humids.length === 0) return null;
+          return humids.reduce((a, b) => a + b, 0) / humids.length;
+        },
+
+        // CO2 value from hallway sensor
+        get co2Value() {
+          for (const room of this.list) {
+            const co2Sensor = room.sensors.find(s => s.co2 != null);
+            if (co2Sensor) return co2Sensor.co2;
+          }
+          return null;
         },
 
         updateRoom(sensorName, data) {

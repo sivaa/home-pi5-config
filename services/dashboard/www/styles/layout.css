@@ -85,6 +85,23 @@
       flex-shrink: 0;
     }
 
+    .header-stats {
+      display: flex;
+      gap: var(--space-md);
+      justify-content: flex-end;
+      font-size: var(--font-size-md);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: 2px;
+    }
+
+    .header-temp {
+      color: var(--color-primary);
+    }
+
+    .header-co2 {
+      color: var(--color-success);
+    }
+
     .date-time {
       font-size: var(--font-size-sm);
       font-weight: var(--font-weight-medium);
