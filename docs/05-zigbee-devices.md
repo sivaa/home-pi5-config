@@ -535,9 +535,76 @@ If rebuilding the Zigbee network from scratch:
 │  Step 5: Disable permit_join                                │
 │                                                             │
 │  Step 6: Set up light bindings (remotes → lights)           │
+│    [ ] Wake [Study] Light Remote (press button)             │
+│    [ ] Bind [Study] Light Remote → [Study] IKEA Light       │
+│    [ ] Wake [Living] Light Remote (press button)            │
+│    [ ] Bind [Living] Light Remote → [Living] IKEA Light     │
+│                                                             │
+│  Step 7: Verify bindings work (test toggle/brightness)      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Direct Device Binding (Remote → Light)
+
+Direct binding allows IKEA remotes to control lights **without Zigbee2MQTT** or Home Assistant. The remote communicates directly with the light via Zigbee mesh.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      DIRECT ZIGBEE BINDINGS                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [Study] Light Remote ────────────────→ [Study] IKEA Light                  │
+│     └─ genOnOff (toggle)                     └─ L1528 FLOALT 30x90          │
+│     └─ genLevelCtrl (brightness)                                            │
+│                                                                              │
+│  [Living] Light Remote ───────────────→ [Living] IKEA Light                 │
+│     └─ genOnOff (toggle)                     └─ L1529 FLOALT 60x60          │
+│     └─ genLevelCtrl (brightness)                                            │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Benefits:                                                                   │
+│    ✓ Works even if Zigbee2MQTT is down                                      │
+│    ✓ Works even if Home Assistant is down                                   │
+│    ✓ Works even if the Pi is rebooting                                      │
+│    ✓ Faster response time (direct mesh communication)                       │
+│                                                                              │
+│  Bound Clusters:                                                             │
+│    • genOnOff - Toggle light on/off (center button)                         │
+│    • genLevelCtrl - Brightness up/down (side buttons)                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Binding Commands
+
+```bash
+# Bind remote to light (remote must be AWAKE - press a button first!)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Study] Light Remote\", \"to\": \"[Study] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Living] Light Remote\", \"to\": \"[Living] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+
+# Check existing bindings
+ssh pi@pi "docker logs zigbee2mqtt 2>&1 | grep -i 'bound cluster'"
+
+# Unbind (if needed)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/unbind' \
+  -m '{\"from\": \"[Study] Light Remote\", \"to\": \"[Study] IKEA Light\"}'"
+```
+
+### Important: Sleepy Device Wake-Up
+
+IKEA remotes are "sleepy devices" - they sleep to save battery. To bind:
+
+1. **Press any button on the remote** to wake it up
+2. **Immediately send the bind command** (within 2-3 seconds)
+3. If binding fails with "Delivery failed", the remote went back to sleep - try again
 
 ---
 
@@ -563,6 +630,9 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2025-12-20 | Re-paired IKEA lights and remotes after network issues |
+| 2025-12-20 | Set up direct Zigbee bindings: remotes → lights (genOnOff + genLevelCtrl) |
+| 2025-12-20 | Added Direct Device Binding section with commands |
 | 2025-12-19 | Added 4x SONOFF TRVZB thermostats (Study, Bed, Living x2) |
 | 2025-12-19 | Added 2x Smart Plugs [2] and [3], 1x Bed Window Contact Sensor |
 | 2025-12-19 | Renamed: CO2 → [Hallway] CO2, Contact Sensor 1 → [Bath] Window Contact |

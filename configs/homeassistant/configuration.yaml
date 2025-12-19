@@ -45,8 +45,9 @@ http:
     - 2a06:98c0::/29
     - 2c0f:f248::/32
 
-# MQTT auto-discovery enabled by default
-# Zigbee2MQTT devices appear automatically
+# MQTT - Configured via UI integration (Settings > Devices & Services > MQTT)
+# VPN provides network security - no MQTT authentication needed
+# broker: mosquitto, port: 1883 (anonymous access allowed)
 
 # InfluxDB integration - writes sensor data directly
 influxdb:

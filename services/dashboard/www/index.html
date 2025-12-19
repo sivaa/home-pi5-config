@@ -3157,10 +3157,13 @@
     // ========================================
     // Detect local dev (localhost) vs Pi deployment
     const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isNginxProxy = window.location.port === '8888';
     const CONFIG = {
       mqttUrl: isLocalDev
         ? 'ws://pi:9001'  // Local dev → connect to Pi's MQTT
-        : 'ws://' + window.location.hostname + ':9001',
+        : isNginxProxy
+          ? 'ws://' + window.location.host + '/mqtt'  // Pi nginx proxy
+          : 'ws://' + window.location.hostname + ':9001',
       baseTopic: 'zigbee2mqtt',
       influxUrl: isLocalDev
         ? 'http://pi:8086'  // Local dev → connect to Pi's InfluxDB

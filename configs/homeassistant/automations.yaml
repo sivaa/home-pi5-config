@@ -62,7 +62,7 @@
 
   trigger:
     - platform: numeric_state
-      entity_id: sensor.co2_co2
+      entity_id: sensor.hallway_co2_co2
       above: 1200
 
   condition:
@@ -82,12 +82,12 @@
       data:
         entity_id: media_player.kitchen_display
         message: >
-          Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.co2_co2') | int // 100) * 100 }}.
+          Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
         language: "en"
     - service: notify.mobile_app_22111317pg
       data:
         title: "⚠️ CO2 High"
-        message: "CO2 above {{ states('sensor.co2_co2') }} ppm - please ventilate"
+        message: "CO2 above {{ states('sensor.hallway_co2_co2') }} ppm - please ventilate"
         data:
           channel: "Alerts"
           importance: high
@@ -109,13 +109,13 @@
       minutes: "/5"
     # Also trigger immediately when crossing threshold
     - platform: numeric_state
-      entity_id: sensor.co2_co2
+      entity_id: sensor.hallway_co2_co2
       above: 1600
 
   condition:
     # Only announce if CO2 is above critical level
     - condition: numeric_state
-      entity_id: sensor.co2_co2
+      entity_id: sensor.hallway_co2_co2
       above: 1600
 
   action:
@@ -123,12 +123,12 @@
       data:
         entity_id: media_player.kitchen_display
         message: >
-          Warning! CO2 level is critical at {{ states('sensor.co2_co2') | int }}. Please open windows immediately!
+          Warning! CO2 level is critical at {{ states('sensor.hallway_co2_co2') | int }}. Please open windows immediately!
         language: "en"
     - service: notify.mobile_app_22111317pg
       data:
         title: "🚨 CO2 CRITICAL"
-        message: "CO2 at {{ states('sensor.co2_co2') }} ppm - OPEN WINDOWS NOW!"
+        message: "CO2 at {{ states('sensor.hallway_co2_co2') }} ppm - OPEN WINDOWS NOW!"
         data:
           channel: "Critical"
           importance: max
@@ -147,7 +147,7 @@
 
   trigger:
     - platform: numeric_state
-      entity_id: sensor.co2_co2
+      entity_id: sensor.hallway_co2_co2
       below: 500
 
   condition:
@@ -183,7 +183,7 @@
     - service: notify.mobile_app_22111317pg
       data:
         title: "✅ Air Quality Good"
-        message: "CO2 now {{ states('sensor.co2_co2') }} ppm - windows can be closed"
+        message: "CO2 now {{ states('sensor.hallway_co2_co2') }} ppm - windows can be closed"
         data:
           channel: "Info"
           importance: default
