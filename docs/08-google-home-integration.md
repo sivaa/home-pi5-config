@@ -123,11 +123,14 @@ Home Assistant announces events via Google Home speakers using Text-to-Speech.
 | Automation | Trigger | Message | Quiet Hours |
 |------------|---------|---------|-------------|
 | Mailbox Motion | PIR sensor detects motion | "Mailbox opened" | 23:00-06:00 |
-| CO2 High Alert | CO2 > 1200 ppm | "Please ventilate..." | 23:00-06:00 |
-| CO2 Critical | CO2 > 1600 ppm | "Warning! CO2 very high..." | 23:00-06:00 |
-| CO2 Good | CO2 < 500 ppm | "Air quality good..." | 23:00-06:00 |
+| CO2 High Alert | CO2 > 1200 ppm (once when crossing) | "Please ventilate..." | 07:00-23:00 |
+| CO2 Critical | CO2 > 1600 ppm (**every 5 min**) | "Warning! CO2 critical..." | **None (24/7)** |
+| CO2 Good | CO2 < 500 ppm (after high/critical) | "Air quality good..." | 07:00-23:00 |
 | Bath Window Open | Window open > 10 min | "Window open for X min" | None |
 | Bed Window Open | Window open > 10 min | "Window open for X min" | None |
+
+> **Note:** CO2 Critical alert is safety-critical and runs 24/7. It announces every 5 minutes
+> while CO2 remains above 1600 ppm until you open windows to ventilate.
 
 ### Entity References
 
