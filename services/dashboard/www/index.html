@@ -760,16 +760,21 @@
                     </div>
                   </div>
 
-                  <!-- Sensor List - inline logic for Alpine compatibility -->
-                  <div class="sensor-list" x-show="room.sensors && room.sensors.length > 0">
-                    <template x-for="sensor in (room.sensors || [])" :key="sensor.name">
+                  <!-- Sensor List - show if multiple sensors OR has CO2/special sensors -->
+                  <div class="sensor-list" x-show="room.sensors && (room.sensors.length > 1 || room.sensors.some(s => s.type === 'co2'))">
+                    <template x-for="sensor in (room.sensors || [])" :key="sensor.name + '-' + sensor.type">
                       <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null }">
-                        <span class="sensor-icon" x-text="sensor.type === 'co2' ? '💨' : (sensor.type === 'motion' ? '👁️' : (sensor.type === 'contact' ? '🚪' : '🌡️'))"></span>
-                        <span class="sensor-label" x-text="sensor.label"></span>
+                        <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : '')"></span>
+                        <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
                         <template x-if="sensor.type === 'climate' || !sensor.type">
                           <div class="sensor-values">
                             <span class="sensor-temp" x-text="sensor.temperature != null ? sensor.temperature.toFixed(1) + '°' : '--°'"></span>
                             <span class="sensor-humid" x-show="sensor.humidity != null">💧<span x-text="sensor.humidity ? sensor.humidity.toFixed(0) + '%' : ''"></span></span>
+                          </div>
+                        </template>
+                        <template x-if="sensor.type === 'thermostat'">
+                          <div class="sensor-values">
+                            <span class="sensor-temp" x-text="sensor.temperature != null ? sensor.temperature.toFixed(1) + '°' : '--°'"></span>
                           </div>
                         </template>
                         <template x-if="sensor.type === 'co2'">
@@ -3154,7 +3159,8 @@
         { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity' },
         { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity' },
         { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity' },
-        { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity' }
+        { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity' },
+        { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '', entityId: '' }
       ],
       staleThreshold: 5 * 60 * 1000,
       maxHistoryPoints: 500,
@@ -3172,41 +3178,53 @@
     const ROOM_SENSORS = {
       living: {
         climate: [
-          { name: '[Living] Temperature & Humidity', label: 'Primary', isPrimary: true },
-          { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
-          { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' }
+          { name: '[Living] Temperature & Humidity', label: 'West', isPrimary: true },
+          { name: '[Living] Temperature & Humidity 6', label: 'North' },
+          { name: '[Living] Temperature & Humidity 7', label: 'Inner' }
         ],
-        co2: [
-          { name: 'CO2', label: 'CO2 Monitor' }
+        thermostat: [
+          { name: '[Living] Thermostat Inner', label: 'Heater Inner' },
+          { name: '[Living] Thermostat Outer', label: 'Heater Outer' }
         ]
       },
       bedroom: {
         climate: [
-          { name: '[Bed] Temperature & Humidity Sensor', label: 'Primary', isPrimary: true },
-          { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' }
+          { name: '[Bed] Temperature & Humidity Sensor', label: 'East', isPrimary: true },
+          { name: '[Bed] Temperature & Humidity Sensor 9', label: 'North' }
+        ],
+        thermostat: [
+          { name: '[Bed] Thermostat', label: 'Heater' }
         ]
       },
       study: {
         climate: [
-          { name: '[Study] Temperature & Humidity', label: 'Primary', isPrimary: true },
-          { name: '[Study] Temperature & Humidity 8', label: 'Sensor 2' }
+          { name: '[Study] Temperature & Humidity', label: 'West', isPrimary: true },
+          { name: '[Study] Temperature & Humidity 8', label: 'Inner' }
+        ],
+        thermostat: [
+          { name: '[Study] Thermostat', label: 'Heater' }
         ]
       },
       kitchen: {
         climate: [
-          { name: '[Kitchen] Temperature & Humidity', label: 'Primary', isPrimary: true },
-          { name: '[Kitchen] Temperature & Humidity 10', label: 'Sensor 2' }
+          { name: '[Kitchen] Temperature & Humidity', label: 'East', isPrimary: true },
+          { name: '[Kitchen] Temperature & Humidity 10', label: 'Inner' }
         ]
       },
       bathroom: {
         climate: [
-          { name: '[Bath] Temperature & Humidity', label: 'Primary', isPrimary: true },
-          { name: '[Bath] Temperature & Humidity 11', label: 'Sensor 2' }
+          { name: '[Bath] Temperature & Humidity', label: 'East', isPrimary: true },
+          { name: '[Bath] Temperature & Humidity 11', label: 'Inner' }
         ]
       },
       balcony: {
         climate: [
           { name: '[Balcony] Temperature & Humidity', label: 'Outdoor', isPrimary: true }
+        ]
+      },
+      hallway: {
+        climate: [
+          { name: 'CO2', label: 'CO2 Sensor', isPrimary: true }
         ]
       }
     };
@@ -3322,6 +3340,7 @@
           const allSensors = [
             ...(roomSensorConfig.climate || []).map(s => ({ ...s, type: 'climate' })),
             ...(roomSensorConfig.co2 || []).map(s => ({ ...s, type: 'co2' })),
+            ...(roomSensorConfig.thermostat || []).map(s => ({ ...s, type: 'thermostat' })),
             ...(roomSensorConfig.motion || []).map(s => ({ ...s, type: 'motion' })),
             ...(roomSensorConfig.contact || []).map(s => ({ ...s, type: 'contact' }))
           ];
@@ -3406,6 +3425,7 @@
 
               // Update sensor values
               if (data.temperature !== undefined) sensor.temperature = data.temperature;
+              if (data.local_temperature !== undefined) sensor.temperature = data.local_temperature;  // Thermostats report local_temperature
               if (data.humidity !== undefined) sensor.humidity = data.humidity;
               if (data.co2 !== undefined) sensor.co2 = data.co2;
               if (data.battery !== undefined) sensor.battery = data.battery;
@@ -3422,24 +3442,26 @@
           return found;
         },
 
-        // Recalculate room averages from all climate sensors
+        // Recalculate room averages from all temperature sensors (climate + thermostat)
         _recalculateRoomAverages(room) {
-          const climateSensors = room.sensors.filter(s =>
-            s.type === 'climate' && s.temperature != null
+          // Include both climate and thermostat sensors for temperature average
+          const tempSensors = room.sensors.filter(s =>
+            (s.type === 'climate' || s.type === 'thermostat') && s.temperature != null
           );
 
-          if (climateSensors.length === 0) {
+          if (tempSensors.length === 0) {
             room.avgTemperature = room.temperature;
             room.avgHumidity = room.humidity;
             room.tempSpread = null;
             return;
           }
 
-          const temps = climateSensors.map(s => s.temperature);
+          const temps = tempSensors.map(s => s.temperature);
           room.avgTemperature = temps.reduce((a, b) => a + b, 0) / temps.length;
           room.tempSpread = Math.max(...temps) - Math.min(...temps);
 
-          const humids = climateSensors.filter(s => s.humidity != null).map(s => s.humidity);
+          // Humidity only from climate sensors (thermostats don't have humidity)
+          const humids = tempSensors.filter(s => s.humidity != null).map(s => s.humidity);
           if (humids.length > 0) {
             room.avgHumidity = humids.reduce((a, b) => a + b, 0) / humids.length;
           }
