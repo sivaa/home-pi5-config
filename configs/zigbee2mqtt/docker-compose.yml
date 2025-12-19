@@ -24,7 +24,7 @@ services:
     devices:
       - /dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_76e8abf6fd73ef1197c4c274d9b539e6-if00-port0:/dev/ttyUSB0
     environment:
-      - TZ=Australia/Sydney
+      - TZ=Europe/Berlin
 
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
@@ -37,8 +37,11 @@ services:
     volumes:
       - /opt/homeassistant:/config
     environment:
-      - TZ=Australia/Sydney
+      - TZ=Europe/Berlin
     privileged: true
+    dns:
+      - 192.168.0.1
+      - 8.8.8.8
 
   influxdb:
     image: influxdb:1.8
@@ -65,7 +68,7 @@ services:
       - MQTT_URL=mqtt://mosquitto:1883
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_DB=homeassistant
-      - TZ=Australia/Sydney
+      - TZ=Europe/Berlin
 
   dashboard:
     image: nginx:alpine

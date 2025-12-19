@@ -386,7 +386,7 @@ export function mailboxView() {
 
     formatTime(timestamp) {
       if (!timestamp) return '--';
-      return new Date(timestamp).toLocaleTimeString('en-AU', {
+      return new Date(timestamp).toLocaleTimeString('de-DE', {
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
@@ -395,7 +395,7 @@ export function mailboxView() {
 
     formatDate(timestamp) {
       if (!timestamp) return '--';
-      return new Date(timestamp).toLocaleDateString('en-AU', {
+      return new Date(timestamp).toLocaleDateString('de-DE', {
         weekday: 'short',
         month: 'short',
         day: 'numeric'
@@ -404,7 +404,7 @@ export function mailboxView() {
 
     formatDateTime(timestamp) {
       if (!timestamp) return '--';
-      return new Date(timestamp).toLocaleString('en-AU', {
+      return new Date(timestamp).toLocaleString('de-DE', {
         weekday: 'short',
         month: 'short',
         day: 'numeric',

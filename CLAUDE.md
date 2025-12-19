@@ -47,6 +47,8 @@ pi-setup/
 
 ## Current Pi Configuration
 
+- **Location:** Berlin, Germany
+- **Timezone:** Europe/Berlin
 - **Device:** Raspberry Pi 5 Model B Rev 1.1
 - **OS:** Debian GNU/Linux 13 (trixie)
 - **Access:** `ssh pi@pi`
