@@ -94,36 +94,36 @@
 
 # -----------------------------------------------------------------------------
 # CO2 CRITICAL ALERT
-# Trigger: CO2 level rises above 1600 ppm (very high)
+# Trigger: Every 5 minutes, checks if CO2 > 1600 ppm
 # Action: Urgent TTS announcement + mobile notification
-# Cooldown: 5 minutes (shorter due to urgency)
 # NOTE: NO quiet hours - safety critical, runs 24/7
 # -----------------------------------------------------------------------------
 - id: co2_critical_alert
   alias: "CO2 Critical Level Alert"
-  description: "Urgent announcement when CO2 levels are dangerously high"
+  description: "Checks every 5 minutes and announces if CO2 is dangerously high"
   mode: single
 
   trigger:
+    # Check every 5 minutes
+    - platform: time_pattern
+      minutes: "/5"
+    # Also trigger immediately when crossing threshold
     - platform: numeric_state
       entity_id: sensor.co2_co2
       above: 1600
 
   condition:
-    # 5-minute cooldown (shorter due to urgency)
-    # NOTE: No quiet hours - this is safety critical and runs 24/7
-    - condition: template
-      value_template: >
-        {{ (now() - state_attr('automation.co2_critical_level_alert', 'last_triggered')).total_seconds() > 300
-           if state_attr('automation.co2_critical_level_alert', 'last_triggered') is not none
-           else true }}
+    # Only announce if CO2 is above critical level
+    - condition: numeric_state
+      entity_id: sensor.co2_co2
+      above: 1600
 
   action:
     - service: tts.google_translate_say
       data:
         entity_id: media_player.kitchen_display
         message: >
-          Warning! CO2 level is very high at {{ (states('sensor.co2_co2') | int // 100) * 100 }}. Please open windows immediately!
+          Warning! CO2 level is critical at {{ states('sensor.co2_co2') | int }}. Please open windows immediately!
         language: "en"
     - service: notify.mobile_app_22111317pg
       data:

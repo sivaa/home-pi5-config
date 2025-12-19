@@ -78,6 +78,8 @@ logger:
   logs:
     homeassistant.components.influxdb: info
     homeassistant.components.google_assistant: info
+    homeassistant.components.automation: info
+    homeassistant.components.tts: info
 
 # =============================================================================
 # MEDIA SOURCE (Required for TTS)
