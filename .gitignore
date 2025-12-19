@@ -15,3 +15,4 @@ backups/configs/zigbee2mqtt/network_key.txt
 # Router reboot script credentials
 scripts/.env
 node_modules/
+.playwright-mcp/
