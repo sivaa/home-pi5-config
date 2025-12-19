@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** December 16, 2025
-> **Total Devices:** 22 (including coordinator)
+> **Last Updated:** December 19, 2025
+> **Total Devices:** 29 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -22,12 +22,12 @@
 │  ┌──────────┬──────────┬───────┼───────┬──────────┬──────────┬──────────┐  │
 │  │          │          │       │       │          │          │          │  │
 │┌─▼──┐ ┌───▼───┐ ┌───▼───┐ ┌──▼──┐ ┌──▼──┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐│  │
-││IKEA│ │SONOFF │ │ NOUS  │ │ PIR │ │Door │ │ Plug  │ │Mailbox│ │ IKEA  ││  │
-││Lite│ │ Temp  │ │  E10  │ │ Mtn │ │ Cnt │ │ S60ZB │ │ Vibra │ │Remote ││  │
-││(2x)│ │ (12x) │ │  CO2  │ │     │ │     │ │       │ │       │ │ (2x)  ││  │
+││IKEA│ │SONOFF │ │ NOUS  │ │ PIR │ │Door │ │ Plug  │ │SONOFF │ │ IKEA  ││  │
+││Lite│ │ Temp  │ │  E10  │ │ Mtn │ │ Cnt │ │ S60ZB │ │ TRVZB │ │Remote ││  │
+││(2x)│ │ (12x) │ │  CO2  │ │     │ │(2x) │ │ (3x)  │ │ (4x)  │ │ (2x)  ││  │
 │└────┘ └───────┘ └───────┘ └─────┘ └─────┘ └───────┘ └───────┘ └───────┘│  │
 │                                                                              │
-│        Rooms: Balcony, Study, Living, Kitchen, Bath, Bed, Mailbox           │
+│      Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox    │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -49,17 +49,24 @@
 | 8 | Kitchen | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
 | 9 | Bath | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
 | 10 | Bed | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
-| 11 | Living | CO2 | E10 | NOUS | CO2 Detector |
-| 12 | - | Motion Detector | SNZB-03P | SONOFF | PIR Motion Sensor |
-| 13 | - | Smart Plug 1 | S60ZBTPF | SONOFF | Smart Plug (Energy) |
-| 14 | - | Contact Sensor 1 | SNZB-04P | SONOFF | Door/Window Sensor |
-| 15 | Mailbox | Motion Sensor | SNZB-03P | SONOFF | PIR Motion Sensor |
-| 16 | Living | Temperature & Humidity 6 | SNZB-02P | SONOFF | Sensor |
-| 17 | Living | Temperature & Humidity 7 | SNZB-02P | SONOFF | Sensor |
-| 18 | Study | Temperature & Humidity 8 | SNZB-02P | SONOFF | Sensor |
-| 19 | Bed | Temperature & Humidity 9 | SNZB-02P | SONOFF | Sensor |
-| 20 | Kitchen | Temperature & Humidity 10 | SNZB-02P | SONOFF | Sensor |
-| 21 | Bath | Temperature & Humidity 11 | SNZB-02P | SONOFF | Sensor |
+| 11 | Hallway | [Hallway] CO2 | E10 | NOUS | CO2 Detector |
+| 12 | Mailbox | [Mailbox] Motion Sensor | SNZB-03P | SONOFF | PIR Motion Sensor |
+| 13 | - | Smart Plug [1] | S60ZBTPF | SONOFF | Smart Plug (Energy) |
+| 14 | - | Smart Plug [2] | S60ZBTPF | SONOFF | Smart Plug (Energy) |
+| 15 | - | Smart Plug [3] | S60ZBTPF | SONOFF | Smart Plug (Energy) |
+| 16 | Bath | [Bath] Window Contact Sensor | SNZB-04P | SONOFF | Door/Window Sensor |
+| 17 | Bed | [Bed] Window Contact Sensor | SNZB-04P | SONOFF | Door/Window Sensor |
+| 18 | - | Vibration Sensor | ZG-102ZM | HOBEIAN | Vibration Sensor |
+| 19 | Living | Temperature & Humidity 6 | SNZB-02P | SONOFF | Sensor |
+| 20 | Living | Temperature & Humidity 7 | SNZB-02P | SONOFF | Sensor |
+| 21 | Study | Temperature & Humidity 8 | SNZB-02P | SONOFF | Sensor |
+| 22 | Bed | Temperature & Humidity 9 | SNZB-02P | SONOFF | Sensor |
+| 23 | Kitchen | Temperature & Humidity 10 | SNZB-02P | SONOFF | Sensor |
+| 24 | Bath | Temperature & Humidity 11 | SNZB-02P | SONOFF | Sensor |
+| 25 | Study | [Study] Thermostat | TRVZB | SONOFF | Radiator Valve |
+| 26 | Bed | [Bed] Thermostat | TRVZB | SONOFF | Radiator Valve |
+| 27 | Living | [Living] Thermostat Inner | TRVZB | SONOFF | Radiator Valve |
+| 28 | Living | [Living] Thermostat Outer | TRVZB | SONOFF | Radiator Valve |
 
 ---
 
@@ -138,7 +145,7 @@
 │    3. Release and device enters pairing mode                │
 │                                                             │
 │  Locations: Study(2), Living(3), Kitchen(2), Bath(2),      │
-│             Bed(2) = 11 units total                         │
+│             Bed(2), Balcony(1) = 12 units total             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -424,6 +431,68 @@
 
 ---
 
+### SONOFF TRVZB - Zigbee Radiator Valve (Thermostat)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  SONOFF TRVZB THERMOSTAT                     │
+├─────────────────────────────────────────────────────────────┤
+│  Manufacturer: SONOFF                                        │
+│  Model: TRVZB                                                │
+│  Protocol: Zigbee 3.0                                        │
+│  Power: 2x AA batteries                                      │
+│  Type: Thermostatic Radiator Valve (TRV)                    │
+├─────────────────────────────────────────────────────────────┤
+│  Features:                                                   │
+│    - Local temperature sensing                               │
+│    - Valve position control (0-100%)                        │
+│    - Frost protection                                        │
+│    - Child lock                                             │
+│    - Window open detection                                  │
+│    - Boost mode                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Controls:                                                   │
+│    - occupied_heating_setpoint: Target temperature          │
+│    - local_temperature: Current room temperature            │
+│    - running_state: heat / idle                             │
+│    - pi_heating_demand: Valve position percentage           │
+│    - system_mode: off / heat                                │
+├─────────────────────────────────────────────────────────────┤
+│  Pairing Procedure:                                          │
+│    1. Remove batteries and re-insert                         │
+│    2. Device automatically enters pairing mode               │
+│    3. LED blinks during pairing                              │
+│                                                              │
+│  Factory Reset:                                              │
+│    Hold both buttons (+ and -) for 10 seconds                │
+│                                                              │
+│  Installation:                                               │
+│    Replace existing radiator valve head                      │
+│    Includes adapters for common valve types                  │
+│                                                              │
+│  Locations: Study(1), Bed(1), Living(2) = 4 units           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "battery": 100,
+  "child_lock": "UNLOCK",
+  "frost_protection": "OFF",
+  "local_temperature": 21.5,
+  "local_temperature_calibration": 0,
+  "occupied_heating_setpoint": 22,
+  "pi_heating_demand": 45,
+  "running_state": "heat",
+  "system_mode": "heat",
+  "window_detection": false,
+  "linkquality": 200
+}
+```
+
+---
+
 ## Disaster Recovery Checklist
 
 If rebuilding the Zigbee network from scratch:
@@ -438,7 +507,9 @@ If rebuilding the Zigbee network from scratch:
 │  Step 2: Pair mains-powered devices FIRST (routers)         │
 │    [ ] IKEA FLOALT Study (L1528)                            │
 │    [ ] IKEA FLOALT Living (L1529)                           │
-│    [ ] SONOFF Smart Plug (S60ZBTPF) - acts as router!       │
+│    [ ] SONOFF Smart Plug [1] (S60ZBTPF) - router!           │
+│    [ ] SONOFF Smart Plug [2] (S60ZBTPF) - router!           │
+│    [ ] SONOFF Smart Plug [3] (S60ZBTPF) - router!           │
 │    [ ] NOUS E10 CO2 sensor (USB powered)                    │
 │                                                             │
 │  Step 3: Pair battery devices (end devices)                 │
@@ -448,11 +519,16 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF SNZB-02P Kitchen (x2)                         │
 │    [ ] SONOFF SNZB-02P Bath (x2)                            │
 │    [ ] SONOFF SNZB-02P Bed (x2)                             │
-│    [ ] SONOFF SNZB-03P Motion Detector                      │
-│    [ ] SONOFF SNZB-04P Contact Sensor                       │
 │    [ ] SONOFF SNZB-03P Mailbox Motion Sensor                │
+│    [ ] SONOFF SNZB-04P Bath Window Contact                  │
+│    [ ] SONOFF SNZB-04P Bed Window Contact                   │
+│    [ ] SONOFF TRVZB Study Thermostat                        │
+│    [ ] SONOFF TRVZB Bed Thermostat                          │
+│    [ ] SONOFF TRVZB Living Thermostat Inner                 │
+│    [ ] SONOFF TRVZB Living Thermostat Outer                 │
 │    [ ] IKEA Remote Study                                    │
 │    [ ] IKEA Remote Living                                   │
+│    [ ] HOBEIAN ZG-102ZM Vibration Sensor (optional)         │
 │                                                             │
 │  Step 4: Rename all devices with [Room] prefix              │
 │                                                             │
@@ -487,6 +563,10 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2025-12-19 | Added 4x SONOFF TRVZB thermostats (Study, Bed, Living x2) |
+| 2025-12-19 | Added 2x Smart Plugs [2] and [3], 1x Bed Window Contact Sensor |
+| 2025-12-19 | Renamed: CO2 → [Hallway] CO2, Contact Sensor 1 → [Bath] Window Contact |
+| 2025-12-19 | Updated device count: 22 → 29 devices |
 | 2025-12-18 | Replaced mailbox vibration sensor with SONOFF SNZB-03P motion sensor |
 | 2025-12-16 | Added HOBEIAN ZG-102ZM mailbox vibration sensor |
 | 2025-12-16 | Added 6 new SNZB-02P temperature sensors (total now 11) |

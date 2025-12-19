@@ -26,14 +26,17 @@ availability:
 device_options:
   retain: true
 devices:
+  # IKEA Lights
   '0xd0cf5efffe25ab28':
     friendly_name: '[Study] IKEA Light'
   '0xd0cf5efffe24d093':
     friendly_name: '[Living] IKEA Light'
+  # IKEA Remotes
   '0x90fd9ffffef4cebf':
     friendly_name: '[Study] Light Remote'
   '0x90fd9ffffee43106':
     friendly_name: '[Living] Light Remote'
+  # Temperature Sensors (original)
   '0xc09b9efffed502b9':
     friendly_name: '[Living] Temperature & Humidity'
   '0xc09b9efffef541b2':
@@ -46,12 +49,47 @@ devices:
     friendly_name: '[Balcony] Temperature & Humidity'
   '0xc09b9efffef541a8':
     friendly_name: '[Bed] Temperature & Humidity Sensor'
+  # Temperature Sensors (additional)
+  '0x8c73dafffe2a0459':
+    friendly_name: '[Living] Temperature & Humidity 6'
+  '0x8c73dafffe2a0638':
+    friendly_name: '[Living] Temperature & Humidity 7'
+  '0xf044d3fffe0806bc':
+    friendly_name: '[Study] Temperature & Humidity 8'
+  '0xf044d3fffe0806da':
+    friendly_name: '[Bed] Temperature & Humidity Sensor 9'
+  '0xf044d3fffe07f88a':
+    friendly_name: '[Kitchen] Temperature & Humidity 10'
+  '0x8c73dafffeb33c57':
+    friendly_name: '[Bath] Temperature & Humidity 11'
+  # CO2 Sensor
   '0xa4c138d2b1446edf':
-    friendly_name: CO2
+    friendly_name: '[Hallway] CO2'
+  # Motion Sensor
   '0x3425b4fffe1432aa':
-    friendly_name: Motion Detector
+    friendly_name: '[Mailbox] Motion Sensor'
+  # Smart Plugs
   '0xa4c13802b54effff':
-    friendly_name: Smart Plug 1
+    friendly_name: 'Smart Plug [1]'
+  '0xa4c13802c8b9ffff':
+    friendly_name: 'Smart Plug [2]'
+  '0xa4c13803091fffff':
+    friendly_name: 'Smart Plug [3]'
+  # Contact Sensors
   '0xc09b9efffe4af947':
-    friendly_name: Contact Sensor 1
+    friendly_name: '[Bath] Window Contact Sensor'
+  '0xc4d8c8fffe0f7eab':
+    friendly_name: '[Bed] Window Contact Sensor'
+  # Thermostats (TRVZB)
+  '0xc4d8c8fffe02cef8':
+    friendly_name: '[Study] Thermostat'
+  '0xc4d8c8fffe0d9fcc':
+    friendly_name: '[Bed] Thermostat'
+  '0x286847fffe3926dd':
+    friendly_name: '[Living] Thermostat Inner'
+  '0x286847fffe38ed6c':
+    friendly_name: '[Living] Thermostat Outer'
+  # Vibration Sensor
+  '0xa4c13863257ea097':
+    friendly_name: 'Vibration Sensor'
 version: 4
