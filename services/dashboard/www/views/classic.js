@@ -1,6 +1,6 @@
 /**
  * Vision 6: Classic Cards View
- * The original Apple-inspired grid design with room cards
+ * Multi-sensor room cards with individual sensor readings
  */
 
 export function classicView() {
@@ -38,6 +38,83 @@ export function classicView() {
       }
     },
 
+    // Get all sensors for a room (filters out sensors with no data)
+    getRoomSensors(room) {
+      if (!room.sensors) return [];
+      // Return all configured sensors, even if they don't have data yet
+      return room.sensors;
+    },
+
+    // Get sensors that have data
+    getActiveSensors(room) {
+      if (!room.sensors) return [];
+      return room.sensors.filter(s =>
+        s.temperature != null || s.humidity != null || s.co2 != null
+      );
+    },
+
+    // Get CO2 sensor for a room (if any)
+    getCO2Sensor(room) {
+      if (!room.sensors) return null;
+      return room.sensors.find(s => s.type === 'co2' && s.co2 != null);
+    },
+
+    // Get icon for sensor type
+    getSensorIcon(sensor) {
+      switch (sensor.type) {
+        case 'co2': return '💨';
+        case 'motion': return '👁️';
+        case 'contact': return '🚪';
+        default: return '🌡️';
+      }
+    },
+
+    // Get CO2 status color based on ppm level
+    getCO2StatusColor(co2) {
+      if (co2 == null) return 'var(--color-text-tertiary)';
+      if (co2 < 600) return 'var(--color-success)';
+      if (co2 < 1000) return 'var(--color-cool)';
+      if (co2 < 1500) return 'var(--color-warning)';
+      return 'var(--color-danger)';
+    },
+
+    // Get CO2 status label
+    getCO2StatusLabel(co2) {
+      if (co2 == null) return 'No data';
+      if (co2 < 600) return 'Excellent';
+      if (co2 < 1000) return 'Good';
+      if (co2 < 1500) return 'Moderate';
+      return 'Poor';
+    },
+
+    // Get battery status for all sensors in a room
+    getRoomBatteryStatus(room) {
+      if (!room.sensors || room.sensors.length === 0) {
+        return { status: 'unknown', icon: '🔋', message: '' };
+      }
+
+      const batteries = room.sensors
+        .filter(s => s.battery != null)
+        .map(s => s.battery);
+
+      if (batteries.length === 0) {
+        return { status: 'unknown', icon: '🔋', message: '' };
+      }
+
+      const minBattery = Math.min(...batteries);
+      if (minBattery < 20) {
+        return { status: 'low', icon: '🪫', message: 'Low battery' };
+      }
+      return { status: 'good', icon: '🔋', message: 'All good' };
+    },
+
+    // Check if a sensor is stale
+    isSensorStale(sensor) {
+      if (!sensor.lastSeen) return true;
+      return Date.now() - sensor.lastSeen > 5 * 60 * 1000;
+    },
+
+    // Check if room is stale (backward compatibility)
     isStale(room) {
       if (!room.lastSeen) return true;
       return Date.now() - room.lastSeen > 5 * 60 * 1000;
@@ -61,6 +138,12 @@ export function classicView() {
       if (minutes < 60) return `${minutes}m ago`;
       const hours = Math.floor(minutes / 60);
       return `${hours}h ${minutes % 60}m ago`;
+    },
+
+    // Format temperature spread for display
+    formatSpread(room) {
+      if (!room.tempSpread || room.tempSpread < 0.1) return null;
+      return `±${(room.tempSpread / 2).toFixed(1)}°`;
     },
 
     openRoom(room) {

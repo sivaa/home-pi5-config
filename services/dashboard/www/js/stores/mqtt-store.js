@@ -22,10 +22,12 @@ export function initMqttStore(Alpine, CONFIG) {
         this.connected = true;
         this.connecting = false;
 
-        // Subscribe to room sensors
-        CONFIG.rooms.forEach(room => {
-          this.client.subscribe(`${CONFIG.baseTopic}/${room.sensor}`, { qos: 0 });
+        // Subscribe to ALL room sensors (primary + additional)
+        const sensorTopics = Alpine.store('rooms').getAllSensorTopics();
+        sensorTopics.forEach(sensorName => {
+          this.client.subscribe(`${CONFIG.baseTopic}/${sensorName}`, { qos: 0 });
         });
+        console.log(`📡 Subscribed to ${sensorTopics.length} sensor topics`);
 
         // Subscribe to light topics and their availability
         Alpine.store('lights').list.forEach(light => {
@@ -47,14 +49,10 @@ export function initMqttStore(Alpine, CONFIG) {
             return;
           }
 
-          // Check if it's a room sensor
-          const roomConfig = CONFIG.rooms.find(r => r.sensor === deviceName);
-          if (roomConfig) {
-            Alpine.store('rooms').updateRoom(deviceName, data);
-            return;
-          }
+          // Route to rooms store - handles both primary and additional sensors
+          Alpine.store('rooms').handleSensorMessage(deviceName, data);
 
-          // Check if it's a light
+          // Also check if it's a light
           Alpine.store('lights').updateLight(deviceName, data);
         } catch (e) {
           console.error('MQTT parse error:', e);

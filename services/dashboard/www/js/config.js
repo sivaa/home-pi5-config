@@ -4,15 +4,21 @@
  */
 
 export const CONFIG = {
-  // Use nginx proxy when accessed via dashboard port
-  mqttUrl: window.location.port === '8888'
-    ? 'ws://' + window.location.host + '/mqtt'
-    : 'ws://' + window.location.hostname + ':9001',
+  // Detect if running locally (localhost) vs on Pi
+  // Local dev: connect directly to Pi services
+  // Pi deployment: use nginx proxy
+  mqttUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'ws://pi:9001'  // Local dev → connect to Pi's MQTT WebSocket
+    : window.location.port === '8888'
+      ? 'ws://' + window.location.host + '/mqtt'  // Pi nginx proxy
+      : 'ws://' + window.location.hostname + ':9001',
   baseTopic: 'zigbee2mqtt',
-  // Use nginx proxy for InfluxDB to avoid CORS issues
-  influxUrl: window.location.port === '8888'
-    ? window.location.origin + '/api/influx'
-    : 'http://' + window.location.hostname + ':8086',
+  // InfluxDB connection
+  influxUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://pi:8086'  // Local dev → connect to Pi's InfluxDB
+    : window.location.port === '8888'
+      ? window.location.origin + '/api/influx'  // Pi nginx proxy
+      : 'http://' + window.location.hostname + ':8086',
   influxDb: 'homeassistant',
   rooms: [
     { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity' },
@@ -65,6 +71,50 @@ export const CONFIG = {
       roomSensor: '[Bed] Temperature & Humidity Sensor'
     }
   ]
+};
+
+// Room-to-sensors mapping for Classic view (multi-sensor support)
+// Each room can have multiple climate sensors + optional CO2/motion/contact sensors
+export const ROOM_SENSORS = {
+  living: {
+    climate: [
+      { name: '[Living] Temperature & Humidity', label: 'Primary', isPrimary: true },
+      { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
+      { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' }
+    ],
+    co2: [
+      { name: 'CO2', label: 'CO2 Monitor' }
+    ]
+  },
+  bedroom: {
+    climate: [
+      { name: '[Bed] Temperature & Humidity Sensor', label: 'Primary', isPrimary: true },
+      { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' }
+    ]
+  },
+  study: {
+    climate: [
+      { name: '[Study] Temperature & Humidity', label: 'Primary', isPrimary: true },
+      { name: '[Study] Temperature & Humidity 8', label: 'Sensor 2' }
+    ]
+  },
+  kitchen: {
+    climate: [
+      { name: '[Kitchen] Temperature & Humidity', label: 'Primary', isPrimary: true },
+      { name: '[Kitchen] Temperature & Humidity 10', label: 'Sensor 2' }
+    ]
+  },
+  bathroom: {
+    climate: [
+      { name: '[Bath] Temperature & Humidity', label: 'Primary', isPrimary: true },
+      { name: '[Bath] Temperature & Humidity 11', label: 'Sensor 2' }
+    ]
+  },
+  balcony: {
+    climate: [
+      { name: '[Balcony] Temperature & Humidity', label: 'Outdoor', isPrimary: true }
+    ]
+  }
 };
 
 // Thermostat event types for timeline view
@@ -237,7 +287,6 @@ export const VIEW_CATEGORIES = [
     name: 'Visualize',
     icon: '👁️',
     views: [
-      { id: 'floor', name: 'Floor Plan', icon: '🏠', title: '2D Floor Plan', key: '3', primary: true },
       { id: '3d', name: '3D', icon: '🏗️', title: '3D Floor Plan', key: '4' },
       { id: 'isometric', name: 'Isometric', icon: '🔷', title: 'Isometric View', key: 'I' },
       { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
@@ -258,7 +307,6 @@ export const VIEW_CATEGORIES = [
     name: 'Display',
     icon: '📺',
     views: [
-      { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6', primary: true },
       { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', key: '8' }
     ]
   },
@@ -272,8 +320,12 @@ export const VIEW_CATEGORIES = [
   }
 ];
 
-// Flat list of all views for lookups
-export const ALL_VIEWS = VIEW_CATEGORIES.flatMap(cat => cat.views);
+// Flat list of all views for lookups - Classic first per user preference
+export const ALL_VIEWS = (() => {
+  const all = VIEW_CATEGORIES.flatMap(cat => cat.views);
+  const classic = all.find(v => v.id === 'classic');
+  return classic ? [classic, ...all.filter(v => v.id !== 'classic')] : all;
+})();
 
 // Primary views shown in main nav bar
 export const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);

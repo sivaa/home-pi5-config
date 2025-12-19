@@ -27,7 +27,6 @@ export function initEventsStore(Alpine, CONFIG) {
     eventTypes: {
       // IMPORTANT - Security & alerts (full card display)
       door_opened: { icon: '🚪', color: '#ef4444', label: 'Door Opened', category: 'contact', priority: 'important' },
-      vibration_detected: { icon: '📬', color: '#8b5cf6', label: 'Mail Arrived', category: 'vibration', priority: 'important' },
       air_quality_poor: { icon: '⚠️', color: '#ef4444', label: 'Air: Poor', category: 'co2', priority: 'important' },
       device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', category: 'availability', priority: 'important' },
 
@@ -39,7 +38,6 @@ export function initEventsStore(Alpine, CONFIG) {
       light_off: { icon: '💡', color: '#64748b', label: 'Light Off', category: 'light', priority: 'activity' },
       plug_on: { icon: '🔌', color: '#22c55e', label: 'Plug On', category: 'plug', priority: 'activity' },
       plug_off: { icon: '🔌', color: '#ef4444', label: 'Plug Off', category: 'plug', priority: 'activity' },
-      vibration_cleared: { icon: '📬', color: '#94a3b8', label: 'Vibration Stopped', category: 'vibration', priority: 'activity' },
       remote_toggle: { icon: '🎮', color: '#8b5cf6', label: 'Remote: Toggle', category: 'remote', priority: 'activity' },
       remote_brightness_up: { icon: '🎮', color: '#fbbf24', label: 'Remote: Bright+', category: 'remote', priority: 'activity' },
       remote_brightness_down: { icon: '🎮', color: '#64748b', label: 'Remote: Bright-', category: 'remote', priority: 'activity' },
@@ -147,7 +145,6 @@ export function initEventsStore(Alpine, CONFIG) {
       const typeLabels = {
         motion: 'Motion',
         contact: 'Door/Window',
-        vibration: 'Vibration',
         light: 'Light',
         plug: 'Plug',
         co2: 'CO2',
@@ -291,7 +288,7 @@ export function initEventsStore(Alpine, CONFIG) {
         lastHour: lastHour.length,
         motionCount: filtered.filter(e => e.eventType === 'motion_detected').length,
         doorCount: filtered.filter(e => e.eventType === 'door_opened').length,
-        mailboxCount: filtered.filter(e => e.eventType === 'vibration_detected').length
+        mailboxCount: filtered.filter(e => e.eventType === 'motion_detected' && e.deviceName === '[Mailbox] Motion Sensor').length
       };
     }
   });

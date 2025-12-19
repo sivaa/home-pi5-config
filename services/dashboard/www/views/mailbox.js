@@ -1,6 +1,6 @@
 /**
  * Mailbox Monitor View
- * Dedicated dashboard for mailbox vibration sensor monitoring
+ * Dedicated dashboard for mailbox motion sensor monitoring
  * Features: Event timeline, delivery patterns, signal health, real-time updates
  */
 
@@ -13,7 +13,7 @@ export function mailboxView() {
     // ========================================
 
     // Device identifier
-    deviceName: '[Mailbox] Vibration Sensor',
+    deviceName: '[Mailbox] Motion Sensor',
 
     // Time range filter
     dateRange: 'today',
@@ -82,18 +82,18 @@ export function mailboxView() {
             const payload = JSON.parse(message.toString());
             const now = Date.now();
 
-            // Handle vibration event
-            if (payload.vibration === true) {
+            // Handle motion event
+            if (payload.occupancy === true) {
               this.addLiveEvent({
                 time: now,
-                eventType: 'vibration_detected',
+                eventType: 'motion_detected',
                 deviceName: this.deviceName,
                 value: 1
               });
-            } else if (payload.vibration === false) {
+            } else if (payload.occupancy === false) {
               this.addLiveEvent({
                 time: now,
-                eventType: 'vibration_cleared',
+                eventType: 'motion_cleared',
                 deviceName: this.deviceName,
                 value: 0
               });
@@ -145,7 +145,7 @@ export function mailboxView() {
         const influxUrl = CONFIG.influxUrl || `http://${window.location.hostname}:8086`;
         const influxDb = CONFIG.influxDb || 'homeassistant';
 
-        // Query mailbox-specific events (vibration + availability)
+        // Query mailbox-specific events (motion + availability)
         const query = `
           SELECT * FROM zigbee_events
           WHERE device_name = '${this.deviceName}'
@@ -216,14 +216,14 @@ export function mailboxView() {
       );
     },
 
-    // Get only delivery events (vibration_detected)
+    // Get only delivery events (motion_detected)
     get deliveryEvents() {
-      return this.filteredEvents.filter(e => e.eventType === 'vibration_detected');
+      return this.filteredEvents.filter(e => e.eventType === 'motion_detected');
     },
 
     // Last delivery info
     get lastDelivery() {
-      const deliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+      const deliveries = this.mailboxEvents.filter(e => e.eventType === 'motion_detected');
       if (deliveries.length === 0) return null;
       return deliveries[0]; // Already sorted DESC
     },
@@ -232,7 +232,7 @@ export function mailboxView() {
     get hasMailToday() {
       const todayStart = new Date().setHours(0, 0, 0, 0);
       return this.mailboxEvents.some(e =>
-        e.eventType === 'vibration_detected' && e.time >= todayStart
+        e.eventType === 'motion_detected' && e.time >= todayStart
       );
     },
 
@@ -244,7 +244,7 @@ export function mailboxView() {
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-      const allDeliveries = this.mailboxEvents.filter(e => e.eventType === 'vibration_detected');
+      const allDeliveries = this.mailboxEvents.filter(e => e.eventType === 'motion_detected');
       const todayDeliveries = allDeliveries.filter(e => e.time >= todayStart);
       const weekDeliveries = allDeliveries.filter(e => e.time >= weekStart);
 
@@ -338,7 +338,7 @@ export function mailboxView() {
       const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
       this.mailboxEvents
-        .filter(e => e.eventType === 'vibration_detected' && e.time >= weekStart)
+        .filter(e => e.eventType === 'motion_detected' && e.time >= weekStart)
         .forEach(e => {
           const hour = new Date(e.time).getHours();
           hours[hour]++;
@@ -360,7 +360,7 @@ export function mailboxView() {
       const monthStart = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
       this.mailboxEvents
-        .filter(e => e.eventType === 'vibration_detected' && e.time >= monthStart)
+        .filter(e => e.eventType === 'motion_detected' && e.time >= monthStart)
         .forEach(e => {
           const day = new Date(e.time).getDay();
           days[day]++;
@@ -442,10 +442,10 @@ export function mailboxView() {
 
     getEventIcon(eventType) {
       const icons = {
-        vibration_detected: '1f4ec',  // open mailbox with raised flag
-        vibration_cleared: '1f4ed',   // open mailbox with lowered flag
-        device_online: '1f4e1',       // satellite antenna
-        device_offline: '26a0'        // warning
+        motion_detected: '1f4ec',  // open mailbox with raised flag
+        motion_cleared: '1f4ed',   // open mailbox with lowered flag
+        device_online: '1f4e1',    // satellite antenna
+        device_offline: '26a0'     // warning
       };
       const code = icons[eventType] || '1f4cd';
       return String.fromCodePoint(parseInt(code, 16));
@@ -453,8 +453,8 @@ export function mailboxView() {
 
     getEventLabel(eventType) {
       const labels = {
-        vibration_detected: 'Mail Arrived',
-        vibration_cleared: 'Vibration Stopped',
+        motion_detected: 'Mail Arrived',
+        motion_cleared: 'Motion Cleared',
         device_online: 'Sensor Online',
         device_offline: 'Sensor Offline'
       };

@@ -208,9 +208,9 @@
             <span x-text="$store.mqtt.connecting ? 'Connecting' : ($store.mqtt.connected ? 'Live' : 'Offline')"></span>
           </div>
 
-          <!-- Navigation tabs -->
+          <!-- Navigation tabs - all views in single line -->
           <div class="nav-primary">
-            <template x-for="view in primaryViews" :key="view.id">
+            <template x-for="view in allViews" :key="view.id">
               <button class="nav-tab"
                       :class="{ active: currentView === view.id }"
                       @click="setView(view.id)"
@@ -219,39 +219,6 @@
                 <span class="nav-label" x-text="view.name"></span>
               </button>
             </template>
-          </div>
-
-          <!-- More dropdown -->
-          <div class="nav-more">
-            <button class="nav-tab nav-more-trigger"
-                    :class="{ active: isOverflowActive() }"
-                    @click="toggleMoreMenu()"
-                    title="More views">
-              <span class="nav-icon">•••</span>
-              <span class="nav-label">More</span>
-              <span class="nav-chevron" :class="{ 'open': moreMenuOpen }">▼</span>
-            </button>
-
-            <div class="nav-dropdown" x-show="moreMenuOpen" x-transition:enter="dropdown-enter"
-                 x-transition:leave="dropdown-leave" @click.away="moreMenuOpen = false">
-              <template x-for="category in overflowCategories" :key="category.id">
-                <div class="nav-dropdown-group">
-                  <div class="nav-dropdown-header">
-                    <span x-text="category.icon"></span>
-                    <span x-text="category.name"></span>
-                  </div>
-                  <template x-for="view in category.views" :key="view.id">
-                    <button class="nav-dropdown-item"
-                            :class="{ active: currentView === view.id }"
-                            @click="setView(view.id)">
-                      <span class="item-icon" x-text="view.icon"></span>
-                      <span class="item-name" x-text="view.name"></span>
-                      <span class="item-shortcut" x-text="view.key"></span>
-                    </button>
-                  </template>
-                </div>
-              </template>
-            </div>
           </div>
         </div>
 
@@ -761,12 +728,17 @@
               <template x-for="room in rooms" :key="room.id">
                 <div class="classic-card-v2"
                      :class="{
-                       'has-warning': getRoomBatteryStatus(room).status === 'low',
-                       'has-co2': getCO2Sensor(room)
+                       'has-co2': room.sensors && room.sensors.some(s => s.type === 'co2')
                      }">
 
                   <!-- Comfort indicator strip -->
-                  <div class="classic-comfort-strip" :class="getComfortClass(room.avgTemperature || room.temperature)"></div>
+                  <div class="classic-comfort-strip" :class="{
+                    'cold': (room.avgTemperature || room.temperature) < 20,
+                    'cool': (room.avgTemperature || room.temperature) >= 20 && (room.avgTemperature || room.temperature) < 23,
+                    'good': (room.avgTemperature || room.temperature) >= 23 && (room.avgTemperature || room.temperature) <= 26,
+                    'warm': (room.avgTemperature || room.temperature) > 26 && (room.avgTemperature || room.temperature) <= 28,
+                    'hot': (room.avgTemperature || room.temperature) > 28
+                  }"></div>
 
                   <!-- Card Header -->
                   <div class="classic-header-v2">
@@ -774,60 +746,38 @@
                       <span class="room-icon" x-text="room.icon"></span>
                       <span class="room-name" x-text="room.name"></span>
                     </div>
-                    <div class="room-avg">
-                      <template x-if="room.avgTemperature !== null">
-                        <span class="avg-temp" x-text="room.avgTemperature.toFixed(1) + '°'"></span>
-                      </template>
-                      <template x-if="room.avgTemperature === null && room.temperature !== null">
-                        <span class="avg-temp" x-text="room.temperature.toFixed(1) + '°'"></span>
-                      </template>
-                      <template x-if="room.avgTemperature === null && room.temperature === null">
-                        <span class="avg-temp no-data">--°</span>
-                      </template>
+                  </div>
+
+                  <!-- Average Values - Prominent Display -->
+                  <div class="room-averages-section">
+                    <div class="avg-temp-display">
+                      <span x-text="room.avgTemperature != null ? room.avgTemperature.toFixed(1) : (room.temperature != null ? room.temperature.toFixed(1) : '--')"></span>
+                      <span class="avg-unit">°C</span>
+                    </div>
+                    <div class="avg-humid-display">
+                      <span class="humid-icon">💧</span>
+                      <span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '--%')"></span>
                     </div>
                   </div>
 
-                  <!-- Sensor List -->
-                  <div class="sensor-list">
-                    <template x-for="sensor in getRoomSensors(room)" :key="sensor.name">
-                      <div class="sensor-row" :class="{ 'stale': isSensorStale(sensor), 'no-data': sensor.temperature === null && sensor.co2 === null }">
-                        <!-- Sensor Icon -->
-                        <span class="sensor-icon" x-text="getSensorIcon(sensor)"></span>
-
-                        <!-- Sensor Label -->
+                  <!-- Sensor List - inline logic for Alpine compatibility -->
+                  <div class="sensor-list" x-show="room.sensors && room.sensors.length > 0">
+                    <template x-for="sensor in (room.sensors || [])" :key="sensor.name">
+                      <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null }">
+                        <span class="sensor-icon" x-text="sensor.type === 'co2' ? '💨' : (sensor.type === 'motion' ? '👁️' : (sensor.type === 'contact' ? '🚪' : '🌡️'))"></span>
                         <span class="sensor-label" x-text="sensor.label"></span>
-
-                        <!-- Climate Sensor Values -->
-                        <template x-if="sensor.type === 'climate'">
+                        <template x-if="sensor.type === 'climate' || !sensor.type">
                           <div class="sensor-values">
-                            <template x-if="sensor.temperature !== null">
-                              <span class="sensor-temp" x-text="sensor.temperature.toFixed(1) + '°'"></span>
-                            </template>
-                            <template x-if="sensor.temperature === null">
-                              <span class="sensor-temp no-data">--°</span>
-                            </template>
-                            <template x-if="sensor.humidity !== null">
-                              <span class="sensor-humid">💧<span x-text="sensor.humidity.toFixed(0) + '%'"></span></span>
-                            </template>
+                            <span class="sensor-temp" x-text="sensor.temperature != null ? sensor.temperature.toFixed(1) + '°' : '--°'"></span>
+                            <span class="sensor-humid" x-show="sensor.humidity != null">💧<span x-text="sensor.humidity ? sensor.humidity.toFixed(0) + '%' : ''"></span></span>
                           </div>
                         </template>
-
-                        <!-- CO2 Sensor Values -->
                         <template x-if="sensor.type === 'co2'">
                           <div class="sensor-values">
-                            <template x-if="sensor.co2 !== null">
-                              <span class="sensor-co2" :style="{ color: getCO2StatusColor(sensor.co2) }">
-                                <span x-text="sensor.co2"></span> ppm
-                              </span>
-                            </template>
-                            <template x-if="sensor.co2 === null">
-                              <span class="sensor-co2 no-data">-- ppm</span>
-                            </template>
+                            <span class="sensor-co2" x-text="sensor.co2 != null ? sensor.co2 + ' ppm' : '-- ppm'"></span>
                           </div>
                         </template>
-
-                        <!-- Status Dot -->
-                        <span class="sensor-status" :class="{ 'fresh': !isSensorStale(sensor) && (sensor.temperature !== null || sensor.co2 !== null), 'stale': isSensorStale(sensor) || (sensor.temperature === null && sensor.co2 === null) }"></span>
+                        <span class="sensor-status" :class="{ 'fresh': sensor.lastSeen && (Date.now() - sensor.lastSeen <= 300000) && (sensor.temperature != null || sensor.co2 != null), 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000) || (sensor.temperature == null && sensor.co2 == null) }"></span>
                       </div>
                     </template>
                   </div>
@@ -839,18 +789,10 @@
 
                   <!-- Card Footer -->
                   <div class="card-footer-v2">
-                    <template x-if="getRoomBatteryStatus(room).message">
-                      <span class="battery-status" :class="getRoomBatteryStatus(room).status">
-                        <span x-text="getRoomBatteryStatus(room).icon"></span>
-                        <span x-text="getRoomBatteryStatus(room).message"></span>
-                      </span>
-                    </template>
-                    <template x-if="formatSpread(room)">
-                      <span class="temp-spread">
-                        Spread: <span x-text="formatSpread(room)"></span>
-                      </span>
-                    </template>
-                    <button class="detail-btn" @click.stop="openRoom(room)">Details</button>
+                    <span class="temp-spread" x-show="room.tempSpread && room.tempSpread >= 0.1">
+                      Spread: <span x-text="room.tempSpread ? '±' + (room.tempSpread / 2).toFixed(1) + '°' : ''"></span>
+                    </span>
+                    <button class="detail-btn" @click.stop="$store.roomDetail.open(room)">Details</button>
                   </div>
                 </div>
               </template>
@@ -1182,55 +1124,27 @@
         <!-- Vision 10: Heater Control -->
         <div x-show="currentView === 'heater'" x-cloak x-data="thermostatView()">
           <div class="thermostat-view">
-            <!-- Header -->
-            <div class="thermostat-header">
-              <h2>Heater Control</h2>
-              <p class="thermostat-subtitle">
-                <span class="subtitle-stat stat-heating">
-                  <span x-text="activeHeatingCount"></span> heating
-                </span>
-                <span>|</span>
-                <span class="subtitle-stat stat-cycles">
-                  <span x-text="stats.heatingCycles"></span> cycles today
-                </span>
-              </p>
-            </div>
-
-            <!-- Tab Navigation -->
-            <div class="thermostat-tabs">
-              <button class="tab-btn" :class="{ active: activeTab === 'overview' }" @click="setTab('overview')">Overview</button>
-              <button class="tab-btn" :class="{ active: activeTab === 'timeline' }" @click="setTab('timeline')">Timeline</button>
-              <button class="tab-btn" :class="{ active: activeTab === 'trends' }" @click="setTab('trends')">Trends</button>
-              <button class="tab-btn" :class="{ active: activeTab === 'efficiency' }" @click="setTab('efficiency')">Efficiency</button>
+            <!-- Compact Header: Title + Stats + Tabs in one line -->
+            <div class="thermostat-compact-header">
+              <h2>Heater</h2>
+              <div class="compact-stats">
+                <span class="compact-stat heating">🔥<span x-text="activeHeatingCount"></span></span>
+                <span class="compact-stat idle">❄️<span x-text="thermostats.length - activeHeatingCount"></span></span>
+                <span class="compact-stat cycles">📊<span x-text="stats.heatingCycles"></span></span>
+                <span class="compact-stat offline" x-show="offlineCount > 0">📡<span x-text="offlineCount"></span></span>
+              </div>
+              <div class="compact-tabs">
+                <button class="tab-btn-sm" :class="{ active: activeTab === 'overview' }" @click="setTab('overview')">Overview</button>
+                <button class="tab-btn-sm" :class="{ active: activeTab === 'timeline' }" @click="setTab('timeline')">Timeline</button>
+                <button class="tab-btn-sm" :class="{ active: activeTab === 'trends' }" @click="setTab('trends')">Trends</button>
+                <button class="tab-btn-sm" :class="{ active: activeTab === 'efficiency' }" @click="setTab('efficiency')">Efficiency</button>
+              </div>
             </div>
 
             <!-- ========================================
                  OVERVIEW TAB
                  ======================================== -->
             <div x-show="activeTab === 'overview'">
-              <!-- Summary Card -->
-              <div class="summary-card">
-                <div class="summary-item">
-                  <span class="summary-icon">🔥</span>
-                  <span class="summary-value" x-text="activeHeatingCount"></span>
-                  <span class="summary-label">heating</span>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-icon">❄️</span>
-                  <span class="summary-value" x-text="thermostats.length - activeHeatingCount"></span>
-                  <span class="summary-label">idle</span>
-                </div>
-                <div class="summary-item">
-                  <span class="summary-icon">📊</span>
-                  <span class="summary-value" x-text="stats.heatingCycles"></span>
-                  <span class="summary-label">cycles</span>
-                </div>
-                <div class="summary-item" x-show="offlineCount > 0">
-                  <span class="summary-icon">📡</span>
-                  <span class="summary-value" x-text="offlineCount"></span>
-                  <span class="summary-label">offline</span>
-                </div>
-              </div>
 
               <!-- Thermostat Cards Grid -->
               <div class="thermostats-grid">
@@ -1345,7 +1259,7 @@
                         <span x-text="t.linkquality !== null ? t.linkquality : '--'"></span>
                       </div>
                       <div class="meta-item" :class="{ offline: !t.available }">
-                        <span x-text="t.available ? '✓' : '✗'"></span>
+                        <span x-text="t.available ? '🟢' : '🔴'"></span>
                         <span x-text="t.available ? 'Online' : 'Offline'"></span>
                       </div>
                     </div>
@@ -3253,8 +3167,53 @@
         { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Thermostat', entityId: 'climate.bedroom_thermostat', roomId: 'bedroom', roomSensor: '[Bed] Temperature & Humidity Sensor' }
       ]
     };
+
+    // Room-to-sensors mapping for multi-sensor support
+    const ROOM_SENSORS = {
+      living: {
+        climate: [
+          { name: '[Living] Temperature & Humidity', label: 'Primary', isPrimary: true },
+          { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
+          { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' }
+        ],
+        co2: [
+          { name: 'CO2', label: 'CO2 Monitor' }
+        ]
+      },
+      bedroom: {
+        climate: [
+          { name: '[Bed] Temperature & Humidity Sensor', label: 'Primary', isPrimary: true },
+          { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' }
+        ]
+      },
+      study: {
+        climate: [
+          { name: '[Study] Temperature & Humidity', label: 'Primary', isPrimary: true },
+          { name: '[Study] Temperature & Humidity 8', label: 'Sensor 2' }
+        ]
+      },
+      kitchen: {
+        climate: [
+          { name: '[Kitchen] Temperature & Humidity', label: 'Primary', isPrimary: true },
+          { name: '[Kitchen] Temperature & Humidity 10', label: 'Sensor 2' }
+        ]
+      },
+      bathroom: {
+        climate: [
+          { name: '[Bath] Temperature & Humidity', label: 'Primary', isPrimary: true },
+          { name: '[Bath] Temperature & Humidity 11', label: 'Sensor 2' }
+        ]
+      },
+      balcony: {
+        climate: [
+          { name: '[Balcony] Temperature & Humidity', label: 'Outdoor', isPrimary: true }
+        ]
+      }
+    };
+
     // Make CONFIG globally available for modules
     window.CONFIG = CONFIG;
+    window.ROOM_SENSORS = ROOM_SENSORS;
 
     // ========================================
     // ALPINE STORES
@@ -3283,9 +3242,22 @@
             this.connected = true;
             this.connecting = false;
 
-            // Subscribe to room sensors
+            // Subscribe to room sensors (primary)
             CONFIG.rooms.forEach(room => {
               this.client.subscribe(`${CONFIG.baseTopic}/${room.sensor}`, { qos: 0 });
+            });
+
+            // Subscribe to all additional sensors from ROOM_SENSORS
+            Object.values(ROOM_SENSORS).forEach(roomConfig => {
+              const allSensors = [
+                ...(roomConfig.climate || []),
+                ...(roomConfig.co2 || []),
+                ...(roomConfig.motion || []),
+                ...(roomConfig.contact || [])
+              ];
+              allSensors.forEach(sensor => {
+                this.client.subscribe(`${CONFIG.baseTopic}/${sensor.name}`, { qos: 0 });
+              });
             });
 
             // Subscribe to light topics (state and availability)
@@ -3317,12 +3289,17 @@
 
               const data = JSON.parse(msgStr);
 
-              // Check if it's a room sensor
+              // Check if it's a room sensor (primary)
               const roomConfig = CONFIG.rooms.find(r => r.sensor === deviceName);
               if (roomConfig) {
                 Alpine.store('rooms').updateRoom(deviceName, data);
+                // Note: updateRoom() calls updateSensor() internally
                 return;
               }
+
+              // Check if it's an additional sensor in any room
+              const sensorFound = Alpine.store('rooms').updateSensor(deviceName, data);
+              if (sensorFound) return;
 
               // Check if it's a light
               Alpine.store('lights').updateLight(deviceName, data);
@@ -3337,17 +3314,42 @@
         }
       });
 
-      // Rooms data store
+      // Rooms data store (with multi-sensor support)
       Alpine.store('rooms', {
-        list: CONFIG.rooms.map(r => ({
-          ...r,
-          temperature: null,
-          humidity: null,
-          lastSeen: null,
-          stale: false,
-          tempHistory: [],
-          humidHistory: []
-        })),
+        list: CONFIG.rooms.map(r => {
+          // Get all sensors for this room from ROOM_SENSORS config
+          const roomSensorConfig = ROOM_SENSORS[r.id] || { climate: [] };
+          const allSensors = [
+            ...(roomSensorConfig.climate || []).map(s => ({ ...s, type: 'climate' })),
+            ...(roomSensorConfig.co2 || []).map(s => ({ ...s, type: 'co2' })),
+            ...(roomSensorConfig.motion || []).map(s => ({ ...s, type: 'motion' })),
+            ...(roomSensorConfig.contact || []).map(s => ({ ...s, type: 'contact' }))
+          ];
+
+          return {
+            ...r,
+            temperature: null,
+            humidity: null,
+            lastSeen: null,
+            stale: false,
+            tempHistory: [],
+            humidHistory: [],
+            // Multi-sensor support
+            sensors: allSensors.map(s => ({
+              ...s,
+              temperature: null,
+              humidity: null,
+              co2: null,
+              battery: null,
+              lastSeen: null,
+              stale: false
+            })),
+            // Computed room averages
+            avgTemperature: null,
+            avgHumidity: null,
+            tempSpread: null
+          };
+        }),
         lastUpdate: null,
         loading: false,
 
@@ -3382,6 +3384,65 @@
           room.lastSeen = sensorTime;
           room.stale = false;
           this.lastUpdate = now;
+
+          // Also update in the sensors array if this is a primary sensor
+          this.updateSensor(sensorName, data);
+        },
+
+        // Update individual sensor in any room's sensors array
+        updateSensor(sensorName, data) {
+          const now = Date.now();
+          let found = false;
+
+          for (const room of this.list) {
+            const sensor = room.sensors.find(s => s.name === sensorName);
+            if (sensor) {
+              found = true;
+
+              let sensorTime = now;
+              if (data.last_seen) {
+                sensorTime = typeof data.last_seen === 'number' ? data.last_seen : new Date(data.last_seen).getTime();
+              }
+
+              // Update sensor values
+              if (data.temperature !== undefined) sensor.temperature = data.temperature;
+              if (data.humidity !== undefined) sensor.humidity = data.humidity;
+              if (data.co2 !== undefined) sensor.co2 = data.co2;
+              if (data.battery !== undefined) sensor.battery = data.battery;
+
+              sensor.lastSeen = sensorTime;
+              sensor.stale = false;
+
+              // Recalculate room averages
+              this._recalculateRoomAverages(room);
+              this.lastUpdate = now;
+              break;
+            }
+          }
+          return found;
+        },
+
+        // Recalculate room averages from all climate sensors
+        _recalculateRoomAverages(room) {
+          const climateSensors = room.sensors.filter(s =>
+            s.type === 'climate' && s.temperature != null
+          );
+
+          if (climateSensors.length === 0) {
+            room.avgTemperature = room.temperature;
+            room.avgHumidity = room.humidity;
+            room.tempSpread = null;
+            return;
+          }
+
+          const temps = climateSensors.map(s => s.temperature);
+          room.avgTemperature = temps.reduce((a, b) => a + b, 0) / temps.length;
+          room.tempSpread = Math.max(...temps) - Math.min(...temps);
+
+          const humids = climateSensors.filter(s => s.humidity != null).map(s => s.humidity);
+          if (humids.length > 0) {
+            room.avgHumidity = humids.reduce((a, b) => a + b, 0) / humids.length;
+          }
         },
 
         async loadHistorical() {
@@ -3814,7 +3875,6 @@
       {
         id: 'visualize', name: 'Visualize', icon: '👁️',
         views: [
-          { id: 'floor', name: 'Floor Plan', icon: '🏠', title: '2D Floor Plan', key: '3', primary: true },
           { id: '3d', name: '3D', icon: '🏗️', title: '3D Floor Plan', key: '4' },
           { id: 'isometric', name: 'Isometric', icon: '🔷', title: 'Isometric View', key: 'I' },
           { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
@@ -3831,7 +3891,6 @@
       {
         id: 'display', name: 'Display', icon: '📺',
         views: [
-          { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6', primary: true },
           { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', key: '8' }
         ]
       },
@@ -3843,7 +3902,12 @@
       }
     ];
 
-    const ALL_VIEWS = VIEW_CATEGORIES.flatMap(cat => cat.views);
+    // Classic first per user preference
+    const ALL_VIEWS = (() => {
+      const all = VIEW_CATEGORIES.flatMap(cat => cat.views);
+      const classic = all.find(v => v.id === 'classic');
+      return classic ? [classic, ...all.filter(v => v.id !== 'classic')] : all;
+    })();
     const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);
     const OVERFLOW_CATEGORIES = VIEW_CATEGORIES.map(cat => ({
       ...cat,
