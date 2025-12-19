@@ -5,13 +5,13 @@
 # Gradually dims the display brightness when idle, resets on input.
 #
 # Behavior:
-#   - On input/touch: brightness set to 80%
+#   - On input/touch: brightness set to 100%
 #   - Every minute of idle: brightness decreases by 10%
-#   - Minimum brightness: 25%
+#   - Minimum brightness: 10%
 #
 # Timeline:
-#   Touch → 80% → 70% → 60% → 50% → 40% → 30% → 25% (idle)
-#          0min   1min   2min   3min   4min   5min   6min
+#   Touch → 100% → 90% → 80% → 70% → 60% → 50% → 40% → 30% → 20% → 10% (idle)
+#           0min   1min   2min   3min   4min   5min   6min   7min   8min   9min
 #
 # Integration:
 #   - input-wake-monitor.sh calls "brightness-dimmer.sh wake" on touch
@@ -21,8 +21,8 @@
 set -euo pipefail
 
 # Configuration
-WAKE_BRIGHTNESS=80      # Brightness on touch/wake
-MIN_BRIGHTNESS=25       # Minimum brightness (idle state)
+WAKE_BRIGHTNESS=100     # Brightness on touch/wake
+MIN_BRIGHTNESS=10       # Minimum brightness (idle state)
 DIM_STEP=10             # Decrease per interval
 DIM_INTERVAL=60         # Seconds between dim steps
 ACTIVITY_FILE="/tmp/display-activity"

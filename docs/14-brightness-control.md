@@ -7,23 +7,23 @@ Energy-saving monitor brightness system using DDC/CI.
 ## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Adaptive Brightness Timeline                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   Touch ──► 80% ──► 70% ──► 60% ──► 50% ──► 40% ──► 30% ──► 25% │
-│            0min    1min    2min    3min    4min    5min    6min │
-│                                                                 │
-│   Any touch during dimming → Reset to 80%                       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        Adaptive Brightness Timeline                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  Touch → 100% → 90% → 80% → 70% → 60% → 50% → 40% → 30% → 20% → 10% (idle)      │
+│          0min   1min   2min   3min   4min   5min   6min   7min   8min   9min    │
+│                                                                                 │
+│  Any touch during dimming → Reset to 100%                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Behavior:**
-- On touch/input: Brightness sets to **80%**
+- On touch/input: Brightness sets to **100%**
 - Every minute of idle: Brightness decreases by **10%**
-- Minimum brightness: **25%** (energy saving mode)
-- Any touch resets back to 80%
+- Minimum brightness: **10%** (energy saving mode)
+- Any touch resets back to 100%
 
 ---
 
@@ -131,8 +131,8 @@ journalctl --user -u brightness-dimmer.service -f
 Settings in `brightness-dimmer.sh`:
 
 ```bash
-WAKE_BRIGHTNESS=80      # Brightness on touch/wake
-MIN_BRIGHTNESS=25       # Minimum brightness (idle state)
+WAKE_BRIGHTNESS=100     # Brightness on touch/wake
+MIN_BRIGHTNESS=10       # Minimum brightness (idle state)
 DIM_STEP=10             # Decrease per interval
 DIM_INTERVAL=60         # Seconds between dim steps
 ```
@@ -145,14 +145,13 @@ DIM_INTERVAL=60         # Seconds between dim steps
 ┌─────────────────────────────────────────────────────────────┐
 │         Typical 24" Monitor Power Consumption               │
 ├─────────────────────────────────────────────────────────────┤
-│  Brightness 100%  →  ~25-35W                                │
-│  Brightness 80%   →  ~20-28W  (wake state)                  │
+│  Brightness 100%  →  ~25-35W  (wake state)                  │
 │  Brightness 50%   →  ~15-22W                                │
-│  Brightness 25%   →  ~8-12W   (idle state, ~65% savings)    │
+│  Brightness 10%   →  ~5-8W    (idle state, ~75% savings)    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-If the display is idle most of the time at 25%, you save **~65%** of monitor power consumption compared to 100% brightness.
+If the display is idle most of the time at 10%, you save **~75%** of monitor power consumption compared to 100% brightness.
 
 ---
 
