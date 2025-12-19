@@ -3448,13 +3448,15 @@
         },
 
         // Update individual sensor in any room's sensors array
+        // Updates ALL sensors with matching name (same physical device may be registered as multiple types)
         updateSensor(sensorName, data) {
           const now = Date.now();
           let found = false;
 
           for (const room of this.list) {
-            const sensor = room.sensors.find(s => s.name === sensorName);
-            if (sensor) {
+            // Find ALL sensors with this name (not just the first)
+            const sensors = room.sensors.filter(s => s.name === sensorName);
+            if (sensors.length > 0) {
               found = true;
 
               let sensorTime = now;
@@ -3462,20 +3464,21 @@
                 sensorTime = typeof data.last_seen === 'number' ? data.last_seen : new Date(data.last_seen).getTime();
               }
 
-              // Update sensor values
-              if (data.temperature !== undefined) sensor.temperature = data.temperature;
-              if (data.local_temperature !== undefined) sensor.temperature = data.local_temperature;  // Thermostats report local_temperature
-              if (data.humidity !== undefined) sensor.humidity = data.humidity;
-              if (data.co2 !== undefined) sensor.co2 = data.co2;
-              if (data.battery !== undefined) sensor.battery = data.battery;
+              // Update ALL matching sensors
+              for (const sensor of sensors) {
+                if (data.temperature !== undefined) sensor.temperature = data.temperature;
+                if (data.local_temperature !== undefined) sensor.temperature = data.local_temperature;
+                if (data.humidity !== undefined) sensor.humidity = data.humidity;
+                if (data.co2 !== undefined) sensor.co2 = data.co2;
+                if (data.battery !== undefined) sensor.battery = data.battery;
 
-              sensor.lastSeen = sensorTime;
-              sensor.stale = false;
+                sensor.lastSeen = sensorTime;
+                sensor.stale = false;
+              }
 
               // Recalculate room averages
               this._recalculateRoomAverages(room);
               this.lastUpdate = now;
-              break;
             }
           }
           return found;
