@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** December 17, 2025
+> **Last Updated:** December 19, 2025
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -65,6 +65,7 @@
 | 10 | [Display Scheduling](docs/10-display-scheduling.md) | Auto off at 22:00, on at 06:00, 5-min night idle |
 | 11 | [On-Screen Keyboard](docs/11-onscreen-keyboard.md) | Tablet-like touch keyboard (squeekboard) |
 | 12 | [Pi Maintenance](docs/12-pi-maintenance.md) | Daily 4:30 AM reboot for unattended reliability |
+| 13 | [Browser Setup](docs/13-browser-setup.md) | Replaced Chromium with lightweight Epiphany |
 
 ---
 
@@ -183,6 +184,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-19 | Replaced Chromium with Epiphany browser (440 MB → 60 MB, fixed infinite loading) |
 | 2025-12-18 | Added daily Pi reboot at 4:30 AM for unattended reliability |
 | 2025-12-18 | Enabled on-screen keyboard (squeekboard) for tablet-like touch input |
 | 2025-12-17 | Added display scheduler: auto-off 22:00, auto-on 06:00, 5-min night idle |
@@ -231,7 +233,8 @@ pi-setup/
 │   ├── 09-router-maintenance.md
 │   ├── 10-display-scheduling.md
 │   ├── 11-onscreen-keyboard.md
-│   └── 12-pi-maintenance.md
+│   ├── 12-pi-maintenance.md
+│   └── 13-browser-setup.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
