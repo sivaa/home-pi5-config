@@ -124,7 +124,7 @@ export const DEBOUNCE_MS = {
 // Environment config
 export const CONFIG = {
   mqtt: {
-    url: process.env.MQTT_URL || 'mqtt://localhost:1883',
+    url: process.env.MQTT_URL,
     topic: 'zigbee2mqtt/#'
   },
   influx: {

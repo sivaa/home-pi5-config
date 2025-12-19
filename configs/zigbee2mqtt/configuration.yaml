@@ -3,6 +3,7 @@ homeassistant:
 frontend:
   enabled: true
   port: 8080
+  # VPN provides network security - no auth needed
 mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://mosquitto:1883
