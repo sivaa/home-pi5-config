@@ -51,7 +51,7 @@
 
 # -----------------------------------------------------------------------------
 # CO2 LEVEL ALERT
-# Trigger: CO2 level rises above 1200 ppm
+# Trigger: CO2 level rises above 1200 ppm, OR on HA startup if already high
 # Action: TTS announcement to ventilate
 # Cooldown: 10 minutes (prevents repeated announcements)
 # -----------------------------------------------------------------------------
@@ -64,8 +64,15 @@
     - platform: numeric_state
       entity_id: sensor.hallway_co2_co2
       above: 1200
+    # Also trigger on HA startup to catch already-high levels
+    - platform: homeassistant
+      event: start
 
   condition:
+    # Verify CO2 is actually above threshold (needed for startup trigger)
+    - condition: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      above: 1200
     # Only announce during waking hours (7 AM to 11 PM)
     - condition: time
       after: "07:00:00"
