@@ -57,18 +57,34 @@ dpkg -l | grep wfplug-squeek
 
 ## Configuration
 
-### Enable Autostart
+### Systemd User Service (Recommended)
+
+Due to a race condition with `lxsession-xdg-autostart`, the keyboard may fail to start at boot.
+The fix is to use a systemd user service instead:
 
 ```bash
-# Copy autostart entry to user config
-mkdir -p ~/.config/autostart
-cp /etc/xdg/autostart/squeekboard.desktop ~/.config/autostart/
+# Service file location
+~/.config/systemd/user/squeekboard.service
+
+# Check status
+systemctl --user status squeekboard.service
+
+# Manual start/stop
+systemctl --user start squeekboard.service
+systemctl --user stop squeekboard.service
+
+# Enable/disable autostart
+systemctl --user enable squeekboard.service
+systemctl --user disable squeekboard.service
 ```
+
+The service file is stored in: `configs/squeekboard/squeekboard.service`
 
 ### Manual Start
 
 ```bash
-# Start squeekboard manually
+# Start squeekboard manually (needs WAYLAND_DISPLAY)
+export WAYLAND_DISPLAY=wayland-0
 squeekboard &
 
 # Or use the startup script (checks for touch device first)
@@ -140,14 +156,35 @@ Touch device detected?
 
 ## Troubleshooting
 
-### Keyboard doesn't appear
+### Keyboard doesn't appear after boot
+
+**Root Cause:** Race condition - `lxsession-xdg-autostart` runs before DBus session is ready.
+
+```bash
+# Check service status
+systemctl --user status squeekboard.service
+
+# If not running, check environment
+cat /proc/$(pgrep squeekboard)/environ | tr '\0' '\n' | grep WAYLAND
+# Should show: WAYLAND_DISPLAY=wayland-0
+
+# Restart service
+systemctl --user restart squeekboard.service
+
+# Or start manually with correct environment
+export WAYLAND_DISPLAY=wayland-0
+export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+squeekboard &
+```
+
+### Keyboard doesn't appear (general)
 
 ```bash
 # Check if squeekboard is running
 pgrep -a squeekboard
 
-# If not running, start it manually
-squeekboard &
+# If not running, start the service
+systemctl --user start squeekboard.service
 
 # Check if touch device is detected
 libinput list-devices | grep -A2 Capabilities | grep touch
@@ -176,10 +213,17 @@ Some web applications may not trigger the Wayland text-input protocol. Use the p
 |------|---------|
 | `/usr/bin/squeekboard` | Main keyboard application |
 | `/usr/bin/sbtest` | Startup script (checks for touch) |
-| `/etc/xdg/autostart/squeekboard.desktop` | System autostart entry |
-| `~/.config/autostart/squeekboard.desktop` | User autostart entry |
+| `~/.config/systemd/user/squeekboard.service` | **Recommended autostart (systemd)** |
+| `/etc/xdg/autostart/squeekboard.desktop` | System autostart entry (has race condition) |
+| `~/.config/autostart/squeekboard.desktop.disabled` | Disabled user autostart |
 | `/etc/xdg/wf-panel-pi/wf-panel-pi.ini` | Panel config with squeek widget |
 | `/usr/lib/aarch64-linux-gnu/wf-panel-pi/libsqueek.so` | Panel plugin |
+
+### Repository Files
+
+| File | Purpose |
+|------|---------|
+| `configs/squeekboard/squeekboard.service` | Source for systemd service |
 
 ---
 

@@ -1,0 +1,20 @@
+[Unit]
+Description=Squeekboard On-Screen Keyboard
+# Run after default.target (graphical-session.target not used on Pi OS)
+After=default.target
+
+[Service]
+Type=simple
+# Delay to ensure labwc is fully initialized and WAYLAND_DISPLAY is available
+ExecStartPre=/bin/sleep 5
+# Check for touch device before starting
+ExecStartPre=/bin/sh -c 'libinput list-devices | grep Capabilities | grep -qw touch'
+# Set WAYLAND_DISPLAY since user services don't inherit it automatically
+Environment=WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/bin/squeekboard
+# Restart if it crashes
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
