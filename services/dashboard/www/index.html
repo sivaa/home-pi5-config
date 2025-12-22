@@ -6850,6 +6850,46 @@
           });
 
           // ═══════════════════════════════════════════════════════════════
+          // WINDOW GEOMETRY - Glass panel with frame for W2
+          // ═══════════════════════════════════════════════════════════════
+          const addWindowGeometry = (winConfig) => {
+            const winWidth = winConfig.size || 2.0;
+
+            // Use same offset logic as window markers
+            let actualX = winConfig.x;
+            if (winConfig.x < 0.1) actualX = 0.5;
+            if (winConfig.x > FLOOR_PLAN_CONFIG.apartmentWidth - 0.1) actualX = FLOOR_PLAN_CONFIG.apartmentWidth - 0.5;
+
+            const posX = actualX - centerX;
+            const posZ = winConfig.z - centerZ;
+
+            // Frame (dark border)
+            const frameMat = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
+            const frame = new THREE.Mesh(
+              new THREE.BoxGeometry(0.2, 0.6, winWidth),
+              frameMat
+            );
+            frame.position.set(posX, 0.4, posZ);
+            networkState.scene.add(frame);
+
+            // Glass pane (light blue transparent)
+            const glassMat = new THREE.MeshBasicMaterial({
+              color: 0x87CEEB,
+              transparent: true,
+              opacity: 0.5
+            });
+            const glass = new THREE.Mesh(
+              new THREE.BoxGeometry(0.15, 0.5, winWidth * 0.9),
+              glassMat
+            );
+            glass.position.set(posX, 0.4, posZ);
+            networkState.scene.add(glass);
+          };
+
+          // Add window geometry for W2 only
+          addWindowGeometry(FLOOR_PLAN_CONFIG.windows[1]);
+
+          // ═══════════════════════════════════════════════════════════════
           // COMPASS DIRECTION LABELS - N/S/E/W outside the building
           // ═══════════════════════════════════════════════════════════════
           const halfW = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
