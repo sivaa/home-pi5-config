@@ -6682,14 +6682,15 @@
           networkState.scene.add(vertStepWall);
           networkState.wallMeshes.push(vertStepWall);
 
-          // Balcony railings (if enabled)
+          // Balcony railings (if enabled) - same color as walls
           if (notch.hasRailing) {
             const railingHeight = 0.5;  // Lower than walls
             const railingThickness = 0.05;
             const railingMat = new THREE.MeshStandardMaterial({
-              color: 0x8B7355,  // Bronze/metal color
-              roughness: 0.4,
-              metalness: 0.6
+              color: 0xB5A080,  // Same as other walls
+              roughness: 0.7,
+              transparent: true,
+              opacity: 0.6
             });
 
             // East railing (along x=9.239, from z=6.165 to z=7.665)
