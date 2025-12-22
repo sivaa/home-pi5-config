@@ -6630,60 +6630,70 @@
           networkState.wallMeshes.push(eastWallLower);
 
           // Wall 10: South wall (gap on EAST side for balcony notch)
-          // Runs from x=0 to x=7.739 (apartmentWidth - notch.width), gap on east side
           const southWallZ = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
           const southWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth - notch.width;  // 9.239 - 1.5 = 7.739
-          const southWallCenterX = southWallWidth / 2 - centerX;  // Gap on EAST side now
-          const southWall = new THREE.Mesh(new THREE.BoxGeometry(southWallWidth, wallHeight, 0.08), wallMat);
+          const southWallCenterX = southWallWidth / 2 - centerX;  // Gap on EAST side
+          const southWall = new THREE.Mesh(
+            new THREE.BoxGeometry(southWallWidth, wallHeight, 0.08),
+            wallMat
+          );
           southWall.position.set(southWallCenterX, wallHeight/2, southWallZ - centerZ);
           networkState.scene.add(southWall);
           networkState.wallMeshes.push(southWall);
 
-          // ========== BALCONY NOTCH ELEMENTS (EAST/SOUTHEAST corner) ==========
+          // ========== BALCONY AT SE CORNER, EXTENDS EAST ==========
 
-          // Balcony floor - matching base floor color (extends outside building)
+          // Balcony positions
+          const balconyOuterX = FLOOR_PLAN_CONFIG.apartmentWidth + notch.width;  // 9.239 + 1.5 = 10.739
+          const balconyStartZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 6.165
+          const notchFloorZ = (FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth / 2) - centerZ;
+
+          // Balcony floor - covers BOTH notch (inside) AND extension (outside east)
           const balconyFloorColor = 0xC0C0C2;  // Same as base floor
           const balconyFloorMat = new THREE.MeshStandardMaterial({
             color: balconyFloorColor,
             roughness: 0.8
           });
-          // Floor covers from z=6.165 to z=9.165 (double depth, extends outside)
-          const balconyFloor = new THREE.Mesh(
-            new THREE.PlaneGeometry(notch.width, notch.depth * 2),
+
+          // Notch floor (inside building) - from x=7.739 to x=9.239
+          const notchFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(notch.width, notch.depth),
             balconyFloorMat
           );
-          balconyFloor.rotation.x = -Math.PI / 2;
-          // Position to cover both inside notch and outside protrusion
-          const balconyFloorX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width / 2) - centerX;  // EAST side
-          const balconyFloorZ = (FLOOR_PLAN_CONFIG.apartmentDepth) - centerZ;  // Center at building edge
-          balconyFloor.position.set(balconyFloorX, 0.01, balconyFloorZ);
-          networkState.scene.add(balconyFloor);
+          notchFloor.rotation.x = -Math.PI / 2;
+          const notchFloorX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width / 2) - centerX;
+          notchFloor.position.set(notchFloorX, 0.01, notchFloorZ);
+          networkState.scene.add(notchFloor);
 
-          // Interior step wall (from living room looking out to balcony)
-          // Horizontal wall along z = 6.165, from x=7.739 to x=9.239 (EAST side)
-          const stepWallZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 6.165
-          const stepWall = new THREE.Mesh(
-            new THREE.BoxGeometry(notch.width, wallHeight, 0.08),
+          // Extension floor (outside building) - from x=9.239 to x=10.739
+          const extFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(notch.width, notch.depth),
+            balconyFloorMat
+          );
+          extFloor.rotation.x = -Math.PI / 2;
+          const extFloorX = (FLOOR_PLAN_CONFIG.apartmentWidth + notch.width / 2) - centerX;
+          extFloor.position.set(extFloorX, 0.01, notchFloorZ);
+          networkState.scene.add(extFloor);
+
+          // Wall 16: North balcony wall (along z = 6.165, extends EAST from notch to outer edge)
+          const northBalconyWall = new THREE.Mesh(
+            new THREE.BoxGeometry(notch.width * 2, wallHeight, 0.08),  // Double width to cover notch + extension
             wallMat
           );
-          const stepWallCenterX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width / 2) - centerX;  // EAST side
-          stepWall.position.set(stepWallCenterX, wallHeight / 2, stepWallZ - centerZ);
-          networkState.scene.add(stepWall);
-          networkState.wallMeshes.push(stepWall);
+          const wall16CenterX = FLOOR_PLAN_CONFIG.apartmentWidth - centerX;  // Centered at building edge
+          northBalconyWall.position.set(wall16CenterX, wallHeight / 2, balconyStartZ - centerZ);
+          networkState.scene.add(northBalconyWall);
+          networkState.wallMeshes.push(northBalconyWall);
 
-          // Vertical step wall (from notch corner going south) - EXTENDS OUTSIDE building
-          // Along x = 7.739, from z = 6.165 to z = 9.165 (1.5m outside building)
-          const balconyOuterZ = FLOOR_PLAN_CONFIG.apartmentDepth + notch.depth;  // 7.665 + 1.5 = 9.165
-          const extendedDepth = notch.depth * 2;  // Double depth to extend outside
-          const vertStepWall = new THREE.Mesh(
-            new THREE.BoxGeometry(0.08, wallHeight, extendedDepth),
+          // Wall 17: West notch wall (along x = 7.739, from z=6.165 to z=7.665)
+          const vertStepWallX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width) - centerX;
+          const westNotchWall = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, wallHeight, notch.depth),
             wallMat
           );
-          const vertStepWallZ = (stepWallZ + balconyOuterZ) / 2 - centerZ;  // Center of extended wall
-          const vertStepWallX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width) - centerX;  // EAST side inner edge
-          vertStepWall.position.set(vertStepWallX, wallHeight / 2, vertStepWallZ);
-          networkState.scene.add(vertStepWall);
-          networkState.wallMeshes.push(vertStepWall);
+          westNotchWall.position.set(vertStepWallX, wallHeight / 2, notchFloorZ);
+          networkState.scene.add(westNotchWall);
+          networkState.wallMeshes.push(westNotchWall);
 
           // Balcony railings (if enabled) - same color as walls
           if (notch.hasRailing) {
@@ -6696,38 +6706,37 @@
               opacity: 0.6
             });
 
-            // East railing (along x=9.239, from z=6.165 to z=9.165) - EXTENDS OUTSIDE
+            // Wall 18: East railing (outer edge at x = 10.739)
             const eastRailing = new THREE.Mesh(
-              new THREE.BoxGeometry(railingThickness, railingHeight, extendedDepth),
+              new THREE.BoxGeometry(railingThickness, railingHeight, notch.depth),
               railingMat
             );
-            const eastRailingX = FLOOR_PLAN_CONFIG.apartmentWidth - centerX;  // EAST edge
-            eastRailing.position.set(eastRailingX, railingHeight / 2, vertStepWallZ);
+            eastRailing.position.set(balconyOuterX - centerX, railingHeight / 2, notchFloorZ);
             networkState.scene.add(eastRailing);
-            networkState.wallMeshes.push(eastRailing);  // Add wall number
+            networkState.wallMeshes.push(eastRailing);
 
-            // South railing (along z=9.165, from x=7.739 to x=9.239) - OUTSIDE building
-            const southRailing = new THREE.Mesh(
-              new THREE.BoxGeometry(notch.width, railingHeight, railingThickness),
+            // Wall 19: South balcony wall (along z = 7.665, extends EAST across notch + extension)
+            const southBalconyWall = new THREE.Mesh(
+              new THREE.BoxGeometry(notch.width * 2, railingHeight, railingThickness),  // Double width
               railingMat
             );
-            southRailing.position.set(stepWallCenterX, railingHeight / 2, balconyOuterZ - centerZ);
-            networkState.scene.add(southRailing);
-            networkState.wallMeshes.push(southRailing);  // Add wall number
+            southBalconyWall.position.set(wall16CenterX, railingHeight / 2, southWallZ - centerZ);
+            networkState.scene.add(southBalconyWall);
+            networkState.wallMeshes.push(southBalconyWall);
 
-            // Corner posts at outer edge (z=9.165)
+            // Corner posts at outer edge
             const cornerPost1 = new THREE.Mesh(
               new THREE.CylinderGeometry(0.04, 0.04, railingHeight, 8),
               railingMat
             );
-            cornerPost1.position.set(vertStepWallX, railingHeight / 2, balconyOuterZ - centerZ);
+            cornerPost1.position.set(balconyOuterX - centerX, railingHeight / 2, balconyStartZ - centerZ);
             networkState.scene.add(cornerPost1);
 
             const cornerPost2 = new THREE.Mesh(
               new THREE.CylinderGeometry(0.04, 0.04, railingHeight, 8),
               railingMat
             );
-            cornerPost2.position.set(eastRailingX, railingHeight / 2, balconyOuterZ - centerZ);
+            cornerPost2.position.set(balconyOuterX - centerX, railingHeight / 2, southWallZ - centerZ);
             networkState.scene.add(cornerPost2);
           }
 
