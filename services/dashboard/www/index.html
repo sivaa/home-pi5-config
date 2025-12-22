@@ -4820,7 +4820,7 @@
       ],
       windows: [
         { x: 9.239, z: 1.848, rotation: Math.PI/2, size: 2.5 },   // Study right (mirrored)
-        { x: 9.239, z: 5.681, rotation: Math.PI/2, size: 2.5 },   // Living right (mirrored)
+        { x: 9.239, z: 4.2, rotation: Math.PI/2, size: 2.5 },     // Living right (east wall)
         { x: 0, z: 5.976, rotation: Math.PI/2, size: 2.5 },       // Bedroom left (mirrored)
         { x: 0, z: 3.218, rotation: Math.PI/2, size: 1.8 },       // Kitchen left (mirrored)
         { x: 0, z: 1.487, rotation: Math.PI/2, size: 1.2 }        // Bathroom left (mirrored)
@@ -6787,6 +6787,108 @@
 
           // Door 7: Main Entry - on north wall (z=0)
           addDoorMarker(4.0, 0);
+
+          // ═══════════════════════════════════════════════════════════════
+          // WINDOW X MARKERS - Blue X on floor (like door markers but blue)
+          // ═══════════════════════════════════════════════════════════════
+          const windowMarkerMat = new THREE.MeshBasicMaterial({ color: 0x0066FF });
+          const winMarkerSize = 0.5;  // Larger than door markers
+
+          const addWindowMarker = (x, z, index) => {
+            // Offset x inside apartment for wall positions
+            let actualX = x;
+            if (x < 0.1) actualX = 0.5;  // West wall - offset 0.5m inside
+            if (x > FLOOR_PLAN_CONFIG.apartmentWidth - 0.1) actualX = FLOOR_PLAN_CONFIG.apartmentWidth - 0.5;  // East wall
+
+            const posX = actualX - centerX;
+            const posZ = z - centerZ;
+
+            // Bar 1 (diagonal \) - flat on floor
+            const bar1 = new THREE.Mesh(
+              new THREE.BoxGeometry(winMarkerSize, 0.05, 0.08),
+              windowMarkerMat
+            );
+            bar1.rotation.y = Math.PI / 4;
+            bar1.position.set(posX, 0.03, posZ);
+            networkState.scene.add(bar1);
+
+            // Bar 2 (diagonal /) - flat on floor
+            const bar2 = new THREE.Mesh(
+              new THREE.BoxGeometry(winMarkerSize, 0.05, 0.08),
+              windowMarkerMat
+            );
+            bar2.rotation.y = -Math.PI / 4;
+            bar2.position.set(posX, 0.03, posZ);
+            networkState.scene.add(bar2);
+
+            // Window number label (blue circle with W#)
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0066FF';
+            ctx.beginPath();
+            ctx.arc(32, 32, 28, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('W' + index, 32, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const labelMat = new THREE.SpriteMaterial({ map: texture });
+            const label = new THREE.Sprite(labelMat);
+            label.scale.set(0.6, 0.6, 1);
+            label.position.set(posX, 0.6, posZ);
+            networkState.scene.add(label);
+          };
+
+          // Add window markers from config
+          FLOOR_PLAN_CONFIG.windows.forEach((win, i) => {
+            addWindowMarker(win.x, win.z, i + 1);
+          });
+
+          // ═══════════════════════════════════════════════════════════════
+          // COMPASS DIRECTION LABELS - N/S/E/W outside the building
+          // ═══════════════════════════════════════════════════════════════
+          const halfW = FLOOR_PLAN_CONFIG.apartmentWidth / 2;
+          const halfD = FLOOR_PLAN_CONFIG.apartmentDepth / 2;
+          const compassOffset = 1.0;  // Distance outside building
+
+          const compassLabels = [
+            { label: 'N', x: 0, z: -halfD - compassOffset, color: '#2563EB' },  // North (blue)
+            { label: 'S', x: 0, z: halfD + compassOffset, color: '#DC2626' },   // South (red)
+            { label: 'W', x: -halfW - compassOffset, z: 0, color: '#059669' },  // West (green)
+            { label: 'E', x: halfW + compassOffset, z: 0, color: '#D97706' }    // East (orange)
+          ];
+
+          compassLabels.forEach(({ label, x, z, color }) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            // Circle background
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(32, 32, 28, 0, Math.PI * 2);
+            ctx.fill();
+
+            // White letter
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, 32, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(0.8, 0.8, 1);
+            sprite.position.set(x, 0.5, z);
+            networkState.scene.add(sprite);
+          });
         },
 
         createRoom(config) {
