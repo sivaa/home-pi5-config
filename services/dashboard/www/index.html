@@ -6700,6 +6700,7 @@
             const eastRailingX = FLOOR_PLAN_CONFIG.apartmentWidth - centerX;  // EAST edge
             eastRailing.position.set(eastRailingX, railingHeight / 2, vertStepWallZ);
             networkState.scene.add(eastRailing);
+            networkState.wallMeshes.push(eastRailing);  // Add wall number
 
             // South railing (along z=7.665, from x=7.739 to x=9.239)
             const southRailing = new THREE.Mesh(
@@ -6708,6 +6709,7 @@
             );
             southRailing.position.set(stepWallCenterX, railingHeight / 2, southWallZ - centerZ);
             networkState.scene.add(southRailing);
+            networkState.wallMeshes.push(southRailing);  // Add wall number
 
             // Corner post at SOUTHEAST corner (9.239, 7.665)
             const cornerPost = new THREE.Mesh(
