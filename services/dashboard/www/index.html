@@ -3169,14 +3169,15 @@
         ? 'http://pi:8086'  // Local dev → connect to Pi's InfluxDB
         : '/api/influx',
       influxDb: 'homeassistant',
+      // Room configuration - isOutdoor: true excludes from home-wide averages
       rooms: [
-        { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity' },
-        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor' },
-        { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity' },
-        { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity' },
-        { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity' },
-        { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity' },
-        { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '', entityId: '' }
+        { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
+        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
+        { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
+        { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity', isOutdoor: false },
+        { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity', isOutdoor: false },
+        { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity', isOutdoor: true },
+        { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '', entityId: '', isOutdoor: false }
       ],
       staleThreshold: 5 * 60 * 1000,
       maxHistoryPoints: 500,
@@ -3395,16 +3396,21 @@
           return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
         },
 
-        // Home-wide average temperature
+        // Indoor rooms only (excludes outdoor rooms like balcony)
+        get indoorRooms() {
+          return this.list.filter(r => !r.isOutdoor);
+        },
+
+        // Home-wide average temperature (indoor rooms only)
         get avgTemperature() {
-          const temps = this.list.filter(r => r.avgTemperature != null).map(r => r.avgTemperature);
+          const temps = this.indoorRooms.filter(r => r.avgTemperature != null).map(r => r.avgTemperature);
           if (temps.length === 0) return null;
           return temps.reduce((a, b) => a + b, 0) / temps.length;
         },
 
-        // Home-wide average humidity
+        // Home-wide average humidity (indoor rooms only)
         get avgHumidity() {
-          const humids = this.list.filter(r => r.avgHumidity != null).map(r => r.avgHumidity);
+          const humids = this.indoorRooms.filter(r => r.avgHumidity != null).map(r => r.avgHumidity);
           if (humids.length === 0) return null;
           return humids.reduce((a, b) => a + b, 0) / humids.length;
         },
@@ -4797,6 +4803,12 @@
       ],
       balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
       hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
+      balconyNotch: {
+        width: 1.5,    // Cut-out width from west wall
+        depth: 1.5,    // Cut-out depth from south edge
+        hasRailing: true,
+        floorColor: 0xFF0000  // Bright red for high visibility
+      },
       doors: [
         { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at east wall)
         { x: 3.706, z: 3.697, rotation: 0, swingDirection: 'south' },           // Living ↔ Hallway
@@ -6559,10 +6571,13 @@
           networkState.scene.add(northWall2);
           networkState.wallMeshes.push(northWall2);
 
-          // Wall 7: West wall (full depth, equal to Wall 9)
-          const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665 (same as Wall 9)
-          const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
-          westWall.position.set(-centerX, wallHeight/2, 0);  // Centered in z
+          // Wall 7: West wall (FULL depth - balcony is on EAST side)
+          const notch = FLOOR_PLAN_CONFIG.balconyNotch;
+          const westWall = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, wallHeight, FLOOR_PLAN_CONFIG.apartmentDepth),
+            wallMat
+          );
+          westWall.position.set(-centerX, wallHeight/2, 0);  // Centered in z (full depth)
           networkState.scene.add(westWall);
           networkState.wallMeshes.push(westWall);
 
@@ -6604,23 +6619,104 @@
           networkState.scene.add(eastWallUpper3);
           networkState.wallMeshes.push(eastWallUpper3);
 
-          // Wall 9: East wall lower (Study+Living right consolidated)
-          // From z=0 to z=7.665 (full depth) at x = study/living right edge (apartment east edge)
+          // Wall 9: East wall lower (Study+Living right - SHORTENED for balcony notch)
+          // From z=0 to z=6.165 (stops before notch) at x = apartment east edge
           const wall9X = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239 (east edge)
-          const wall9Depth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
-          const eastWallLower = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, wall9Depth), wallMat);
-          eastWallLower.position.set(wall9X - centerX, wallHeight/2, 0);  // Centered in z
+          const eastWallEndZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 7.665 - 1.5 = 6.165
+          const eastWallCenterZ = eastWallEndZ / 2 - centerZ;  // Center of shortened wall
+          const eastWallLower = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, eastWallEndZ), wallMat);
+          eastWallLower.position.set(wall9X - centerX, wallHeight/2, eastWallCenterZ);
           networkState.scene.add(eastWallLower);
           networkState.wallMeshes.push(eastWallLower);
 
-          // Wall 10: South wall (Bedroom+Living front consolidated)
-          // Full apartment width at z=7.665 (south edge)
-          const wall10Z = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
-          const wall10Width = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
-          const southWall = new THREE.Mesh(new THREE.BoxGeometry(wall10Width, wallHeight, 0.08), wallMat);
-          southWall.position.set(0, wallHeight/2, wall10Z - centerZ);  // x centered, z at south edge
+          // Wall 10: South wall (gap on EAST side for balcony notch)
+          // Runs from x=0 to x=7.739 (apartmentWidth - notch.width), gap on east side
+          const southWallZ = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+          const southWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth - notch.width;  // 9.239 - 1.5 = 7.739
+          const southWallCenterX = southWallWidth / 2 - centerX;  // Gap on EAST side now
+          const southWall = new THREE.Mesh(new THREE.BoxGeometry(southWallWidth, wallHeight, 0.08), wallMat);
+          southWall.position.set(southWallCenterX, wallHeight/2, southWallZ - centerZ);
           networkState.scene.add(southWall);
           networkState.wallMeshes.push(southWall);
+
+          // ========== BALCONY NOTCH ELEMENTS (EAST/SOUTHEAST corner) ==========
+
+          // Balcony floor - matching base floor color (light gray)
+          const balconyFloorColor = 0xC0C0C2;  // Same as base floor
+          const balconyFloorMat = new THREE.MeshStandardMaterial({
+            color: balconyFloorColor,
+            roughness: 0.8
+          });
+          const balconyFloor = new THREE.Mesh(
+            new THREE.PlaneGeometry(notch.width, notch.depth),
+            balconyFloorMat
+          );
+          balconyFloor.rotation.x = -Math.PI / 2;
+          // Position in the notch area (SOUTHEAST corner - living room side)
+          const balconyFloorX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width / 2) - centerX;  // EAST side
+          const balconyFloorZ = (FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth / 2) - centerZ;
+          balconyFloor.position.set(balconyFloorX, 0.01, balconyFloorZ);  // Same height as base floor
+          networkState.scene.add(balconyFloor);
+
+          // Interior step wall (from living room looking out to balcony)
+          // Horizontal wall along z = 6.165, from x=7.739 to x=9.239 (EAST side)
+          const stepWallZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 6.165
+          const stepWall = new THREE.Mesh(
+            new THREE.BoxGeometry(notch.width, wallHeight, 0.08),
+            wallMat
+          );
+          const stepWallCenterX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width / 2) - centerX;  // EAST side
+          stepWall.position.set(stepWallCenterX, wallHeight / 2, stepWallZ - centerZ);
+          networkState.scene.add(stepWall);
+          networkState.wallMeshes.push(stepWall);
+
+          // Vertical step wall (from notch corner going south)
+          // Along x = 7.739 (apartmentWidth - notch.width), from z = 6.165 to z = 7.665
+          const vertStepWall = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, wallHeight, notch.depth),
+            wallMat
+          );
+          const vertStepWallZ = (stepWallZ + FLOOR_PLAN_CONFIG.apartmentDepth) / 2 - centerZ;
+          const vertStepWallX = (FLOOR_PLAN_CONFIG.apartmentWidth - notch.width) - centerX;  // EAST side inner edge
+          vertStepWall.position.set(vertStepWallX, wallHeight / 2, vertStepWallZ);
+          networkState.scene.add(vertStepWall);
+          networkState.wallMeshes.push(vertStepWall);
+
+          // Balcony railings (if enabled)
+          if (notch.hasRailing) {
+            const railingHeight = 0.5;  // Lower than walls
+            const railingThickness = 0.05;
+            const railingMat = new THREE.MeshStandardMaterial({
+              color: 0x8B7355,  // Bronze/metal color
+              roughness: 0.4,
+              metalness: 0.6
+            });
+
+            // East railing (along x=9.239, from z=6.165 to z=7.665)
+            const eastRailing = new THREE.Mesh(
+              new THREE.BoxGeometry(railingThickness, railingHeight, notch.depth),
+              railingMat
+            );
+            const eastRailingX = FLOOR_PLAN_CONFIG.apartmentWidth - centerX;  // EAST edge
+            eastRailing.position.set(eastRailingX, railingHeight / 2, vertStepWallZ);
+            networkState.scene.add(eastRailing);
+
+            // South railing (along z=7.665, from x=7.739 to x=9.239)
+            const southRailing = new THREE.Mesh(
+              new THREE.BoxGeometry(notch.width, railingHeight, railingThickness),
+              railingMat
+            );
+            southRailing.position.set(stepWallCenterX, railingHeight / 2, southWallZ - centerZ);
+            networkState.scene.add(southRailing);
+
+            // Corner post at SOUTHEAST corner (9.239, 7.665)
+            const cornerPost = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.04, 0.04, railingHeight, 8),
+              railingMat
+            );
+            cornerPost.position.set(eastRailingX, railingHeight / 2, southWallZ - centerZ);
+            networkState.scene.add(cornerPost);
+          }
 
           // Door X markers - adding from FLOOR_PLAN_CONFIG.doors
           const doorMarkerMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });

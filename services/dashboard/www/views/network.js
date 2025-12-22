@@ -164,17 +164,17 @@ export function networkView() {
         let result = null;
 
         // Check for full-length horizontal walls (North/South)
-        // In isometric view: z=-halfD appears at TOP (North), z=+halfD at BOTTOM (South)
+        // In isometric view: z=-halfD appears at TOP (South), z=+halfD at BOTTOM (North)
         if (isHorizontal && Math.abs(params.width - apartmentWidth) < lengthTolerance) {
-          if (Math.abs(wall.position.z - (-halfD)) < tolerance) result = 'N';  // Top edge
-          else if (Math.abs(wall.position.z - halfD) < tolerance) result = 'S';  // Bottom edge
+          if (Math.abs(wall.position.z - (-halfD)) < tolerance) result = 'S';  // Top edge
+          else if (Math.abs(wall.position.z - halfD) < tolerance) result = 'N';  // Bottom edge
         }
 
         // Check for full-length vertical walls (West/East)
-        // In isometric view: x=-halfW appears at LEFT (West), x=+halfW at RIGHT (East)
+        // In isometric view: x=-halfW appears at LEFT (East), x=+halfW at RIGHT (West)
         if (isVertical && Math.abs(params.depth - apartmentDepth) < lengthTolerance) {
-          if (Math.abs(wall.position.x - (-halfW)) < tolerance) result = 'W';  // Left edge
-          else if (Math.abs(wall.position.x - halfW) < tolerance) result = 'E';  // Right edge
+          if (Math.abs(wall.position.x - (-halfW)) < tolerance) result = 'E';  // Left edge
+          else if (Math.abs(wall.position.x - halfW) < tolerance) result = 'W';  // Right edge
         }
 
         return result;
@@ -245,6 +245,7 @@ export function networkView() {
      * TOTAL: 10 walls (indices 0-9)
      */
     buildFloorPlan() {
+      console.log('[FLOORPLAN DEBUG] buildFloorPlan() called');
       networkState.wallMeshes = [];
       const centerX = FLOOR_PLAN_CONFIG.apartmentWidth / 2;  // 4.6195
       const centerZ = FLOOR_PLAN_CONFIG.apartmentDepth / 2;  // 3.8325
@@ -351,10 +352,14 @@ export function networkView() {
       networkState.scene.add(northWall2);
       networkState.wallMeshes.push(northWall2);
 
-      // Wall 7: West wall (full depth, equal to Wall 9)
-      const westWallDepth = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665 (same as Wall 9)
+      // Wall 7: West wall (shortened for balcony notch)
+      // Runs from z=0 to z=(apartmentDepth - balconyNotch.depth) = 6.165
+      const notch = FLOOR_PLAN_CONFIG.balconyNotch;
+      const westWallEndZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 7.665 - 1.5 = 6.165
+      const westWallDepth = westWallEndZ;  // From z=0 to z=6.165
+      const westWallCenterZ = westWallDepth / 2 - centerZ;  // Center of shortened wall
       const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallHeight, westWallDepth), wallMat);
-      westWall.position.set(-centerX, wallHeight/2, 0);  // Centered in z
+      westWall.position.set(-centerX, wallHeight/2, westWallCenterZ);
       networkState.scene.add(westWall);
       networkState.wallMeshes.push(westWall);
 
@@ -405,14 +410,86 @@ export function networkView() {
       networkState.scene.add(eastWallLower);
       networkState.wallMeshes.push(eastWallLower);
 
-      // Wall 10: South wall (Bedroom+Living front consolidated)
-      // Full apartment width at z=7.665 (south edge)
-      const wall10Z = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
-      const wall10Width = FLOOR_PLAN_CONFIG.apartmentWidth;  // 9.239
-      const southWall = new THREE.Mesh(new THREE.BoxGeometry(wall10Width, wallHeight, 0.08), wallMat);
-      southWall.position.set(0, wallHeight/2, wall10Z - centerZ);  // x centered, z at south edge
+      // Wall 10: South wall (shortened for balcony notch)
+      // Starts at x=notch.width (1.5) instead of x=0, ends at apartment east edge
+      const southWallZ = FLOOR_PLAN_CONFIG.apartmentDepth;  // 7.665
+      const southWallWidth = FLOOR_PLAN_CONFIG.apartmentWidth - notch.width;  // 9.239 - 1.5 = 7.739
+      const southWallCenterX = (notch.width + FLOOR_PLAN_CONFIG.apartmentWidth) / 2 - centerX;  // Center of shortened wall
+      const southWall = new THREE.Mesh(new THREE.BoxGeometry(southWallWidth, wallHeight, 0.08), wallMat);
+      southWall.position.set(southWallCenterX, wallHeight/2, southWallZ - centerZ);
       networkState.scene.add(southWall);
       networkState.wallMeshes.push(southWall);
+
+      // ========== BALCONY NOTCH ELEMENTS ==========
+      console.log('[BALCONY DEBUG] Creating balcony floor with color:', notch.floorColor);
+
+      // Balcony floor (in the cut-out notch area) - Using BoxGeometry for visibility
+      const balconyFloorColor = notch.floorColor || 0xD4C9B0;  // Blood red from config
+      const balconyFloorMat = new THREE.MeshStandardMaterial({ color: balconyFloorColor, roughness: 0.9 });
+      const balconyFloor = new THREE.Mesh(
+        new THREE.BoxGeometry(notch.width, 0.1, notch.depth),  // Box instead of plane
+        balconyFloorMat
+      );
+      // DEBUG: Put in center of apartment to verify it renders
+      balconyFloor.position.set(0, 0.5, 0);  // CENTER of apartment, raised high
+      balconyFloor.receiveShadow = true;
+      networkState.scene.add(balconyFloor);
+
+      // Interior step wall (from living room looking out to balcony)
+      // Horizontal wall along z = apartmentDepth - notch.depth (6.165), from x=0 to x=notch.width
+      const stepWallZ = FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth;  // 6.165
+      const stepWall = new THREE.Mesh(
+        new THREE.BoxGeometry(notch.width, wallHeight, 0.08),
+        wallMat
+      );
+      const stepWallCenterX = notch.width / 2 - centerX;
+      stepWall.position.set(stepWallCenterX, wallHeight / 2, stepWallZ - centerZ);
+      networkState.scene.add(stepWall);
+      networkState.wallMeshes.push(stepWall);
+
+      // Vertical step wall (from notch corner going south)
+      // Along x = notch.width (1.5), from z = 6.165 to z = 7.665
+      const vertStepWall = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, wallHeight, notch.depth),
+        wallMat
+      );
+      const vertStepWallZ = (stepWallZ + FLOOR_PLAN_CONFIG.apartmentDepth) / 2 - centerZ;
+      vertStepWall.position.set(notch.width - centerX, wallHeight / 2, vertStepWallZ);
+      networkState.scene.add(vertStepWall);
+      networkState.wallMeshes.push(vertStepWall);
+
+      // Balcony railings (if enabled)
+      if (notch.hasRailing) {
+        const railingHeight = 0.5;  // Lower than walls
+        const railingThickness = 0.05;
+        const railingMat = new THREE.MeshStandardMaterial({
+          color: 0x8B7355,  // Bronze/metal color
+          roughness: 0.4,
+          metalness: 0.6
+        });
+
+        // West railing (along x=0, from z=6.165 to z=7.665)
+        const westRailing = new THREE.Mesh(
+          new THREE.BoxGeometry(railingThickness, railingHeight, notch.depth),
+          railingMat
+        );
+        westRailing.position.set(-centerX, railingHeight / 2, vertStepWallZ);
+        networkState.scene.add(westRailing);
+
+        // South railing (along z=7.665, from x=0 to x=1.5)
+        const southRailing = new THREE.Mesh(
+          new THREE.BoxGeometry(notch.width, railingHeight, railingThickness),
+          railingMat
+        );
+        southRailing.position.set(stepWallCenterX, railingHeight / 2, southWallZ - centerZ);
+        networkState.scene.add(southRailing);
+
+        // Corner post
+        const postGeom = new THREE.CylinderGeometry(0.04, 0.04, railingHeight, 8);
+        const cornerPost = new THREE.Mesh(postGeom, railingMat);
+        cornerPost.position.set(-centerX, railingHeight / 2, southWallZ - centerZ);
+        networkState.scene.add(cornerPost);
+      }
 
       // Door X markers - adding from FLOOR_PLAN_CONFIG.doors
       const doorMarkerMat = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
@@ -476,11 +553,44 @@ export function networkView() {
       const rz = config.z - centerZ;
 
       // Room floor at correct position
-      const floorGeom = new THREE.PlaneGeometry(config.width, config.depth);
       const floorMat = new THREE.MeshStandardMaterial({ color: floorColor, roughness: 0.8 });
-      const floor = new THREE.Mesh(floorGeom, floorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.set(rx, 0.01, rz);
+      let floor;
+
+      // Special L-shaped floor for living room (balcony notch cut-out)
+      if (config.id === 'living' && FLOOR_PLAN_CONFIG.balconyNotch) {
+        const notch = FLOOR_PLAN_CONFIG.balconyNotch;
+        const w = config.width;
+        const d = config.depth;
+
+        // Create L-shape: rectangle with southwest corner cut out
+        // Shape coordinates are relative to room center
+        const shape = new THREE.Shape();
+        // Start at southwest corner of main room (after notch)
+        shape.moveTo(-w/2 + notch.width, -d/2);
+        // Go east along south edge
+        shape.lineTo(w/2, -d/2);
+        // Go north along east edge
+        shape.lineTo(w/2, d/2);
+        // Go west along north edge
+        shape.lineTo(-w/2, d/2);
+        // Go south along west edge (partial - stop at notch)
+        shape.lineTo(-w/2, -d/2 + notch.depth);
+        // Go east to notch inner corner
+        shape.lineTo(-w/2 + notch.width, -d/2 + notch.depth);
+        // Go south to close the shape
+        shape.lineTo(-w/2 + notch.width, -d/2);
+
+        const floorGeom = new THREE.ShapeGeometry(shape);
+        floor = new THREE.Mesh(floorGeom, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(rx, 0.01, rz);
+      } else {
+        // Standard rectangular floor for other rooms
+        const floorGeom = new THREE.PlaneGeometry(config.width, config.depth);
+        floor = new THREE.Mesh(floorGeom, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(rx, 0.01, rz);
+      }
       floor.receiveShadow = true;
       group.add(floor);
 

@@ -20,13 +20,14 @@ export const CONFIG = {
       ? window.location.origin + '/api/influx'  // Pi nginx proxy
       : 'http://' + window.location.hostname + ':8086',
   influxDb: 'homeassistant',
+  // Room configuration - isOutdoor: true excludes from home-wide averages
   rooms: [
-    { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity' },
-    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor' },
-    { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity' },
-    { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity' },
-    { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity' },
-    { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity' }
+    { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
+    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
+    { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
+    { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity', isOutdoor: false },
+    { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity', isOutdoor: false },
+    { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity', isOutdoor: true }
   ],
   staleThreshold: 5 * 60 * 1000,  // 5 minutes
   maxHistoryPoints: 500,
@@ -224,6 +225,12 @@ export const FLOOR_PLAN_CONFIG = {
     { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 7.664, z: 0.712, width: 3.15, depth: 1.424, color: 0xa78bfa, labelY: 2 }
   ],
   balcony: { x: -0.525, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
+  balconyNotch: {
+    width: 1.5,    // Cut-out width from west wall (x=0 to x=1.5)
+    depth: 1.5,    // Cut-out depth from south edge (z=7.665 back to z=6.165)
+    hasRailing: true,
+    floorColor: 0x8B0000  // Blood red for high visibility
+  },
   hallway: { x: 5.4, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
   doors: [
     { x: 0, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at west wall)
