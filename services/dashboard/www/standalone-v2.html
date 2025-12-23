@@ -106,7 +106,7 @@
         width: 1.0,
         depth: 1.5,
         hasRailing: true,
-        floorColor: 0xC0C0C2
+        floorColor: 0xC9B89A  // Warm beige (same as room floors)
       },
       doors: [
         { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },
@@ -570,7 +570,7 @@
           const notchFloorZ = (FLOOR_PLAN_CONFIG.apartmentDepth - notch.depth / 2) - centerZ;
 
           // Balcony floor - covers BOTH notch (inside) AND extension (outside east)
-          const balconyFloorColor = 0xC0C0C2;  // Same as base floor
+          const balconyFloorColor = 0xC9B89A;  // Warm beige (same as room floors)
           const balconyFloorMat = new THREE.MeshStandardMaterial({
             color: balconyFloorColor,
             roughness: 0.8
