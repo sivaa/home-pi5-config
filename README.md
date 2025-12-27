@@ -70,6 +70,7 @@
 | 14 | [Brightness Control](docs/14-brightness-control.md) | Adaptive DDC/CI dimming (80% wake, 25% idle) |
 | 15 | [HA Automations](docs/15-ha-automations.md) | Home Assistant automation configurations |
 | 16 | [Touch Monitor](docs/16-touch-monitor.md) | Touch gestures (scroll, pinch-zoom) setup |
+| 17 | [Heater Watchdog](docs/17-heater-watchdog.md) | Poll-based safety monitor for heater-window violations |
 
 ---
 
@@ -189,6 +190,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-27 | Added heater-watchdog: poll-based safety monitor runs every 5min as defense-in-depth layer |
 | 2025-12-27 | Enabled touch gestures (scroll, pinch-zoom) by disabling labwc mouse emulation |
 | 2025-12-19 | Added adaptive brightness control (DDC/CI): 80% on wake, dims 10%/min to 25% idle |
 | 2025-12-19 | Replaced Chromium with Epiphany browser (440 MB → 60 MB, fixed infinite loading) |
@@ -246,7 +248,8 @@ pi-setup/
 │   ├── 13-browser-setup.md
 │   ├── 14-brightness-control.md
 │   ├── 15-ha-automations.md
-│   └── 16-touch-monitor.md
+│   ├── 16-touch-monitor.md
+│   └── 17-heater-watchdog.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
@@ -254,6 +257,9 @@ pi-setup/
 │   ├── dashboard/             <- Custom smart home dashboard
 │   │   ├── www/index.html
 │   │   └── nginx/dashboard.conf
+│   ├── heater-watchdog/       <- Poll-based heater safety monitor
+│   │   ├── heater-watchdog.py
+│   │   └── Dockerfile
 │   ├── homeassistant/
 │   ├── mosquitto/
 │   └── zigbee2mqtt/

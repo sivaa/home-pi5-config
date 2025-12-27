@@ -83,3 +83,30 @@ services:
     depends_on:
       - mosquitto
       - influxdb
+
+  cast-ip-monitor:
+    build:
+      context: ../../services/cast-ip-monitor
+    container_name: cast-ip-monitor
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/homeassistant:/ha-config
+    environment:
+      - SCAN_INTERVAL=300
+      - TZ=Europe/Berlin
+
+  heater-watchdog:
+    build:
+      context: ../../services/heater-watchdog
+    container_name: heater-watchdog
+    restart: unless-stopped
+    depends_on:
+      - homeassistant
+    environment:
+      - HA_URL=http://homeassistant:8123
+      - HA_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no
+      - CHECK_INTERVAL=300
+      - NOTIFY_SERVICE=notify.mobile_app_22111317pg
+      - TZ=Europe/Berlin
