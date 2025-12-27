@@ -220,12 +220,31 @@
               </button>
             </template>
           </div>
+
+          <!-- Temperature Display: Balcony + Weather Forecast -->
+          <div class="header-temps">
+            <!-- Balcony Temperature (from Zigbee sensor) -->
+            <div class="temp-item temp-balcony"
+                 x-show="$store.rooms.list.find(r => r.id === 'balcony')?.temperature != null"
+                 :title="'Balcony sensor - ' + ($store.rooms.list.find(r => r.id === 'balcony')?.stale ? 'Stale data' : 'Live')">
+              <span class="temp-icon">🌿</span>
+              <span class="temp-value"
+                    x-text="$store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) + '°'"></span>
+            </div>
+            <!-- Weather Forecast (from Home Assistant) -->
+            <div class="temp-item temp-weather"
+                 x-show="$store.weather?.temperature != null"
+                 :title="'Zehlendorf forecast: ' + ($store.weather?.condition || 'Unknown')">
+              <span class="temp-icon" x-text="$store.weather?.conditionIcon || '🌡️'"></span>
+              <span class="temp-value" x-text="$store.weather?.temperature?.toFixed(0) + '°'"></span>
+            </div>
+          </div>
         </div>
 
         <!-- Right: Stats + Date/Time -->
         <div class="header-right">
           <div class="header-top">
-            <div class="header-stats">
+            <div class="header-stats" :data-v="$store.rooms.version">
               <span class="header-temp" x-show="$store.rooms.avgTemperature != null">
                 🏠 <span x-text="$store.rooms.avgTemperature?.toFixed(1)"></span>°
               </span>
@@ -1197,42 +1216,33 @@
                       </div>
                     </div>
 
-                    <!-- Temperature Display -->
-                    <div class="temp-display">
-                      <div class="current-temp">
-                        <span x-text="formatTemp(t.localTemp)"></span>
-                        <span class="unit">°C</span>
+                    <!-- Split Panel Temperature Display -->
+                    <div class="temp-split-panel" x-data="{ holdInterval: null, holdDelay: null }">
+                      <div class="temp-panel now-panel">
+                        <span class="panel-label">NOW</span>
+                        <span class="panel-temp" x-text="formatTemp(t.localTemp) + '°'"></span>
                       </div>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div class="progress-container">
-                      <div class="progress-bar">
-                        <div class="progress-fill"
-                             :class="{ heating: t.runningState === 'heat', idle: t.runningState !== 'heat' }"
-                             :style="'width: ' + getProgressPercent(t) + '%'"></div>
-                      </div>
-                      <div class="progress-label">
-                        <span x-text="getProgressLabel(t)"></span>
-                        <span x-text="getProgressPercent(t) + '%'"></span>
-                      </div>
-                    </div>
-
-                    <!-- Temperature Slider -->
-                    <div class="temp-slider-container" x-data="{ sliderValue: getDisplayTemp(t) || 17 }">
-                      <div class="slider-value-display">
-                        <span class="slider-value" x-text="sliderValue + '°C'"></span>
-                      </div>
-                      <input type="range" class="temp-slider"
-                             :value="getDisplayTemp(t) || 17"
-                             x-effect="sliderValue = getDisplayTemp(t) || sliderValue"
-                             @input="sliderValue = $event.target.value"
-                             @change="setTargetTemp(t.id, $event.target.value)"
-                             :disabled="!t.available || t.syncing"
-                             min="5" max="30" step="0.5">
-                      <div class="slider-range-labels">
-                        <span class="slider-min">5°C</span>
-                        <span class="slider-max">30°C</span>
+                      <div class="temp-panel target-panel" :class="{ syncing: t.syncing, heating: t.runningState === 'heat' }">
+                        <span class="panel-label">TARGET</span>
+                        <span class="panel-temp" x-text="(getDisplayTemp(t) || 17) + '°'"></span>
+                        <div class="panel-controls">
+                          <button class="panel-btn"
+                                  @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
+                                  @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @touchstart.prevent="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
+                                  @touchend="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @click="if(!holdInterval) adjustTemp(t.id, -1)"
+                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) <= 5">−</button>
+                          <button class="panel-btn"
+                                  @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
+                                  @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @touchstart.prevent="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
+                                  @touchend="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @click="if(!holdInterval) adjustTemp(t.id, 1)"
+                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) >= 22">+</button>
+                        </div>
                       </div>
                     </div>
 
@@ -3202,6 +3212,9 @@
         thermostat: [
           { name: '[Living] Thermostat Inner', label: 'Heater Inner' },
           { name: '[Living] Thermostat Outer', label: 'Heater Outer' }
+        ],
+        co2: [
+          { name: '[Hallway] CO2', label: 'Air Quality' }
         ]
       },
       bedroom: {
@@ -3391,6 +3404,7 @@
         }),
         lastUpdate: null,
         loading: false,
+        version: 0,  // Reactive trigger for header updates
 
         get historyCount() {
           return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
@@ -3451,6 +3465,7 @@
           room.lastSeen = sensorTime;
           room.stale = false;
           this.lastUpdate = now;
+          this.version++;  // Force header reactivity
 
           // Also update in the sensors array if this is a primary sensor
           this.updateSensor(sensorName, data);
@@ -3488,6 +3503,7 @@
               // Recalculate room averages
               this._recalculateRoomAverages(room);
               this.lastUpdate = now;
+              this.version++;  // Force header reactivity
             }
           }
           return found;

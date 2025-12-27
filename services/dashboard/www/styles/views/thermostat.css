@@ -514,7 +514,256 @@
   border-color: var(--color-primary);
 }
 
-/* Temperature Slider */
+/* Split Panel Temperature Display: NOW | TARGET */
+.temp-split-panel {
+  display: flex;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--space-md);
+  background: var(--color-bg);
+}
+
+.temp-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md) var(--space-sm);
+}
+
+.temp-panel.now-panel {
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.temp-panel.target-panel {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.08) 0%, rgba(251, 146, 60, 0.15) 100%);
+}
+
+.temp-panel.target-panel.heating {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.15) 100%);
+}
+
+.temp-panel.target-panel.syncing {
+  animation: syncPulse 1s ease-in-out infinite;
+}
+
+.panel-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: var(--space-xs);
+}
+
+.now-panel .panel-label {
+  color: var(--color-text-tertiary);
+}
+
+.target-panel .panel-label {
+  color: var(--color-warning);
+}
+
+.target-panel.heating .panel-label {
+  color: var(--color-danger);
+}
+
+.panel-temp {
+  font-size: 42px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.now-panel .panel-temp {
+  color: var(--color-text);
+}
+
+.target-panel .panel-temp {
+  color: var(--color-warning);
+}
+
+.target-panel.heating .panel-temp {
+  color: var(--color-danger);
+}
+
+.panel-controls {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.panel-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 2px solid rgba(251, 146, 60, 0.3);
+  background: var(--color-surface);
+  font-size: 22px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-warning);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.target-panel.heating .panel-btn {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+}
+
+.panel-btn:hover:not(:disabled) {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  color: white;
+}
+
+.target-panel.heating .panel-btn:hover:not(:disabled) {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: white;
+}
+
+.panel-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.panel-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Legacy: Temperature Control (+ / - Buttons) */
+.temp-control-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xs);
+  padding: var(--space-sm) 0;
+}
+
+.temp-adjust-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.temp-adjust-btn .btn-icon {
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.temp-adjust-btn.decrease .btn-icon {
+  color: var(--color-primary);
+}
+
+.temp-adjust-btn.increase .btn-icon {
+  color: var(--color-danger);
+}
+
+.temp-adjust-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.temp-adjust-btn.decrease:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.temp-adjust-btn.increase:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.temp-adjust-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.temp-adjust-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.temp-adjust-btn.at-limit {
+  opacity: 0.3;
+  border-style: dashed;
+}
+
+.temp-target-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.temp-target-display.syncing {
+  border-color: var(--color-warning);
+  animation: syncPulse 1s ease-in-out infinite;
+}
+
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.temp-target-display .target-value {
+  font-size: 32px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-warning);
+  line-height: 1.1;
+}
+
+.temp-target-display .target-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-medium);
+}
+
+.temp-range-hint {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-md);
+}
+
+/* Heating card adjustments */
+.thermostat-card.heating .temp-target-display {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.thermostat-card.heating .temp-target-display .target-value {
+  color: var(--color-danger);
+}
+
+/* Legacy slider styles (kept for compatibility) */
 .temp-slider-container {
   margin-bottom: var(--space-md);
   padding: 0 var(--space-xs);

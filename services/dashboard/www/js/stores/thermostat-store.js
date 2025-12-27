@@ -420,8 +420,8 @@ export function initThermostatStore(Alpine, CONFIG) {
       const thermostat = this.list.find(t => t.id === thermostatId);
       if (!thermostat || !thermostat.available) return;
 
-      // Clamp to valid range (5-30°C)
-      const clampedTemp = Math.max(5, Math.min(30, temp));
+      // Clamp to valid range (5-22°C) - max 22° for energy efficiency
+      const clampedTemp = Math.max(5, Math.min(22, temp));
 
       // Optimistic update
       thermostat.pendingTarget = clampedTemp;
@@ -435,7 +435,7 @@ export function initThermostatStore(Alpine, CONFIG) {
       if (!thermostat) return;
 
       const currentTarget = thermostat.pendingTarget ?? thermostat.targetTemp ?? 20;
-      const newTarget = Math.round((currentTarget + delta) * 2) / 2;  // 0.5° steps
+      const newTarget = Math.round(currentTarget + delta);  // 1° steps
       this.setTargetTemp(thermostatId, newTarget);
     },
 

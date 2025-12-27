@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10 Award-Winning Heater Card Designs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --temp-current: 18.5;
+      --temp-target: 19;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+      color: #fff;
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .page-header h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .page-header p {
+      color: rgba(255,255,255,0.6);
+      font-size: 1.1rem;
+    }
+
+    .designs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 40px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .design-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .design-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .design-number {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .design-name {
+      font-weight: 600;
+      font-size: 1rem;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .design-style {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+      font-weight: 400;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 1: MINIMAL CIRCLE (Apple Watch Inspired)
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-1 {
+      background: #ffffff;
+      border-radius: 28px;
+      padding: 30px;
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    }
+
+    .card-1 .header {
+      position: absolute;
+      top: 20px;
+      left: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-1 .room-icon {
+      font-size: 20px;
+    }
+
+    .card-1 .room-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .card-1 .status-pill {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .card-1 .status-pill.heating {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .card-1 .circle-container {
+      position: relative;
+      width: 180px;
+      height: 180px;
+    }
+
+    .card-1 .circle-bg {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: #f5f5f5;
+    }
+
+    .card-1 .circle-progress {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(
+        #ff6b6b 0deg,
+        #ff6b6b calc(var(--progress, 75) * 3.6deg),
+        transparent calc(var(--progress, 75) * 3.6deg)
+      );
+      mask: radial-gradient(transparent 60%, black 61%);
+      -webkit-mask: radial-gradient(transparent 60%, black 61%);
+    }
+
+    .card-1 .temp-display {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-1 .temp-value {
+      font-size: 48px;
+      font-weight: 700;
+      color: #1a1a1a;
+      line-height: 1;
+    }
+
+    .card-1 .temp-label {
+      font-size: 13px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .card-1 .controls {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      margin-top: 25px;
+    }
+
+    .card-1 .ctrl-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: none;
+      background: #f0f0f0;
+      color: #333;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card-1 .ctrl-btn:hover {
+      background: #e0e0e0;
+      transform: scale(1.1);
+    }
+
+    .card-1 .current-temp {
+      font-size: 14px;
+      color: #888;
+    }
+
+    .card-1 .mode-toggle {
+      position: absolute;
+      bottom: 20px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .card-1 .mode-btn {
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-1 .mode-btn.heat {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .card-1 .mode-btn.heat.active {
+      background: #c62828;
+      color: white;
+    }
+
+    .card-1 .mode-btn.off {
+      background: #f5f5f5;
+      color: #666;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 2: NEUMORPHIC SOFT
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-2 {
+      background: #e0e5ec;
+      border-radius: 24px;
+      padding: 28px;
+      min-height: 320px;
+      box-shadow: 20px 20px 60px #bec3c9, -20px -20px 60px #ffffff;
+    }
+
+    .card-2 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .card-2 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-2 .room-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #e0e5ec;
+      box-shadow: 5px 5px 10px #bec3c9, -5px -5px 10px #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .card-2 .room-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #3a4a5c;
+    }
+
+    .card-2 .room-sub {
+      font-size: 12px;
+      color: #8a9bae;
+    }
+
+    .card-2 .status {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #e0e5ec;
+      box-shadow: inset 3px 3px 6px #bec3c9, inset -3px -3px 6px #ffffff;
+      color: #4caf50;
+    }
+
+    .card-2 .temp-section {
+      background: #e0e5ec;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: inset 8px 8px 16px #bec3c9, inset -8px -8px 16px #ffffff;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .card-2 .temp-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .card-2 .temp-current {
+      text-align: center;
+    }
+
+    .card-2 .temp-current .value {
+      font-size: 32px;
+      font-weight: 300;
+      color: #5a6a7c;
+    }
+
+    .card-2 .temp-current .label {
+      font-size: 11px;
+      color: #8a9bae;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .card-2 .arrow {
+      font-size: 20px;
+      color: #8a9bae;
+    }
+
+    .card-2 .temp-target {
+      text-align: center;
+    }
+
+    .card-2 .temp-target .value {
+      font-size: 42px;
+      font-weight: 700;
+      color: #ff6b6b;
+    }
+
+    .card-2 .temp-target .label {
+      font-size: 11px;
+      color: #ff6b6b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .card-2 .controls {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-2 .ctrl-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 15px;
+      border: none;
+      background: #e0e5ec;
+      box-shadow: 5px 5px 10px #bec3c9, -5px -5px 10px #ffffff;
+      color: #5a6a7c;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .card-2 .ctrl-btn:active {
+      box-shadow: inset 3px 3px 6px #bec3c9, inset -3px -3px 6px #ffffff;
+    }
+
+    .card-2 .mode-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .card-2 .mode-btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      background: #e0e5ec;
+      box-shadow: 5px 5px 10px #bec3c9, -5px -5px 10px #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      color: #5a6a7c;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .card-2 .mode-btn.active {
+      box-shadow: inset 3px 3px 6px #bec3c9, inset -3px -3px 6px #ffffff;
+      color: #ff6b6b;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 3: GLASS MORPHISM
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-3-wrapper {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      min-height: 320px;
+    }
+
+    .card-3-bg {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    }
+
+    .card-3-bg::before {
+      content: '';
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: #ffd93d;
+      border-radius: 50%;
+      top: -30px;
+      right: -30px;
+      filter: blur(40px);
+    }
+
+    .card-3-bg::after {
+      content: '';
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      background: #6bcb77;
+      border-radius: 50%;
+      bottom: -20px;
+      left: -20px;
+      filter: blur(40px);
+    }
+
+    .card-3 {
+      position: relative;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 24px;
+      padding: 28px;
+      min-height: 320px;
+    }
+
+    .card-3 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .card-3 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-3 .room-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .card-3 .room-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .card-3 .room-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .card-3 .status-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-3 .status-dot {
+      width: 8px;
+      height: 8px;
+      background: #6bcb77;
+      border-radius: 50%;
+    }
+
+    .card-3 .temp-display {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .card-3 .temp-main {
+      font-size: 72px;
+      font-weight: 700;
+      color: white;
+      line-height: 1;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+
+    .card-3 .temp-info {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 10px;
+    }
+
+    .card-3 .temp-info span {
+      font-size: 14px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .card-3 .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-3 .ctrl-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-3 .ctrl-btn:hover {
+      background: rgba(255,255,255,0.3);
+      transform: scale(1.1);
+    }
+
+    .card-3 .mode-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .card-3 .mode-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.8);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-3 .mode-btn.active {
+      background: rgba(255,255,255,0.3);
+      color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 4: DARK BRUTALIST
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-4 {
+      background: #0a0a0a;
+      border: 3px solid #fff;
+      padding: 0;
+      min-height: 320px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .card-4 .header {
+      border-bottom: 3px solid #fff;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-4 .room-name {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+
+    .card-4 .status {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #0f0;
+    }
+
+    .card-4 .temp-section {
+      padding: 30px 20px;
+      border-bottom: 3px solid #fff;
+    }
+
+    .card-4 .temp-row {
+      display: flex;
+      align-items: baseline;
+      gap: 15px;
+    }
+
+    .card-4 .temp-main {
+      font-size: 100px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 0.9;
+    }
+
+    .card-4 .temp-unit {
+      font-size: 40px;
+      font-weight: 400;
+      color: #666;
+    }
+
+    .card-4 .temp-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #666;
+      margin-top: 10px;
+    }
+
+    .card-4 .controls {
+      display: flex;
+      border-bottom: 3px solid #fff;
+    }
+
+    .card-4 .ctrl-btn {
+      flex: 1;
+      padding: 20px;
+      border: none;
+      border-right: 3px solid #fff;
+      background: transparent;
+      color: #fff;
+      font-size: 32px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.1s;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .card-4 .ctrl-btn:last-child {
+      border-right: none;
+    }
+
+    .card-4 .ctrl-btn:hover {
+      background: #fff;
+      color: #0a0a0a;
+    }
+
+    .card-4 .mode-buttons {
+      display: flex;
+    }
+
+    .card-4 .mode-btn {
+      flex: 1;
+      padding: 18px;
+      border: none;
+      border-right: 3px solid #fff;
+      background: transparent;
+      color: #666;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .card-4 .mode-btn:last-child {
+      border-right: none;
+    }
+
+    .card-4 .mode-btn.active {
+      background: #fff;
+      color: #0a0a0a;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 5: GRADIENT WAVE
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-5 {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #e74c3c 100%);
+      border-radius: 24px;
+      padding: 28px;
+      min-height: 320px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-5::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255,255,255,0.1)' d='M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+      background-size: cover;
+      animation: wave 8s ease-in-out infinite;
+    }
+
+    @keyframes wave {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-20px); }
+    }
+
+    .card-5 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-5 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-5 .room-icon {
+      font-size: 24px;
+    }
+
+    .card-5 .room-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .card-5 .status {
+      background: rgba(255,255,255,0.2);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .card-5 .temp-display {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+      margin: 25px 0;
+    }
+
+    .card-5 .temp-current-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .card-5 .temp-main {
+      font-size: 80px;
+      font-weight: 800;
+      color: white;
+      line-height: 1;
+      text-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+
+    .card-5 .temp-target-info {
+      margin-top: 10px;
+      font-size: 16px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .card-5 .controls {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      margin: 20px 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-5 .ctrl-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 28px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-5 .ctrl-btn:hover {
+      background: rgba(255,255,255,0.3);
+      border-color: white;
+      transform: scale(1.1);
+    }
+
+    .card-5 .mode-buttons {
+      display: flex;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-5 .mode-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-5 .mode-btn.active {
+      background: white;
+      color: #e74c3c;
+      border-color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 6: COMPACT PILL
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-6 {
+      background: #1a1a2e;
+      border-radius: 60px;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+      min-height: auto;
+    }
+
+    .card-6 .room-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .card-6 .info {
+      flex: 1;
+    }
+
+    .card-6 .room-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .card-6 .status {
+      font-size: 11px;
+      color: #4caf50;
+    }
+
+    .card-6 .temp-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-6 .temp-now {
+      text-align: center;
+    }
+
+    .card-6 .temp-now .value {
+      font-size: 24px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .card-6 .temp-now .label {
+      font-size: 9px;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+    }
+
+    .card-6 .arrow {
+      font-size: 16px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .card-6 .temp-target {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,107,107,0.15);
+      padding: 8px 12px;
+      border-radius: 30px;
+      border: 1px solid rgba(255,107,107,0.3);
+    }
+
+    .card-6 .ctrl-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-6 .ctrl-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .card-6 .temp-target .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ff6b6b;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .card-6 .mode-toggle {
+      display: flex;
+      background: rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 4px;
+    }
+
+    .card-6 .mode-btn {
+      padding: 8px 16px;
+      border-radius: 16px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-6 .mode-btn.active {
+      background: #ff6b6b;
+      color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 7: SPLIT PANEL
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-7 {
+      background: #fff;
+      border-radius: 24px;
+      overflow: hidden;
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    .card-7 .header {
+      padding: 16px 20px;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    .card-7 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-7 .room-icon {
+      font-size: 20px;
+    }
+
+    .card-7 .room-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .card-7 .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: #4caf50;
+      background: #e8f5e9;
+      padding: 4px 12px;
+      border-radius: 12px;
+    }
+
+    .card-7 .split-container {
+      flex: 1;
+      display: flex;
+    }
+
+    .card-7 .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px;
+    }
+
+    .card-7 .panel.now {
+      background: #f8f9fa;
+      border-right: 1px solid #eee;
+    }
+
+    .card-7 .panel.target {
+      background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+    }
+
+    .card-7 .panel-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .card-7 .panel.target .panel-label {
+      color: #c62828;
+    }
+
+    .card-7 .panel-value {
+      font-size: 48px;
+      font-weight: 700;
+      color: #333;
+      line-height: 1;
+    }
+
+    .card-7 .panel.target .panel-value {
+      color: #c62828;
+    }
+
+    .card-7 .panel-sub {
+      font-size: 12px;
+      color: #888;
+      margin-top: 8px;
+    }
+
+    .card-7 .target-controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .card-7 .ctrl-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      border: 2px solid #ffcdd2;
+      background: white;
+      color: #c62828;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-7 .ctrl-btn:hover {
+      background: #c62828;
+      color: white;
+      border-color: #c62828;
+    }
+
+    .card-7 .footer {
+      display: flex;
+      border-top: 1px solid #eee;
+    }
+
+    .card-7 .mode-btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      background: white;
+      color: #888;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-7 .mode-btn:first-child {
+      border-right: 1px solid #eee;
+    }
+
+    .card-7 .mode-btn.active {
+      background: #c62828;
+      color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 8: RADIAL ARC GAUGE
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-8 {
+      background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+      border-radius: 24px;
+      padding: 25px;
+      min-height: 320px;
+      position: relative;
+    }
+
+    .card-8 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .card-8 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-8 .room-icon {
+      font-size: 18px;
+    }
+
+    .card-8 .room-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .card-8 .status {
+      font-size: 11px;
+      color: #4caf50;
+    }
+
+    .card-8 .gauge-container {
+      position: relative;
+      width: 220px;
+      height: 130px;
+      margin: 0 auto 15px;
+    }
+
+    .card-8 .gauge-svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .card-8 .gauge-bg {
+      fill: none;
+      stroke: rgba(255,255,255,0.1);
+      stroke-width: 12;
+      stroke-linecap: round;
+    }
+
+    .card-8 .gauge-fill {
+      fill: none;
+      stroke: url(#gauge-gradient);
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-dasharray: 251;
+      stroke-dashoffset: 63;
+      transition: stroke-dashoffset 0.5s ease;
+    }
+
+    .card-8 .gauge-target {
+      fill: none;
+      stroke: #ff6b6b;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+
+    .card-8 .temp-display {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    .card-8 .temp-value {
+      font-size: 42px;
+      font-weight: 700;
+      color: white;
+      line-height: 1;
+    }
+
+    .card-8 .temp-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .card-8 .gauge-labels {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+      margin-bottom: 15px;
+    }
+
+    .card-8 .gauge-labels span {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .card-8 .target-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .card-8 .target-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .card-8 .target-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ff6b6b;
+    }
+
+    .card-8 .ctrl-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-8 .ctrl-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .card-8 .mode-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .card-8 .mode-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .card-8 .mode-btn.active {
+      background: #ff6b6b;
+      border-color: #ff6b6b;
+      color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 9: METRO TILES
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-9 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 3px;
+      background: #333;
+      min-height: 320px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .card-9 .tile {
+      background: #0078d4;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-9 .tile-header {
+      grid-column: 1 / -1;
+      background: #005a9e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-9 .room-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .card-9 .status {
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .card-9 .tile-temp-now {
+      background: #106ebe;
+    }
+
+    .card-9 .tile-temp-target {
+      background: #d83b01;
+    }
+
+    .card-9 .tile-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 5px;
+    }
+
+    .card-9 .tile-value {
+      font-size: 48px;
+      font-weight: 300;
+      color: white;
+      line-height: 1;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .card-9 .tile-icon {
+      font-size: 24px;
+      margin-top: auto;
+    }
+
+    .card-9 .tile-controls {
+      grid-column: 1 / -1;
+      background: #333;
+      display: flex;
+    }
+
+    .card-9 .ctrl-btn {
+      flex: 1;
+      padding: 18px;
+      border: none;
+      background: #444;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .card-9 .ctrl-btn:hover {
+      background: #555;
+    }
+
+    .card-9 .mode-btn {
+      flex: 1;
+      padding: 18px;
+      border: none;
+      background: #444;
+      color: rgba(255,255,255,0.6);
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .card-9 .mode-btn.active {
+      background: #d83b01;
+      color: white;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════════
+       DESIGN 10: ORGANIC BLOB
+       ═══════════════════════════════════════════════════════════════════════════ */
+    .card-10 {
+      background: linear-gradient(135deg, #fef9ef 0%, #fdf4e3 100%);
+      border-radius: 32px;
+      padding: 28px;
+      min-height: 320px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-10::before {
+      content: '';
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(255,183,77,0.3) 0%, transparent 70%);
+      top: -50px;
+      right: -50px;
+      border-radius: 50%;
+    }
+
+    .card-10::after {
+      content: '';
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle, rgba(129,199,132,0.3) 0%, transparent 70%);
+      bottom: -30px;
+      left: -30px;
+      border-radius: 50%;
+    }
+
+    .card-10 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-10 .room-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-10 .room-icon {
+      width: 44px;
+      height: 44px;
+      background: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    .card-10 .room-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #5d4e37;
+    }
+
+    .card-10 .room-sub {
+      font-size: 12px;
+      color: #a89f91;
+    }
+
+    .card-10 .status-blob {
+      background: #e8f5e9;
+      color: #4caf50;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .card-10 .temp-display {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .card-10 .temp-blob {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      background: white;
+      padding: 25px 40px;
+      border-radius: 50px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    .card-10 .temp-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .card-10 .temp-now {
+      text-align: center;
+    }
+
+    .card-10 .temp-now .value {
+      font-size: 28px;
+      font-weight: 600;
+      color: #8d7b68;
+    }
+
+    .card-10 .temp-now .label {
+      font-size: 10px;
+      color: #a89f91;
+      text-transform: uppercase;
+    }
+
+    .card-10 .arrow {
+      font-size: 18px;
+      color: #c9b99a;
+    }
+
+    .card-10 .temp-target {
+      text-align: center;
+    }
+
+    .card-10 .temp-target .value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #e67e22;
+    }
+
+    .card-10 .temp-target .label {
+      font-size: 10px;
+      color: #e67e22;
+      text-transform: uppercase;
+    }
+
+    .card-10 .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-10 .ctrl-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: white;
+      color: #8d7b68;
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      transition: all 0.2s;
+    }
+
+    .card-10 .ctrl-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+    .card-10 .mode-buttons {
+      display: flex;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card-10 .mode-btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 25px;
+      border: none;
+      background: white;
+      color: #a89f91;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+      transition: all 0.2s;
+    }
+
+    .card-10 .mode-btn.active {
+      background: #e67e22;
+      color: white;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .designs-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <h1>10 Award-Winning Heater Card Designs</h1>
+    <p>Professional UI/UX concepts for smart thermostat controls</p>
+  </div>
+
+  <div class="designs-grid">
+
+    <!-- DESIGN 1: Minimal Circle -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">1</div>
+        <div>
+          <div class="design-name">Minimal Circle</div>
+          <div class="design-style">Apple Watch Inspired</div>
+        </div>
+      </div>
+      <div class="card-1">
+        <div class="header">
+          <span class="room-icon">🛏️</span>
+          <span class="room-name">Bedroom</span>
+        </div>
+        <div class="status-pill">Idle</div>
+        <div class="circle-container">
+          <div class="circle-bg"></div>
+          <div class="circle-progress" style="--progress: 75;"></div>
+          <div class="temp-display">
+            <span class="temp-value">19°</span>
+            <span class="temp-label">Target</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn">−</button>
+          <span class="current-temp">Now: 18.5°</span>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-toggle">
+          <button class="mode-btn heat active">Heat</button>
+          <button class="mode-btn off">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 2: Neumorphic Soft -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">2</div>
+        <div>
+          <div class="design-name">Neumorphic Soft</div>
+          <div class="design-style">Tactile 3D Interface</div>
+        </div>
+      </div>
+      <div class="card-2">
+        <div class="header">
+          <div class="room-info">
+            <div class="room-icon">🛋️</div>
+            <div>
+              <div class="room-name">Living Room</div>
+              <div class="room-sub">Main Floor</div>
+            </div>
+          </div>
+          <div class="status">● Online</div>
+        </div>
+        <div class="temp-section">
+          <div class="temp-row">
+            <div class="temp-current">
+              <div class="value">18.5°</div>
+              <div class="label">Current</div>
+            </div>
+            <span class="arrow">→</span>
+            <div class="temp-target">
+              <div class="value">19°</div>
+              <div class="label">Target</div>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn">−</button>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 3: Glass Morphism -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">3</div>
+        <div>
+          <div class="design-name">Glass Morphism</div>
+          <div class="design-style">iOS/macOS Style</div>
+        </div>
+      </div>
+      <div class="card-3-wrapper">
+        <div class="card-3-bg"></div>
+        <div class="card-3">
+          <div class="header">
+            <div class="room-info">
+              <div class="room-icon">📚</div>
+              <div>
+                <div class="room-name">Study</div>
+                <div class="room-sub">Second Floor</div>
+              </div>
+            </div>
+            <div class="status-badge">
+              <div class="status-dot"></div>
+              Idle
+            </div>
+          </div>
+          <div class="temp-display">
+            <div class="temp-main">19°</div>
+            <div class="temp-info">
+              <span>Now: 18.5°</span>
+              <span>●</span>
+              <span>Target: 19°</span>
+            </div>
+          </div>
+          <div class="controls">
+            <button class="ctrl-btn">−</button>
+            <button class="ctrl-btn">+</button>
+          </div>
+          <div class="mode-buttons">
+            <button class="mode-btn active">Heat</button>
+            <button class="mode-btn">Off</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 4: Dark Brutalist -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">4</div>
+        <div>
+          <div class="design-name">Dark Brutalist</div>
+          <div class="design-style">Industrial Aesthetic</div>
+        </div>
+      </div>
+      <div class="card-4">
+        <div class="header">
+          <span class="room-name">Bedroom</span>
+          <span class="status">● IDLE</span>
+        </div>
+        <div class="temp-section">
+          <div class="temp-row">
+            <span class="temp-main">19</span>
+            <span class="temp-unit">°C</span>
+          </div>
+          <div class="temp-label">Target Temperature</div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn">−</button>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 5: Gradient Wave -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">5</div>
+        <div>
+          <div class="design-name">Gradient Wave</div>
+          <div class="design-style">Temperature Reactive</div>
+        </div>
+      </div>
+      <div class="card-5">
+        <div class="header">
+          <div class="room-info">
+            <span class="room-icon">🛏️</span>
+            <span class="room-name">Bedroom</span>
+          </div>
+          <div class="status">● Heating</div>
+        </div>
+        <div class="temp-display">
+          <div class="temp-current-label">Current Temperature</div>
+          <div class="temp-main">18.5°</div>
+          <div class="temp-target-info">Target: 19°</div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn">−</button>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 6: Compact Pill -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">6</div>
+        <div>
+          <div class="design-name">Compact Pill</div>
+          <div class="design-style">Space Efficient Widget</div>
+        </div>
+      </div>
+      <div class="card-6">
+        <div class="room-icon">🛋️</div>
+        <div class="info">
+          <div class="room-name">Living Room</div>
+          <div class="status">● Online</div>
+        </div>
+        <div class="temp-section">
+          <div class="temp-now">
+            <div class="value">18°</div>
+            <div class="label">Now</div>
+          </div>
+          <span class="arrow">→</span>
+          <div class="temp-target">
+            <button class="ctrl-btn">−</button>
+            <span class="value">19°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+        <div class="mode-toggle">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 7: Split Panel -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">7</div>
+        <div>
+          <div class="design-name">Split Panel</div>
+          <div class="design-style">Current vs Target</div>
+        </div>
+      </div>
+      <div class="card-7">
+        <div class="header">
+          <div class="room-info">
+            <span class="room-icon">📚</span>
+            <span class="room-name">Study</span>
+          </div>
+          <div class="status-badge">Idle</div>
+        </div>
+        <div class="split-container">
+          <div class="panel now">
+            <span class="panel-label">Now</span>
+            <span class="panel-value">18.5°</span>
+            <span class="panel-sub">Current reading</span>
+          </div>
+          <div class="panel target">
+            <span class="panel-label">Target</span>
+            <span class="panel-value">19°</span>
+            <div class="target-controls">
+              <button class="ctrl-btn">−</button>
+              <button class="ctrl-btn">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 8: Radial Arc Gauge -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">8</div>
+        <div>
+          <div class="design-name">Radial Arc Gauge</div>
+          <div class="design-style">Dashboard Instrument</div>
+        </div>
+      </div>
+      <div class="card-8">
+        <div class="header">
+          <div class="room-info">
+            <span class="room-icon">🛏️</span>
+            <span class="room-name">Bedroom</span>
+          </div>
+          <span class="status">● Online</span>
+        </div>
+        <div class="gauge-container">
+          <svg class="gauge-svg" viewBox="0 0 200 120">
+            <defs>
+              <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#4fc3f7"/>
+                <stop offset="50%" stop-color="#ffb74d"/>
+                <stop offset="100%" stop-color="#ef5350"/>
+              </linearGradient>
+            </defs>
+            <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100"/>
+            <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100"/>
+          </svg>
+          <div class="temp-display">
+            <div class="temp-value">18.5°</div>
+            <div class="temp-label">Current</div>
+          </div>
+        </div>
+        <div class="gauge-labels">
+          <span>5°</span>
+          <span>15°</span>
+          <span>25°</span>
+        </div>
+        <div class="target-row">
+          <button class="ctrl-btn">−</button>
+          <span class="target-label">Target:</span>
+          <span class="target-value">19°</span>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 9: Metro Tiles -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">9</div>
+        <div>
+          <div class="design-name">Metro Tiles</div>
+          <div class="design-style">Windows Modern UI</div>
+        </div>
+      </div>
+      <div class="card-9">
+        <div class="tile tile-header">
+          <span class="room-name">🛋️ Living Room</span>
+          <span class="status">● Online</span>
+        </div>
+        <div class="tile tile-temp-now">
+          <span class="tile-label">Current</span>
+          <span class="tile-value">18°</span>
+          <span class="tile-icon">🌡️</span>
+        </div>
+        <div class="tile tile-temp-target">
+          <span class="tile-label">Target</span>
+          <span class="tile-value">19°</span>
+          <span class="tile-icon">🎯</span>
+        </div>
+        <div class="tile tile-controls">
+          <button class="ctrl-btn">−</button>
+          <button class="ctrl-btn">+</button>
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGN 10: Organic Blob -->
+    <div class="design-wrapper">
+      <div class="design-label">
+        <div class="design-number">10</div>
+        <div>
+          <div class="design-name">Organic Blob</div>
+          <div class="design-style">Nature Inspired</div>
+        </div>
+      </div>
+      <div class="card-10">
+        <div class="header">
+          <div class="room-info">
+            <div class="room-icon">🛏️</div>
+            <div>
+              <div class="room-name">Bedroom</div>
+              <div class="room-sub">Upstairs</div>
+            </div>
+          </div>
+          <div class="status-blob">● Idle</div>
+        </div>
+        <div class="temp-display">
+          <div class="temp-blob">
+            <div class="temp-row">
+              <div class="temp-now">
+                <div class="value">18.5°</div>
+                <div class="label">Now</div>
+              </div>
+              <span class="arrow">→</span>
+              <div class="temp-target">
+                <div class="value">19°</div>
+                <div class="label">Target</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn">−</button>
+          <button class="ctrl-btn">+</button>
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
