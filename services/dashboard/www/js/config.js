@@ -27,6 +27,7 @@ export const CONFIG = {
     { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
     { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity', isOutdoor: false },
     { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity', isOutdoor: false },
+    { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '[Hallway] CO2', entityId: 'sensor.hallway_co2', isOutdoor: false },
     { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity', isOutdoor: true }
   ],
   staleThreshold: 5 * 60 * 1000,  // 5 minutes
@@ -114,6 +115,11 @@ export const ROOM_SENSORS = {
   balcony: {
     climate: [
       { name: '[Balcony] Temperature & Humidity', label: 'Outdoor', isPrimary: true }
+    ]
+  },
+  hallway: {
+    climate: [
+      { name: '[Hallway] CO2', label: 'Air Quality', isPrimary: true }
     ]
   }
 };
@@ -223,7 +229,8 @@ export const FLOOR_PLAN_CONFIG = {
     { id: 'living', name: 'Living Room', icon: '🛋️', x: 6.864, z: 5.181, width: 4.750, depth: 2.968, color: 0x34d399, labelY: 3 },
     { id: 'bedroom', name: 'Bedroom', icon: '🛏️', x: 2.2445, z: 5.476, width: 4.489, depth: 2.378, color: 0xfbbf24, labelY: 4 },
     { id: 'kitchen', name: 'Kitchen', icon: '🍳', x: 1.6655, z: 2.8957, width: 3.331, depth: 2.7827, color: 0xf87171, labelY: 3 },
-    { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 }
+    { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 },
+    { id: 'hallway', name: 'Hallway', icon: '🚶', x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8, labelY: 2 }
   ],
   balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
   hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
@@ -348,6 +355,19 @@ export const OVERFLOW_CATEGORIES = VIEW_CATEGORIES.map(cat => ({
 export const KEYBOARD_SHORTCUTS = Object.fromEntries(
   ALL_VIEWS.map(v => [v.key, v.id])
 );
+
+// Contact sensor short names for sidebar display
+// Maps friendly_name patterns to short display names
+export const CONTACT_SENSOR_SHORT_NAMES = {
+  '[Bath] Window Contact Sensor': 'Bath Window',
+  '[Bed] Window Contact Sensor': 'Bed Window',
+  '[Kitchen] Window Contact Sensor': 'Kitchen Window',
+  '[Study] Window Contact Sensor - Large': 'Study Big',
+  '[Study] Window Contact Sensor - Small': 'Study Small',
+  '[Living] Window Contact Sensor - Balcony Door': 'Balcony Door',
+  '[Living] Window Contact Sensor - Window': 'Living Window',
+  '[Hallway] Window Contact Sensor - Main Door': 'Main Door'
+};
 
 // Sensor visual properties for 3D config view
 export const SENSOR_VISUALS = {

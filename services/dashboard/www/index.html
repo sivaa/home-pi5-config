@@ -235,27 +235,8 @@
             </template>
           </div>
 
-          <!-- Temperature Display: Balcony + Weather Forecast -->
-          <div class="header-temps">
-            <!-- Balcony Temperature (from Zigbee sensor) -->
-            <div class="temp-item temp-balcony"
-                 x-show="$store.rooms.list.find(r => r.id === 'balcony')?.temperature != null"
-                 :title="'Balcony sensor - ' + ($store.rooms.list.find(r => r.id === 'balcony')?.stale ? 'Stale data' : 'Live')">
-              <span class="temp-icon">🌿</span>
-              <span class="temp-value"
-                    x-text="$store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) + '°'"></span>
-            </div>
-            <!-- Weather Forecast (from Home Assistant) -->
-            <div class="temp-item temp-weather"
-                 x-show="$store.weather?.temperature != null"
-                 :title="'Zehlendorf forecast: ' + ($store.weather?.condition || 'Unknown')">
-              <span class="temp-icon" x-text="$store.weather?.conditionIcon || '🌡️'"></span>
-              <span class="temp-value" x-text="$store.weather?.temperature?.toFixed(0) + '°'"></span>
-            </div>
-          </div>
-
           <!-- Theme Toggle: Light / Dark / System -->
-          <div class="theme-toggle">
+          <div class="theme-toggle" x-data>
             <span class="theme-toggle-label">Theme</span>
             <button class="theme-toggle-btn"
                     :class="{ active: $store.theme.preference === 'light' }"
@@ -272,20 +253,9 @@
           </div>
         </div>
 
-        <!-- Right: Stats + Date/Time -->
+        <!-- Right: Date/Time -->
         <div class="header-right">
           <div class="header-top">
-            <div class="header-stats" :data-v="$store.rooms.version">
-              <span class="header-temp" x-show="$store.rooms.avgTemperature != null">
-                🏠 <span x-text="$store.rooms.avgTemperature?.toFixed(1)"></span>°
-              </span>
-              <span class="header-humid" x-show="$store.rooms.avgHumidity != null">
-                💧 <span x-text="$store.rooms.avgHumidity?.toFixed(0)"></span>%
-              </span>
-              <span class="header-co2" x-show="$store.rooms.co2Value != null">
-                💨 <span x-text="$store.rooms.co2Value"></span>
-              </span>
-            </div>
             <div class="date-time" x-text="currentDateTime"></div>
             <button class="panel-toggle"
                     @click="togglePanel()"
@@ -2135,7 +2105,7 @@
           <template x-for="sensor in ($store.sensors?.sensorsByType?.contact || []).filter(s => $store.sensors?.liveData?.[s.ieee_address]?.contact === false)" :key="sensor.ieee_address">
             <div class="panel-metric contact-open">
               <span class="panel-icon">🔓</span>
-              <span class="panel-value" x-text="sensor.friendly_name.replace(/\[|\]/g, '').trim()"></span>
+              <span class="panel-value" x-text="getContactShortName(sensor.friendly_name)"></span>
             </div>
           </template>
         </div>
@@ -2985,6 +2955,17 @@
         }
       };
     };
+  </script>
+
+  <!-- Theme Store - MUST load before Alpine processes elements -->
+  <script type="module">
+    import { initThemeStore } from './js/stores/theme-store.js';
+
+    // Register theme store when Alpine initializes
+    document.addEventListener('alpine:init', () => {
+      initThemeStore(Alpine);
+      console.log('[theme-store] Theme store registered');
+    });
   </script>
 
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -4162,6 +4143,22 @@
           const contacts = Alpine.store('sensors')?.sensorsByType?.contact || [];
           const liveData = Alpine.store('sensors')?.liveData || {};
           return contacts.filter(s => liveData[s.ieee_address]?.contact === false).length;
+        },
+
+        // Short names for contact sensors in sidebar
+        contactShortNames: {
+          '[Bath] Window Contact Sensor': 'Bath Window',
+          '[Bed] Window Contact Sensor': 'Bed Window',
+          '[Kitchen] Window Contact Sensor': 'Kitchen Window',
+          '[Study] Window Contact Sensor - Large': 'Study Big',
+          '[Study] Window Contact Sensor - Small': 'Study Small',
+          '[Living] Window Contact Sensor - Balcony Door': 'Balcony Door',
+          '[Living] Window Contact Sensor - Window': 'Living Window',
+          '[Hallway] Window Contact Sensor - Main Door': 'Main Door'
+        },
+
+        getContactShortName(friendlyName) {
+          return this.contactShortNames[friendlyName] || friendlyName.replace(/\[|\]/g, '').trim();
         }
       };
     }
@@ -5033,7 +5030,8 @@
         { id: 'living', name: 'Living Room', icon: '🛋️', x: 6.864, z: 5.181, width: 4.750, depth: 2.968, color: 0x34d399, labelY: 3 },
         { id: 'bedroom', name: 'Bedroom', icon: '🛏️', x: 2.2445, z: 5.476, width: 4.489, depth: 2.378, color: 0xfbbf24, labelY: 4 },
         { id: 'kitchen', name: 'Kitchen', icon: '🍳', x: 1.6655, z: 2.8957, width: 3.331, depth: 2.7827, color: 0xf87171, labelY: 3 },
-        { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 }
+        { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 },
+        { id: 'hallway', name: 'Hallway', icon: '🚶', x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8, labelY: 2 }
       ],
       balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
       hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
