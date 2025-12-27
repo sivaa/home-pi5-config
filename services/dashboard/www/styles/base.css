@@ -144,3 +144,16 @@
       transition: none !important;
     }
 
+    /* ========================================
+       TREND INDICATORS
+       ======================================== */
+    .trend-indicator {
+      font-size: 0.6em;
+      margin-left: 3px;
+      opacity: 0.5;
+      vertical-align: middle;
+    }
+    .trend-rising { color: #4CAF50; }
+    .trend-falling { color: #f44336; }
+    .trend-stable { display: none; }
+

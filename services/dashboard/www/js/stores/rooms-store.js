@@ -100,6 +100,30 @@ export function initRoomsStore(Alpine, CONFIG) {
         .slice(-50);
     },
 
+    // Calculate trend from history (rising/falling/stable)
+    getTrend(historyArray, thresholdPercent = 2) {
+      if (!historyArray || historyArray.length < 10) return 'stable';
+      const recent = historyArray.slice(-5);
+      const previous = historyArray.slice(-10, -5);
+      if (previous.length < 3) return 'stable';
+      const recentAvg = recent.reduce((a, b) => a + b.value, 0) / recent.length;
+      const previousAvg = previous.reduce((a, b) => a + b.value, 0) / previous.length;
+      const change = ((recentAvg - previousAvg) / previousAvg) * 100;
+      if (change > thresholdPercent) return 'rising';
+      if (change < -thresholdPercent) return 'falling';
+      return 'stable';
+    },
+
+    // Get temperature trend for a room
+    getTempTrend(room) {
+      return this.getTrend(room.tempHistory, 1.5);  // 1.5% threshold for temp
+    },
+
+    // Get humidity trend for a room
+    getHumidTrend(room) {
+      return this.getTrend(room.humidHistory, 3);  // 3% threshold for humidity
+    },
+
     // Update primary sensor (backward compatibility)
     updateRoom(sensorName, data) {
       const roomIndex = this.list.findIndex(r => r.sensor === sensorName);
