@@ -501,3 +501,41 @@
         display: none;
       }
     }
+
+    /* ========================================
+       CLASSIC VIEW - DARK MODE ADJUSTMENTS
+       ======================================== */
+
+    /* Average card: lighten the gradient for visibility */
+    [data-theme="dark"] .classic-average {
+      background: linear-gradient(135deg, #3A3A3C 0%, #2C2C2E 100%);
+    }
+
+    /* Card hover: ensure shadow is visible */
+    [data-theme="dark"] .classic-card:hover,
+    [data-theme="dark"] .classic-card-v2:hover {
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Sparkline colors for dark mode */
+    [data-theme="dark"] .sparkline-svg path[fill="none"] {
+      stroke: var(--color-primary);
+    }
+
+    [data-theme="dark"] .sparkline-svg path[fill^="rgba"] {
+      fill: rgba(10, 132, 255, 0.15);
+    }
+
+    /* Sensor row border in dark mode */
+    [data-theme="dark"] .sensor-row {
+      border-bottom-color: var(--color-border);
+    }
+
+    /* Battery status icons */
+    [data-theme="dark"] .battery-status.good {
+      color: var(--color-success);
+    }
+
+    [data-theme="dark"] .battery-status.low {
+      color: var(--color-warning);
+    }

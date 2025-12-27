@@ -318,3 +318,70 @@
     height: 32px;
   }
 }
+
+/* ========================================
+   NETWORK VIEW - DARK MODE
+   ======================================== */
+[data-theme="dark"] {
+  --network-bg: #1C1C1E;
+  --network-floor: #2C2C2E;
+  --network-wall: #3A3A3C;
+  --network-wall-dark: #4A4A4C;
+  --network-furniture: #3A3A3C;
+  --network-shadow: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .network-view {
+  background: var(--network-bg);
+}
+
+[data-theme="dark"] .network-container {
+  background: linear-gradient(135deg, #1C1C1E 0%, #2C2C2E 100%);
+}
+
+[data-theme="dark"] .device-name {
+  background: rgba(44, 44, 46, 0.95);
+  color: #F5F5F7;
+}
+
+[data-theme="dark"] .device-icon {
+  background: #2C2C2E;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .network-control-btn {
+  background: rgba(44, 44, 46, 0.9);
+  border-color: var(--network-wall);
+  color: #F5F5F7;
+}
+
+[data-theme="dark"] .network-control-btn:hover {
+  background: #3A3A3C;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .network-control-btn.active {
+  background: #0A84FF;
+  color: white;
+  border-color: #0A84FF;
+}
+
+[data-theme="dark"] .network-legend {
+  background: rgba(44, 44, 46, 0.8);
+}
+
+[data-theme="dark"] .legend-item {
+  color: #F5F5F7;
+}
+
+[data-theme="dark"] .network-stats {
+  color: #A1A1A6;
+}
+
+[data-theme="dark"] .network-zoom-indicator {
+  color: #F5F5F7;
+}
+
+[data-theme="dark"] .network-zoom-controls {
+  border-left-color: var(--network-wall);
+}

@@ -12,6 +12,7 @@ import { initSensorsStore } from './stores/sensors-store.js';
 import { initEventsStore } from './stores/events-store.js';
 import { initThermostatStore } from './stores/thermostat-store.js';
 import { initWeatherStore } from './stores/weather-store.js';
+import { initThemeStore } from './stores/theme-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
@@ -41,6 +42,7 @@ if (typeof THREE !== 'undefined') {
 document.addEventListener('alpine:init', () => {
   // Register stores
   Alpine.store('config', CONFIG);
+  initThemeStore(Alpine);  // Theme store (no config needed)
   initMqttStore(Alpine, CONFIG);
   initRoomsStore(Alpine, CONFIG);
   initLightsStore(Alpine, CONFIG);

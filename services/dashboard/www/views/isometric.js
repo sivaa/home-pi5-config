@@ -39,6 +39,25 @@ export function isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS) {
     darkTheme: false,
 
     init() {
+      // Sync with global theme store
+      const globalTheme = document.documentElement.getAttribute('data-theme');
+      this.darkTheme = globalTheme === 'dark';
+
+      // Watch for global theme changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'data-theme') {
+            const newTheme = document.documentElement.getAttribute('data-theme');
+            const shouldBeDark = newTheme === 'dark';
+            if (this.darkTheme !== shouldBeDark) {
+              this.darkTheme = shouldBeDark;
+              this.applyTheme();
+            }
+          }
+        });
+      });
+      observer.observe(document.documentElement, { attributes: true });
+
       // Wait for container to become visible and have dimensions
       this.waitForContainer();
     },
@@ -77,6 +96,7 @@ export function isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS) {
       this.initScene();
       this.initCamera(container);
       this.initRenderer(container);
+      this.applyTheme();  // Apply theme after renderer is ready
       this.initLighting();
       this.buildFloorPlan();
       this.createLabels(container);
@@ -89,7 +109,8 @@ export function isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS) {
 
     initScene() {
       isoState.scene = new THREE.Scene();
-      isoState.scene.background = new THREE.Color(0xE8E8EA);
+      // Note: Background color is set via renderer.setClearColor in applyTheme()
+      // which is called after renderer is initialized
     },
 
     initCamera(container) {
@@ -852,11 +873,22 @@ export function isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS) {
 
     toggleDarkTheme() {
       this.darkTheme = !this.darkTheme;
-      if (this.darkTheme) {
-        isoState.scene.background = new THREE.Color(0x0f172a);
+      this.applyTheme();
+    },
+
+    applyTheme() {
+      console.log('[isometric] applyTheme called, darkTheme:', this.darkTheme, 'renderer:', !!isoState.renderer);
+      if (!isoState.renderer) {
+        console.log('[isometric] No renderer available, skipping');
+        return;
+      }
+      // Use setClearColor instead of scene.background (works with alpha: true)
+      const color = this.darkTheme ? 0x0f172a : 0xE8E8EA;
+      console.log('[isometric] Setting clear color to:', color.toString(16));
+      isoState.renderer.setClearColor(color, 1);
+      if (this.darkTheme && isoState.scene) {
         isoState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
-      } else {
-        isoState.scene.background = new THREE.Color(0xE8E8EA);
+      } else if (isoState.scene) {
         isoState.scene.fog = null;
       }
     },

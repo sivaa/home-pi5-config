@@ -37,6 +37,25 @@ export function threeDView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, Orbi
     darkTheme: false,
 
     init() {
+      // Sync with global theme store
+      const globalTheme = document.documentElement.getAttribute('data-theme');
+      this.darkTheme = globalTheme === 'dark';
+
+      // Watch for global theme changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'data-theme') {
+            const newTheme = document.documentElement.getAttribute('data-theme');
+            const shouldBeDark = newTheme === 'dark';
+            if (this.darkTheme !== shouldBeDark) {
+              this.darkTheme = shouldBeDark;
+              this.applyTheme();
+            }
+          }
+        });
+      });
+      observer.observe(document.documentElement, { attributes: true });
+
       // Wait for container to become visible and have dimensions
       this.waitForContainer();
     },
@@ -75,6 +94,7 @@ export function threeDView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, Orbi
       this.initScene();
       this.initCamera(container, OrbitControls);
       this.initRenderer(container);
+      this.applyTheme();  // Apply theme after renderer is ready
       this.initLighting();
       this.buildFloorPlan();
       this.createLabels(container);
@@ -86,7 +106,8 @@ export function threeDView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, Orbi
 
     initScene() {
       threeState.scene = new THREE.Scene();
-      threeState.scene.background = new THREE.Color(0xE8E8EA);
+      // Note: Background color is set via renderer.setClearColor in applyTheme()
+      // which is called after renderer is initialized
     },
 
     initCamera(container, OrbitControls) {
@@ -849,12 +870,18 @@ export function threeDView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, Orbi
 
     toggleDarkTheme() {
       this.darkTheme = !this.darkTheme;
+      this.applyTheme();
+    },
+
+    applyTheme() {
+      if (!threeState.renderer) return;
+      // Use setClearColor instead of scene.background (works with alpha: true)
       if (this.darkTheme) {
-        threeState.scene.background = new THREE.Color(0x0f172a);
-        threeState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
+        threeState.renderer.setClearColor(0x0f172a, 1);
+        if (threeState.scene) threeState.scene.fog = new THREE.Fog(0x0f172a, 10, 50);
       } else {
-        threeState.scene.background = new THREE.Color(0xE8E8EA);
-        threeState.scene.fog = null;
+        threeState.renderer.setClearColor(0xE8E8EA, 1);
+        if (threeState.scene) threeState.scene.fog = null;
       }
     },
 

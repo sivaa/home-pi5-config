@@ -35,11 +35,31 @@ export function networkView() {
     autoRotate: false,
     rotationAngle: 0,
     zoomLevel: 2.0,
+    darkTheme: false,
     deviceCount: ZIGBEE_DEVICES.length,
     routerCount: ZIGBEE_DEVICES.filter(d => d.type === 'router').length,
     endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
 
     init() {
+      // Sync with global theme store
+      const globalTheme = document.documentElement.getAttribute('data-theme');
+      this.darkTheme = globalTheme === 'dark';
+
+      // Watch for global theme changes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === 'data-theme') {
+            const newTheme = document.documentElement.getAttribute('data-theme');
+            const shouldBeDark = newTheme === 'dark';
+            if (this.darkTheme !== shouldBeDark) {
+              this.darkTheme = shouldBeDark;
+              this.applyTheme();
+            }
+          }
+        });
+      });
+      observer.observe(document.documentElement, { attributes: true });
+
       this.waitForContainer();
     },
 
@@ -66,6 +86,7 @@ export function networkView() {
       this.initScene();
       this.initCamera(container);
       this.initRenderer(container);
+      this.applyTheme();  // Apply theme after renderer is ready
       this.initLighting();
       this.buildFloorPlan();
       this.addWallNumbers();
@@ -80,8 +101,15 @@ export function networkView() {
 
     initScene() {
       networkState.scene = new THREE.Scene();
-      // Warm beige gradient background
-      networkState.scene.background = new THREE.Color(0xE8DFD4);
+      // Note: Background color is set via renderer.setClearColor in applyTheme()
+      // which is called after renderer is initialized
+    },
+
+    applyTheme() {
+      if (!networkState.renderer) return;
+      // Use setClearColor instead of scene.background (works with alpha: true)
+      const bgColor = this.darkTheme ? 0x1C1C1E : 0xE8DFD4;
+      networkState.renderer.setClearColor(bgColor, 1);
     },
 
     initCamera(container) {

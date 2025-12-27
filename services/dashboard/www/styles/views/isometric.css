@@ -253,3 +253,55 @@
     height: 32px;
   }
 }
+
+/* ========================================
+   ISOMETRIC VIEW - DARK MODE
+   ======================================== */
+[data-theme="dark"] .isometric-view {
+  background: var(--color-bg);
+}
+
+[data-theme="dark"] .iso-container {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .iso-container canvas {
+  background: #0f172a !important;
+}
+
+[data-theme="dark"] .iso-label {
+  background: rgba(44, 44, 46, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .iso-label .label-name {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .iso-label .label-value {
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .iso-control-btn {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .iso-control-btn:hover {
+  background: var(--color-border);
+}
+
+[data-theme="dark"] .iso-control-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+[data-theme="dark"] .iso-view-toggle {
+  background: var(--color-surface);
+}
+
+[data-theme="dark"] .iso-view-toggle .iso-control-btn.active {
+  background: var(--color-border);
+  color: var(--color-text);
+}

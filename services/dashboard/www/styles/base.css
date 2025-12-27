@@ -87,3 +87,60 @@
     body { -ms-overflow-style: none; scrollbar-width: none; }
     body::-webkit-scrollbar { display: none; }
 
+    /* ========================================
+       DARK THEME
+       ======================================== */
+    [data-theme="dark"] {
+      /* Backgrounds - Apple-inspired dark grays */
+      --color-bg: #1C1C1E;
+      --color-surface: #2C2C2E;
+
+      /* Text - High contrast for readability */
+      --color-text: #F5F5F7;
+      --color-text-secondary: #A1A1A6;
+      --color-text-tertiary: #6E6E73;
+
+      /* Borders */
+      --color-border: #3A3A3C;
+
+      /* Shadows - More prominent in dark mode */
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+      --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
+
+      /* Accent colors - Brighter for dark backgrounds */
+      --color-primary: #0A84FF;
+      --color-success: #32D74B;
+      --color-warning: #FFD60A;
+      --color-danger: #FF453A;
+      --color-info: #64D2FF;
+
+      /* Temperature colors - Slightly adjusted */
+      --color-cold: #64B5F6;
+      --color-cool: #81C784;
+      --color-comfortable: #66BB6A;
+      --color-warm: #FFD54F;
+      --color-hot: #FF8A65;
+      --color-very-hot: #EF5350;
+    }
+
+    /* Smooth theme transitions */
+    html,
+    html *,
+    html *::before,
+    html *::after {
+      transition: background-color 250ms ease,
+                  color 250ms ease,
+                  border-color 250ms ease,
+                  box-shadow 250ms ease;
+    }
+
+    /* Disable transitions on initial page load */
+    html.no-transitions,
+    html.no-transitions *,
+    html.no-transitions *::before,
+    html.no-transitions *::after {
+      transition: none !important;
+    }
+
