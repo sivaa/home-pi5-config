@@ -7,6 +7,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Home Climate</title>
 
+  <!-- FOIT Prevention: Set theme before any CSS loads -->
+  <script>
+    (function() {
+      const stored = localStorage.getItem('dashboard-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      let theme = 'light';
+      if (stored === 'dark' || (stored === 'system' && prefersDark) || (!stored && prefersDark)) {
+        theme = 'dark';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-theme-preference', stored || 'system');
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
@@ -239,6 +253,22 @@
               <span class="temp-value" x-text="$store.weather?.temperature?.toFixed(0) + '°'"></span>
             </div>
           </div>
+
+          <!-- Theme Toggle: Light / Dark / System -->
+          <div class="theme-toggle">
+            <button class="theme-toggle-btn"
+                    :class="{ active: $store.theme.preference === 'light' }"
+                    @click="$store.theme.setPreference('light')"
+                    title="Light mode">☀️</button>
+            <button class="theme-toggle-btn"
+                    :class="{ active: $store.theme.preference === 'dark' }"
+                    @click="$store.theme.setPreference('dark')"
+                    title="Dark mode">🌙</button>
+            <button class="theme-toggle-btn"
+                    :class="{ active: $store.theme.preference === 'system' }"
+                    @click="$store.theme.setPreference('system')"
+                    title="System preference">⚙️</button>
+          </div>
         </div>
 
         <!-- Right: Stats + Date/Time -->
@@ -256,13 +286,19 @@
               </span>
             </div>
             <div class="date-time" x-text="currentDateTime"></div>
+            <button class="panel-toggle"
+                    @click="togglePanel()"
+                    :title="panelOpen ? 'Hide overview panel' : 'Show overview panel'">
+              <span x-text="panelOpen ? '»' : '«'"></span>
+            </button>
           </div>
           <div class="last-update" x-text="'Last update: ' + lastUpdateText"></div>
         </div>
       </div>
     </header>
 
-    <!-- Main Content -->
+    <!-- Main Content + Overview Panel -->
+    <div class="app-body">
     <main class="app-main">
       <div class="view-container">
 
@@ -1216,17 +1252,16 @@
                       </div>
                     </div>
 
-                    <!-- Split Panel Temperature Display -->
-                    <div class="temp-split-panel" x-data="{ holdInterval: null, holdDelay: null }">
-                      <div class="temp-panel now-panel">
-                        <span class="panel-label">NOW</span>
-                        <span class="panel-temp" x-text="formatTemp(t.localTemp) + '°'"></span>
+                    <!-- Stacked Neumorphic Temperature Display -->
+                    <div class="temp-stack" x-data="{ holdInterval: null, holdDelay: null }">
+                      <div class="now-container">
+                        <span class="now-label">NOW</span>
+                        <span class="now-temp"><span x-text="tempParts(t.localTemp).whole"></span><span class="temp-degree">°</span><span class="temp-decimal" x-text="tempParts(t.localTemp).decimal"></span></span>
                       </div>
-                      <div class="temp-panel target-panel" :class="{ syncing: t.syncing, heating: t.runningState === 'heat' }">
-                        <span class="panel-label">TARGET</span>
-                        <span class="panel-temp" x-text="(getDisplayTemp(t) || 17) + '°'"></span>
-                        <div class="panel-controls">
-                          <button class="panel-btn"
+                      <div class="target-container" :class="{ syncing: t.syncing, heating: t.runningState === 'heat' }">
+                        <span class="target-label">Target</span>
+                        <div class="target-row">
+                          <button class="ctrl-btn"
                                   @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
                                   @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
                                   @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
@@ -1234,7 +1269,8 @@
                                   @touchend="clearTimeout(holdDelay); clearInterval(holdInterval)"
                                   @click="if(!holdInterval) adjustTemp(t.id, -1)"
                                   :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) <= 5">−</button>
-                          <button class="panel-btn"
+                          <span class="target-temp"><span x-text="tempParts(getDisplayTemp(t) || 17).whole"></span><span class="temp-degree">°</span><span class="temp-decimal" x-text="tempParts(getDisplayTemp(t) || 17).decimal"></span></span>
+                          <button class="ctrl-btn"
                                   @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
                                   @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
                                   @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
@@ -2028,6 +2064,88 @@
       </div>
     </main>
 
+    <!-- Overview Panel (Right Sidebar) -->
+    <aside class="overview-panel" :class="{ collapsed: !panelOpen }">
+      <div class="panel-content">
+
+        <!-- Section: Home Average -->
+        <div class="panel-section">
+          <div class="panel-section-title">HOME</div>
+          <div class="panel-metric">
+            <span class="panel-icon">🏠</span>
+            <span class="panel-value" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
+          </div>
+          <div class="panel-metric">
+            <span class="panel-icon">💧</span>
+            <span class="panel-value" x-text="($store.rooms.avgHumidity?.toFixed(0) || '--') + '%'"></span>
+          </div>
+          <div class="panel-metric" x-show="$store.rooms.co2Value">
+            <span class="panel-icon">💨</span>
+            <span class="panel-value" x-text="$store.rooms.co2Value"></span>
+          </div>
+        </div>
+
+        <!-- Section: Outside -->
+        <div class="panel-section">
+          <div class="panel-section-title">OUTSIDE</div>
+          <div class="panel-metric">
+            <span class="panel-icon">🌿</span>
+            <span class="panel-value" x-text="($store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) || '--') + '°'"></span>
+          </div>
+          <div class="panel-metric" x-show="$store.weather?.temperature != null">
+            <span class="panel-icon" x-text="$store.weather?.conditionIcon || '☁️'"></span>
+            <span class="panel-value" x-text="($store.weather?.temperature?.toFixed(0) || '--') + '°'"></span>
+          </div>
+        </div>
+
+        <!-- Section: By Room -->
+        <div class="panel-section">
+          <div class="panel-section-title">ROOMS</div>
+          <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
+            <div class="panel-room-row">
+              <span class="panel-room-icon" x-text="room.icon"></span>
+              <span class="panel-room-name" x-text="room.name"></span>
+              <span class="panel-room-temp" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Section: Heating -->
+        <div class="panel-section">
+          <div class="panel-section-title">HEATING</div>
+          <div class="panel-metric">
+            <span class="panel-icon">🔥</span>
+            <span class="panel-value" x-text="($store.thermostats?.activeHeatingCount || 0) + '/' + ($store.thermostats?.list?.length || 0)"></span>
+          </div>
+          <template x-for="trv in ($store.thermostats?.list || [])" :key="trv.id">
+            <div class="panel-room-row" :class="{ 'heating-active': trv.runningState === 'heat' }">
+              <span class="panel-room-icon" x-text="trv.runningState === 'heat' ? '🔥' : '❄️'"></span>
+              <span class="panel-room-name" x-text="trv.name"></span>
+              <span class="panel-room-temp" x-text="(trv.localTemp?.toFixed(1) || '--') + '°'"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Section: Security (Windows/Doors) -->
+        <div class="panel-section">
+          <div class="panel-section-title">SECURITY</div>
+          <div class="panel-metric">
+            <span class="panel-icon">🪟</span>
+            <span class="panel-value" x-text="getOpenContactCount() === 0 ? '✓' : getOpenContactCount()"></span>
+          </div>
+          <template x-for="sensor in ($store.sensors?.sensorsByType?.contact || [])" :key="sensor.ieee_address">
+            <div class="panel-room-row" :class="{ 'contact-open': $store.sensors?.liveData?.[sensor.ieee_address]?.contact === false }">
+              <span class="panel-room-icon" x-text="$store.sensors?.liveData?.[sensor.ieee_address]?.contact === false ? '🔓' : '🔒'"></span>
+              <span class="panel-room-name" x-text="sensor.friendly_name.replace(/\[|\]/g, '').trim()"></span>
+              <span class="panel-room-temp" x-text="$store.sensors?.liveData?.[sensor.ieee_address]?.contact === false ? 'Open' : 'Closed'"></span>
+            </div>
+          </template>
+        </div>
+
+      </div>
+    </aside>
+    </div><!-- /.app-body -->
+
     <!-- Footer -->
     <footer class="app-footer" x-show="currentView !== 'ambient'">
       <span class="footer-status">
@@ -2409,6 +2527,13 @@
         },
         getBatteryIcon(b) { return b === null || b < 20 ? '🪫' : '🔋'; },
         formatTemp(temp) { return temp?.toFixed(1) ?? '--'; },
+        // Split temp into whole and decimal parts for styling
+        tempParts(temp) {
+          if (temp == null) return { whole: '--', decimal: '' };
+          const fixed = temp.toFixed(1);
+          const [whole, decimal] = fixed.split('.');
+          return { whole, decimal: '.' + decimal };
+        },
 
         // Troubleshooting helpers
         getLastStateChange(t) {
@@ -3978,6 +4103,7 @@
         currentView: 'comfort',
         currentDateTime: '',
         now: Date.now(),
+        panelOpen: localStorage.getItem('panel-open') !== 'false',
 
         get lastUpdateText() {
           const lastUpdate = Alpine.store('rooms').lastUpdate;
@@ -4027,6 +4153,17 @@
             weekday: 'short', month: 'short', day: 'numeric',
             hour: 'numeric', minute: '2-digit', hour12: true
           });
+        },
+
+        togglePanel() {
+          this.panelOpen = !this.panelOpen;
+          localStorage.setItem('panel-open', this.panelOpen);
+        },
+
+        getOpenContactCount() {
+          const contacts = Alpine.store('sensors')?.sensorsByType?.contact || [];
+          const liveData = Alpine.store('sensors')?.liveData || {};
+          return contacts.filter(s => liveData[s.ieee_address]?.contact === false).length;
         }
       };
     }

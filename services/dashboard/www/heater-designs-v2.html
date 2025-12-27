@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heater Card Designs V2 - Stacked Layout</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --card-bg: #16213e;
+      --text: #eaeaea;
+      --text-muted: #8892b0;
+      --accent: #ff6b35;
+      --accent-cool: #4cc9f0;
+      --success: #4ade80;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 28px;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .layout-demo {
+      text-align: center;
+      margin-bottom: 40px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre;
+      color: var(--text-muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .design-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .design-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      text-align: center;
+    }
+
+    .design-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    /* ========================================
+       DESIGN 1: Centered Stack (Clean & Simple)
+       ======================================== */
+    .design-1 {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .design-1 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .design-1 .room-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .design-1 .status {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+
+    .design-1 .now-section {
+      margin-bottom: 20px;
+    }
+
+    .design-1 .now-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .design-1 .now-temp {
+      font-size: 64px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .design-1 .target-section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .design-1 .target-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .design-1 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .design-1 .target-temp {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--warning);
+      min-width: 60px;
+    }
+
+    .design-1 .ctrl-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .design-1 .ctrl-btn:hover {
+      background: var(--accent);
+      transform: scale(1.1);
+    }
+
+    .design-1 .mode-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .design-1 .mode-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .design-1 .mode-btn.active {
+      background: var(--danger);
+    }
+
+    /* ========================================
+       DESIGN 2: Card with Divider
+       ======================================== */
+    .design-2 {
+      background: var(--card-bg);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .design-2 .header {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .design-2 .room-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .design-2 .status {
+      font-size: 11px;
+      color: var(--danger);
+    }
+
+    .design-2 .now-section {
+      padding: 24px;
+      background: rgba(100, 100, 100, 0.1);
+      text-align: center;
+    }
+
+    .design-2 .now-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .design-2 .now-temp {
+      font-size: 56px;
+      font-weight: 700;
+    }
+
+    .design-2 .divider {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .design-2 .target-section {
+      padding: 20px;
+      background: rgba(255, 107, 53, 0.05);
+      text-align: center;
+    }
+
+    .design-2 .target-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .design-2 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .design-2 .target-temp {
+      font-size: 36px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .design-2 .ctrl-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 2px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .design-2 .ctrl-btn:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    /* ========================================
+       DESIGN 3: Pill Buttons (Modern Touch)
+       ======================================== */
+    .design-3 {
+      background: linear-gradient(135deg, #1e3a5f 0%, #16213e 100%);
+      border-radius: 20px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .design-3 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .design-3 .room-name {
+      font-weight: 600;
+    }
+
+    .design-3 .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .design-3 .now-temp {
+      font-size: 72px;
+      font-weight: 300;
+      letter-spacing: -2px;
+      margin-bottom: 24px;
+    }
+
+    .design-3 .target-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50px;
+      padding: 8px;
+    }
+
+    .design-3 .pill-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.15);
+      color: var(--text);
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .design-3 .pill-btn:hover {
+      background: var(--accent);
+      transform: scale(1.15);
+    }
+
+    .design-3 .target-value {
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .design-3 .target-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .design-3 .target-temp {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--warning);
+    }
+
+    /* ========================================
+       DESIGN 4: Gradient Background (Temperature Feel)
+       ======================================== */
+    .design-4 {
+      background: linear-gradient(180deg, #2d4a7c 0%, #1a1a2e 50%, #4a1a1a 100%);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .design-4::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    }
+
+    .design-4 .content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .design-4 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .design-4 .room-name {
+      font-weight: 600;
+    }
+
+    .design-4 .status {
+      background: rgba(239, 68, 68, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: #ff8080;
+    }
+
+    .design-4 .now-section {
+      margin-bottom: 24px;
+    }
+
+    .design-4 .now-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 4px;
+    }
+
+    .design-4 .now-temp {
+      font-size: 80px;
+      font-weight: 200;
+      text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .design-4 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .design-4 .ctrl-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      color: var(--text);
+      font-size: 26px;
+      cursor: pointer;
+    }
+
+    .design-4 .target-info {
+      text-align: center;
+    }
+
+    .design-4 .target-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .design-4 .target-temp {
+      font-size: 32px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    /* ========================================
+       DESIGN 5: Neumorphic Stack (Soft 3D)
+       ======================================== */
+    .design-5 {
+      background: #2a2a3e;
+      border-radius: 24px;
+      padding: 24px;
+    }
+
+    .design-5 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .design-5 .room-name {
+      font-weight: 600;
+    }
+
+    .design-5 .status {
+      color: var(--danger);
+      font-size: 12px;
+    }
+
+    .design-5 .now-container {
+      background: #2a2a3e;
+      border-radius: 20px;
+      padding: 24px;
+      text-align: center;
+      margin-bottom: 16px;
+      box-shadow:
+        8px 8px 16px #1f1f2d,
+        -8px -8px 16px #353549;
+    }
+
+    .design-5 .now-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .design-5 .now-temp {
+      font-size: 52px;
+      font-weight: 700;
+    }
+
+    .design-5 .target-container {
+      background: #2a2a3e;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      box-shadow:
+        inset 4px 4px 8px #1f1f2d,
+        inset -4px -4px 8px #353549;
+    }
+
+    .design-5 .target-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .design-5 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .design-5 .target-temp {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--warning);
+      min-width: 50px;
+    }
+
+    .design-5 .ctrl-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: none;
+      background: #2a2a3e;
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow:
+        4px 4px 8px #1f1f2d,
+        -4px -4px 8px #353549;
+    }
+
+    .design-5 .ctrl-btn:active {
+      box-shadow:
+        inset 2px 2px 4px #1f1f2d,
+        inset -2px -2px 4px #353549;
+    }
+
+    /* ========================================
+       DESIGN 6: Dark Mode (Night Friendly)
+       ======================================== */
+    .design-6 {
+      background: #0d0d0d;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #222;
+    }
+
+    .design-6 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .design-6 .room-name {
+      font-weight: 500;
+      color: #888;
+    }
+
+    .design-6 .status {
+      font-size: 11px;
+      color: var(--danger);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .design-6 .status::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+    }
+
+    .design-6 .now-section {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .design-6 .now-label {
+      font-size: 11px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .design-6 .now-temp {
+      font-size: 68px;
+      font-weight: 200;
+      color: #fff;
+      text-shadow: 0 0 40px rgba(255,255,255,0.2);
+    }
+
+    .design-6 .target-section {
+      text-align: center;
+    }
+
+    .design-6 .target-label {
+      font-size: 10px;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+    }
+
+    .design-6 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .design-6 .target-temp {
+      font-size: 36px;
+      font-weight: 400;
+      color: var(--accent);
+      text-shadow: 0 0 30px rgba(255, 107, 53, 0.4);
+      min-width: 70px;
+    }
+
+    .design-6 .ctrl-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid #333;
+      background: transparent;
+      color: #666;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .design-6 .ctrl-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 20px rgba(255, 107, 53, 0.3);
+    }
+
+    /* ========================================
+       DESIGN 7: Compact Dense (Space Saver)
+       ======================================== */
+    .design-7 {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .design-7 .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .design-7 .room-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .design-7 .status {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+
+    .design-7 .now-section {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .design-7 .now-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .design-7 .now-label {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .design-7 .now-temp {
+      font-size: 38px;
+      font-weight: 700;
+    }
+
+    .design-7 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+
+    .design-7 .target-label {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .design-7 .target-temp {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--warning);
+    }
+
+    .design-7 .ctrl-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .design-7 .ctrl-btn:hover {
+      background: var(--accent);
+    }
+
+    /* ========================================
+       DESIGN 8: Big NOW Focus (Emphasis)
+       ======================================== */
+    .design-8 {
+      background: linear-gradient(180deg, #1a2744 0%, #16213e 100%);
+      border-radius: 20px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .design-8 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .design-8 .room-name {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .design-8 .status-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--danger);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .design-8 .now-temp {
+      font-size: 96px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 8px;
+      background: linear-gradient(180deg, #fff 0%, #aaa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .design-8 .now-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 24px;
+    }
+
+    .design-8 .target-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .design-8 .target-text {
+      color: var(--text-muted);
+    }
+
+    .design-8 .target-temp {
+      color: var(--warning);
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .design-8 .ctrl-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: transparent;
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .design-8 .ctrl-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ========================================
+       DESIGN 9: Inline Target (Horizontal Controls)
+       ======================================== */
+    .design-9 {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .design-9 .header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .design-9 .room-name {
+      font-weight: 600;
+    }
+
+    .design-9 .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--danger);
+    }
+
+    .design-9 .now-section {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .design-9 .now-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .design-9 .now-temp {
+      font-size: 58px;
+      font-weight: 600;
+    }
+
+    .design-9 .target-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.05);
+      border-radius: 30px;
+      padding: 6px;
+    }
+
+    .design-9 .ctrl-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .design-9 .ctrl-btn:hover {
+      background: var(--accent);
+      transform: scale(1.1);
+    }
+
+    .design-9 .target-center {
+      text-align: center;
+    }
+
+    .design-9 .target-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .design-9 .target-temp {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--warning);
+    }
+
+    /* ========================================
+       DESIGN 10: Status Integrated (All-in-One)
+       ======================================== */
+    .design-10 {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .design-10 .status-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--danger);
+      color: white;
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .design-10 .room-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .design-10 .now-section {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .design-10 .now-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .design-10 .heating-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--danger);
+      animation: pulse 1s infinite;
+    }
+
+    .design-10 .now-temp {
+      font-size: 52px;
+      font-weight: 700;
+    }
+
+    .design-10 .now-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .design-10 .target-section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .design-10 .target-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .design-10 .target-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .design-10 .progress-hint {
+      font-size: 10px;
+      color: var(--accent);
+    }
+
+    .design-10 .target-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .design-10 .target-temp {
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--warning);
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .design-10 .ctrl-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .design-10 .ctrl-btn:hover {
+      background: var(--accent);
+    }
+
+    .design-10 .progress-bar {
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+
+    .design-10 .progress-fill {
+      height: 100%;
+      width: 65%;
+      background: linear-gradient(90deg, var(--accent-cool), var(--accent));
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heater Card Designs V2</h1>
+  <p class="subtitle">Stacked Vertical Layout: NOW on top, TARGET with [−] [+] below</p>
+
+  <div class="layout-demo">
+┌─────────────────────────┐
+│  Room Name    [STATUS]  │
+│                         │
+│         NOW             │
+│        18.8°            │  ← Large, prominent
+│                         │
+│        TARGET           │
+│    [−]  19°  [+]        │  ← Controls below
+│                         │
+│   [Optional Modes]      │
+└─────────────────────────┘
+  </div>
+
+  <div class="grid">
+    <!-- Design 1: Centered Stack -->
+    <div class="design-wrapper">
+      <div class="design-label">#1 Centered Stack</div>
+      <div class="design-desc">Clean & Simple - Maximum clarity</div>
+      <div class="design-1">
+        <div class="header">
+          <span class="room-name">Study</span>
+          <span class="status">Heating</span>
+        </div>
+        <div class="now-section">
+          <div class="now-label">Now</div>
+          <div class="now-temp">18.8°</div>
+        </div>
+        <div class="target-section">
+          <div class="target-label">Target</div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <span class="target-temp">19°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+        <div class="mode-btns">
+          <button class="mode-btn active">Heat</button>
+          <button class="mode-btn">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 2: Card with Divider -->
+    <div class="design-wrapper">
+      <div class="design-label">#2 Card with Divider</div>
+      <div class="design-desc">Visual separation with gradient line</div>
+      <div class="design-2">
+        <div class="header">
+          <span class="room-name">Living Room</span>
+          <span class="status">● Heating</span>
+        </div>
+        <div class="now-section">
+          <div class="now-label">Current Temperature</div>
+          <div class="now-temp">19.2°</div>
+        </div>
+        <div class="divider"></div>
+        <div class="target-section">
+          <div class="target-label">Set Target</div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <span class="target-temp">20°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 3: Pill Buttons -->
+    <div class="design-wrapper">
+      <div class="design-label">#3 Pill Buttons</div>
+      <div class="design-desc">Modern touch with rounded controls</div>
+      <div class="design-3">
+        <div class="header">
+          <span class="room-name">Bedroom</span>
+          <span class="status-dot"></span>
+        </div>
+        <div class="now-temp">17.5°</div>
+        <div class="target-pill">
+          <button class="pill-btn">−</button>
+          <div class="target-value">
+            <div class="target-label">Target</div>
+            <div class="target-temp">18°</div>
+          </div>
+          <button class="pill-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 4: Gradient Background -->
+    <div class="design-wrapper">
+      <div class="design-label">#4 Gradient Background</div>
+      <div class="design-desc">Temperature feel with color shift</div>
+      <div class="design-4">
+        <div class="content">
+          <div class="header">
+            <span class="room-name">Kitchen</span>
+            <span class="status">Heating</span>
+          </div>
+          <div class="now-section">
+            <div class="now-label">Now</div>
+            <div class="now-temp">16.8°</div>
+          </div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <div class="target-info">
+              <div class="target-label">Target</div>
+              <div class="target-temp">19°</div>
+            </div>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 5: Neumorphic Stack -->
+    <div class="design-wrapper">
+      <div class="design-label">#5 Neumorphic Stack</div>
+      <div class="design-desc">Soft 3D with raised/inset containers</div>
+      <div class="design-5">
+        <div class="header">
+          <span class="room-name">Bathroom</span>
+          <span class="status">● Heating</span>
+        </div>
+        <div class="now-container">
+          <div class="now-label">Now</div>
+          <div class="now-temp">20.1°</div>
+        </div>
+        <div class="target-container">
+          <div class="target-label">Target</div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <span class="target-temp">21°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 6: Dark Mode -->
+    <div class="design-wrapper">
+      <div class="design-label">#6 Dark Mode</div>
+      <div class="design-desc">Night friendly with glow effects</div>
+      <div class="design-6">
+        <div class="header">
+          <span class="room-name">Study</span>
+          <span class="status">Heating</span>
+        </div>
+        <div class="now-section">
+          <div class="now-label">Now</div>
+          <div class="now-temp">18.4°</div>
+        </div>
+        <div class="target-section">
+          <div class="target-label">Target</div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <span class="target-temp">20°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 7: Compact Dense -->
+    <div class="design-wrapper">
+      <div class="design-label">#7 Compact Dense</div>
+      <div class="design-desc">Space saver - ideal for 4-card grid</div>
+      <div class="design-7">
+        <div class="header">
+          <span class="room-name">Living</span>
+          <span class="status">Heat</span>
+        </div>
+        <div class="now-section">
+          <div class="now-row">
+            <span class="now-label">Now</span>
+            <span class="now-temp">19.5°</span>
+          </div>
+        </div>
+        <div class="target-row">
+          <button class="ctrl-btn">−</button>
+          <span class="target-label">Target</span>
+          <span class="target-temp">20°</span>
+          <button class="ctrl-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 8: Big NOW Focus -->
+    <div class="design-wrapper">
+      <div class="design-label">#8 Big NOW Focus</div>
+      <div class="design-desc">NOW dominates, TARGET subtle</div>
+      <div class="design-8">
+        <div class="header">
+          <span class="room-name">Bedroom</span>
+          <span class="status-icon">🔥</span>
+        </div>
+        <div class="now-temp">17°</div>
+        <div class="now-label">Current</div>
+        <div class="target-section">
+          <button class="ctrl-btn">−</button>
+          <span class="target-text">Set to</span>
+          <span class="target-temp">19°</span>
+          <button class="ctrl-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 9: Inline Target -->
+    <div class="design-wrapper">
+      <div class="design-label">#9 Inline Target</div>
+      <div class="design-desc">Horizontal control bar below NOW</div>
+      <div class="design-9">
+        <div class="header">
+          <span class="room-name">Kitchen</span>
+          <span class="status">● Heating</span>
+        </div>
+        <div class="now-section">
+          <div class="now-label">Now</div>
+          <div class="now-temp">18.2°</div>
+        </div>
+        <div class="target-bar">
+          <button class="ctrl-btn">−</button>
+          <div class="target-center">
+            <div class="target-label">Target</div>
+            <div class="target-temp">19°</div>
+          </div>
+          <button class="ctrl-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design 10: Status Integrated -->
+    <div class="design-wrapper">
+      <div class="design-label">#10 Status Integrated</div>
+      <div class="design-desc">All-in-one with progress indicator</div>
+      <div class="design-10">
+        <span class="status-badge">HEATING</span>
+        <div class="room-name">Bathroom</div>
+        <div class="now-section">
+          <div class="now-row">
+            <span class="heating-dot"></span>
+            <span class="now-temp">19.8°</span>
+          </div>
+          <div class="now-label">Current</div>
+        </div>
+        <div class="target-section">
+          <div class="target-header">
+            <span class="target-label">Target</span>
+            <span class="progress-hint">+1.2° to go</span>
+          </div>
+          <div class="target-row">
+            <button class="ctrl-btn">−</button>
+            <span class="target-temp">21°</span>
+            <button class="ctrl-btn">+</button>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Add hover interactions for demo
+    document.querySelectorAll('.ctrl-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const card = e.target.closest('[class^="design-"]');
+        const tempEl = card.querySelector('.target-temp');
+        if (tempEl) {
+          let temp = parseInt(tempEl.textContent);
+          if (e.target.textContent === '+') {
+            temp = Math.min(22, temp + 1);
+          } else {
+            temp = Math.max(5, temp - 1);
+          }
+          tempEl.textContent = temp + '°';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
