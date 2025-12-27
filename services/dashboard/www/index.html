@@ -3885,6 +3885,89 @@
           return `${Math.floor(seconds / 3600)}h ago`;
         }
       });
+
+      // Weather store (fetches forecast from Home Assistant via nginx proxy)
+      Alpine.store('weather', {
+        temperature: null,
+        humidity: null,
+        condition: null,
+        conditionIcon: null,
+        loading: false,
+        lastUpdate: null,
+        error: null,
+
+        // Home Assistant API config (via nginx proxy to avoid CORS)
+        entityId: 'weather.forecast_home',
+        haToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no',
+
+        pollInterval: 5 * 60 * 1000,
+        pollTimer: null,
+
+        init() {
+          console.log('Weather store: Initializing...');
+          this.fetchWeather();
+          this.pollTimer = setInterval(() => this.fetchWeather(), this.pollInterval);
+        },
+
+        async fetchWeather() {
+          this.loading = true;
+          this.error = null;
+
+          try {
+            // Use nginx proxy to avoid CORS: /api/ha/ -> homeassistant:8123/api/
+            const response = await fetch(
+              `/api/ha/states/${this.entityId}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${this.haToken}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            this.temperature = data.attributes.temperature;
+            this.humidity = data.attributes.humidity;
+            this.condition = data.state;
+            this.conditionIcon = this.getConditionIcon(data.state);
+            this.lastUpdate = Date.now();
+            console.log('Weather store: Updated', { temp: this.temperature, condition: this.condition });
+          } catch (e) {
+            console.error('Weather store: Fetch error:', e);
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        getConditionIcon(condition) {
+          const iconMap = {
+            'sunny': '☀️',
+            'clear-night': '🌙',
+            'partlycloudy': '⛅',
+            'cloudy': '☁️',
+            'rainy': '🌧️',
+            'pouring': '🌧️',
+            'snowy': '🌨️',
+            'snowy-rainy': '🌨️',
+            'fog': '🌫️',
+            'hail': '🌨️',
+            'lightning': '⚡',
+            'lightning-rainy': '⛈️',
+            'windy': '💨',
+            'windy-variant': '💨',
+            'exceptional': '⚠️'
+          };
+          return iconMap[condition] || '🌡️';
+        }
+      });
+
+      // Initialize weather store after a short delay
+      setTimeout(() => Alpine.store('weather')?.init(), 2000);
     });
 
     // ========================================

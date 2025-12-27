@@ -15,6 +15,10 @@ mobile_app:
 http:
   server_port: 8123
   use_x_forwarded_for: true
+  cors_allowed_origins:
+    - http://localhost:8888
+    - http://127.0.0.1:8888
+    - http://pi:8888
   trusted_proxies:
     # Local/Docker
     - 127.0.0.1
@@ -235,6 +239,17 @@ google_assistant:
       aliases:
         - "Bedroom Heater"
         - "Bed Heater"
+
+# =============================================================================
+# WEATHER INTEGRATION
+# Purpose: Official weather forecast for Zehlendorf, Berlin (used in dashboard header)
+# Docs: https://www.home-assistant.io/integrations/met/
+# =============================================================================
+weather:
+  - platform: met
+    name: Zehlendorf Weather
+    latitude: 52.4319
+    longitude: 13.2599
 
 # =============================================================================
 # AUTOMATIONS

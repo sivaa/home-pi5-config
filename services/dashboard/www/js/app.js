@@ -11,6 +11,7 @@ import { initRoomDetailStore } from './stores/room-detail-store.js';
 import { initSensorsStore } from './stores/sensors-store.js';
 import { initEventsStore } from './stores/events-store.js';
 import { initThermostatStore } from './stores/thermostat-store.js';
+import { initWeatherStore } from './stores/weather-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
@@ -47,6 +48,12 @@ document.addEventListener('alpine:init', () => {
   initSensorsStore(Alpine, CONFIG);
   initEventsStore(Alpine, CONFIG);
   initThermostatStore(Alpine, CONFIG);
+  initWeatherStore(Alpine, CONFIG);
+
+  // Initialize weather store after a short delay
+  setTimeout(() => {
+    Alpine.store('weather')?.init();
+  }, 2000);
 
   // Load historical events on startup
   setTimeout(() => {

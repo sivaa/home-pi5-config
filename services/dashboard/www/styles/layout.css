@@ -161,6 +161,62 @@
     .nav-icon { font-size: 14px; }
     .nav-label { font-size: 11px; }
 
+    /* ========================================
+       HEADER TEMPERATURE DISPLAY
+       ======================================== */
+    .header-temps {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-left: var(--space-md);
+      padding-left: var(--space-md);
+      border-left: 1px solid var(--color-border);
+    }
+
+    .temp-item {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      white-space: nowrap;
+      cursor: default;
+      transition: all var(--transition-fast);
+    }
+
+    .temp-item:hover {
+      background: var(--color-bg);
+    }
+
+    .temp-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .temp-value {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Balcony - outdoor/nature feel */
+    .temp-balcony {
+      color: var(--color-success);
+    }
+
+    /* Weather forecast - sky/external feel */
+    .temp-weather {
+      color: var(--color-info);
+    }
+
+    /* Separator between balcony and weather */
+    .temp-balcony::after {
+      content: '|';
+      margin-left: 6px;
+      color: var(--color-border);
+      font-weight: var(--font-weight-normal);
+    }
+
     [x-cloak] { display: none !important; }
 
     /* ========================================
@@ -174,6 +230,20 @@
         padding: 6px;
       }
       .nav-icon { font-size: 16px; }
+    }
+
+    @media (max-width: 900px) {
+      .header-temps {
+        margin-left: var(--space-sm);
+        padding-left: var(--space-sm);
+      }
+      .temp-item {
+        padding: 2px 6px;
+        font-size: var(--font-size-xs);
+      }
+      .temp-icon {
+        font-size: 12px;
+      }
     }
 
     /* ========================================
@@ -202,6 +272,9 @@
       }
       .last-update {
         display: none;
+      }
+      .header-temps {
+        display: none;  /* Hide on very small screens */
       }
     }
 
