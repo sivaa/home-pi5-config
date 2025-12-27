@@ -572,3 +572,232 @@
           channel: "Audit"
           importance: high
           tag: "setpoint_{{ trigger.entity_id }}"
+
+# =============================================================================
+# WINDOW-HEATER SAFETY AUTOMATIONS
+# Purpose: Turn off heaters when windows/doors open, resume when all closed
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# WINDOW/DOOR OPEN - TURN OFF ALL HEATERS
+# Trigger: ANY of 8 contact sensors opens
+# Action: Turn off all thermostats, announce which window and heaters affected
+# -----------------------------------------------------------------------------
+- id: window_open_turn_off_heaters
+  alias: "Window Open - Turn Off All Heaters"
+  description: "When any window or door opens, immediately turn off all heaters and notify"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      to: "on"
+
+  variables:
+    window_name: >
+      {% set names = {
+        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom Window',
+        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom Window',
+        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen Window',
+        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large Window',
+        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small Window',
+        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Living Balcony Door',
+        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window',
+        'binary_sensor.hallway_window_contact_sensor_main_door_contact': 'Main Door'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+
+    heaters_running: >
+      {% set running = [] %}
+      {% if state_attr('climate.study_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Study'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Inner'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Outer'] %}
+      {% endif %}
+      {% if state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Bedroom'] %}
+      {% endif %}
+      {{ running | join(', ') if running else 'None' }}
+
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.study_thermostat
+          - climate.living_thermostat_inner
+          - climate.living_thermostat_outer
+          - climate.bed_thermostat
+      data:
+        hvac_mode: "off"
+
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: >
+          Warning! {{ window_name }} is open.
+          {% if heaters_running != 'None' %}
+            Turning off heaters: {{ heaters_running }}.
+          {% else %}
+            All heaters were already off.
+          {% endif %}
+          Close all windows to resume heating.
+        language: "en"
+
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🪟 Window Open - Heaters Off"
+        message: >
+          {{ window_name }} opened.
+          {% if heaters_running != 'None' %}
+            Heaters turned off: {{ heaters_running }}.
+          {% else %}
+            All heaters were already off.
+          {% endif %}
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "window_heater_safety"
+
+# -----------------------------------------------------------------------------
+# ALL WINDOWS CLOSED - RESUME HEATING
+# Trigger: ANY contact sensor closes
+# Condition: ALL 8 sensors must be closed
+# Action: Turn all thermostats back to heat mode
+# -----------------------------------------------------------------------------
+- id: all_windows_closed_resume_heaters
+  alias: "All Windows Closed - Resume Heaters"
+  description: "When all windows and doors are closed, turn heaters back on and notify"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      to: "off"
+
+  condition:
+    - condition: state
+      entity_id: binary_sensor.bath_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.bed_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_large_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_small_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_window_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+      state: "off"
+
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.study_thermostat
+          - climate.living_thermostat_inner
+          - climate.living_thermostat_outer
+          - climate.bed_thermostat
+      data:
+        hvac_mode: "heat"
+
+    - delay:
+        seconds: 2
+
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "All windows are now closed. Heating has resumed."
+        language: "en"
+
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "✅ All Windows Closed - Heating Resumed"
+        message: "All windows and doors are closed. All heaters have been turned back on."
+        data:
+          channel: "Info"
+          importance: default
+          tag: "window_heater_safety"
+
+# -----------------------------------------------------------------------------
+# MAIN DOOR OPEN TOO LONG - REPEAT ALERT
+# Trigger: Main door open for more than 3 minutes
+# Action: Repeat TTS + mobile alert every 5 minutes until closed
+# -----------------------------------------------------------------------------
+- id: main_door_open_too_long
+  alias: "Main Door Open Too Long - Repeat Alert"
+  description: "If main door is open more than 3 minutes, alert every 5 minutes until closed"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+      to: "on"
+      for:
+        minutes: 3
+
+  action:
+    - repeat:
+        while:
+          - condition: state
+            entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+            state: "on"
+        sequence:
+          - service: tts.google_translate_say
+            data:
+              entity_id:
+                - media_player.kitchen_display
+                - media_player.broken_display
+                - media_player.master_bedroom_clock
+              message: >
+                Attention! The main door has been open for more than 3 minutes.
+                Please close the main door. Heating is disabled until all doors and windows are closed.
+              language: "en"
+
+          - service: notify.mobile_app_22111317pg
+            data:
+              title: "🚪 Main Door Still Open!"
+              message: "The main door has been open for more than 3 minutes. Heaters are off."
+              data:
+                channel: "Critical"
+                importance: max
+                tag: "main_door_open_alert"
+
+          - delay:
+              minutes: 5
