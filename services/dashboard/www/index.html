@@ -1260,7 +1260,7 @@
                         <span class="now-temp"><span x-text="tempParts(t.localTemp).whole"></span><span class="temp-degree">°</span><span class="temp-decimal" x-text="tempParts(t.localTemp).decimal"></span></span>
                       </div>
                       <div class="target-container" :class="{ syncing: t.syncing, heating: t.runningState === 'heat' }">
-                        <span class="target-label">Target</span>
+                        <span class="target-label">TARGET</span>
                         <div class="target-row">
                           <button class="ctrl-btn"
                                   @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
@@ -1289,13 +1289,13 @@
                               :class="{ active: t.systemMode === 'heat' }"
                               @click="setMode(t.id, 'heat')"
                               :disabled="!t.available || t.syncing">
-                        Heat
+                        🔥 Heat
                       </button>
                       <button class="mode-btn off"
                               :class="{ active: t.systemMode === 'off' }"
                               @click="setMode(t.id, 'off')"
                               :disabled="!t.available || t.syncing">
-                        Off
+                        ⏻ Off
                       </button>
                     </div>
 
@@ -1475,11 +1475,11 @@
                     <div class="trend-legend">
                       <div class="legend-item">
                         <div class="legend-color temp"></div>
-                        <span>Temperature</span>
+                        <span>TEMPERATURE</span>
                       </div>
                       <div class="legend-item">
                         <div class="legend-color target"></div>
-                        <span>Target</span>
+                        <span>TARGET</span>
                       </div>
                     </div>
                   </div>

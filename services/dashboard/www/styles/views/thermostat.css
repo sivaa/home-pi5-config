@@ -931,35 +931,63 @@
 
 .mode-btn {
   flex: 1;
-  padding: var(--space-sm);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
   color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .mode-btn:hover:not(:disabled) {
-  background: var(--color-surface);
+  border-color: var(--color-text-tertiary);
+  transform: translateY(-1px);
 }
 
+/* Inactive heat button - warm hint */
+.mode-btn.heat {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+}
+
+.mode-btn.heat:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Inactive off button - cool hint */
+.mode-btn.off {
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.mode-btn.off:hover:not(:disabled) {
+  border-color: var(--color-text-tertiary);
+}
+
+/* Active states */
 .mode-btn.active {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: white;
+  transform: none;
 }
 
 .mode-btn.heat.active {
   background: var(--color-danger);
   border-color: var(--color-danger);
+  color: white;
 }
 
 .mode-btn.off.active {
   background: var(--color-text-secondary);
   border-color: var(--color-text-secondary);
+  color: white;
 }
 
 .mode-btn:disabled {
