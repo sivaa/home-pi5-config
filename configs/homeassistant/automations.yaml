@@ -579,38 +579,30 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# WINDOW/DOOR OPEN - TURN OFF ALL HEATERS
-# Trigger: ANY of 8 contact sensors opens
-# Action: Turn off all thermostats, announce which window and heaters affected
+# DOOR OPEN FOR 2 MINUTES - TURN OFF ALL HEATERS
+# Trigger: Balcony door or main door open for 2 minutes
+# Action: Turn off all heaters, notify user
+# Note: If door closes within 2 minutes, this automation does NOT fire
 # -----------------------------------------------------------------------------
-- id: window_open_turn_off_heaters
-  alias: "Window Open - Turn Off All Heaters"
-  description: "When any window or door opens, immediately turn off all heaters and notify"
-  mode: single
+- id: door_open_turn_off_heaters
+  alias: "Door Open 2min - Turn Off All Heaters"
+  description: "When balcony door or main door stays open for 2 minutes, turn off all heaters"
+  mode: parallel
+  max: 2
 
   trigger:
     - platform: state
       entity_id:
-        - binary_sensor.bath_window_contact_sensor_contact
-        - binary_sensor.bed_window_contact_sensor_contact
-        - binary_sensor.kitchen_window_contact_sensor_contact
-        - binary_sensor.study_window_contact_sensor_large_contact
-        - binary_sensor.study_window_contact_sensor_small_contact
         - binary_sensor.living_window_contact_sensor_balcony_door_contact
-        - binary_sensor.living_window_contact_sensor_window_contact
         - binary_sensor.hallway_window_contact_sensor_main_door_contact
       to: "on"
+      for:
+        minutes: 2
 
   variables:
-    window_name: >
+    door_name: >
       {% set names = {
-        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom Window',
-        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom Window',
-        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen Window',
-        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large Window',
-        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small Window',
-        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Living Balcony Door',
-        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window',
+        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Balcony Door',
         'binary_sensor.hallway_window_contact_sensor_main_door_contact': 'Main Door'
       } %}
       {{ names.get(trigger.entity_id, trigger.entity_id) }}
@@ -649,7 +641,102 @@
           - media_player.broken_display
           - media_player.master_bedroom_clock
         message: >
-          Warning! {{ window_name }} is open.
+          Warning! {{ door_name }} has been open for 2 minutes.
+          {% if heaters_running != 'None' %}
+            Turning off heaters: {{ heaters_running }}.
+          {% else %}
+            All heaters were already off.
+          {% endif %}
+          Close all doors and windows to resume heating.
+        language: "en"
+
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚪 Door Open 2min - Heaters Off"
+        message: >
+          {{ door_name }} has been open for 2 minutes.
+          {% if heaters_running != 'None' %}
+            Heaters turned off: {{ heaters_running }}.
+          {% else %}
+            All heaters were already off.
+          {% endif %}
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "window_heater_safety"
+
+# -----------------------------------------------------------------------------
+# WINDOW OPEN FOR 30 SECONDS - TURN OFF ALL HEATERS
+# Trigger: Any window open for 30 seconds
+# Action: Turn off all heaters, notify user
+# Note: If window closes within 30 seconds, this automation does NOT fire
+# -----------------------------------------------------------------------------
+- id: window_open_turn_off_heaters
+  alias: "Window Open 30s - Turn Off All Heaters"
+  description: "When any window stays open for 30 seconds, turn off all heaters"
+  mode: parallel
+  max: 6
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+      to: "on"
+      for:
+        seconds: 30
+
+  variables:
+    window_name: >
+      {% set names = {
+        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom Window',
+        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom Window',
+        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen Window',
+        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large Window',
+        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small Window',
+        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+
+    heaters_running: >
+      {% set running = [] %}
+      {% if state_attr('climate.study_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Study'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Inner'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Outer'] %}
+      {% endif %}
+      {% if state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Bedroom'] %}
+      {% endif %}
+      {{ running | join(', ') if running else 'None' }}
+
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id:
+          - climate.study_thermostat
+          - climate.living_thermostat_inner
+          - climate.living_thermostat_outer
+          - climate.bed_thermostat
+      data:
+        hvac_mode: "off"
+
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: >
+          Warning! {{ window_name }} has been open for 30 seconds.
           {% if heaters_running != 'None' %}
             Turning off heaters: {{ heaters_running }}.
           {% else %}
@@ -660,9 +747,9 @@
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "🪟 Window Open - Heaters Off"
+        title: "🪟 Window Open 30s - Heaters Off"
         message: >
-          {{ window_name }} opened.
+          {{ window_name }} has been open for 30 seconds.
           {% if heaters_running != 'None' %}
             Heaters turned off: {{ heaters_running }}.
           {% else %}
@@ -801,3 +888,69 @@
 
           - delay:
               minutes: 5
+
+# -----------------------------------------------------------------------------
+# WINDOW OPEN COLD WEATHER ALERT
+# Trigger: Any window/door open for 15 minutes when balcony temp < 18°C
+# Action: TTS announcement on kitchen display every 2 minutes until closed
+# Note: Independent of heater safety automations
+# -----------------------------------------------------------------------------
+- id: window_open_cold_weather_alert
+  alias: "Window Open Cold Weather Alert"
+  description: "Alert every 2 minutes when window open >15min and outdoor temp <18°C"
+  mode: parallel
+  max: 8
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      to: "on"
+      for:
+        minutes: 15
+
+  condition:
+    - condition: numeric_state
+      entity_id: sensor.balcony_temperature_humidity_temperature
+      below: 18
+
+  variables:
+    window_name: >
+      {% set names = {
+        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom Window',
+        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom Window',
+        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen Window',
+        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large Window',
+        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small Window',
+        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Balcony Door',
+        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window',
+        'binary_sensor.hallway_window_contact_sensor_main_door_contact': 'Main Door'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+
+  action:
+    - repeat:
+        while:
+          - condition: template
+            value_template: "{{ is_state(trigger.entity_id, 'on') }}"
+          - condition: numeric_state
+            entity_id: sensor.balcony_temperature_humidity_temperature
+            below: 18
+        sequence:
+          - service: tts.google_translate_say
+            data:
+              entity_id: media_player.kitchen_display
+              message: >
+                Attention! {{ window_name }} has been open for a long time
+                and it's {{ states('sensor.balcony_temperature_humidity_temperature') | round(0) }} degrees outside.
+                Please close it to keep the apartment warm.
+              language: "en"
+          - delay:
+              minutes: 2
