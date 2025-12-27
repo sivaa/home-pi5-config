@@ -51,9 +51,10 @@
 
 # -----------------------------------------------------------------------------
 # CO2 LEVEL ALERT
-# Trigger: CO2 level rises above 1200 ppm, OR on HA startup if already high
+# Trigger: CO2 level rises above 1200 ppm, OR every 30 min while high, OR on HA startup
 # Action: TTS announcement to ventilate
-# Cooldown: 10 minutes (prevents repeated announcements)
+# Cooldown: 30 minutes (prevents repeated announcements)
+# Quiet Hours: 07:00-23:00 only
 # -----------------------------------------------------------------------------
 - id: co2_high_alert
   alias: "CO2 High Level Alert"
@@ -67,6 +68,9 @@
     # Also trigger on HA startup to catch already-high levels
     - platform: homeassistant
       event: start
+    # Periodic check every 30 minutes while CO2 stays high
+    - platform: time_pattern
+      minutes: "/30"
 
   condition:
     # Verify CO2 is actually above threshold (needed for startup trigger)
@@ -77,10 +81,10 @@
     - condition: time
       after: "07:00:00"
       before: "23:00:00"
-    # 10-minute cooldown to prevent spam
+    # 30-minute cooldown to match periodic trigger
     - condition: template
       value_template: >
-        {{ (now() - state_attr('automation.co2_high_level_alert', 'last_triggered')).total_seconds() > 600
+        {{ (now() - state_attr('automation.co2_high_level_alert', 'last_triggered')).total_seconds() > 1800
            if state_attr('automation.co2_high_level_alert', 'last_triggered') is not none
            else true }}
 
@@ -101,19 +105,19 @@
 
 # -----------------------------------------------------------------------------
 # CO2 CRITICAL ALERT
-# Trigger: Every 5 minutes, checks if CO2 > 1600 ppm
+# Trigger: Every 10 minutes, checks if CO2 > 1600 ppm
 # Action: Urgent TTS announcement + mobile notification
 # NOTE: NO quiet hours - safety critical, runs 24/7
 # -----------------------------------------------------------------------------
 - id: co2_critical_alert
   alias: "CO2 Critical Level Alert"
-  description: "Checks every 5 minutes and announces if CO2 is dangerously high"
+  description: "Checks every 10 minutes and announces if CO2 is dangerously high"
   mode: single
 
   trigger:
-    # Check every 5 minutes
+    # Check every 10 minutes
     - platform: time_pattern
-      minutes: "/5"
+      minutes: "/10"
     # Also trigger immediately when crossing threshold
     - platform: numeric_state
       entity_id: sensor.hallway_co2_co2
@@ -623,7 +627,31 @@
       {% endif %}
       {{ running | join(', ') if running else 'None' }}
 
+  # Only proceed if at least one heater is running
+  condition:
+    - condition: template
+      value_template: >
+        {{ state_attr('climate.study_thermostat', 'hvac_action') == 'heating'
+           or state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating'
+           or state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating'
+           or state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' }}
+
   action:
+    # SAVE current heater states before turning off
+    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.study_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.living_inner_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.living_outer_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.bedroom_heater_was_on
+
+    # Turn off all heaters
     - service: climate.set_hvac_mode
       target:
         entity_id:
@@ -642,11 +670,7 @@
           - media_player.master_bedroom_clock
         message: >
           Warning! {{ door_name }} has been open for 2 minutes.
-          {% if heaters_running != 'None' %}
-            Turning off heaters: {{ heaters_running }}.
-          {% else %}
-            All heaters were already off.
-          {% endif %}
+          Turning off heaters: {{ heaters_running }}.
           Close all doors and windows to resume heating.
         language: "en"
 
@@ -655,11 +679,7 @@
         title: "🚪 Door Open 2min - Heaters Off"
         message: >
           {{ door_name }} has been open for 2 minutes.
-          {% if heaters_running != 'None' %}
-            Heaters turned off: {{ heaters_running }}.
-          {% else %}
-            All heaters were already off.
-          {% endif %}
+          Heaters turned off: {{ heaters_running }}.
         data:
           channel: "Critical"
           importance: max
@@ -718,7 +738,31 @@
       {% endif %}
       {{ running | join(', ') if running else 'None' }}
 
+  # Only proceed if at least one heater is running
+  condition:
+    - condition: template
+      value_template: >
+        {{ state_attr('climate.study_thermostat', 'hvac_action') == 'heating'
+           or state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating'
+           or state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating'
+           or state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' }}
+
   action:
+    # SAVE current heater states before turning off
+    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.study_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.living_inner_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.living_outer_heater_was_on
+    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+      target:
+        entity_id: input_boolean.bedroom_heater_was_on
+
+    # Turn off all heaters
     - service: climate.set_hvac_mode
       target:
         entity_id:
@@ -737,11 +781,7 @@
           - media_player.master_bedroom_clock
         message: >
           Warning! {{ window_name }} has been open for 30 seconds.
-          {% if heaters_running != 'None' %}
-            Turning off heaters: {{ heaters_running }}.
-          {% else %}
-            All heaters were already off.
-          {% endif %}
+          Turning off heaters: {{ heaters_running }}.
           Close all windows to resume heating.
         language: "en"
 
@@ -750,11 +790,7 @@
         title: "🪟 Window Open 30s - Heaters Off"
         message: >
           {{ window_name }} has been open for 30 seconds.
-          {% if heaters_running != 'None' %}
-            Heaters turned off: {{ heaters_running }}.
-          {% else %}
-            All heaters were already off.
-          {% endif %}
+          Heaters turned off: {{ heaters_running }}.
         data:
           channel: "Critical"
           importance: max
@@ -810,16 +846,48 @@
       entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
       state: "off"
 
+  variables:
+    heaters_restored: >
+      {% set restored = [] %}
+      {% if is_state('input_boolean.study_heater_was_on', 'on') %}
+        {% set restored = restored + ['Study'] %}
+      {% endif %}
+      {% if is_state('input_boolean.living_inner_heater_was_on', 'on') %}
+        {% set restored = restored + ['Living Inner'] %}
+      {% endif %}
+      {% if is_state('input_boolean.living_outer_heater_was_on', 'on') %}
+        {% set restored = restored + ['Living Outer'] %}
+      {% endif %}
+      {% if is_state('input_boolean.bedroom_heater_was_on', 'on') %}
+        {% set restored = restored + ['Bedroom'] %}
+      {% endif %}
+      {{ restored | join(', ') if restored else 'None' }}
+
   action:
+    # Only restore heaters that were ON before window opened
     - service: climate.set_hvac_mode
       target:
-        entity_id:
-          - climate.study_thermostat
-          - climate.living_thermostat_inner
-          - climate.living_thermostat_outer
-          - climate.bed_thermostat
+        entity_id: climate.study_thermostat
       data:
-        hvac_mode: "heat"
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.study_heater_was_on', 'on') else 'off' }}"
+
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.living_thermostat_inner
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_inner_heater_was_on', 'on') else 'off' }}"
+
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.living_thermostat_outer
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_outer_heater_was_on', 'on') else 'off' }}"
+
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.bed_thermostat
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
 
     - delay:
         seconds: 2
@@ -830,13 +898,25 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: "All windows are now closed. Heating has resumed."
+        message: >
+          All windows are now closed.
+          {% if heaters_restored != 'None' %}
+            Heating resumed for: {{ heaters_restored }}.
+          {% else %}
+            No heaters were running before, so none have been restored.
+          {% endif %}
         language: "en"
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "✅ All Windows Closed - Heating Resumed"
-        message: "All windows and doors are closed. All heaters have been turned back on."
+        title: "✅ All Windows Closed"
+        message: >
+          All windows and doors are closed.
+          {% if heaters_restored != 'None' %}
+            Heaters restored: {{ heaters_restored }}.
+          {% else %}
+            No heaters were running before window opened.
+          {% endif %}
         data:
           channel: "Info"
           importance: default
@@ -954,3 +1034,120 @@
               language: "en"
           - delay:
               minutes: 2
+
+# -----------------------------------------------------------------------------
+# PREVENT HEATING IF WINDOW OPEN
+# Trigger: Any thermostat enters "heating" state
+# Condition: At least one window/door is open
+# Action: Turn off that thermostat, warn user
+# Note: This prevents heaters from starting while windows are open
+# -----------------------------------------------------------------------------
+- id: prevent_heating_if_window_open
+  alias: "Prevent Heating If Window Open"
+  description: "When any heater starts heating, check if windows are open. If yes, turn it off."
+  mode: parallel
+  max: 4
+
+  trigger:
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: hvac_action
+      to: "heating"
+
+  condition:
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: binary_sensor.bath_window_contact_sensor_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.bed_window_contact_sensor_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.study_window_contact_sensor_large_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.study_window_contact_sensor_small_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.living_window_contact_sensor_window_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
+          state: "on"
+        - condition: state
+          entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+          state: "on"
+
+  variables:
+    heater_name: >
+      {% set names = {
+        'climate.study_thermostat': 'Study',
+        'climate.living_thermostat_inner': 'Living Inner',
+        'climate.living_thermostat_outer': 'Living Outer',
+        'climate.bed_thermostat': 'Bedroom'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+
+    open_windows: >
+      {% set open = [] %}
+      {% if is_state('binary_sensor.bath_window_contact_sensor_contact', 'on') %}
+        {% set open = open + ['Bathroom'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.bed_window_contact_sensor_contact', 'on') %}
+        {% set open = open + ['Bedroom'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.kitchen_window_contact_sensor_contact', 'on') %}
+        {% set open = open + ['Kitchen'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.study_window_contact_sensor_large_contact', 'on') %}
+        {% set open = open + ['Study Large'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.study_window_contact_sensor_small_contact', 'on') %}
+        {% set open = open + ['Study Small'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.living_window_contact_sensor_window_contact', 'on') %}
+        {% set open = open + ['Living Window'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.living_window_contact_sensor_balcony_door_contact', 'on') %}
+        {% set open = open + ['Balcony Door'] %}
+      {% endif %}
+      {% if is_state('binary_sensor.hallway_window_contact_sensor_main_door_contact', 'on') %}
+        {% set open = open + ['Main Door'] %}
+      {% endif %}
+      {{ open | join(', ') }}
+
+  action:
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: "{{ trigger.entity_id }}"
+      data:
+        hvac_mode: "off"
+
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: >
+          {{ heater_name }} heater cannot start. Windows are open: {{ open_windows }}.
+          Please close all windows first.
+        language: "en"
+
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚫 Heater Blocked - Windows Open"
+        message: >
+          {{ heater_name }} tried to start heating, but blocked because windows are open: {{ open_windows }}.
+        data:
+          channel: "Critical"
+          importance: high
+          tag: "heater_blocked_windows"

@@ -252,6 +252,24 @@ weather:
     longitude: 13.2599
 
 # =============================================================================
+# INPUT BOOLEANS - State Memory for Automations
+# Purpose: Remember heater states before window-triggered shutoff
+# =============================================================================
+input_boolean:
+  study_heater_was_on:
+    name: Study Heater Was On
+    initial: off
+  living_inner_heater_was_on:
+    name: Living Inner Heater Was On
+    initial: off
+  living_outer_heater_was_on:
+    name: Living Outer Heater Was On
+    initial: off
+  bedroom_heater_was_on:
+    name: Bedroom Heater Was On
+    initial: off
+
+# =============================================================================
 # AUTOMATIONS
 # Purpose: Event-driven actions for smart home
 # =============================================================================
