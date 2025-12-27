@@ -281,6 +281,12 @@
     /* ========================================
        MAIN CONTENT
        ======================================== */
+    .app-body {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
     .app-main {
       flex: 1;
       overflow-y: auto;
@@ -289,6 +295,142 @@
     .view-container {
       max-width: 1400px;
       margin: 0 auto;
+    }
+
+    /* ========================================
+       OVERVIEW PANEL (Right Sidebar)
+       ======================================== */
+    .overview-panel {
+      width: 260px;
+      background: var(--color-surface);
+      border-left: 1px solid var(--color-border);
+      overflow-y: auto;
+      flex-shrink: 0;
+      transition: width 0.2s ease, opacity 0.2s ease;
+    }
+
+    .overview-panel.collapsed {
+      width: 0;
+      opacity: 0;
+      overflow: hidden;
+      border-left: none;
+    }
+
+    .panel-content {
+      padding: var(--space-md);
+    }
+
+    .panel-section {
+      margin-bottom: var(--space-lg);
+    }
+
+    .panel-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .panel-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-text-tertiary);
+      letter-spacing: 1px;
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .panel-metric {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-sm) 0;
+    }
+
+    .panel-icon {
+      font-size: 22px;
+      width: 28px;
+      text-align: center;
+    }
+
+    .panel-value {
+      font-size: 24px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .panel-room-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-xs) 0;
+      font-size: 13px;
+    }
+
+    .panel-room-icon {
+      width: 20px;
+      text-align: center;
+    }
+
+    .panel-room-name {
+      flex: 1;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .panel-room-temp {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Heating status highlight */
+    .panel-room-row.heating-active {
+      color: var(--color-danger);
+    }
+
+    .panel-room-row.heating-active .panel-room-temp {
+      color: var(--color-danger);
+    }
+
+    /* Contact sensor open state */
+    .panel-room-row.contact-open {
+      color: var(--color-warning);
+    }
+
+    .panel-room-row.contact-open .panel-room-temp {
+      color: var(--color-warning);
+    }
+
+    /* Panel toggle button in header */
+    .panel-toggle {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: var(--space-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .panel-toggle:hover {
+      background: var(--color-text-tertiary);
+      color: white;
+    }
+
+    /* Hide panel on smaller screens */
+    @media (max-width: 1200px) {
+      .overview-panel {
+        display: none;
+      }
+      .panel-toggle {
+        display: none;
+      }
     }
 
     /* ========================================
@@ -334,5 +476,85 @@
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
+    }
+
+    /* ========================================
+       THEME TOGGLE
+       ======================================== */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--color-bg);
+      padding: 2px;
+      border-radius: var(--radius-full);
+      margin-left: var(--space-md);
+      border: 1px solid var(--color-border);
+    }
+
+    .theme-toggle-label {
+      font-size: var(--font-size-xs);
+      font-weight: var(--font-weight-medium);
+      color: var(--color-text-secondary);
+      padding: 0 var(--space-sm);
+      white-space: nowrap;
+    }
+
+    .theme-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--color-text-tertiary);
+      transition: all var(--transition-fast);
+    }
+
+    .theme-toggle-btn:hover {
+      color: var(--color-text);
+    }
+
+    .theme-toggle-btn.active {
+      background: var(--color-surface);
+      color: var(--color-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Dark mode: active button stands out more */
+    [data-theme="dark"] .theme-toggle-btn.active {
+      background: var(--color-border);
+    }
+
+    /* Responsive: smaller on tablets, hide label */
+    @media (max-width: 900px) {
+      .theme-toggle {
+        margin-left: var(--space-sm);
+      }
+      .theme-toggle-label {
+        display: none;
+      }
+      .theme-toggle-btn {
+        width: 24px;
+        height: 20px;
+        font-size: 12px;
+      }
+    }
+
+    /* Responsive: show compact toggle on mobile */
+    @media (max-width: 600px) {
+      .theme-toggle {
+        margin-left: var(--space-xs);
+        padding: 1px;
+      }
+      .theme-toggle-btn {
+        width: 22px;
+        height: 18px;
+        font-size: 11px;
+      }
     }
 

@@ -256,6 +256,7 @@
 
           <!-- Theme Toggle: Light / Dark / System -->
           <div class="theme-toggle">
+            <span class="theme-toggle-label">Theme</span>
             <button class="theme-toggle-btn"
                     :class="{ active: $store.theme.preference === 'light' }"
                     @click="$store.theme.setPreference('light')"
@@ -2102,42 +2103,39 @@
         <div class="panel-section">
           <div class="panel-section-title">ROOMS</div>
           <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
-            <div class="panel-room-row">
-              <span class="panel-room-icon" x-text="room.icon"></span>
-              <span class="panel-room-name" x-text="room.name"></span>
-              <span class="panel-room-temp" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
+            <div class="panel-metric">
+              <span class="panel-icon" x-text="room.icon"></span>
+              <span class="panel-value" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
             </div>
           </template>
         </div>
 
-        <!-- Section: Heating -->
+        <!-- Section: Heating (only active heaters) -->
         <div class="panel-section">
           <div class="panel-section-title">HEATING</div>
           <div class="panel-metric">
-            <span class="panel-icon">🔥</span>
-            <span class="panel-value" x-text="($store.thermostats?.activeHeatingCount || 0) + '/' + ($store.thermostats?.list?.length || 0)"></span>
+            <span class="panel-icon" x-text="($store.thermostats?.activeHeatingCount || 0) > 0 ? '🔥' : '❄️'"></span>
+            <span class="panel-value" x-text="($store.thermostats?.activeHeatingCount || 0) === 0 ? 'All off' : ($store.thermostats?.activeHeatingCount + ' heating')"></span>
           </div>
-          <template x-for="trv in ($store.thermostats?.list || [])" :key="trv.id">
-            <div class="panel-room-row" :class="{ 'heating-active': trv.runningState === 'heat' }">
-              <span class="panel-room-icon" x-text="trv.runningState === 'heat' ? '🔥' : '❄️'"></span>
-              <span class="panel-room-name" x-text="trv.name"></span>
-              <span class="panel-room-temp" x-text="(trv.localTemp?.toFixed(1) || '--') + '°'"></span>
+          <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
+            <div class="panel-metric heating-active">
+              <span class="panel-icon" x-text="trv.icon || '🔥'"></span>
+              <span class="panel-value" x-text="(trv.localTemp?.toFixed(1) || '--') + '° → ' + (trv.targetTemp || '--') + '°'"></span>
             </div>
           </template>
         </div>
 
-        <!-- Section: Security (Windows/Doors) -->
+        <!-- Section: Security (only open windows/doors) -->
         <div class="panel-section">
           <div class="panel-section-title">SECURITY</div>
           <div class="panel-metric">
-            <span class="panel-icon">🪟</span>
+            <span class="panel-icon" x-text="getOpenContactCount() === 0 ? '🔒' : '🔓'"></span>
             <span class="panel-value" x-text="getOpenContactCount() === 0 ? '✓' : getOpenContactCount()"></span>
           </div>
-          <template x-for="sensor in ($store.sensors?.sensorsByType?.contact || [])" :key="sensor.ieee_address">
-            <div class="panel-room-row" :class="{ 'contact-open': $store.sensors?.liveData?.[sensor.ieee_address]?.contact === false }">
-              <span class="panel-room-icon" x-text="$store.sensors?.liveData?.[sensor.ieee_address]?.contact === false ? '🔓' : '🔒'"></span>
-              <span class="panel-room-name" x-text="sensor.friendly_name.replace(/\[|\]/g, '').trim()"></span>
-              <span class="panel-room-temp" x-text="$store.sensors?.liveData?.[sensor.ieee_address]?.contact === false ? 'Open' : 'Closed'"></span>
+          <template x-for="sensor in ($store.sensors?.sensorsByType?.contact || []).filter(s => $store.sensors?.liveData?.[s.ieee_address]?.contact === false)" :key="sensor.ieee_address">
+            <div class="panel-metric contact-open">
+              <span class="panel-icon">🔓</span>
+              <span class="panel-value" x-text="sensor.friendly_name.replace(/\[|\]/g, '').trim()"></span>
             </div>
           </template>
         </div>
