@@ -235,27 +235,26 @@
             </template>
           </div>
 
-          <!-- Theme Toggle: Light / Dark / System -->
-          <div class="theme-toggle" x-data>
-            <span class="theme-toggle-label">Theme</span>
-            <button class="theme-toggle-btn"
-                    :class="{ active: $store.theme.preference === 'light' }"
-                    @click="$store.theme.setPreference('light')"
-                    title="Light mode">☀️</button>
-            <button class="theme-toggle-btn"
-                    :class="{ active: $store.theme.preference === 'dark' }"
-                    @click="$store.theme.setPreference('dark')"
-                    title="Dark mode">🌙</button>
-            <button class="theme-toggle-btn"
-                    :class="{ active: $store.theme.preference === 'system' }"
-                    @click="$store.theme.setPreference('system')"
-                    title="System preference">⚙️</button>
-          </div>
         </div>
 
-        <!-- Right: Date/Time -->
+        <!-- Right: Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
+            <!-- Theme Toggle -->
+            <div class="theme-toggle" x-data>
+              <button class="theme-toggle-btn"
+                      :class="{ active: $store.theme.preference === 'light' }"
+                      @click="$store.theme.setPreference('light')"
+                      title="Light mode">☀️</button>
+              <button class="theme-toggle-btn"
+                      :class="{ active: $store.theme.preference === 'dark' }"
+                      @click="$store.theme.setPreference('dark')"
+                      title="Dark mode">🌙</button>
+              <button class="theme-toggle-btn"
+                      :class="{ active: $store.theme.preference === 'system' }"
+                      @click="$store.theme.setPreference('system')"
+                      title="System preference">⚙️</button>
+            </div>
             <div class="date-time" x-text="currentDateTime"></div>
             <button class="panel-toggle"
                     @click="togglePanel()"
@@ -792,10 +791,12 @@
                     <div class="avg-temp-display">
                       <span x-text="room.avgTemperature != null ? room.avgTemperature.toFixed(1) : (room.temperature != null ? room.temperature.toFixed(1) : '--')"></span>
                       <span class="avg-unit">°C</span>
+                      <span class="trend-indicator" :class="'trend-' + $store.rooms.getTempTrend(room)" x-text="$store.rooms.getTempTrend(room) === 'rising' ? '▲' : ($store.rooms.getTempTrend(room) === 'falling' ? '▼' : '')"></span>
                     </div>
                     <div class="avg-humid-display">
                       <span class="humid-icon">💧</span>
                       <span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '--%')"></span>
+                      <span class="trend-indicator" :class="'trend-' + $store.rooms.getHumidTrend(room)" x-text="$store.rooms.getHumidTrend(room) === 'rising' ? '▲' : ($store.rooms.getHumidTrend(room) === 'falling' ? '▼' : '')"></span>
                     </div>
                   </div>
 

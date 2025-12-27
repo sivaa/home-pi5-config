@@ -488,16 +488,8 @@
       background: var(--color-bg);
       padding: 2px;
       border-radius: var(--radius-full);
-      margin-left: var(--space-md);
+      margin-right: var(--space-sm);
       border: 1px solid var(--color-border);
-    }
-
-    .theme-toggle-label {
-      font-size: var(--font-size-xs);
-      font-weight: var(--font-weight-medium);
-      color: var(--color-text-secondary);
-      padding: 0 var(--space-sm);
-      white-space: nowrap;
     }
 
     .theme-toggle-btn {
@@ -530,14 +522,8 @@
       background: var(--color-border);
     }
 
-    /* Responsive: smaller on tablets, hide label */
+    /* Responsive: smaller on tablets */
     @media (max-width: 900px) {
-      .theme-toggle {
-        margin-left: var(--space-sm);
-      }
-      .theme-toggle-label {
-        display: none;
-      }
       .theme-toggle-btn {
         width: 24px;
         height: 20px;
@@ -545,16 +531,16 @@
       }
     }
 
-    /* Responsive: show compact toggle on mobile */
+    /* Responsive: compact toggle on mobile */
     @media (max-width: 600px) {
       .theme-toggle {
-        margin-left: var(--space-xs);
         padding: 1px;
+        margin-right: var(--space-xs);
       }
       .theme-toggle-btn {
-        width: 22px;
-        height: 18px;
-        font-size: 11px;
+        width: 20px;
+        height: 16px;
+        font-size: 10px;
       }
     }
 
