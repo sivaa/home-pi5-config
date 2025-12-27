@@ -787,13 +787,13 @@
                 - media_player.master_bedroom_clock
               message: >
                 Attention! The main door has been open for more than 3 minutes.
-                Please close the main door. Heating is disabled until all doors and windows are closed.
+                Please close the main door.
               language: "en"
 
           - service: notify.mobile_app_22111317pg
             data:
               title: "🚪 Main Door Still Open!"
-              message: "The main door has been open for more than 3 minutes. Heaters are off."
+              message: "The main door has been open for more than 3 minutes. Please close it."
               data:
                 channel: "Critical"
                 importance: max
