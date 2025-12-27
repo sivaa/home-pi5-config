@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** December 19, 2025
+> **Last Updated:** December 27, 2025
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -68,6 +68,8 @@
 | 12 | [Pi Maintenance](docs/12-pi-maintenance.md) | Daily 4:30 AM reboot for unattended reliability |
 | 13 | [Browser Setup](docs/13-browser-setup.md) | Replaced Chromium with lightweight Epiphany |
 | 14 | [Brightness Control](docs/14-brightness-control.md) | Adaptive DDC/CI dimming (80% wake, 25% idle) |
+| 15 | [HA Automations](docs/15-ha-automations.md) | Home Assistant automation configurations |
+| 16 | [Touch Monitor](docs/16-touch-monitor.md) | Touch gestures (scroll, pinch-zoom) setup |
 
 ---
 
@@ -96,6 +98,7 @@
 | `homeassistant/SERVICE_ACCOUNT.json` | GCP credentials (gitignored) | `/opt/homeassistant/` |
 | `cloudflared/config.yml` | Cloudflare tunnel config | `/etc/cloudflared/` |
 | `display-scheduler/*` | Display power management | `~/.config/systemd/user/` + `~/.local/bin/` |
+| `labwc/rc.xml` | Touch gestures config | `~/.config/labwc/` |
 
 ### Sensitive Files (Not in Git)
 
@@ -186,6 +189,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-27 | Enabled touch gestures (scroll, pinch-zoom) by disabling labwc mouse emulation |
 | 2025-12-19 | Added adaptive brightness control (DDC/CI): 80% on wake, dims 10%/min to 25% idle |
 | 2025-12-19 | Replaced Chromium with Epiphany browser (440 MB → 60 MB, fixed infinite loading) |
 | 2025-12-18 | Added daily Pi reboot at 4:30 AM for unattended reliability |
@@ -221,6 +225,8 @@ pi-setup/
 │   │   ├── brightness-dimmer.sh
 │   │   ├── input-wake-monitor.sh
 │   │   └── *.service/*.timer files
+│   ├── labwc/             <- Wayland compositor config
+│   │   └── rc.xml         <- Touch gestures (mouseEmulation=no)
 │   └── pi-reboot/         <- Daily Pi reboot (4:30 AM)
 │       ├── daily-reboot.timer
 │       └── daily-reboot.service
@@ -238,7 +244,9 @@ pi-setup/
 │   ├── 11-onscreen-keyboard.md
 │   ├── 12-pi-maintenance.md
 │   ├── 13-browser-setup.md
-│   └── 14-brightness-control.md
+│   ├── 14-brightness-control.md
+│   ├── 15-ha-automations.md
+│   └── 16-touch-monitor.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
