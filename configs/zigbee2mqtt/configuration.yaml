@@ -81,6 +81,18 @@ devices:
     friendly_name: '[Bath] Window Contact Sensor'
   '0xc4d8c8fffe0f7eab':
     friendly_name: '[Bed] Window Contact Sensor'
+  '0x983268fffe608ed9':
+    friendly_name: '[Kitchen] Window Contact Sensor'
+  '0xe456acfffe55ffb3':
+    friendly_name: '[Study] Window Contact Sensor - Large'
+  '0x983268fffe9be51b':
+    friendly_name: '[Study] Window Contact Sensor - Small'
+  '0x983268fffe9beede':
+    friendly_name: '[Living] Window Contact Sensor - Balcony Door'
+  '0x8c73dafffecacc18':
+    friendly_name: '[Living] Window Contact Sensor - Window'
+  '0x983268fffe653343':
+    friendly_name: '[Hallway] Window Contact Sensor - Main Door'
   # Thermostats (TRVZB)
   '0xc4d8c8fffe02cef8':
     friendly_name: '[Study] Thermostat'

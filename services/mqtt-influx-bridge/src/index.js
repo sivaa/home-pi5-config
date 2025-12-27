@@ -29,7 +29,8 @@ const influx = new Influx.InfluxDB({
         'device_name',
         'device_type',
         'room',
-        'event_type'
+        'event_type',
+        'source'  // Track where the change came from (Dashboard, External)
       ]
     }
   ]
@@ -56,15 +57,27 @@ const client = mqtt.connect(CONFIG.mqtt.url, {
 
 client.on('connect', () => {
   console.log('Connected to MQTT broker');
-  console.log(`Subscribing to ${CONFIG.mqtt.topic}...`);
 
+  // Subscribe to Zigbee events
+  console.log(`Subscribing to ${CONFIG.mqtt.topic}...`);
   client.subscribe(CONFIG.mqtt.topic, { qos: 0 }, (err) => {
     if (err) {
-      console.error('Subscribe error:', err);
+      console.error('Subscribe error (zigbee):', err);
     } else {
-      console.log('Subscribed successfully');
+      console.log('Subscribed to Zigbee events');
+    }
+  });
+
+  // Subscribe to Dashboard audit events (for source tracking)
+  const auditTopic = 'dashboard/audit/#';
+  console.log(`Subscribing to ${auditTopic}...`);
+  client.subscribe(auditTopic, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Subscribe error (audit):', err);
+    } else {
+      console.log('Subscribed to Dashboard audit events');
       console.log('');
-      console.log('Listening for Zigbee events...');
+      console.log('Listening for Zigbee and audit events...');
       console.log('─'.repeat(60));
     }
   });
@@ -85,7 +98,13 @@ client.on('message', async (topic, message) => {
       payload = messageStr;
     }
 
-    // Process message into events
+    // Route audit messages to audit processor (for source tracking)
+    if (topic.startsWith('dashboard/audit/')) {
+      processor.processAuditMessage(topic, payload);
+      return;  // Audit messages don't generate events
+    }
+
+    // Process Zigbee message into events
     const events = processor.processMessage(topic, payload);
 
     if (events.length > 0) {

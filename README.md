@@ -39,11 +39,12 @@
 │    MQTT Broker:   mqtt://pi:1883 (WS: 9001)                 │
 │    Cloudflared:   Tunnel to ha.sivaa.in                     │
 ├─────────────────────────────────────────────────────────────┤
-│  Zigbee Devices: 15 total                                   │
-│    Sensors: 9 (6x temp/humidity, 1x CO2, 1x PIR, 1x contact)│
+│  Zigbee Devices: 35 total                                   │
+│    Sensors: 23 (12x temp, 1x CO2, 1x PIR, 8x contact, 1x vib)│
+│    Thermostats: 4 (SONOFF TRVZB radiator valves)            │
 │    Lights:  2 (IKEA FLOALT panels)                          │
 │    Remotes: 2 (IKEA TRADFRI)                                │
-│    Plugs:   1 (SONOFF smart plug w/ energy monitor)         │
+│    Plugs:   3 (SONOFF S60ZBTPF smart plugs)                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 

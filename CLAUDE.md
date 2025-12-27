@@ -59,13 +59,15 @@ pi-setup/
 - **Hardware:**
   - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
   - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
-- **Zigbee Devices:** 29 total (including coordinator)
+- **Zigbee Devices:** 35 total (including coordinator)
   - 12x Temperature sensors (SNZB-02P, SNZB-02WD)
+  - 8x Window/door contact sensors (SNZB-04P)
   - 4x Thermostats (TRVZB radiator valves)
-  - 2x IKEA FLOALT lights + 2x remotes
   - 3x Smart plugs (S60ZBTPF)
-  - 2x Window contact sensors (SNZB-04P)
-  - CO2 sensor, motion sensor, vibration sensor
+  - 2x IKEA FLOALT lights + 2x remotes
+  - 1x CO2 sensor (NOUS E10)
+  - 1x Motion sensor (SNZB-03P) - Mailbox
+  - 1x Vibration sensor (unused)
 - **Docker Services:** 5 containers
   - mosquitto (MQTT), zigbee2mqtt, homeassistant
   - influxdb, dashboard (nginx)

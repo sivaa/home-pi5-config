@@ -211,42 +211,43 @@ export const THERMOSTAT_EVENT_TYPES = {
   }
 };
 
-// Floor plan configuration for 3D view - exact apartment dimensions
+// Floor plan configuration - exact dimensions from floor map (mirrored layout)
 export const FLOOR_PLAN_CONFIG = {
   apartmentWidth: 9.239,
-  apartmentDepth: 7.665,
+  apartmentDepth: 6.665,  // Reduced from 7.665 (south wall moved 1.0m north)
   wallHeight: 2.0,
   wallThickness: 0.15,
+  // Room positions are center coordinates (mirrored layout)
   rooms: [
-    { id: 'study', name: 'Study', icon: '📚', x: 2.4425, z: 1.8485, width: 4.885, depth: 3.697, color: 0x60a5fa, labelY: 3 },
-    { id: 'living', name: 'Living Room', icon: '🛋️', x: 2.954, z: 5.681, width: 5.908, depth: 3.968, color: 0x34d399, labelY: 3 },
-    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', x: 6.9945, z: 5.976, width: 4.489, depth: 3.378, color: 0xfbbf24, labelY: 4 },
-    { id: 'kitchen', name: 'Kitchen', icon: '🍳', x: 7.5735, z: 3.218, width: 3.331, depth: 2.138, color: 0xf87171, labelY: 3 },
-    { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 7.664, z: 0.712, width: 3.15, depth: 1.424, color: 0xa78bfa, labelY: 2 }
+    { id: 'study', name: 'Study', icon: '📚', x: 7.285, z: 1.8485, width: 3.908, depth: 3.697, color: 0x60a5fa, labelY: 3 },
+    { id: 'living', name: 'Living Room', icon: '🛋️', x: 6.864, z: 5.181, width: 4.750, depth: 2.968, color: 0x34d399, labelY: 3 },
+    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', x: 2.2445, z: 5.476, width: 4.489, depth: 2.378, color: 0xfbbf24, labelY: 4 },
+    { id: 'kitchen', name: 'Kitchen', icon: '🍳', x: 1.6655, z: 2.8957, width: 3.331, depth: 2.7827, color: 0xf87171, labelY: 3 },
+    { id: 'bathroom', name: 'Bathroom', icon: '🚿', x: 1.6985, z: 0.7522, width: 3.397, depth: 1.5043, color: 0xa78bfa, labelY: 2 }
   ],
-  balcony: { x: -0.525, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
+  balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
+  hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
   balconyNotch: {
-    width: 1.5,    // Cut-out width from west wall (x=0 to x=1.5)
-    depth: 1.5,    // Cut-out depth from south edge (z=7.665 back to z=6.165)
+    width: 1.0,    // Cut-out width
+    depth: 1.5,    // Cut-out depth (increased to make balcony bigger)
     hasRailing: true,
-    floorColor: 0x8B0000  // Blood red for high visibility
+    floorColor: 0xC0C0C2  // Match base floor
   },
-  hallway: { x: 5.4, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
   doors: [
-    { x: 0, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at west wall)
-    { x: 5.533, z: 3.697, rotation: 0, swingDirection: 'south' },           // Living ↔ Hallway
-    { x: 4.885, z: 1.848, rotation: Math.PI/2, swingDirection: 'east' },    // Study ↔ Hallway
-    { x: 6.105, z: 3.697, rotation: 0, swingDirection: 'south' },           // Bedroom ↔ Hallway
-    { x: 5.908, z: 2.818, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Kitchen
-    { x: 5.908, z: 1.338, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Bathroom
-    { x: 9.239, z: 4.8, rotation: Math.PI/2, type: 'entry', swingDirection: 'west' }  // Main entry door (east wall)
+    { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at east wall)
+    { x: 3.706, z: 3.697, rotation: 0, swingDirection: 'south' },           // Living ↔ Hallway
+    { x: 4.354, z: 1.848, rotation: Math.PI/2, swingDirection: 'east' },    // Study ↔ Hallway
+    { x: 3.134, z: 3.697, rotation: 0, swingDirection: 'south' },           // Bedroom ↔ Hallway
+    { x: 3.331, z: 2.818, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Kitchen
+    { x: 3.331, z: 1.338, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Bathroom
+    { x: 0, z: 4.8, rotation: Math.PI/2, type: 'entry', swingDirection: 'east' }  // Main entry door (west wall in mirrored layout)
   ],
   windows: [
-    { x: 0, z: 1.848, rotation: Math.PI/2, size: 2.5 },       // Study left
-    { x: 0, z: 5.681, rotation: Math.PI/2, size: 2.5 },       // Living left
-    { x: 9.239, z: 5.976, rotation: Math.PI/2, size: 2.5 },   // Bedroom right
-    { x: 9.239, z: 3.218, rotation: Math.PI/2, size: 1.8 },   // Kitchen right
-    { x: 9.239, z: 1.487, rotation: Math.PI/2, size: 1.2 }    // Bathroom right
+    { x: 9.239, z: 1.848, rotation: Math.PI/2, size: 2.5 },   // Study right (mirrored)
+    { x: 9.239, z: 4.2, rotation: Math.PI/2, size: 2.5 },     // Living right (east wall)
+    { x: 0, z: 5.976, rotation: Math.PI/2, size: 2.5 },       // Bedroom left (mirrored)
+    { x: 0, z: 3.218, rotation: Math.PI/2, size: 1.8 },       // Kitchen left (mirrored)
+    { x: 0, z: 1.487, rotation: Math.PI/2, size: 1.2 }        // Bathroom left (mirrored)
   ],
   furniture: [
     { type: 'bed', room: 'bedroom', width: 1.8, depth: 2.0, height: 0.6 }

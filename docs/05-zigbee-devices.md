@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** December 19, 2025
-> **Total Devices:** 29 (including coordinator)
+> **Last Updated:** December 27, 2025
+> **Total Devices:** 35 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -24,7 +24,7 @@
 │┌─▼──┐ ┌───▼───┐ ┌───▼───┐ ┌──▼──┐ ┌──▼──┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐│  │
 ││IKEA│ │SONOFF │ │ NOUS  │ │ PIR │ │Door │ │ Plug  │ │SONOFF │ │ IKEA  ││  │
 ││Lite│ │ Temp  │ │  E10  │ │ Mtn │ │ Cnt │ │ S60ZB │ │ TRVZB │ │Remote ││  │
-││(2x)│ │ (12x) │ │  CO2  │ │     │ │(2x) │ │ (3x)  │ │ (4x)  │ │ (2x)  ││  │
+││(2x)│ │ (12x) │ │  CO2  │ │     │ │(8x) │ │ (3x)  │ │ (4x)  │ │ (2x)  ││  │
 │└────┘ └───────┘ └───────┘ └─────┘ └─────┘ └───────┘ └───────┘ └───────┘│  │
 │                                                                              │
 │      Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox    │
@@ -67,6 +67,12 @@
 | 26 | Bed | [Bed] Thermostat | TRVZB | SONOFF | Radiator Valve |
 | 27 | Living | [Living] Thermostat Inner | TRVZB | SONOFF | Radiator Valve |
 | 28 | Living | [Living] Thermostat Outer | TRVZB | SONOFF | Radiator Valve |
+| 29 | Kitchen | [Kitchen] Window Contact Sensor | SNZB-04P | SONOFF | Door/Window Sensor |
+| 30 | Study | [Study] Window Contact Sensor - Large | SNZB-04P | SONOFF | Door/Window Sensor |
+| 31 | Study | [Study] Window Contact Sensor - Small | SNZB-04P | SONOFF | Door/Window Sensor |
+| 32 | Living | [Living] Window Contact Sensor - Balcony Door | SNZB-04P | SONOFF | Door/Window Sensor |
+| 33 | Living | [Living] Window Contact Sensor - Window | SNZB-04P | SONOFF | Door/Window Sensor |
+| 34 | Hallway | [Hallway] Window Contact Sensor - Main Door | SNZB-04P | SONOFF | Door/Window Sensor |
 
 ---
 
@@ -522,6 +528,12 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF SNZB-03P Mailbox Motion Sensor                │
 │    [ ] SONOFF SNZB-04P Bath Window Contact                  │
 │    [ ] SONOFF SNZB-04P Bed Window Contact                   │
+│    [ ] SONOFF SNZB-04P Kitchen Window Contact               │
+│    [ ] SONOFF SNZB-04P Study Window Contact - Large         │
+│    [ ] SONOFF SNZB-04P Study Window Contact - Small         │
+│    [ ] SONOFF SNZB-04P Living Window Contact - Balcony Door │
+│    [ ] SONOFF SNZB-04P Living Window Contact - Window       │
+│    [ ] SONOFF SNZB-04P Hallway Window Contact - Main Door   │
 │    [ ] SONOFF TRVZB Study Thermostat                        │
 │    [ ] SONOFF TRVZB Bed Thermostat                          │
 │    [ ] SONOFF TRVZB Living Thermostat Inner                 │
@@ -630,6 +642,8 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2025-12-27 | Added 6x SNZB-04P contact sensors (Kitchen, Study×2, Living×2, Hallway Main Door) |
+| 2025-12-27 | Updated device count: 29 → 35 devices |
 | 2025-12-20 | Re-paired IKEA lights and remotes after network issues |
 | 2025-12-20 | Set up direct Zigbee bindings: remotes → lights (genOnOff + genLevelCtrl) |
 | 2025-12-20 | Added Direct Device Binding section with commands |

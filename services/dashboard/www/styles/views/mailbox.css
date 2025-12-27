@@ -1,6 +1,6 @@
 /* ========================================
    MAILBOX MONITOR VIEW
-   Dedicated dashboard for mailbox vibration sensor
+   Dedicated dashboard for mailbox motion sensor
    ======================================== */
 
 /* ---------- Color Tokens ---------- */
@@ -457,11 +457,11 @@
   flex-shrink: 0;
 }
 
-.mailbox-event-icon.vibration-detected {
+.mailbox-event-icon.motion_detected {
   background: rgba(139, 92, 246, 0.1);
 }
 
-.mailbox-event-icon.vibration-cleared {
+.mailbox-event-icon.motion_cleared {
   background: rgba(148, 163, 184, 0.1);
 }
 

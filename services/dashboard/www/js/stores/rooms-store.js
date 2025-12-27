@@ -51,25 +51,34 @@ export function initRoomsStore(Alpine, CONFIG) {
       return this.list.reduce((sum, r) => sum + r.tempHistory.length + r.humidHistory.length, 0);
     },
 
-    // Computed: Home-wide average temperature
+    // Computed: Indoor rooms only (excludes outdoor rooms like balcony)
+    get indoorRooms() {
+      return this.list.filter(r => !r.isOutdoor);
+    },
+
+    // Computed: Home-wide average temperature (indoor rooms only)
     get avgTemperature() {
-      const temps = this.list.filter(r => r.avgTemperature != null).map(r => r.avgTemperature);
+      const temps = this.indoorRooms
+        .filter(r => r.avgTemperature != null)
+        .map(r => r.avgTemperature);
       if (temps.length === 0) return null;
       return temps.reduce((a, b) => a + b, 0) / temps.length;
     },
 
-    // Computed: Home-wide average humidity
+    // Computed: Home-wide average humidity (indoor rooms only)
     get avgHumidity() {
-      const humids = this.list.filter(r => r.avgHumidity != null).map(r => r.avgHumidity);
+      const humids = this.indoorRooms
+        .filter(r => r.avgHumidity != null)
+        .map(r => r.avgHumidity);
       if (humids.length === 0) return null;
       return humids.reduce((a, b) => a + b, 0) / humids.length;
     },
 
-    // Computed: Combined temperature history for home average sparkline
+    // Computed: Combined temperature history for home average sparkline (indoor rooms only)
     get avgHistory() {
-      // Combine all room histories and compute average at each time point
+      // Combine all indoor room histories and compute average at each time point
       const allPoints = [];
-      this.list.forEach(room => {
+      this.indoorRooms.forEach(room => {
         room.tempHistory.forEach(p => allPoints.push(p));
       });
       if (allPoints.length === 0) return [];

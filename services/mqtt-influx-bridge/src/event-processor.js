@@ -6,6 +6,57 @@ export class EventProcessor {
     this.lastEvents = new Map();
     // Track last values for change detection
     this.lastValues = new Map();
+    // Track pending audit info (source tracking)
+    // Key: device name, Value: { source, action, timestamp }
+    this.pendingAudits = new Map();
+    // Audit timeout (ms) - how long to remember audit info
+    this.auditTimeoutMs = 5000;
+  }
+
+  /**
+   * Process an audit message from dashboard
+   * @param {string} topic - Audit topic (dashboard/audit/thermostat)
+   * @param {object} payload - Audit payload with source info
+   */
+  processAuditMessage(topic, payload) {
+    if (!payload.device || !payload.source) {
+      return [];
+    }
+
+    // Store audit info for this device
+    this.pendingAudits.set(payload.device, {
+      source: payload.source,
+      action: payload.action,
+      timestamp: payload.timestamp || Date.now(),
+      payload: payload.payload
+    });
+
+    console.log(`[audit] Stored pending audit for ${payload.device}: source=${payload.source}`);
+
+    // Clean up old audits after timeout
+    setTimeout(() => {
+      const audit = this.pendingAudits.get(payload.device);
+      if (audit && audit.timestamp === payload.timestamp) {
+        this.pendingAudits.delete(payload.device);
+        console.log(`[audit] Expired audit for ${payload.device}`);
+      }
+    }, this.auditTimeoutMs);
+
+    return [];  // Audit messages don't generate events themselves
+  }
+
+  /**
+   * Get and consume pending audit info for a device
+   * @param {string} deviceName - Device name
+   * @returns {object|null} Audit info or null
+   */
+  consumeAudit(deviceName) {
+    const audit = this.pendingAudits.get(deviceName);
+    if (audit) {
+      this.pendingAudits.delete(deviceName);
+      return audit;
+    }
+    return null;
   }
 
   /**
@@ -95,13 +146,18 @@ export class EventProcessor {
     // Update last event time
     this.lastEvents.set(debounceKey, timestamp);
 
+    // Check for pending audit (source tracking)
+    const audit = this.consumeAudit(deviceName);
+    const source = audit?.source || 'External';
+
     return {
       measurement: 'zigbee_events',
       tags: {
         device_name: deviceName,
         device_type: mapping.deviceType,
         room: room,
-        event_type: mapping.getEvent(value)
+        event_type: mapping.getEvent(value),
+        source: source
       },
       fields: {
         value: typeof value === 'boolean' ? (value ? 1 : 0) : (typeof value === 'number' ? value : 0),
@@ -143,13 +199,18 @@ export class EventProcessor {
     this.lastEvents.set(debounceKey, timestamp);
     this.lastValues.set(debounceKey, state);
 
+    // Check for pending audit (source tracking)
+    const audit = this.consumeAudit(deviceName);
+    const source = audit?.source || 'External';
+
     return {
       measurement: 'zigbee_events',
       tags: {
         device_name: deviceName,
         device_type: deviceType,
         room: room,
-        event_type: eventType
+        event_type: eventType,
+        source: source
       },
       fields: {
         value: state === 'ON' ? 1 : 0,
@@ -183,7 +244,8 @@ export class EventProcessor {
         device_name: deviceName,
         device_type: 'availability',
         room: room,
-        event_type: isOnline ? 'device_online' : 'device_offline'
+        event_type: isOnline ? 'device_online' : 'device_offline',
+        source: 'External'  // Availability is always system-generated
       },
       fields: {
         value: isOnline ? 1 : 0,

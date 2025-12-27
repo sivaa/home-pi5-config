@@ -526,3 +526,49 @@
           channel: "Heater"
           importance: default
           tag: "heater_bedroom"
+
+# =============================================================================
+# THERMOSTAT AUDIT LOGGING
+# Purpose: Track ALL setpoint changes for debugging and accountability
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# THERMOSTAT SETPOINT CHANGE AUDIT
+# Trigger: ANY change to setpoint temperature on ANY thermostat
+# Action: Mobile notification with old/new values and timestamp
+# Why: To catch rogue temperature changes from unknown sources
+# -----------------------------------------------------------------------------
+- id: thermostat_setpoint_changed_audit
+  alias: "Thermostat Setpoint Changed (Audit)"
+  description: "Sends notification when any thermostat setpoint changes - for audit tracking"
+  mode: parallel
+
+  trigger:
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: temperature
+
+  condition:
+    # Only trigger if temperature actually changed (not just state refresh)
+    - condition: template
+      value_template: >
+        {{ trigger.from_state.attributes.temperature is defined
+           and trigger.to_state.attributes.temperature is defined
+           and trigger.from_state.attributes.temperature != trigger.to_state.attributes.temperature }}
+
+  action:
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🌡️ Setpoint Changed"
+        message: >
+          {{ trigger.to_state.name }}
+          {{ trigger.from_state.attributes.temperature }}°C → {{ trigger.to_state.attributes.temperature }}°C
+          at {{ now().strftime('%H:%M:%S') }}
+        data:
+          channel: "Audit"
+          importance: high
+          tag: "setpoint_{{ trigger.entity_id }}"

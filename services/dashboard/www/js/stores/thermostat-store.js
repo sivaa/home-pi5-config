@@ -472,6 +472,20 @@ export function initThermostatStore(Alpine, CONFIG) {
         return;
       }
 
+      // Publish audit event BEFORE sending the actual command
+      // This allows mqtt-influx-bridge to track the source of changes
+      const auditPayload = {
+        device: thermostat.sensor,
+        deviceId: thermostat.id,
+        deviceName: thermostat.name,
+        action: this.getActionType(payload),
+        source: 'Dashboard',
+        payload: payload,
+        timestamp: Date.now()
+      };
+      client.publish('dashboard/audit/thermostat', JSON.stringify(auditPayload), { qos: 0 });
+      console.log('[thermostat-store] Audit published:', auditPayload);
+
       const topic = `zigbee2mqtt/${thermostat.sensor}/set`;
       client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
         if (err) {
@@ -488,6 +502,13 @@ export function initThermostatStore(Alpine, CONFIG) {
           }, 5000);
         }
       });
+    },
+
+    getActionType(payload) {
+      if (payload.occupied_heating_setpoint !== undefined) return 'setpoint_change';
+      if (payload.system_mode !== undefined) return 'mode_change';
+      if (payload.child_lock !== undefined) return 'child_lock_change';
+      return 'unknown';
     },
 
     // ============================================
