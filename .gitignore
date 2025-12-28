@@ -16,3 +16,11 @@ backups/configs/zigbee2mqtt/network_key.txt
 scripts/.env
 node_modules/
 .playwright-mcp/
+
+# Prototype HTML files
+services/dashboard/www/prototypes/
+
+# Test results
+test-results/
+services/dashboard/www/test-results/
+.playwright-mcp/
