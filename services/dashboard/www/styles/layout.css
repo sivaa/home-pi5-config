@@ -673,6 +673,27 @@
       margin-left: var(--space-xs);
     }
 
+    /* Heating row alignment: label left, value right */
+    .panel-metric.heating-row {
+      justify-content: space-between;
+    }
+
+    .heating-room-name {
+      font-weight: 500;
+      color: var(--color-text);
+    }
+
+    .heating-temp-value {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--color-danger);
+    }
+
+    .heating-arrow {
+      opacity: 0.4;
+      margin: 0 3px;
+    }
+
     /* Compact section details (when expanded) */
     .panel-section.compact .panel-metrics-grid {
       margin-top: var(--space-xs);
