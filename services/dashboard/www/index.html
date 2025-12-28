@@ -791,6 +791,19 @@
                         <span class="now-label">NOW</span>
                         <span class="now-temp"><span x-text="tempParts(t.localTemp).whole"></span><span class="temp-degree">°</span><span class="temp-decimal" x-text="tempParts(t.localTemp).decimal"></span></span>
                       </div>
+
+                      <!-- Temperature Progress Bar -->
+                      <div class="temp-progress-container">
+                        <div class="temp-progress-labels">
+                          <span class="temp-progress-status" x-text="getTempProgressLabel(t)"></span>
+                          <span class="temp-progress-percent" x-text="getTempProgressPercent(t) + '%'"></span>
+                        </div>
+                        <div class="temp-progress-track">
+                          <div class="temp-progress-fill"
+                               :style="{ width: getTempProgressPercent(t) + '%', background: getTempProgressColor(t) }"></div>
+                        </div>
+                      </div>
+
                       <div class="target-container" :class="{ syncing: t.syncing, heating: t.runningState === 'heat' }">
                         <span class="target-label">TARGET</span>
                         <div class="target-row">
@@ -2751,7 +2764,7 @@
 
   <!-- Sensors Store Module - discovers and tracks sensor data for doors/windows -->
   <script type="module">
-    import { initSensorsStore } from './js/stores/sensors-store.js';
+    import { initSensorsStore } from './js/stores/sensors-store.js?v=2';
 
     function initSensors() {
       const CONFIG = window.CONFIG;
@@ -2767,6 +2780,12 @@
             sensorsStore.init?.();
             sensorsStore.startDurationTicker?.();
             console.log('[sensors] Sensor discovery initialized');
+
+            // Load open timestamps from InfluxDB after devices are discovered
+            // This corrects fallback timers with actual open times
+            setTimeout(() => {
+              sensorsStore.loadOpenSensorTimestamps?.(CONFIG);
+            }, 3000);
           }
         }, 2000);
       }

@@ -313,6 +313,40 @@ export function thermostatView() {
       return 'Below target';
     },
 
+    // Temperature Progress Bar Helpers
+    getTempProgressLabel(t) {
+      if (!t?.localTemp || !t?.targetTemp) return 'Unknown';
+      if (t?.runningState === 'heat') return 'Heating...';
+      if (Math.abs(t.localTemp - t.targetTemp) <= 0.5) return 'At target';
+      if (t.localTemp > t.targetTemp) return 'Above target';
+      return 'Below target';
+    },
+
+    getTempProgressPercent(t) {
+      if (!t?.localTemp || !t?.targetTemp) return 0;
+      const percent = (t.localTemp / t.targetTemp) * 100;
+      return Math.min(100, Math.max(0, Math.round(percent)));
+    },
+
+    getTempProgressColor(t) {
+      if (!t?.localTemp || !t?.targetTemp) return '#666';
+      const percent = (t.localTemp / t.targetTemp) * 100;
+
+      if (percent >= 100) {
+        // At or above target = solid green
+        return '#22c55e';
+      } else if (percent >= 90) {
+        // 90-100% = yellow to green gradient
+        return 'linear-gradient(90deg, #eab308, #22c55e)';
+      } else if (percent >= 70) {
+        // 70-90% = orange to yellow to green gradient
+        return 'linear-gradient(90deg, #f97316, #eab308, #22c55e)';
+      } else {
+        // Below 70% = red to orange to yellow to green gradient
+        return 'linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e)';
+      }
+    },
+
     getBatteryColor(battery) {
       if (battery === null) return 'var(--color-text-tertiary)';
       if (battery < 20) return 'var(--color-danger)';
