@@ -6,8 +6,9 @@ After=default.target
 [Service]
 Type=simple
 
-# wtype needs WAYLAND_DISPLAY to communicate with labwc
+# wtype needs WAYLAND_DISPLAY and XDG_RUNTIME_DIR to communicate with labwc
 Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 
 # Run the Python HTTP server
 ExecStart=/usr/bin/python3 /opt/kiosk-control/kiosk-control.py
