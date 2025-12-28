@@ -300,8 +300,6 @@ export const VIEW_CATEGORIES = [
     name: 'Visualize',
     icon: '👁️',
     views: [
-      { id: '3d', name: '3D', icon: '🏗️', title: '3D Floor Plan', key: '4' },
-      { id: 'isometric', name: 'Isometric', icon: '🔷', title: 'Isometric View', key: 'I' },
       { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
     ]
   },

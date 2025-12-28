@@ -21,10 +21,8 @@ import { ambientView } from '../views/ambient.js';
 import { timelineView } from '../views/timeline.js';
 import { classicView } from '../views/classic.js';
 import { lightsView } from '../views/lights.js';
-import { threeDView } from '../views/floor-plan-3d.js';
 import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
-import { isometricView } from '../views/isometric.js';
 import { networkView } from '../views/network.js';
 import { thermostatView } from '../views/thermostat.js';
 import { mailboxView } from '../views/mailbox.js';
@@ -141,23 +139,14 @@ window.ambientView = ambientView;
 window.timelineView = timelineView;
 window.classicView = classicView;
 window.lightsView = lightsView;
-// 3D view is a factory function that needs config passed to it
-window.threeDView = function() {
-  return threeDView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS, OrbitControls);
-};
 
-// Sensor config view is also a factory function
+// Sensor config view is a factory function
 window.sensorConfigView = function() {
   return sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, OrbitControls);
 };
 
 // CO2 monitor view
 window.co2View = co2View;
-
-// Isometric view is a factory function
-window.isometricView = function() {
-  return isometricView(FLOOR_PLAN_CONFIG, TEMP_COLORS, HUMIDITY_COLORS);
-};
 
 // Network view
 window.networkView = networkView;
