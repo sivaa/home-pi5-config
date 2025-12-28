@@ -708,6 +708,83 @@
       padding-left: 28px;
     }
 
+    /* ========================================
+       FLOOR PLAN IN SIDEBAR
+       ======================================== */
+    .floor-plan-container {
+      width: 100%;
+      aspect-ratio: 1.386;
+      margin-top: var(--space-sm);
+    }
+
+    .floor-plan-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Room rectangles */
+    .floor-room {
+      fill: var(--color-surface);
+      stroke: var(--color-border);
+      stroke-width: 0.5;
+    }
+
+    /* Hallway slightly different shade */
+    .floor-room-hallway {
+      fill: var(--color-bg);
+    }
+
+    /* Wall lines */
+    .floor-wall {
+      stroke: var(--color-text-tertiary);
+      stroke-width: 1.5;
+      stroke-linecap: round;
+    }
+
+    /* Outer perimeter thicker */
+    .floor-plan-walls > rect.floor-wall {
+      stroke-width: 2;
+      stroke: var(--color-text-secondary);
+    }
+
+    /* Temperature labels */
+    .floor-label {
+      font-family: var(--font-family);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      fill: var(--color-text);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    /* Smaller labels for small rooms */
+    .floor-label-small {
+      font-size: 9px;
+    }
+
+    /* Subtle decimal styling */
+    .floor-decimal {
+      font-size: 0.7em;
+      opacity: 0.6;
+    }
+
+    /* Temperature color coding */
+    .floor-temp-cold { fill: #60a5fa; }
+    .floor-temp-cool { fill: #4ade80; }
+    .floor-temp-comfortable { fill: #22c55e; }
+    .floor-temp-warm { fill: #fbbf24; }
+    .floor-temp-hot { fill: #f97316; }
+
+    /* Dark mode adjustments */
+    [data-theme="dark"] .floor-room {
+      fill: var(--color-bg);
+    }
+
+    [data-theme="dark"] .floor-room-hallway {
+      fill: rgba(255, 255, 255, 0.03);
+    }
+
     /* Hide panel on smaller screens */
     @media (max-width: 1200px) {
       .overview-panel {

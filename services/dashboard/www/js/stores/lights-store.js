@@ -41,7 +41,7 @@ export function initLightsStore(Alpine, CONFIG) {
     },
 
     get lightsOnCount() {
-      return this.list.filter(l => l.state === 'ON').length;
+      return this.list.filter(l => l.state === 'ON' && l.available).length;
     },
 
     presets: {

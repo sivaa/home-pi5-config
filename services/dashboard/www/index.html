@@ -602,11 +602,6 @@
             <div class="lights-grid" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
               <template x-for="light in $store.lights.list" :key="light.id">
                 <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available }">
-                  <!-- Unavailable overlay -->
-                  <div class="light-unavailable-overlay" x-show="!light.available" x-transition.opacity>
-                    <span class="unavailable-icon">⚡</span>
-                    <span class="unavailable-text">Offline</span>
-                  </div>
                   <!-- Syncing overlay -->
                   <div class="light-syncing-overlay" x-show="light.syncing && light.available" x-transition.opacity>
                     <span class="loading-indicator"></span>
@@ -618,7 +613,6 @@
                       <div class="light-details">
                         <span class="light-name" x-text="light.name"></span>
                         <span class="light-status">
-                          <span x-show="!light.available" class="unavailable-status">Offline</span>
                           <span x-show="light.available && light.syncing" class="syncing-text">Syncing...</span>
                           <span x-show="light.available && !light.syncing" x-text="light.state === 'ON' ? 'On' : 'Off'"></span>
                         </span>
@@ -1817,16 +1811,60 @@
           </div>
         </div>
 
-        <!-- Section: By Room -->
+        <!-- Section: By Room (Floor Plan) -->
         <div class="panel-section panel-section-primary rooms-section">
           <div class="panel-section-title">ROOMS</div>
-          <div class="panel-metrics-grid">
-            <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
-              <div class="panel-metric">
-                <span class="panel-icon" x-text="room.icon"></span>
-                <span class="panel-value" x-html="formatTempStyled(room.temperature)"></span>
-              </div>
-            </template>
+          <div class="floor-plan-container">
+            <svg class="floor-plan-svg" viewBox="0 0 92.39 66.65" preserveAspectRatio="xMidYMid meet">
+              <!-- Room fills - Hallway as vertical corridor -->
+              <g class="floor-plan-rooms">
+                <!-- Right side: Study (top), Living (bottom) - aligned at y=40 -->
+                <rect class="floor-room" x="48" y="0" width="44.39" height="40"/>
+                <rect class="floor-room" x="48" y="40" width="44.39" height="26.65"/>
+                <!-- Left column: Bathroom (top), Kitchen (middle), Bedroom (bottom) -->
+                <rect class="floor-room" x="0" y="0" width="28" height="20"/>
+                <rect class="floor-room" x="0" y="20" width="28" height="20"/>
+                <rect class="floor-room" x="0" y="40" width="48" height="26.65"/>
+                <!-- Hallway: vertical corridor between left rooms and right rooms -->
+                <rect class="floor-room floor-room-hallway" x="28" y="0" width="20" height="40"/>
+              </g>
+              <!-- Temperature labels with styled decimals -->
+              <g class="floor-plan-labels">
+                <!-- Right side - Study (0-40), Living (40-66.65) -->
+                <text class="floor-label" x="70" y="20" :class="getRoomTempClass('study')">
+                  <tspan x-text="getRoomTempInt('study')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('study')"></tspan>
+                </text>
+                <text class="floor-label" x="70" y="53" :class="getRoomTempClass('living')">
+                  <tspan x-text="getRoomTempInt('living')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('living')"></tspan>
+                </text>
+                <!-- Left column -->
+                <text class="floor-label floor-label-small" x="14" y="10" :class="getRoomTempClass('bathroom')">
+                  <tspan x-text="getRoomTempInt('bathroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bathroom')"></tspan>
+                </text>
+                <text class="floor-label floor-label-small" x="14" y="30" :class="getRoomTempClass('kitchen')">
+                  <tspan x-text="getRoomTempInt('kitchen')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('kitchen')"></tspan>
+                </text>
+                <text class="floor-label" x="24" y="53" :class="getRoomTempClass('bedroom')">
+                  <tspan x-text="getRoomTempInt('bedroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bedroom')"></tspan>
+                </text>
+                <!-- Hallway (vertical corridor) -->
+                <text class="floor-label floor-label-small" x="38" y="20" :class="getRoomTempClass('hallway')">
+                  <tspan x-text="getRoomTempInt('hallway')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
+                </text>
+              </g>
+              <!-- Wall structure -->
+              <g class="floor-plan-walls" fill="none">
+                <!-- Outer perimeter -->
+                <rect class="floor-wall" x="0.5" y="0.5" width="91.39" height="65.65"/>
+                <!-- Internal walls - horizontal line aligned at y=40 -->
+                <path class="floor-wall" d="
+                  M 48 0 L 48 66.65
+                  M 28 0 L 28 40
+                  M 0 20 L 28 20
+                  M 0 40 L 92.39 40
+                "/>
+              </g>
+            </svg>
           </div>
         </div>
 
@@ -3338,7 +3376,7 @@
         },
 
         get lightsOnCount() {
-          return this.list.filter(l => l.state === 'ON').length;
+          return this.list.filter(l => l.state === 'ON' && l.available).length;
         },
 
         presets: {
@@ -4141,6 +4179,43 @@
         togglePanel() {
           this.panelOpen = !this.panelOpen;
           localStorage.setItem('panel-open', this.panelOpen);
+        },
+
+        // Floor plan temperature helpers (split for styling)
+        getRoomTempInt(roomId) {
+          const room = Alpine.store('rooms').list.find(r => r.id === roomId);
+          if (!room) return '--';
+          const temp = room.avgTemperature ?? room.temperature;
+          if (temp == null) return '--';
+          return Math.floor(temp).toString();
+        },
+        getRoomTempDec(roomId) {
+          const room = Alpine.store('rooms').list.find(r => r.id === roomId);
+          if (!room) return '°';
+          const temp = room.avgTemperature ?? room.temperature;
+          if (temp == null) return '°';
+          const decimal = (temp % 1).toFixed(1).substring(1); // ".X"
+          return decimal + '°';
+        },
+        // Keep original for backwards compatibility
+        getRoomTemp(roomId) {
+          const room = Alpine.store('rooms').list.find(r => r.id === roomId);
+          if (!room) return '--°';
+          const temp = room.avgTemperature ?? room.temperature;
+          if (temp == null) return '--°';
+          return temp.toFixed(1) + '°';
+        },
+
+        // Get temperature color class for floor plan
+        getRoomTempClass(roomId) {
+          const room = Alpine.store('rooms').list.find(r => r.id === roomId);
+          const temp = room?.avgTemperature ?? room?.temperature;
+          if (temp == null) return '';
+          if (temp < 18) return 'floor-temp-cold';
+          if (temp < 20) return 'floor-temp-cool';
+          if (temp < 23) return 'floor-temp-comfortable';
+          if (temp < 26) return 'floor-temp-warm';
+          return 'floor-temp-hot';
         },
 
         getOpenContactCount() {
