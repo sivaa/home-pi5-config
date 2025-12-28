@@ -1,0 +1,32 @@
+[Unit]
+Description=Kiosk Browser - Dashboard Display
+# Run after display mode is set and labwc is ready
+After=default.target display-boot-check.service
+Wants=display-boot-check.service
+
+[Service]
+Type=simple
+
+# Wait for labwc to be fully ready (after display-boot-check's 10s + 5s extra)
+ExecStartPre=/bin/sleep 5
+
+# Wait for nginx dashboard container to be responding (up to 60s)
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888 > /dev/null && exit 0; sleep 2; done; exit 1'
+
+# Set WAYLAND_DISPLAY since user services don't inherit it automatically
+Environment=WAYLAND_DISPLAY=wayland-0
+
+# Launch Epiphany with the dashboard URL
+# The labwc window rule will auto-fullscreen it
+ExecStart=/usr/bin/epiphany --new-window http://localhost:8888
+
+# Restart if browser crashes (but not if manually stopped)
+Restart=on-failure
+RestartSec=10
+
+# Output to journal for debugging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

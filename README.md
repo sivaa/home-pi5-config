@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** December 27, 2025
+> **Last Updated:** December 28, 2025
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -71,6 +71,7 @@
 | 15 | [HA Automations](docs/15-ha-automations.md) | Home Assistant automation configurations |
 | 16 | [Touch Monitor](docs/16-touch-monitor.md) | Touch gestures (scroll, pinch-zoom) setup |
 | 17 | [Heater Watchdog](docs/17-heater-watchdog.md) | Poll-based safety monitor for heater-window violations |
+| 18 | [Kiosk Browser](docs/18-kiosk-browser.md) | Auto-launch dashboard in fullscreen on boot |
 
 ---
 
@@ -99,7 +100,8 @@
 | `homeassistant/SERVICE_ACCOUNT.json` | GCP credentials (gitignored) | `/opt/homeassistant/` |
 | `cloudflared/config.yml` | Cloudflare tunnel config | `/etc/cloudflared/` |
 | `display-scheduler/*` | Display power management | `~/.config/systemd/user/` + `~/.local/bin/` |
-| `labwc/rc.xml` | Touch gestures config | `~/.config/labwc/` |
+| `kiosk-browser/*` | Auto-launch dashboard browser | `~/.config/systemd/user/` |
+| `labwc/rc.xml` | Touch gestures + kiosk fullscreen | `~/.config/labwc/` |
 
 ### Sensitive Files (Not in Git)
 
@@ -190,6 +192,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 | Date | Change |
 |------|--------|
+| 2025-12-28 | Added kiosk browser: auto-launch dashboard in fullscreen on boot |
 | 2025-12-27 | Added heater-watchdog: poll-based safety monitor runs every 5min as defense-in-depth layer |
 | 2025-12-27 | Enabled touch gestures (scroll, pinch-zoom) by disabling labwc mouse emulation |
 | 2025-12-19 | Added adaptive brightness control (DDC/CI): 80% on wake, dims 10%/min to 25% idle |
@@ -227,8 +230,10 @@ pi-setup/
 │   │   ├── brightness-dimmer.sh
 │   │   ├── input-wake-monitor.sh
 │   │   └── *.service/*.timer files
+│   ├── kiosk-browser/     <- Auto-launch dashboard browser
+│   │   └── kiosk-browser.service
 │   ├── labwc/             <- Wayland compositor config
-│   │   └── rc.xml         <- Touch gestures (mouseEmulation=no)
+│   │   └── rc.xml         <- Touch gestures + kiosk fullscreen
 │   └── pi-reboot/         <- Daily Pi reboot (4:30 AM)
 │       ├── daily-reboot.timer
 │       └── daily-reboot.service
@@ -249,7 +254,8 @@ pi-setup/
 │   ├── 14-brightness-control.md
 │   ├── 15-ha-automations.md
 │   ├── 16-touch-monitor.md
-│   └── 17-heater-watchdog.md
+│   ├── 17-heater-watchdog.md
+│   └── 18-kiosk-browser.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)

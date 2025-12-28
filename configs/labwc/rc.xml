@@ -1,4 +1,13 @@
 <?xml version="1.0"?>
 <openbox_config xmlns="http://openbox.org/3.4/rc">
-	<touch deviceName="ILITEK ILITEK-TP" mapToOutput="HDMI-A-1" mouseEmulation="no"/>
+  <!-- Touch input configuration -->
+  <touch deviceName="ILITEK ILITEK-TP" mapToOutput="HDMI-A-1" mouseEmulation="no"/>
+
+  <!-- Window rules for kiosk mode -->
+  <windowRules>
+    <!-- Auto-fullscreen Epiphany browser windows -->
+    <windowRule identifier="org.gnome.Epiphany*">
+      <action name="ToggleFullscreen"/>
+    </windowRule>
+  </windowRules>
 </openbox_config>
