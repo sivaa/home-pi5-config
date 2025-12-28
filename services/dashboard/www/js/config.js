@@ -217,13 +217,12 @@ export const THERMOSTAT_EVENT_TYPES = {
   }
 };
 
-// Floor plan configuration - exact dimensions from floor map (mirrored layout)
+// Apartment layout configuration - used by network 3D view
 export const FLOOR_PLAN_CONFIG = {
   apartmentWidth: 9.239,
-  apartmentDepth: 6.665,  // Reduced from 7.665 (south wall moved 1.0m north)
+  apartmentDepth: 6.665,
   wallHeight: 2.0,
   wallThickness: 0.15,
-  // Room positions are center coordinates (mirrored layout)
   rooms: [
     { id: 'study', name: 'Study', icon: '📚', x: 7.285, z: 1.8485, width: 3.908, depth: 3.697, color: 0x60a5fa, labelY: 3 },
     { id: 'living', name: 'Living Room', icon: '🛋️', x: 6.864, z: 5.181, width: 4.750, depth: 2.968, color: 0x34d399, labelY: 3 },
@@ -235,26 +234,26 @@ export const FLOOR_PLAN_CONFIG = {
   balcony: { x: 9.764, z: 7.065, width: 1.050, depth: 1.200, color: 0x93c5fd },
   hallway: { x: 3.839, z: 2.0, width: 1.5, depth: 2.5, color: 0x94a3b8 },
   balconyNotch: {
-    width: 1.0,    // Cut-out width
-    depth: 1.5,    // Cut-out depth (increased to make balcony bigger)
+    width: 1.0,
+    depth: 1.5,
     hasRailing: true,
-    floorColor: 0xC0C0C2  // Match base floor
+    floorColor: 0xC0C0C2
   },
   doors: [
-    { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },  // Balcony ↔ Living (double glass French doors at east wall)
-    { x: 3.706, z: 3.697, rotation: 0, swingDirection: 'south' },           // Living ↔ Hallway
-    { x: 4.354, z: 1.848, rotation: Math.PI/2, swingDirection: 'east' },    // Study ↔ Hallway
-    { x: 3.134, z: 3.697, rotation: 0, swingDirection: 'south' },           // Bedroom ↔ Hallway
-    { x: 3.331, z: 2.818, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Kitchen
-    { x: 3.331, z: 1.338, rotation: Math.PI/2, swingDirection: 'east' },    // Hallway ↔ Bathroom
-    { x: 0, z: 4.8, rotation: Math.PI/2, type: 'entry', swingDirection: 'east' }  // Main entry door (west wall in mirrored layout)
+    { x: 9.239, z: 6.465, rotation: Math.PI/2, type: 'french', swingDirection: 'inward' },
+    { x: 3.706, z: 3.697, rotation: 0, swingDirection: 'south' },
+    { x: 4.354, z: 1.848, rotation: Math.PI/2, swingDirection: 'east' },
+    { x: 3.134, z: 3.697, rotation: 0, swingDirection: 'south' },
+    { x: 3.331, z: 2.818, rotation: Math.PI/2, swingDirection: 'east' },
+    { x: 3.331, z: 1.338, rotation: Math.PI/2, swingDirection: 'east' },
+    { x: 0, z: 4.8, rotation: Math.PI/2, type: 'entry', swingDirection: 'east' }
   ],
   windows: [
-    { x: 9.239, z: 1.848, rotation: Math.PI/2, size: 2.5 },   // Study right (mirrored)
-    { x: 9.239, z: 4.2, rotation: Math.PI/2, size: 2.5 },     // Living right (east wall)
-    { x: 0, z: 5.976, rotation: Math.PI/2, size: 2.5 },       // Bedroom left (mirrored)
-    { x: 0, z: 3.218, rotation: Math.PI/2, size: 1.8 },       // Kitchen left (mirrored)
-    { x: 0, z: 1.487, rotation: Math.PI/2, size: 1.2 }        // Bathroom left (mirrored)
+    { x: 9.239, z: 1.848, rotation: Math.PI/2, size: 2.5 },
+    { x: 9.239, z: 4.2, rotation: Math.PI/2, size: 2.5 },
+    { x: 0, z: 5.976, rotation: Math.PI/2, size: 2.5 },
+    { x: 0, z: 3.218, rotation: Math.PI/2, size: 1.8 },
+    { x: 0, z: 1.487, rotation: Math.PI/2, size: 1.2 }
   ],
   furniture: [
     { type: 'bed', room: 'bedroom', width: 1.8, depth: 2.0, height: 0.6 }
@@ -292,6 +291,7 @@ export const VIEW_CATEGORIES = [
     icon: '📈',
     views: [
       { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
+      { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
       { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
     ]
   },
@@ -300,8 +300,6 @@ export const VIEW_CATEGORIES = [
     name: 'Visualize',
     icon: '👁️',
     views: [
-      { id: 'floor', name: 'Floor', icon: '🏠', title: 'Floor Plan', key: '3' },
-      { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6' },
       { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
     ]
   },
