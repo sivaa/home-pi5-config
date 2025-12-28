@@ -1848,8 +1848,9 @@
                   <tspan x-text="getRoomTempInt('bedroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bedroom')"></tspan>
                 </text>
                 <!-- Hallway (vertical corridor 35-55) -->
-                <text class="floor-label floor-label-small" x="45" y="20" :class="getRoomTempClass('hallway')">
-                  <tspan x-text="getRoomTempInt('hallway')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
+                <text class="floor-label floor-label-small" x="45" y="16" :class="getRoomTempClass('hallway')">
+                  <tspan x-text="getRoomTempInt('hallway')"></tspan>
+                  <tspan x="45" dy="8" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
               </g>
               <!-- Wall structure -->
