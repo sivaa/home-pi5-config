@@ -233,19 +233,13 @@
         <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
-            <!-- Kiosk Controls (only on Pi, not localhost dev) -->
-            <div class="kiosk-controls" x-data x-show="$store.kiosk.isKioskAvailable" x-cloak>
+            <!-- Kiosk Controls -->
+            <div class="kiosk-controls" x-data>
               <button class="kiosk-btn"
-                      @click="$store.kiosk.toggleFullscreen()"
-                      :disabled="$store.kiosk.isLoading"
-                      :class="{ 'is-fullscreen': $store.kiosk.isFullscreen }"
-                      :title="$store.kiosk.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
-                <span x-show="$store.kiosk.isFullscreen">&#x26F6;</span>
-                <span x-show="!$store.kiosk.isFullscreen">&#x26F6;</span>
-              </button>
+                      @click="$store.kiosk?.toggleFullscreen()"
+                      title="Toggle fullscreen">&#x26F6;</button>
               <button class="kiosk-btn"
-                      @click="$store.kiosk.refresh()"
-                      :disabled="$store.kiosk.isLoading"
+                      @click="$store.kiosk?.refresh()"
                       title="Refresh page">&#x1F504;</button>
             </div>
             <!-- Theme Toggle -->
@@ -5272,6 +5266,17 @@
         getZoomPercent() { return Math.round(this.zoomLevel * 100); }
       };
     }
+  </script>
+
+  <!-- Theme Store - MUST load before Alpine processes elements -->
+  <script type="module">
+    import { initThemeStore } from './js/stores/theme-store.js';
+
+    // Register theme store when Alpine initializes
+    document.addEventListener('alpine:init', () => {
+      initThemeStore(Alpine);
+      console.log('[theme-store] Theme store registered');
+    });
   </script>
 
   <!-- Alpine.js - MUST load last after all stores and views are defined -->
