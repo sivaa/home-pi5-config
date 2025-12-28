@@ -320,14 +320,6 @@ export const VIEW_CATEGORIES = [
     views: [
       { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', key: '8' }
     ]
-  },
-  {
-    id: 'settings',
-    name: 'Settings',
-    icon: '⚙️',
-    views: [
-      { id: 'config', name: 'Config', icon: '⚙️', title: 'Sensor Config', key: '9' }
-    ]
   }
 ];
 

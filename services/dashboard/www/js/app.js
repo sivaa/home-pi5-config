@@ -21,7 +21,6 @@ import { ambientView } from '../views/ambient.js';
 import { timelineView } from '../views/timeline.js';
 import { classicView } from '../views/classic.js';
 import { lightsView } from '../views/lights.js';
-import { sensorConfigView } from '../views/sensor-config.js';
 import { co2View } from '../views/co2-monitor.js';
 import { networkView } from '../views/network.js';
 import { thermostatView } from '../views/thermostat.js';
@@ -139,11 +138,6 @@ window.ambientView = ambientView;
 window.timelineView = timelineView;
 window.classicView = classicView;
 window.lightsView = lightsView;
-
-// Sensor config view is a factory function
-window.sensorConfigView = function() {
-  return sensorConfigView(FLOOR_PLAN_CONFIG, SENSOR_VISUALS, OrbitControls);
-};
 
 // CO2 monitor view
 window.co2View = co2View;
