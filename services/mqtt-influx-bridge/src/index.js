@@ -32,6 +32,21 @@ const influx = new Influx.InfluxDB({
         'event_type',
         'source'  // Track where the change came from (Dashboard, External)
       ]
+    },
+    {
+      measurement: 'tts_events',
+      fields: {
+        message: Influx.FieldType.STRING,
+        success: Influx.FieldType.BOOLEAN,
+        all_available: Influx.FieldType.BOOLEAN,
+        devices_available: Influx.FieldType.INTEGER,
+        devices_total: Influx.FieldType.INTEGER,
+        devices_json: Influx.FieldType.STRING
+      },
+      tags: [
+        'automation',  // Parent automation ID (e.g., co2_high_alert)
+        'status'       // success, partial, all_failed
+      ]
     }
   ]
 });
@@ -76,8 +91,19 @@ client.on('connect', () => {
       console.error('Subscribe error (audit):', err);
     } else {
       console.log('Subscribed to Dashboard audit events');
+    }
+  });
+
+  // Subscribe to TTS events (for persistent logging)
+  const ttsTopic = CONFIG.tts.topic;
+  console.log(`Subscribing to ${ttsTopic}...`);
+  client.subscribe(ttsTopic, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Subscribe error (tts):', err);
+    } else {
+      console.log('Subscribed to TTS events');
       console.log('');
-      console.log('Listening for Zigbee and audit events...');
+      console.log('Listening for Zigbee, audit, and TTS events...');
       console.log('─'.repeat(60));
     }
   });
@@ -102,6 +128,12 @@ client.on('message', async (topic, message) => {
     if (topic.startsWith('dashboard/audit/')) {
       processor.processAuditMessage(topic, payload);
       return;  // Audit messages don't generate events
+    }
+
+    // Route TTS messages to TTS handler (persistent logging)
+    if (topic === CONFIG.tts.topic) {
+      await writeTTSEvent(payload);
+      return;
     }
 
     // Process Zigbee message into events
@@ -155,6 +187,57 @@ async function writeEvents(events) {
     stats.eventsWritten += events.length;
   } catch (err) {
     console.error('InfluxDB write error:', err.message);
+    stats.errors++;
+  }
+}
+
+/**
+ * Write TTS event to InfluxDB
+ */
+async function writeTTSEvent(payload) {
+  try {
+    // Count available devices
+    const devices = payload.devices || [];
+    const devicesAvailable = devices.filter(d => d.available).length;
+    const devicesTotal = devices.length;
+
+    // Determine status tag
+    let status = 'success';
+    if (!payload.success) {
+      status = 'all_failed';
+    } else if (!payload.all_available) {
+      status = 'partial';
+    }
+
+    // Write to InfluxDB
+    await influx.writePoints([{
+      measurement: CONFIG.tts.measurement,
+      tags: {
+        automation: payload.automation || 'unknown',
+        status: status
+      },
+      fields: {
+        message: payload.message || '',
+        success: payload.success === true,
+        all_available: payload.all_available === true,
+        devices_available: devicesAvailable,
+        devices_total: devicesTotal,
+        devices_json: JSON.stringify(devices)
+      },
+      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date()
+    }]);
+
+    stats.eventsWritten++;
+
+    // Log TTS event
+    const icon = status === 'all_failed' ? '🔇' : status === 'partial' ? '🔈' : '🔊';
+    const shortMsg = (payload.message || '').substring(0, 40);
+    console.log(
+      `${icon} [TTS] ${payload.automation || 'unknown'}: "${shortMsg}..." ` +
+      `(${devicesAvailable}/${devicesTotal} devices)`
+    );
+  } catch (err) {
+    console.error('TTS write error:', err.message);
     stats.errors++;
   }
 }

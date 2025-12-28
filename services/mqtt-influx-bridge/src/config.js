@@ -132,5 +132,10 @@ export const CONFIG = {
     database: process.env.INFLUX_DB || 'homeassistant',
     measurement: 'zigbee_events'
   },
+  // TTS events logging
+  tts: {
+    topic: 'dashboard/tts',
+    measurement: 'tts_events'
+  },
   logLevel: process.env.LOG_LEVEL || 'info'
 };

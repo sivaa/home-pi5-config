@@ -1186,3 +1186,71 @@
           channel: "Critical"
           importance: high
           tag: "heater_blocked_windows"
+
+# =============================================================================
+# TTS NOTIFICATION AUDIT LOGGING
+# Purpose: Publish all TTS notifications to MQTT for dashboard logging
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TTS EVENT MQTT PUBLISHER
+# Trigger: Any call to tts.google_translate_say service
+# Action: Publish event details to dashboard/tts topic
+# Fields: timestamp, message, devices, availability status
+# -----------------------------------------------------------------------------
+- id: tts_event_mqtt_publisher
+  alias: "TTS Event MQTT Publisher"
+  description: "Publishes all TTS notifications to MQTT for dashboard logging"
+  mode: parallel
+  max: 10
+
+  trigger:
+    - platform: event
+      event_type: call_service
+      event_data:
+        domain: tts
+        service: google_translate_say
+
+  variables:
+    devices: >
+      {% set data = trigger.event.data.service_data %}
+      {% if data.entity_id is string %}
+        {{ [data.entity_id] }}
+      {% else %}
+        {{ data.entity_id | default([]) }}
+      {% endif %}
+    message: "{{ trigger.event.data.service_data.message | default('No message') }}"
+
+    device_status: >
+      {% set status = [] %}
+      {% for device in devices %}
+        {% set name = device | replace('media_player.', '') %}
+        {% set state = states(device) %}
+        {% set available = state not in ['unavailable', 'unknown'] %}
+        {% set status = status + [{'device': name, 'available': available, 'state': state}] %}
+      {% endfor %}
+      {{ status }}
+
+    all_available: >
+      {{ device_status | selectattr('available', 'eq', true) | list | length == device_status | length }}
+
+    any_available: >
+      {{ device_status | selectattr('available', 'eq', true) | list | length > 0 }}
+
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/tts"
+        payload: >
+          {{
+            {
+              "timestamp": now().isoformat(),
+              "event": "tts_call",
+              "message": message,
+              "devices": device_status,
+              "success": any_available,
+              "all_available": all_available,
+              "automation": trigger.event.context.parent_id | default('manual')
+            } | tojson
+          }}
+        retain: false
