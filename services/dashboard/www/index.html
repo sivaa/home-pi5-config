@@ -1818,23 +1818,23 @@
             <svg class="floor-plan-svg" viewBox="0 0 92.39 66.65" preserveAspectRatio="xMidYMid meet">
               <!-- Room fills - Hallway as vertical corridor -->
               <g class="floor-plan-rooms">
-                <!-- Right side: Study (top), Living (bottom) - aligned at y=40 -->
+                <!-- Right side: Study (top), Living (bottom) -->
                 <rect class="floor-room" x="55" y="0" width="37.39" height="40"/>
-                <rect class="floor-room" x="55" y="40" width="37.39" height="26.65"/>
+                <rect class="floor-room" x="45" y="40" width="47.39" height="26.65"/>
                 <!-- Left column: Bathroom (top), Kitchen (middle), Bedroom (bottom) -->
                 <rect class="floor-room" x="0" y="0" width="35" height="20"/>
                 <rect class="floor-room" x="0" y="20" width="35" height="20"/>
-                <rect class="floor-room" x="0" y="40" width="55" height="26.65"/>
+                <rect class="floor-room" x="0" y="40" width="45" height="26.65"/>
                 <!-- Hallway: vertical corridor between left rooms and right rooms -->
                 <rect class="floor-room floor-room-hallway" x="35" y="0" width="20" height="40"/>
               </g>
               <!-- Temperature labels with styled decimals -->
               <g class="floor-plan-labels">
-                <!-- Right side - Study (55-92.39), Living (55-92.39) -->
+                <!-- Right side - Study (55-92.39), Living (45-92.39) -->
                 <text class="floor-label" x="74" y="20" :class="getRoomTempClass('study')">
                   <tspan x-text="getRoomTempInt('study')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('study')"></tspan>
                 </text>
-                <text class="floor-label" x="74" y="53" :class="getRoomTempClass('living')">
+                <text class="floor-label" x="69" y="53" :class="getRoomTempClass('living')">
                   <tspan x-text="getRoomTempInt('living')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('living')"></tspan>
                 </text>
                 <!-- Left column (0-35) -->
@@ -1844,7 +1844,7 @@
                 <text class="floor-label floor-label-small" x="17" y="30" :class="getRoomTempClass('kitchen')">
                   <tspan x-text="getRoomTempInt('kitchen')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('kitchen')"></tspan>
                 </text>
-                <text class="floor-label" x="27" y="53" :class="getRoomTempClass('bedroom')">
+                <text class="floor-label" x="22" y="53" :class="getRoomTempClass('bedroom')">
                   <tspan x-text="getRoomTempInt('bedroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bedroom')"></tspan>
                 </text>
                 <!-- Hallway (vertical corridor 35-55) -->
@@ -1856,9 +1856,10 @@
               <g class="floor-plan-walls" fill="none">
                 <!-- Outer perimeter -->
                 <rect class="floor-wall" x="0.5" y="0.5" width="91.39" height="65.65"/>
-                <!-- Internal walls - horizontal line aligned at y=40 -->
+                <!-- Internal walls -->
                 <path class="floor-wall" d="
-                  M 55 0 L 55 66.65
+                  M 55 0 L 55 40
+                  M 45 40 L 45 66.65
                   M 35 0 L 35 40
                   M 0 20 L 35 20
                   M 0 40 L 92.39 40
