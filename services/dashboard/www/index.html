@@ -769,7 +769,6 @@
                         <span class="thermostat-icon" x-text="t.icon"></span>
                         <div>
                           <div class="thermostat-name" x-text="t.name"></div>
-                          <div class="thermostat-room" x-text="t.roomId"></div>
                         </div>
                       </div>
                       <div class="status-badge"
@@ -1832,8 +1831,13 @@
           <template x-if="($store.thermostats?.activeHeatingCount || 0) > 0">
             <div class="panel-metrics-grid">
               <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
-                <div class="panel-metric heating-active full-width">
-                  <span class="panel-value" x-text="trv.name + ' ' + (trv.localTemp?.toFixed(1) || '--') + '→' + (trv.targetTemp || '--') + '°'"></span>
+                <div class="panel-metric heating-active full-width heating-row">
+                  <span class="heating-room-name" x-text="trv.name"></span>
+                  <span class="heating-temp-value">
+                    <span x-text="(trv.localTemp?.toFixed(1) || '--')"></span>
+                    <span class="heating-arrow">→</span>
+                    <span x-text="(trv.targetTemp || '--') + '°'"></span>
+                  </span>
                 </div>
               </template>
             </div>

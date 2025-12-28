@@ -347,11 +347,7 @@
 .thermostat-name {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-}
-
-.thermostat-room {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-tertiary);
+  text-transform: uppercase;
 }
 
 /* Status Badge */
@@ -619,14 +615,14 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-xl);
 }
 
 .target-temp {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: var(--font-weight-bold);
   color: var(--color-warning);
-  min-width: 60px;
+  min-width: 70px;
   text-align: center;
 }
 
