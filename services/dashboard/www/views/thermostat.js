@@ -4,27 +4,55 @@
  */
 
 // Event type definitions for thermostat timeline
+// Priority levels: alert (red, requires action) > warning (yellow, monitor) > activity (blue, normal ops) > background (gray, routine)
 const THERMOSTAT_EVENT_TYPES = {
-  // IMPORTANT (full cards)
-  heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'important', category: 'heating' },
-  heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'important', category: 'heating' },
-  target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'important', category: 'heating' },
-  device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', priority: 'important', category: 'system' },
-  low_battery: { icon: '🪫', color: '#f59e0b', label: 'Low Battery', priority: 'important', category: 'system' },
+  // ALERT - Requires immediate attention (shown prominently)
+  device_offline: {
+    icon: '🔴', color: '#ef4444', label: 'Device Offline',
+    priority: 'alert', category: 'system',
+    action: 'Check device power and Zigbee signal'
+  },
+  low_battery_critical: {
+    icon: '🪫', color: '#ef4444', label: 'Battery Critical',
+    priority: 'alert', category: 'system',
+    action: 'Replace batteries immediately'
+  },
 
-  // ACTIVITY (compact lines)
+  // WARNING - Should investigate (shown with less urgency)
+  low_battery: {
+    icon: '🔋', color: '#f59e0b', label: 'Battery Low',
+    priority: 'warning', category: 'system',
+    action: 'Plan to replace batteries soon'
+  },
+  window_detected: {
+    icon: '🪟', color: '#f59e0b', label: 'Window Open',
+    priority: 'warning', category: 'heating',
+    action: 'Heating paused - close window to resume'
+  },
+
+  // ACTIVITY - Normal operations (compact rows)
+  heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'activity', category: 'heating' },
+  heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'activity', category: 'heating' },
+  target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'activity', category: 'heating' },
   setpoint_changed: { icon: '🎯', color: '#f59e0b', label: 'Setpoint Changed', priority: 'activity', category: 'control' },
   mode_changed: { icon: '⚙️', color: '#8b5cf6', label: 'Mode Changed', priority: 'activity', category: 'control' },
   preset_changed: { icon: '🚀', color: '#06b6d4', label: 'Preset Changed', priority: 'activity', category: 'control' },
   child_lock_changed: { icon: '🔒', color: '#64748b', label: 'Child Lock Changed', priority: 'activity', category: 'control' },
+  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' },
 
-  // BACKGROUND (collapsed)
+  // BACKGROUND - Routine events (collapsed by default)
   device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background', category: 'system' },
   battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background', category: 'system' },
-  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' },
+  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' }
+};
 
-  // INITIAL STATE (activity level - shows on first connect)
-  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' }
+// Time range presets for timeline filtering
+const TIME_RANGE_PRESETS = {
+  '1h': { label: '1h', ms: 60 * 60 * 1000 },
+  '6h': { label: '6h', ms: 6 * 60 * 60 * 1000 },
+  'today': { label: 'Today', ms: null },  // Special: start of day
+  '24h': { label: '24h', ms: 24 * 60 * 60 * 1000 },
+  '7d': { label: '7d', ms: 7 * 24 * 60 * 60 * 1000 }
 };
 
 // Use global CONFIG defined in index.html
@@ -37,7 +65,8 @@ export function thermostatView() {
     // ============================================
 
     activeTab: 'overview',       // 'overview' | 'timeline' | 'trends' | 'efficiency'
-    timeRange: '24h',
+    timeRange: '24h',            // For trends tab
+    timelineTimeRange: '24h',    // For timeline tab (event filtering)
     showBackground: false,       // Toggle for background events
     filterRoom: '',
     filterEventType: '',
@@ -120,13 +149,36 @@ export function thermostatView() {
       return this.$store.thermostats.list;
     },
 
+    // Get time cutoff based on selected timeline range
+    getTimelineCutoff() {
+      const now = Date.now();
+      const preset = TIME_RANGE_PRESETS[this.timelineTimeRange];
+
+      if (!preset) return now - (24 * 60 * 60 * 1000); // Default 24h
+
+      if (this.timelineTimeRange === 'today') {
+        // Start of today (midnight)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today.getTime();
+      }
+
+      return now - preset.ms;
+    },
+
     get events() {
       let events = [...this.$store.thermostats.events];
 
-      // Apply filters
+      // Apply time filter first
+      const cutoff = this.getTimelineCutoff();
+      events = events.filter(e => e.time >= cutoff);
+
+      // Apply room filter
       if (this.filterRoom) {
         events = events.filter(e => e.roomId === this.filterRoom);
       }
+
+      // Apply event type filter
       if (this.filterEventType) {
         events = events.filter(e => e.eventType === this.filterEventType);
       }
@@ -134,16 +186,36 @@ export function thermostatView() {
       return events;
     },
 
-    get importantEvents() {
-      return this.events.filter(e => e.info?.priority === 'important').slice(0, 10);
+    // ALERTS - Critical issues requiring immediate action
+    get alertEvents() {
+      return this.events.filter(e => e.info?.priority === 'alert');
     },
 
+    // WARNINGS - Issues to monitor
+    get warningEvents() {
+      return this.events.filter(e => e.info?.priority === 'warning');
+    },
+
+    // Combined alerts & warnings for the "Alerts & Warnings" section
+    get alertsAndWarnings() {
+      return this.events.filter(e =>
+        e.info?.priority === 'alert' || e.info?.priority === 'warning'
+      ).slice(0, 10);
+    },
+
+    // ACTIVITY - Normal operations (demoted from "important")
     get activityEvents() {
-      return this.events.filter(e => e.info?.priority === 'activity').slice(0, 20);
+      return this.events.filter(e => e.info?.priority === 'activity').slice(0, 30);
     },
 
+    // BACKGROUND - Routine events (collapsed)
     get backgroundEvents() {
       return this.events.filter(e => e.info?.priority === 'background');
+    },
+
+    // Check if there are any active alerts (for badge display)
+    get hasActiveAlerts() {
+      return this.alertEvents.length > 0;
     },
 
     get stats() {
@@ -288,6 +360,64 @@ export function thermostatView() {
       return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
     },
 
+    // Split temp into whole and decimal parts for styling
+    tempParts(temp) {
+      if (temp == null) return { whole: '--', decimal: '' };
+      const fixed = temp.toFixed(1);
+      const [whole, decimal] = fixed.split('.');
+      return { whole, decimal: '.' + decimal };
+    },
+
+    // ============================================
+    // HEATER STATS HELPERS (Pill Display)
+    // ============================================
+
+    getLastCycleText(t) {
+      const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+      if (!stats?.cycles?.length) return 'No cycle data';
+
+      const isHeating = t.runningState === 'heat';
+      const mostRecent = stats.cycles[0];
+
+      // Currently heating - show live duration
+      if (isHeating && mostRecent && !mostRecent.completed) {
+        const runningMins = Math.round((Date.now() - mostRecent.startTime) / 60000);
+        return `Running ${runningMins}m...`;
+      }
+
+      // Find most recent COMPLETED cycle
+      const lastCompleted = stats.cycles.find(c => c.completed);
+      if (lastCompleted) {
+        const endTime = lastCompleted.endTime ? this.formatRelativeTime(lastCompleted.endTime) : '?';
+        const duration = lastCompleted.durationMinutes ?? '?';
+        return `${endTime} • ran ${duration}m`;
+      }
+
+      // No completed cycles
+      if (mostRecent) {
+        return `Started ${this.formatRelativeTime(mostRecent.startTime)}`;
+      }
+
+      return 'No cycle data';
+    },
+
+    getCycleCount(t) {
+      const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+      return stats?.heatingCycles ?? 0;
+    },
+
+    getTotalTime(t) {
+      const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+      if (!stats?.heatingMinutes) return '--';
+      return this.formatDuration(stats.heatingMinutes);
+    },
+
+    getAvgTime(t) {
+      const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+      if (!stats?.avgCycleMinutes || stats.avgCycleMinutes === 0) return null;
+      return `${stats.avgCycleMinutes}m`;
+    },
+
     getEventInfo(eventType) {
       return THERMOSTAT_EVENT_TYPES[eventType] || {
         icon: '📝',
@@ -315,6 +445,18 @@ export function thermostatView() {
     clearFilters() {
       this.filterRoom = '';
       this.filterEventType = '';
+    },
+
+    setTimelineTimeRange(range) {
+      this.timelineTimeRange = range;
+    },
+
+    // Get available time range presets for UI
+    getTimeRangePresets() {
+      return Object.entries(TIME_RANGE_PRESETS).map(([key, val]) => ({
+        key,
+        label: val.label
+      }));
     },
 
     // ============================================

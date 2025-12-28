@@ -32,11 +32,12 @@
   <link rel="stylesheet" href="styles/views/floor-plan.css">
   <link rel="stylesheet" href="styles/views/ambient.css">
   <link rel="stylesheet" href="styles/views/timeline.css">
+  <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css">
   <link rel="stylesheet" href="styles/views/lights.css">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
-  <link rel="stylesheet" href="styles/views/thermostat.css">
+  <link rel="stylesheet" href="styles/views/thermostat.css?v=6">
   <link rel="stylesheet" href="styles/views/mailbox.css">
 
   <!-- Three.js for 3D Floor Plan -->
@@ -984,30 +985,15 @@
                       </button>
                     </div>
 
-                    <!-- Heater Stats (Redesigned) -->
+                    <!-- Heater Stats (Professional) -->
                     <div class="heater-stats">
-                      <!-- Last Cycle Row -->
-                      <div class="stats-last">
-                        <span class="stats-icon">🏁</span>
-                        <span class="stats-text" x-text="getLastCycleText(t)"></span>
+                      <div class="stats-row">
+                        <span class="stats-value" x-text="getLastCycleText(t)"></span>
+                        <span class="stats-value secondary" x-text="getCycleCount(t) + ' cycles'"></span>
                       </div>
-                      <!-- 24h Summary - Pill Grid -->
-                      <div class="stats-summary">
-                        <div class="stat-pill">
-                          <span class="pill-icon">🔄</span>
-                          <span class="pill-value" x-text="getCycleCount(t)"></span>
-                          <span class="pill-label">cycles</span>
-                        </div>
-                        <div class="stat-pill">
-                          <span class="pill-icon">⏱️</span>
-                          <span class="pill-value" x-text="getTotalTime(t)"></span>
-                          <span class="pill-label">total</span>
-                        </div>
-                        <div class="stat-pill" x-show="getAvgTime(t)">
-                          <span class="pill-icon">📈</span>
-                          <span class="pill-value" x-text="getAvgTime(t)"></span>
-                          <span class="pill-label">avg</span>
-                        </div>
+                      <div class="stats-row">
+                        <span class="stats-value secondary" x-text="getTotalTime(t) + ' total'"></span>
+                        <span class="stats-value secondary" x-show="getAvgTime(t)" x-text="getAvgTime(t) + ' avg'"></span>
                       </div>
                     </div>
 
@@ -1275,6 +1261,221 @@
                           }"
                           x-text="(comp.today.setpointChanges - comp.yesterday.setpointChanges > 0 ? '+' : '') + (comp.today.setpointChanges - comp.yesterday.setpointChanges)"></span>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Logs View -->
+        <div x-show="currentView === 'logs'" x-cloak x-data="logsView()" x-init="init()">
+          <div class="logs-view">
+            <!-- Filter Sidebar -->
+            <div class="logs-sidebar" x-show="showFilters">
+              <!-- Time Range -->
+              <div class="logs-sidebar-section">
+                <div class="logs-sidebar-title">Time Range</div>
+                <div class="logs-time-range">
+                  <button class="logs-time-btn" :class="{ active: timeRange === 'live' }" @click="setTimeRange('live')">Live</button>
+                  <button class="logs-time-btn" :class="{ active: timeRange === '1h' }" @click="setTimeRange('1h')">1h</button>
+                  <button class="logs-time-btn" :class="{ active: timeRange === '6h' }" @click="setTimeRange('6h')">6h</button>
+                  <button class="logs-time-btn" :class="{ active: timeRange === '24h' }" @click="setTimeRange('24h')">24h</button>
+                </div>
+              </div>
+
+              <!-- Categories -->
+              <div class="logs-sidebar-section">
+                <div class="logs-sidebar-title">Categories</div>
+                <div class="logs-category-list">
+                  <template x-for="(info, key) in categories" :key="key">
+                    <div class="logs-category-item"
+                         :class="{ inactive: filters.categories.length > 0 && !filters.categories.includes(key) }"
+                         @click="toggleCategory(key)">
+                      <span class="logs-category-icon" x-text="info.icon"></span>
+                      <span class="logs-category-label" x-text="info.label"></span>
+                      <span class="logs-category-count" x-text="stats.byCategory[key] || 0"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Severity -->
+              <div class="logs-sidebar-section">
+                <div class="logs-sidebar-title">Severity</div>
+                <div class="logs-severity-list">
+                  <button class="logs-severity-btn error" :class="{ active: filters.severities.includes('error') }" @click="toggleSeverity('error')">Errors</button>
+                  <button class="logs-severity-btn warning" :class="{ active: filters.severities.includes('warning') }" @click="toggleSeverity('warning')">Warnings</button>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="logs-sidebar-section">
+                <div class="logs-sidebar-title">Quick Filters</div>
+                <div class="logs-presets">
+                  <button class="logs-preset-btn" @click="applyPreset('errors')">Errors Only</button>
+                  <button class="logs-preset-btn" @click="applyPreset('doors')">Doors</button>
+                  <button class="logs-preset-btn" @click="applyPreset('heating')">Heating</button>
+                  <button class="logs-preset-btn" @click="applyPreset('anomalies')">Anomalies</button>
+                  <button class="logs-preset-btn" @click="clearFilters()">Clear All</button>
+                </div>
+              </div>
+
+              <!-- Device Filter -->
+              <div class="logs-sidebar-section">
+                <div class="logs-sidebar-title">Device</div>
+                <select class="logs-device-select" @change="setDevice($event.target.value)">
+                  <option value="">All Devices</option>
+                  <template x-for="device in availableDevices" :key="device">
+                    <option :value="device" x-text="device"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="logs-main">
+              <!-- Header -->
+              <div class="logs-header">
+                <h2 class="logs-title">Activity Logs</h2>
+                <div class="logs-search">
+                  <input type="text" class="logs-search-input" placeholder="Search logs..."
+                         x-model="searchQuery" @input="onSearchInput()">
+                </div>
+                <div class="logs-controls">
+                  <button class="logs-control-btn" :class="{ active: isPaused }" @click="togglePause()">
+                    <span x-text="isPaused ? '▶️ Resume' : '⏸️ Pause'"></span>
+                  </button>
+                  <button class="logs-control-btn" @click="showFilters = !showFilters">
+                    <span x-text="showFilters ? '◀️ Hide Filters' : '▶️ Filters'"></span>
+                  </button>
+                  <button class="logs-control-btn" @click="showStats = !showStats">
+                    <span>📊 Stats</span>
+                  </button>
+                  <button class="logs-control-btn danger" @click="clearLogs()">
+                    <span>🗑️ Clear</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Statistics Panel -->
+              <div class="logs-stats" x-show="showStats" x-collapse>
+                <div class="logs-stat-card">
+                  <div class="logs-stat-value" x-text="stats.total"></div>
+                  <div class="logs-stat-label">Total Events</div>
+                </div>
+                <div class="logs-stat-card">
+                  <div class="logs-stat-value" x-text="stats.lastHour"></div>
+                  <div class="logs-stat-label">Last Hour</div>
+                </div>
+                <div class="logs-stat-card">
+                  <div class="logs-stat-value error" x-text="stats.errors"></div>
+                  <div class="logs-stat-label">Errors</div>
+                </div>
+                <div class="logs-stat-card">
+                  <div class="logs-stat-value warning" x-text="stats.warnings"></div>
+                  <div class="logs-stat-label">Warnings</div>
+                </div>
+                <div class="logs-stat-card">
+                  <div class="logs-stat-value" x-text="stats.anomalies"></div>
+                  <div class="logs-stat-label">Anomalies</div>
+                </div>
+                <div class="logs-stat-card">
+                  <div class="logs-sidebar-title">Messages/Hour</div>
+                  <div class="logs-sparkline">
+                    <template x-for="(val, idx) in getHourlySparkline()" :key="idx">
+                      <div class="logs-sparkline-bar" :style="{ height: val + '%' }"></div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Log Entries List -->
+              <div class="logs-list">
+                <div class="logs-list-header">
+                  <span class="logs-count" x-text="'Showing ' + logs.length + ' of ' + totalLogs + ' entries'"></span>
+                  <span x-show="isLoading" class="logs-loading">Loading...</span>
+                </div>
+
+                <div class="logs-entries" x-show="logs.length > 0">
+                  <template x-for="log in logs" :key="log.id">
+                    <div class="log-entry"
+                         :class="{ anomaly: log.isAnomaly, expanded: isExpanded(log.id) }"
+                         @click="expandLog(log.id)">
+
+                      <!-- Compact View -->
+                      <template x-if="!isExpanded(log.id)">
+                        <div class="log-entry-header" style="display: contents;">
+                          <span class="log-entry-icon" x-text="getCategoryInfo(log.category).icon"></span>
+                          <span class="log-entry-time" x-text="formatTime(log.timestamp)"></span>
+                          <span class="log-entry-device" x-text="log.device"></span>
+                          <span class="log-entry-values" x-text="formatValues(log.values)"></span>
+                          <span class="log-entry-severity" :class="log.severity" x-show="log.severity !== 'info'" x-text="log.severity"></span>
+                          <span class="log-entry-anomaly-badge" x-show="log.isAnomaly">⚠️</span>
+                        </div>
+                      </template>
+
+                      <!-- Expanded View -->
+                      <template x-if="isExpanded(log.id)">
+                        <div class="log-entry-expanded">
+                          <div class="log-entry-header">
+                            <span class="log-entry-icon" x-text="getCategoryInfo(log.category).icon"></span>
+                            <span class="log-entry-time" x-text="formatTime(log.timestamp)"></span>
+                            <span class="log-entry-device" x-text="log.device"></span>
+                            <span class="log-entry-severity" :class="log.severity" x-text="log.severity"></span>
+                          </div>
+
+                          <div class="log-entry-details">
+                            <div class="log-entry-detail">
+                              <span class="log-entry-detail-label">Category</span>
+                              <span class="log-entry-detail-value" x-text="getCategoryInfo(log.category).label"></span>
+                            </div>
+                            <div class="log-entry-detail">
+                              <span class="log-entry-detail-label">Event Type</span>
+                              <span class="log-entry-detail-value" x-text="log.eventType"></span>
+                            </div>
+                            <div class="log-entry-detail">
+                              <span class="log-entry-detail-label">Room</span>
+                              <span class="log-entry-detail-value" x-text="log.roomId"></span>
+                            </div>
+                            <div class="log-entry-detail">
+                              <span class="log-entry-detail-label">Source</span>
+                              <span class="log-entry-detail-value" x-text="log.source"></span>
+                            </div>
+                            <div class="log-entry-detail">
+                              <span class="log-entry-detail-label">Values</span>
+                              <span class="log-entry-detail-value" x-text="formatValues(log.values)"></span>
+                            </div>
+                            <div class="log-entry-detail" x-show="log.topic">
+                              <span class="log-entry-detail-label">Topic</span>
+                              <span class="log-entry-detail-value" x-text="log.topic" style="font-size: 0.7rem;"></span>
+                            </div>
+                          </div>
+
+                          <div class="log-entry-payload" x-show="log.payload">
+                            <div class="logs-sidebar-title">Raw Payload</div>
+                            <pre x-text="formatPayload(log.payload)"></pre>
+                          </div>
+
+                          <div class="log-entry-actions">
+                            <button class="log-entry-action-btn" @click.stop="copyPayload(log)">📋 Copy Payload</button>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+
+                  <!-- Load More -->
+                  <div class="logs-load-more" x-show="hasMore">
+                    <button class="logs-load-more-btn" @click="loadMore()">
+                      Load More (<span x-text="totalLogs - visibleCount"></span> remaining)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="logs-empty" x-show="logs.length === 0 && !isLoading">
+                  <div class="logs-empty-icon">📋</div>
+                  <div class="logs-empty-text">No logs yet. Messages will appear here as they arrive.</div>
                 </div>
               </div>
             </div>
@@ -1712,7 +1913,7 @@
         </div>
 
         <!-- Section: By Room -->
-        <div class="panel-section panel-section-primary">
+        <div class="panel-section panel-section-primary rooms-section">
           <div class="panel-section-title">ROOMS</div>
           <div class="panel-metrics-grid">
             <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
@@ -1725,7 +1926,7 @@
         </div>
 
         <!-- Section: Heating (icon + title + badge) -->
-        <div class="panel-section compact">
+        <div class="panel-section compact heating-section">
           <div class="panel-section-header">
             <span class="section-icon" x-text="($store.thermostats?.activeHeatingCount || 0) > 0 ? '🔥' : '❄️'"></span>
             <span class="section-title">Heating</span>
@@ -1745,7 +1946,7 @@
         </div>
 
         <!-- Section: Doors (lock icon + title + badge) -->
-        <div class="panel-section compact">
+        <div class="panel-section compact doors-section">
           <div class="panel-section-header">
             <span class="section-icon" x-text="getDoorCount() > 0 ? '🔓' : '🔒'"></span>
             <span class="section-title">Doors</span>
@@ -1768,7 +1969,7 @@
         </div>
 
         <!-- Section: Windows (lock icon + title + badge) -->
-        <div class="panel-section compact">
+        <div class="panel-section compact windows-section">
           <div class="panel-section-header">
             <span class="section-icon" x-text="getWindowCount() > 0 ? '🔓' : '🔒'"></span>
             <span class="section-title">Windows</span>
@@ -2570,7 +2771,7 @@
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
     import { initThermostatStore } from './js/stores/thermostat-store.js?v=3';
-    import { thermostatView } from './views/thermostat.js?v=4';
+    import { thermostatView } from './views/thermostat.js?v=6';
 
     // Expose thermostatView globally for Alpine x-data
     window.thermostatView = thermostatView;
@@ -2738,6 +2939,47 @@
 
       // Config store
       Alpine.store('config', CONFIG);
+
+      // Kiosk control store - uses JavaScript Fullscreen API
+      Alpine.store('kiosk', {
+        isFullscreen: !!document.fullscreenElement,
+        isLoading: false,
+
+        // Auto-fullscreen on Pi (not on local dev)
+        init() {
+          const isOnPi = window.location.hostname !== 'localhost' || window.location.port === '8888';
+          if (isOnPi && !document.fullscreenElement) {
+            // Delay to ensure page is fully loaded
+            setTimeout(() => {
+              document.documentElement.requestFullscreen().catch(e => {
+                console.log('[kiosk] Auto-fullscreen failed (user gesture required):', e.message);
+              });
+            }, 1000);
+          }
+        },
+
+        async toggleFullscreen() {
+          if (this.isLoading) return;
+          this.isLoading = true;
+          try {
+            if (document.fullscreenElement) {
+              await document.exitFullscreen();
+              this.isFullscreen = false;
+            } else {
+              await document.documentElement.requestFullscreen();
+              this.isFullscreen = true;
+            }
+          } catch (e) {
+            console.error('[kiosk] Fullscreen error:', e);
+          } finally {
+            this.isLoading = false;
+          }
+        },
+
+        refresh() {
+          window.location.reload();
+        }
+      });
 
       // MQTT connection store
       Alpine.store('mqtt', {

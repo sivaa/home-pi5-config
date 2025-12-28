@@ -4,27 +4,46 @@
  */
 
 // Event type definitions for thermostat timeline
+// Priority levels: alert (red, requires action) > warning (yellow, monitor) > activity (blue, normal ops) > background (gray, routine)
 const THERMOSTAT_EVENT_TYPES = {
-  // IMPORTANT (full cards)
-  heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'important', category: 'heating' },
-  heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'important', category: 'heating' },
-  target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'important', category: 'heating' },
-  device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', priority: 'important', category: 'system' },
-  low_battery: { icon: '🪫', color: '#f59e0b', label: 'Low Battery', priority: 'important', category: 'system' },
+  // ALERT - Requires immediate attention (shown prominently)
+  device_offline: {
+    icon: '🔴', color: '#ef4444', label: 'Device Offline',
+    priority: 'alert', category: 'system',
+    action: 'Check device power and Zigbee signal'
+  },
+  low_battery_critical: {
+    icon: '🪫', color: '#ef4444', label: 'Battery Critical',
+    priority: 'alert', category: 'system',
+    action: 'Replace batteries immediately'
+  },
 
-  // ACTIVITY (compact lines)
+  // WARNING - Should investigate (shown with less urgency)
+  low_battery: {
+    icon: '🔋', color: '#f59e0b', label: 'Battery Low',
+    priority: 'warning', category: 'system',
+    action: 'Plan to replace batteries soon'
+  },
+  window_detected: {
+    icon: '🪟', color: '#f59e0b', label: 'Window Open',
+    priority: 'warning', category: 'heating',
+    action: 'Heating paused - close window to resume'
+  },
+
+  // ACTIVITY - Normal operations (compact rows)
+  heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'activity', category: 'heating' },
+  heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'activity', category: 'heating' },
+  target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'activity', category: 'heating' },
   setpoint_changed: { icon: '🎯', color: '#f59e0b', label: 'Setpoint Changed', priority: 'activity', category: 'control' },
   mode_changed: { icon: '⚙️', color: '#8b5cf6', label: 'Mode Changed', priority: 'activity', category: 'control' },
   preset_changed: { icon: '🚀', color: '#06b6d4', label: 'Preset Changed', priority: 'activity', category: 'control' },
   child_lock_changed: { icon: '🔒', color: '#64748b', label: 'Child Lock Changed', priority: 'activity', category: 'control' },
+  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' },
 
-  // BACKGROUND (collapsed)
+  // BACKGROUND - Routine events (collapsed by default)
   device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background', category: 'system' },
   battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background', category: 'system' },
-  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' },
-
-  // INITIAL STATE (activity level - shows on first connect)
-  initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity', category: 'system' }
+  temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background', category: 'data' }
 };
 
 export function initThermostatStore(Alpine, CONFIG) {
@@ -375,14 +394,25 @@ export function initThermostatStore(Alpine, CONFIG) {
         });
       }
 
-      // Low battery warning
-      if (thermostat.battery !== null && thermostat.battery < 20 &&
-          (prev.battery === null || prev.battery >= 20)) {
-        this.addEvent({
-          ...baseEvent,
-          eventType: 'low_battery',
-          battery: thermostat.battery
-        });
+      // Low battery detection (critical <10%, warning 10-20%)
+      if (thermostat.battery !== null) {
+        // Critical battery (<10%) - entered critical zone
+        if (thermostat.battery < 10 && (prev.battery === null || prev.battery >= 10)) {
+          this.addEvent({
+            ...baseEvent,
+            eventType: 'low_battery_critical',
+            battery: thermostat.battery
+          });
+        }
+        // Low battery warning (10-20%) - entered warning zone
+        else if (thermostat.battery < 20 && thermostat.battery >= 10 &&
+                 (prev.battery === null || prev.battery >= 20)) {
+          this.addEvent({
+            ...baseEvent,
+            eventType: 'low_battery',
+            battery: thermostat.battery
+          });
+        }
       }
 
       // Open window detected
@@ -395,6 +425,15 @@ export function initThermostatStore(Alpine, CONFIG) {
     },
 
     addEvent(event) {
+      // Deduplicate: Don't add if identical event exists within 5 seconds
+      const isDuplicate = this.events.some(e =>
+        e.deviceId === event.deviceId &&
+        e.eventType === event.eventType &&
+        Math.abs(e.time - event.time) < 5000
+      );
+
+      if (isDuplicate) return;
+
       // Add event info from config
       const eventInfo = THERMOSTAT_EVENT_TYPES[event.eventType] || {
         icon: '📝',
@@ -560,24 +599,79 @@ export function initThermostatStore(Alpine, CONFIG) {
 
     getStatsByDevice(deviceId, hours = 24) {
       const cutoff = Date.now() - (hours * 60 * 60 * 1000);
-      const deviceEvents = this.events.filter(e => e.deviceId === deviceId && e.time > cutoff);
+      const deviceEvents = this.events
+        .filter(e => e.deviceId === deviceId && e.time > cutoff)
+        .sort((a, b) => a.time - b.time);  // Sort ASC for correct pairing
 
-      const heatingStarted = deviceEvents.filter(e => e.eventType === 'heating_started');
-      const heatingStopped = deviceEvents.filter(e => e.eventType === 'heating_stopped');
+      // Filter to only heating start/stop events and dedupe spurious consecutive STARTs
+      // A heater can't "start" twice - if we see START→START, keep only the first
+      const heatingEvents = deviceEvents.filter(e =>
+        e.eventType === 'heating_started' || e.eventType === 'heating_stopped'
+      );
 
-      // Calculate heating duration
-      let totalHeatingMs = 0;
-      for (let i = 0; i < heatingStarted.length; i++) {
-        const start = heatingStarted[i];
-        const stop = heatingStopped.find(s => s.time > start.time);
-        if (stop) {
-          totalHeatingMs += stop.time - start.time;
+      const validStarts = [];
+      const validStops = [];
+      let lastEventType = null;
+
+      for (const event of heatingEvents) {
+        if (event.eventType === 'heating_started') {
+          // Only count this START if we're not already in "started" state
+          if (lastEventType !== 'heating_started') {
+            validStarts.push(event);
+            lastEventType = 'heating_started';
+          }
+          // else: spurious duplicate START, ignore it
+        } else if (event.eventType === 'heating_stopped') {
+          // Only count STOP if we were in "started" state
+          if (lastEventType === 'heating_started') {
+            validStops.push(event);
+            lastEventType = 'heating_stopped';
+          }
+          // else: spurious STOP without START, ignore it
         }
       }
 
+      // Build cycle list with correct pairing (now using deduplicated events)
+      const cycles = [];
+      let totalHeatingMs = 0;
+      let stopIndex = 0;
+
+      for (const start of validStarts) {
+        // Find next stop AFTER this start (sequential, not find())
+        while (stopIndex < validStops.length && validStops[stopIndex].time <= start.time) {
+          stopIndex++;
+        }
+
+        const stop = validStops[stopIndex] || null;
+        const durationMs = stop ? stop.time - start.time : null;
+
+        if (durationMs && durationMs > 0) {
+          totalHeatingMs += durationMs;
+          stopIndex++;  // Consume this stop event
+        }
+
+        cycles.push({
+          startTime: start.time,
+          endTime: stop?.time || null,
+          durationMinutes: durationMs ? Math.round(durationMs / 60000) : null,
+          completed: !!stop && durationMs > 0
+        });
+      }
+
+      // Sort cycles DESC for display (most recent first)
+      cycles.sort((a, b) => b.startTime - a.startTime);
+      const completedCount = cycles.filter(c => c.completed).length;
+
       return {
-        heatingCycles: heatingStarted.length,
+        // Use completedCount for both - semantically correct AND math adds up
+        heatingCycles: completedCount,
         heatingMinutes: Math.round(totalHeatingMs / 60000),
+        avgCycleMinutes: completedCount > 0 ? Math.round(totalHeatingMs / completedCount / 60000) : 0,
+        // Also expose raw data for UI if needed
+        totalStarts: validStarts.length,
+        incompleteCount: validStarts.length - completedCount,
+        cycles: cycles,
+        lastCycle: cycles[0] || null,
         setpointChanges: deviceEvents.filter(e => e.eventType === 'setpoint_changed').length,
         targetReached: deviceEvents.filter(e => e.eventType === 'target_reached').length
       };
