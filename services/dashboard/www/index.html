@@ -234,15 +234,6 @@
         <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
-            <!-- Kiosk Controls -->
-            <div class="kiosk-controls" x-data>
-              <button class="kiosk-btn"
-                      @click="$store.kiosk?.toggleFullscreen()"
-                      title="Toggle fullscreen">&#x26F6;</button>
-              <button class="kiosk-btn"
-                      @click="$store.kiosk?.refresh()"
-                      title="Refresh page">&#x1F504;</button>
-            </div>
             <!-- Theme Toggle -->
             <div class="theme-toggle" x-data>
               <button class="theme-toggle-btn"
@@ -1451,7 +1442,29 @@
                             </div>
                           </div>
 
-                          <div class="log-entry-payload" x-show="log.payload">
+                          <!-- TTS-specific section -->
+                          <div class="log-entry-tts" x-show="log.category === 'tts'" style="margin-top: var(--space-sm); padding: var(--space-sm); background: var(--color-bg); border-radius: var(--radius-sm);">
+                            <div class="logs-sidebar-title">🔊 TTS Notification Details</div>
+                            <div style="margin-top: var(--space-xs);">
+                              <div style="font-weight: 500; margin-bottom: var(--space-xs);">Message:</div>
+                              <div style="font-style: italic; padding: var(--space-xs); background: var(--color-surface); border-radius: var(--radius-sm); font-size: 0.85rem;" x-text="log.ttsMessage || 'No message'"></div>
+                            </div>
+                            <div style="margin-top: var(--space-sm);">
+                              <div style="font-weight: 500; margin-bottom: var(--space-xs);">Target Devices:</div>
+                              <template x-for="device in (log.ttsDevices || [])" :key="device.device">
+                                <div style="display: flex; align-items: center; gap: var(--space-xs); padding: 2px 0; font-size: 0.85rem;">
+                                  <span x-text="device.available ? '✅' : '❌'"></span>
+                                  <span x-text="device.device"></span>
+                                  <span style="color: var(--color-text-tertiary);" x-text="device.available ? '(available)' : '(unavailable)'"></span>
+                                </div>
+                              </template>
+                            </div>
+                            <div style="margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--color-border);">
+                              <span :style="{ color: log.ttsSuccess ? '#22c55e' : '#ef4444', fontWeight: 500 }" x-text="log.ttsSuccess ? '✅ TTS sent successfully' : '❌ TTS failed - no available devices'"></span>
+                            </div>
+                          </div>
+
+                          <div class="log-entry-payload" x-show="log.payload && log.category !== 'tts'">
                             <div class="logs-sidebar-title">Raw Payload</div>
                             <pre x-text="formatPayload(log.payload)"></pre>
                           </div>
@@ -2127,9 +2140,22 @@
           if (!this.co2Sensor) return null;
           return this.$store?.sensors?.getLiveData?.(this.co2Sensor.ieee_address) ?? null;
         },
-        get co2Value() { return this.liveData?.co2 ?? null; },
-        get temperature() { return this.liveData?.temperature ?? null; },
-        get humidity() { return this.liveData?.humidity ?? null; },
+        get co2Value() {
+          // Live data first, then fall back to last historical value
+          if (this.liveData?.co2 != null) return this.liveData.co2;
+          if (this.co2History.length > 0) return this.co2History[this.co2History.length - 1].value;
+          return null;
+        },
+        get temperature() {
+          if (this.liveData?.temperature != null) return this.liveData.temperature;
+          if (this.tempHistory.length > 0) return this.tempHistory[this.tempHistory.length - 1].value;
+          return null;
+        },
+        get humidity() {
+          if (this.liveData?.humidity != null) return this.liveData.humidity;
+          if (this.humidHistory.length > 0) return this.humidHistory[this.humidHistory.length - 1].value;
+          return null;
+        },
         get airQualityLevel() {
           const co2 = this.co2Value;
           if (co2 === null) return 'unknown';
@@ -2868,6 +2894,71 @@
     }
   </script>
 
+  <!-- Sensors Store Module - discovers and tracks sensor data for doors/windows -->
+  <script type="module">
+    import { initSensorsStore } from './js/stores/sensors-store.js';
+
+    function initSensors() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('sensors')) {
+          initSensorsStore(Alpine, CONFIG);
+          console.log('[sensors] Sensors store initialized');
+        }
+        // Initialize sensors store after MQTT connects
+        setTimeout(() => {
+          const sensorsStore = Alpine.store('sensors');
+          if (sensorsStore) {
+            sensorsStore.init?.();
+            sensorsStore.startDurationTicker?.();
+            console.log('[sensors] Sensor discovery initialized');
+          }
+        }, 2000);
+      }
+    }
+
+    if (typeof Alpine !== 'undefined') {
+      initSensors();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initSensorsStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initSensors);
+    }
+  </script>
+
+  <!-- Events Store Module - tracks door/window/motion events -->
+  <script type="module">
+    import { initEventsStore } from './js/stores/events-store.js';
+
+    function initEvents() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('events')) {
+          initEventsStore(Alpine, CONFIG);
+          console.log('[events] Events store initialized');
+        }
+        // Load historical events after init
+        setTimeout(() => {
+          const eventsStore = Alpine.store('events');
+          if (eventsStore) {
+            eventsStore.loadHistorical?.(24);
+            console.log('[events] Historical events loading');
+          }
+        }, 2000);
+      }
+    }
+
+    if (typeof Alpine !== 'undefined') {
+      initEvents();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initEventsStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initEvents);
+    }
+  </script>
+
   <script>
     // ========================================
     // CONFIGURATION
@@ -2981,79 +3072,6 @@
       // Config store
       Alpine.store('config', CONFIG);
 
-      // Kiosk control store - uses kiosk-control API for compositor-level control
-      Alpine.store('kiosk', {
-        isFullscreen: true,   // Assume fullscreen on load (will be updated by status check)
-        isLoading: false,
-
-        /**
-         * Get the kiosk-control API URL
-         * On Pi: localhost:8889
-         * Local dev: pi:8889 (connect to Pi's kiosk-control service)
-         */
-        get apiUrl() {
-          if (window.location.hostname === 'localhost' && window.location.port !== '8888') {
-            return 'http://pi:8889/api/kiosk';
-          }
-          return 'http://127.0.0.1:8889/api/kiosk';
-        },
-
-        /**
-         * Initialize - check current fullscreen status
-         */
-        init() {
-          // Check status after a short delay
-          setTimeout(() => this.checkStatus(), 2000);
-        },
-
-        /**
-         * Check current fullscreen status from kiosk-control
-         */
-        async checkStatus() {
-          try {
-            const response = await fetch(`${this.apiUrl}/status`, { mode: 'cors' });
-            if (response.ok) {
-              const data = await response.json();
-              this.isFullscreen = data.fullscreen;
-              console.log('[kiosk] Status:', this.isFullscreen ? 'fullscreen' : 'windowed');
-            }
-          } catch (e) {
-            console.log('[kiosk] Status check failed (not on Pi?):', e.message);
-          }
-        },
-
-        /**
-         * Toggle fullscreen via kiosk-control API
-         * - Enter: uses wlrctl compositor control
-         * - Exit: restarts browser without session state
-         */
-        async toggleFullscreen() {
-          if (this.isLoading) return;
-          this.isLoading = true;
-
-          try {
-            const response = await fetch(`${this.apiUrl}/toggle`, { mode: 'cors' });
-            if (response.ok) {
-              const data = await response.json();
-              this.isFullscreen = data.fullscreen;
-              console.log('[kiosk] Toggle result:', data.action, '- fullscreen:', data.fullscreen);
-              // If exiting fullscreen, page will reload due to browser restart
-            }
-          } catch (e) {
-            console.error('[kiosk] Toggle failed:', e);
-          } finally {
-            this.isLoading = false;
-          }
-        },
-
-        /**
-         * Refresh the browser page
-         */
-        refresh() {
-          window.location.reload();
-        }
-      });
-
       // MQTT connection store
       Alpine.store('mqtt', {
         connected: false,
@@ -3076,6 +3094,10 @@
             // Subscribe to ALL zigbee2mqtt topics (for logs view)
             this.client.subscribe(`${CONFIG.baseTopic}/#`, { qos: 0 });
             console.log(`[mqtt] Subscribed to ${CONFIG.baseTopic}/# (all topics for logs)`);
+
+            // Subscribe to dashboard topics (for TTS notifications, commands, etc.)
+            this.client.subscribe('dashboard/#', { qos: 0 });
+            console.log('[mqtt] Subscribed to dashboard/# (TTS notifications)');
 
             // Subscribe to room sensors (primary) - now covered by wildcard but keeping for clarity
             CONFIG.rooms.forEach(room => {
@@ -3812,6 +3834,7 @@
           thermostat: { icon: '🔥', label: 'Thermostat', color: '#ef4444' },
           light: { icon: '💡', label: 'Lights', color: '#fbbf24' },
           plug: { icon: '🔌', label: 'Plugs', color: '#8b5cf6' },
+          tts: { icon: '🔊', label: 'TTS Notifications', color: '#ec4899' },
           system: { icon: '📡', label: 'System', color: '#6b7280' },
           command: { icon: '🎮', label: 'Commands', color: '#06b6d4' }
         },
@@ -3827,6 +3850,16 @@
           if (this.paused) return;
           if (topic.includes('/bridge/')) return;
 
+          // Handle TTS notifications specially
+          if (topic === 'dashboard/tts') {
+            const entry = this.createTTSLogEntry(payload);
+            if (entry) {
+              this.logs.unshift(entry);
+              if (this.logs.length > this.maxLogs) this.logs.pop();
+            }
+            return;
+          }
+
           const entry = this.createLogEntry(topic, payload);
           if (!entry) return;
 
@@ -3837,6 +3870,51 @@
           this.previousState[entry.device] = {
             values: { ...entry.values },
             timestamp: entry.timestamp
+          };
+        },
+
+        // Create log entry for TTS notifications
+        createTTSLogEntry(payload) {
+          const timestamp = payload.timestamp ? new Date(payload.timestamp).getTime() : Date.now();
+          const devices = payload.devices || [];
+          const deviceNames = devices.map(d => d.device).join(', ');
+          const availableDevices = devices.filter(d => d.available);
+          const unavailableDevices = devices.filter(d => !d.available);
+
+          // Determine severity based on success
+          let severity = 'info';
+          if (!payload.success) {
+            severity = 'error';
+          } else if (!payload.all_available) {
+            severity = 'warning';
+          } else {
+            severity = 'success';
+          }
+
+          return {
+            id: `tts-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp,
+            source: 'tts',
+            topic: 'dashboard/tts',
+            device: deviceNames || 'Unknown',
+            category: 'tts',
+            eventType: 'tts_call',
+            severity,
+            payload,
+            values: {
+              message: payload.message,
+              success: payload.success,
+              allAvailable: payload.all_available,
+              devices: devices.length,
+              availableCount: availableDevices.length,
+              unavailableCount: unavailableDevices.length
+            },
+            roomId: 'tts',
+            isAnomaly: !payload.success,
+            // TTS-specific fields for display
+            ttsMessage: payload.message,
+            ttsDevices: devices,
+            ttsSuccess: payload.success
           };
         },
 
@@ -4040,6 +4118,18 @@
 
         formatValues(values) {
           const parts = [];
+          // TTS-specific formatting
+          if (values.message !== undefined) {
+            const msg = values.message.length > 50 ? values.message.substring(0, 50) + '...' : values.message;
+            parts.push(`"${msg}"`);
+          }
+          if (values.success !== undefined) {
+            parts.push(values.success ? '✅ Sent' : '❌ Failed');
+          }
+          if (values.devices !== undefined && values.availableCount !== undefined) {
+            parts.push(`${values.availableCount}/${values.devices} devices`);
+          }
+          // Standard sensor values
           if (values.temperature !== undefined) parts.push(`${values.temperature.toFixed(1)}°C`);
           if (values.humidity !== undefined) parts.push(`${values.humidity}%`);
           if (values.co2 !== undefined) parts.push(`${values.co2}ppm`);
@@ -4056,6 +4146,18 @@
 
       // Initialize logs store
       Alpine.store('logs')?.init();
+
+      // Store validation - warn if critical stores are missing
+      setTimeout(() => {
+        const criticalStores = ['mqtt', 'rooms', 'sensors', 'events', 'thermostats', 'lights'];
+        const missingStores = criticalStores.filter(name => !Alpine.store(name));
+        if (missingStores.length > 0) {
+          console.error(`[CRITICAL] Missing stores: ${missingStores.join(', ')}`);
+          console.error('[CRITICAL] Door/window status will not display correctly!');
+        } else {
+          console.log('[stores] All critical stores registered successfully');
+        }
+      }, 3000);
     });
 
     // ========================================
