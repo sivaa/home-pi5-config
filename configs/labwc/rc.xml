@@ -3,6 +3,13 @@
   <!-- Touch input configuration -->
   <touch deviceName="ILITEK ILITEK-TP" mapToOutput="HDMI-A-1" mouseEmulation="no"/>
 
+  <!-- Keyboard shortcuts for kiosk control -->
+  <keyboard>
+    <keybind key="F11">
+      <action name="ToggleFullscreen"/>
+    </keybind>
+  </keyboard>
+
   <!-- Window rules for kiosk mode -->
   <windowRules>
     <!-- Auto-fullscreen Epiphany browser windows -->

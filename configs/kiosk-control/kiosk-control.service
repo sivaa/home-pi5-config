@@ -1,0 +1,24 @@
+[Unit]
+Description=Kiosk Control Service - HTTP API for display control
+# Start after labwc is running
+After=default.target
+
+[Service]
+Type=simple
+
+# wtype needs WAYLAND_DISPLAY to communicate with labwc
+Environment=WAYLAND_DISPLAY=wayland-0
+
+# Run the Python HTTP server
+ExecStart=/usr/bin/python3 /opt/kiosk-control/kiosk-control.py
+
+# Auto-restart on failure
+Restart=on-failure
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
