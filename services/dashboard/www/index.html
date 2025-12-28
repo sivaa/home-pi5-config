@@ -1879,26 +1879,40 @@
       <div class="panel-content">
 
         <!-- Section: Home Average -->
-        <div class="panel-section panel-section-primary">
+        <div class="panel-section panel-section-primary home-section">
           <div class="panel-section-title">HOME</div>
-          <div class="panel-metrics-grid">
-            <div class="panel-metric">
-              <span class="panel-icon">🏠</span>
-              <span class="panel-value" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
-            </div>
+          <!-- Primary: Large temperature -->
+          <div class="panel-metric">
+            <span class="panel-icon">🏠</span>
+            <span class="panel-value temp-primary" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
+          </div>
+          <!-- Secondary: Humidity and CO2 on next line with color coding -->
+          <div class="panel-secondary-row">
             <div class="panel-metric">
               <span class="panel-icon">💧</span>
-              <span class="panel-value" x-text="($store.rooms.avgHumidity?.toFixed(0) || '--') + '%'"></span>
+              <span class="panel-value"
+                    :class="{
+                      'metric-good': $store.rooms.avgHumidity >= 40 && $store.rooms.avgHumidity <= 60,
+                      'metric-warning': ($store.rooms.avgHumidity >= 30 && $store.rooms.avgHumidity < 40) || ($store.rooms.avgHumidity > 60 && $store.rooms.avgHumidity <= 70),
+                      'metric-bad': $store.rooms.avgHumidity < 30 || $store.rooms.avgHumidity > 70
+                    }"
+                    x-text="($store.rooms.avgHumidity?.toFixed(0) || '--') + '%'"></span>
             </div>
             <div class="panel-metric" x-show="$store.rooms.co2Value">
               <span class="panel-icon">💨</span>
-              <span class="panel-value" x-text="$store.rooms.co2Value"></span>
+              <span class="panel-value"
+                    :class="{
+                      'metric-good': $store.rooms.co2Value < 800,
+                      'metric-warning': $store.rooms.co2Value >= 800 && $store.rooms.co2Value <= 1000,
+                      'metric-bad': $store.rooms.co2Value > 1000
+                    }"
+                    x-text="$store.rooms.co2Value"></span>
             </div>
           </div>
         </div>
 
         <!-- Section: Outside -->
-        <div class="panel-section panel-section-primary">
+        <div class="panel-section panel-section-primary outside-section">
           <div class="panel-section-title">OUTSIDE</div>
           <div class="panel-metrics-grid">
             <div class="panel-metric">
@@ -2827,6 +2841,33 @@
     }
   </script>
 
+  <!-- CO2 View Module - loads methods and triggers stub enhancement -->
+  <script type="module">
+    import { co2View } from './views/co2-monitor.js?v=1';
+
+    // Get the module object and extract the methods
+    const moduleObj = co2View();
+    window._co2ViewMethods = {
+      loadHistoricalData: moduleObj.loadHistoricalData,
+      queryInflux: moduleObj.queryInflux,
+      setTimeRange: moduleObj.setTimeRange,
+      drawChart: moduleObj.drawChart,
+      drawThresholdZones: moduleObj.drawThresholdZones,
+      formatTimeLabel: moduleObj.formatTimeLabel,
+      calculateTrend: moduleObj.calculateTrend,
+      formatLastUpdate: moduleObj.formatLastUpdate,
+      toggleAmbient: moduleObj.toggleAmbient,
+      destroy: moduleObj.destroy
+    };
+    console.log('[co2-view] Module loaded, methods ready');
+
+    // If stub component exists, trigger enhancement
+    if (window._co2ViewComponent && !window._co2ViewComponent._moduleLoaded) {
+      console.log('[co2-view] Stub found, enhancing with methods...');
+      window._co2ViewComponent._checkForModule();
+    }
+  </script>
+
   <script>
     // ========================================
     // CONFIGURATION
@@ -2940,42 +2981,74 @@
       // Config store
       Alpine.store('config', CONFIG);
 
-      // Kiosk control store - uses JavaScript Fullscreen API
+      // Kiosk control store - uses kiosk-control API for compositor-level control
       Alpine.store('kiosk', {
-        isFullscreen: !!document.fullscreenElement,
+        isFullscreen: true,   // Assume fullscreen on load (will be updated by status check)
         isLoading: false,
 
-        // Auto-fullscreen on Pi (not on local dev)
+        /**
+         * Get the kiosk-control API URL
+         * On Pi: localhost:8889
+         * Local dev: pi:8889 (connect to Pi's kiosk-control service)
+         */
+        get apiUrl() {
+          if (window.location.hostname === 'localhost' && window.location.port !== '8888') {
+            return 'http://pi:8889/api/kiosk';
+          }
+          return 'http://127.0.0.1:8889/api/kiosk';
+        },
+
+        /**
+         * Initialize - check current fullscreen status
+         */
         init() {
-          const isOnPi = window.location.hostname !== 'localhost' || window.location.port === '8888';
-          if (isOnPi && !document.fullscreenElement) {
-            // Delay to ensure page is fully loaded
-            setTimeout(() => {
-              document.documentElement.requestFullscreen().catch(e => {
-                console.log('[kiosk] Auto-fullscreen failed (user gesture required):', e.message);
-              });
-            }, 1000);
+          // Check status after a short delay
+          setTimeout(() => this.checkStatus(), 2000);
+        },
+
+        /**
+         * Check current fullscreen status from kiosk-control
+         */
+        async checkStatus() {
+          try {
+            const response = await fetch(`${this.apiUrl}/status`, { mode: 'cors' });
+            if (response.ok) {
+              const data = await response.json();
+              this.isFullscreen = data.fullscreen;
+              console.log('[kiosk] Status:', this.isFullscreen ? 'fullscreen' : 'windowed');
+            }
+          } catch (e) {
+            console.log('[kiosk] Status check failed (not on Pi?):', e.message);
           }
         },
 
+        /**
+         * Toggle fullscreen via kiosk-control API
+         * - Enter: uses wlrctl compositor control
+         * - Exit: restarts browser without session state
+         */
         async toggleFullscreen() {
           if (this.isLoading) return;
           this.isLoading = true;
+
           try {
-            if (document.fullscreenElement) {
-              await document.exitFullscreen();
-              this.isFullscreen = false;
-            } else {
-              await document.documentElement.requestFullscreen();
-              this.isFullscreen = true;
+            const response = await fetch(`${this.apiUrl}/toggle`, { mode: 'cors' });
+            if (response.ok) {
+              const data = await response.json();
+              this.isFullscreen = data.fullscreen;
+              console.log('[kiosk] Toggle result:', data.action, '- fullscreen:', data.fullscreen);
+              // If exiting fullscreen, page will reload due to browser restart
             }
           } catch (e) {
-            console.error('[kiosk] Fullscreen error:', e);
+            console.error('[kiosk] Toggle failed:', e);
           } finally {
             this.isLoading = false;
           }
         },
 
+        /**
+         * Refresh the browser page
+         */
         refresh() {
           window.location.reload();
         }
@@ -3000,9 +3073,13 @@
             this.connected = true;
             this.connecting = false;
 
-            // Subscribe to room sensors (primary)
+            // Subscribe to ALL zigbee2mqtt topics (for logs view)
+            this.client.subscribe(`${CONFIG.baseTopic}/#`, { qos: 0 });
+            console.log(`[mqtt] Subscribed to ${CONFIG.baseTopic}/# (all topics for logs)`);
+
+            // Subscribe to room sensors (primary) - now covered by wildcard but keeping for clarity
             CONFIG.rooms.forEach(room => {
-              this.client.subscribe(`${CONFIG.baseTopic}/${room.sensor}`, { qos: 0 });
+              // Already covered by wildcard
             });
 
             // Subscribe to all additional sensors from ROOM_SENSORS
@@ -3029,6 +3106,15 @@
             try {
               const msgStr = message.toString();
               const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+
+              // Capture ALL messages for logs store (before any filtering)
+              try {
+                const logPayload = JSON.parse(msgStr);
+                Alpine.store('logs')?.captureMessage(topic, logPayload);
+              } catch (e) {
+                // Non-JSON message, capture as-is
+                Alpine.store('logs')?.captureMessage(topic, { raw: msgStr });
+              }
 
               // Check if it's an availability message
               if (topic.endsWith('/availability')) {
@@ -3683,6 +3769,293 @@
 
       // Initialize weather store after a short delay
       setTimeout(() => Alpine.store('weather')?.init(), 2000);
+
+      // ========================================
+      // LOGS STORE
+      // ========================================
+      Alpine.store('logs', {
+        // Data
+        logs: [],
+        maxLogs: 5000,
+        previousState: {},
+
+        // Anomaly thresholds
+        thresholds: {
+          tempDelta: 3,
+          tempDeltaWindow: 600000,
+          doorOpenDuration: 1800000,
+          co2Warning: 1200,
+          co2Critical: 1500,
+          lowBattery: 20
+        },
+
+        // Filters
+        filters: {
+          timeRange: 'live',
+          categories: [],
+          devices: [],
+          search: '',
+          anomaliesOnly: false,
+          severities: []
+        },
+
+        // UI State
+        paused: false,
+        loading: false,
+        expandedLogId: null,
+
+        // Categories
+        categories: {
+          climate: { icon: '🌡️', label: 'Climate', color: '#22c55e' },
+          contact: { icon: '🚪', label: 'Doors/Windows', color: '#3b82f6' },
+          motion: { icon: '👁️', label: 'Motion', color: '#f59e0b' },
+          thermostat: { icon: '🔥', label: 'Thermostat', color: '#ef4444' },
+          light: { icon: '💡', label: 'Lights', color: '#fbbf24' },
+          plug: { icon: '🔌', label: 'Plugs', color: '#8b5cf6' },
+          system: { icon: '📡', label: 'System', color: '#6b7280' },
+          command: { icon: '🎮', label: 'Commands', color: '#06b6d4' }
+        },
+
+        init() {
+          const saved = localStorage.getItem('logs-thresholds');
+          if (saved) {
+            try { Object.assign(this.thresholds, JSON.parse(saved)); } catch (e) {}
+          }
+        },
+
+        captureMessage(topic, payload) {
+          if (this.paused) return;
+          if (topic.includes('/bridge/')) return;
+
+          const entry = this.createLogEntry(topic, payload);
+          if (!entry) return;
+
+          entry.isAnomaly = this.detectAnomaly(entry);
+          this.logs.unshift(entry);
+          if (this.logs.length > this.maxLogs) this.logs.pop();
+
+          this.previousState[entry.device] = {
+            values: { ...entry.values },
+            timestamp: entry.timestamp
+          };
+        },
+
+        createLogEntry(topic, payload) {
+          const timestamp = Date.now();
+          const device = topic.replace('zigbee2mqtt/', '').replace('dashboard/', '');
+          const roomId = this.extractRoomId(device);
+          const category = this.detectCategory(device, payload);
+          const eventType = this.detectEventType(payload);
+          const severity = this.detectSeverity(payload, category);
+
+          const values = {
+            temperature: payload.temperature,
+            humidity: payload.humidity,
+            co2: payload.co2,
+            contact: payload.contact,
+            occupancy: payload.occupancy,
+            battery: payload.battery,
+            state: payload.state,
+            linkquality: payload.linkquality,
+            localTemperature: payload.local_temperature,
+            targetTemperature: payload.occupied_heating_setpoint,
+            runningState: payload.running_state,
+            systemMode: payload.system_mode
+          };
+
+          Object.keys(values).forEach(key => {
+            if (values[key] === undefined) delete values[key];
+          });
+
+          return {
+            id: `${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp, source: 'mqtt', topic, device, category, eventType,
+            severity, payload, values, roomId, isAnomaly: false
+          };
+        },
+
+        extractRoomId(device) {
+          const match = device.match(/^\[([^\]]+)\]/);
+          return match ? match[1].toLowerCase() : 'unknown';
+        },
+
+        detectCategory(device, payload) {
+          if (payload.local_temperature !== undefined || payload.running_state !== undefined ||
+              device.toLowerCase().includes('thermostat')) return 'thermostat';
+          if (payload.contact !== undefined) return 'contact';
+          if (payload.occupancy !== undefined) return 'motion';
+          if (payload.co2 !== undefined) return 'climate';
+          if (payload.brightness !== undefined || device.toLowerCase().includes('light')) return 'light';
+          if (device.toLowerCase().includes('plug') ||
+              (payload.state !== undefined && !payload.brightness && !payload.temperature)) return 'plug';
+          if (payload.temperature !== undefined || payload.humidity !== undefined) return 'climate';
+          if (payload.state === 'online' || payload.state === 'offline') return 'system';
+          if (device.startsWith('audit/')) return 'command';
+          return 'system';
+        },
+
+        detectEventType(payload) {
+          if (payload.state === 'online' || payload.state === 'offline') return 'availability';
+          if (payload.state === 'ON' || payload.state === 'OFF') return 'state_change';
+          if (payload.contact !== undefined) return 'state_change';
+          if (payload.occupancy !== undefined) return 'state_change';
+          if (payload.running_state !== undefined) return 'state_change';
+          return 'reading';
+        },
+
+        detectSeverity(payload, category) {
+          if (payload.state === 'offline') return 'error';
+          if (payload.battery !== undefined && payload.battery < 10) return 'error';
+          if (payload.battery !== undefined && payload.battery < this.thresholds.lowBattery) return 'warning';
+          if (payload.co2 !== undefined && payload.co2 >= this.thresholds.co2Critical) return 'error';
+          if (payload.co2 !== undefined && payload.co2 >= this.thresholds.co2Warning) return 'warning';
+          if (payload.contact === false) return 'warning';
+          if (payload.state === 'online') return 'success';
+          return 'info';
+        },
+
+        detectAnomaly(entry) {
+          if (entry.severity === 'error') return true;
+          if (entry.values.temperature !== undefined) {
+            const prev = this.previousState[entry.device];
+            if (prev && prev.values.temperature !== undefined) {
+              const delta = Math.abs(entry.values.temperature - prev.values.temperature);
+              const timeDiff = entry.timestamp - prev.timestamp;
+              if (delta >= this.thresholds.tempDelta && timeDiff <= this.thresholds.tempDeltaWindow) return true;
+            }
+          }
+          if (entry.values.co2 !== undefined && entry.values.co2 >= this.thresholds.co2Critical) return true;
+          if (entry.values.battery !== undefined && entry.values.battery < this.thresholds.lowBattery) return true;
+          return false;
+        },
+
+        get filteredLogs() {
+          let result = this.logs;
+          if (this.filters.timeRange !== 'live') {
+            const now = Date.now();
+            const hours = { '1h': 1, '6h': 6, '24h': 24 }[this.filters.timeRange] || 24;
+            const cutoff = now - (hours * 60 * 60 * 1000);
+            result = result.filter(log => log.timestamp >= cutoff);
+          }
+          if (this.filters.categories.length > 0) {
+            result = result.filter(log => this.filters.categories.includes(log.category));
+          }
+          if (this.filters.devices.length > 0) {
+            result = result.filter(log => this.filters.devices.includes(log.device));
+          }
+          if (this.filters.severities.length > 0) {
+            result = result.filter(log => this.filters.severities.includes(log.severity));
+          }
+          if (this.filters.anomaliesOnly) {
+            result = result.filter(log => log.isAnomaly);
+          }
+          if (this.filters.search) {
+            const search = this.filters.search.toLowerCase();
+            result = result.filter(log =>
+              log.device.toLowerCase().includes(search) ||
+              log.topic.toLowerCase().includes(search) ||
+              JSON.stringify(log.values).toLowerCase().includes(search)
+            );
+          }
+          return result;
+        },
+
+        get stats() {
+          const logs = this.filteredLogs;
+          const now = Date.now();
+          const oneHourAgo = now - 3600000;
+
+          const byCategory = {};
+          Object.keys(this.categories).forEach(cat => byCategory[cat] = 0);
+          logs.forEach(log => { if (byCategory[log.category] !== undefined) byCategory[log.category]++; });
+
+          const byDevice = {};
+          logs.forEach(log => { byDevice[log.device] = (byDevice[log.device] || 0) + 1; });
+          const topDevices = Object.entries(byDevice).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+          const hourlyBuckets = Array(6).fill(0);
+          logs.forEach(log => {
+            const hoursAgo = Math.floor((now - log.timestamp) / 3600000);
+            if (hoursAgo < 6) hourlyBuckets[hoursAgo]++;
+          });
+
+          return {
+            total: logs.length,
+            lastHour: logs.filter(log => log.timestamp >= oneHourAgo).length,
+            byCategory, topDevices,
+            hourlyBuckets: hourlyBuckets.reverse(),
+            errors: logs.filter(log => log.severity === 'error').length,
+            warnings: logs.filter(log => log.severity === 'warning').length,
+            anomalies: logs.filter(log => log.isAnomaly).length
+          };
+        },
+
+        get availableDevices() {
+          return [...new Set(this.logs.map(log => log.device))].sort();
+        },
+
+        toggleCategory(category) {
+          const idx = this.filters.categories.indexOf(category);
+          if (idx === -1) this.filters.categories.push(category);
+          else this.filters.categories.splice(idx, 1);
+        },
+
+        toggleSeverity(severity) {
+          const idx = this.filters.severities.indexOf(severity);
+          if (idx === -1) this.filters.severities.push(severity);
+          else this.filters.severities.splice(idx, 1);
+        },
+
+        setTimeRange(range) { this.filters.timeRange = range; },
+        setSearch(query) { this.filters.search = query; },
+
+        clearFilters() {
+          this.filters = { timeRange: 'live', categories: [], devices: [], search: '', anomaliesOnly: false, severities: [] };
+        },
+
+        clearLogs() { this.logs = []; this.previousState = {}; },
+        togglePause() { this.paused = !this.paused; },
+        expandLog(id) { this.expandedLogId = this.expandedLogId === id ? null : id; },
+
+        formatTime(timestamp) {
+          const date = new Date(timestamp);
+          const now = new Date();
+          if (date.toDateString() === now.toDateString()) {
+            return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          }
+          return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        },
+
+        formatRelativeTime(timestamp) {
+          const seconds = Math.floor((Date.now() - timestamp) / 1000);
+          if (seconds < 60) return 'just now';
+          if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+          if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+          return `${Math.floor(seconds / 86400)}d ago`;
+        },
+
+        getSeverityColor(severity) {
+          return { error: '#ef4444', warning: '#f59e0b', info: '#3b82f6', success: '#22c55e' }[severity] || '#3b82f6';
+        },
+
+        formatValues(values) {
+          const parts = [];
+          if (values.temperature !== undefined) parts.push(`${values.temperature.toFixed(1)}°C`);
+          if (values.humidity !== undefined) parts.push(`${values.humidity}%`);
+          if (values.co2 !== undefined) parts.push(`${values.co2}ppm`);
+          if (values.battery !== undefined) parts.push(`🔋${values.battery}%`);
+          if (values.contact !== undefined) parts.push(values.contact ? 'closed' : 'open');
+          if (values.occupancy !== undefined) parts.push(values.occupancy ? 'motion' : 'clear');
+          if (values.state !== undefined) parts.push(values.state);
+          if (values.runningState !== undefined) parts.push(values.runningState);
+          if (values.targetTemperature !== undefined) parts.push(`→${values.targetTemperature}°C`);
+          if (values.linkquality !== undefined) parts.push(`📶${values.linkquality}`);
+          return parts.join(' | ') || 'no values';
+        }
+      });
+
+      // Initialize logs store
+      Alpine.store('logs')?.init();
     });
 
     // ========================================
@@ -3814,7 +4187,8 @@
         id: 'monitor', name: 'Monitor', icon: '📈',
         views: [
           { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
-          { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
+          { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
+          { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' }
         ]
       },
       {
@@ -5474,6 +5848,192 @@
         },
 
         getZoomPercent() { return Math.round(this.zoomLevel * 100); }
+      };
+    }
+
+    // ========================================
+    // LOGS VIEW
+    // ========================================
+    function logsView() {
+      return {
+        showFilters: true,
+        showStats: true,
+        searchQuery: '',
+        searchDebounce: null,
+        visibleCount: 100,
+        loadMoreStep: 100,
+
+        init() {
+          this.$store.logs?.init?.();
+        },
+
+        get logs() {
+          return this.$store.logs.filteredLogs.slice(0, this.visibleCount);
+        },
+
+        get totalLogs() {
+          return this.$store.logs.filteredLogs.length;
+        },
+
+        get hasMore() {
+          return this.visibleCount < this.totalLogs;
+        },
+
+        get stats() {
+          return this.$store.logs.stats;
+        },
+
+        get categories() {
+          return this.$store.logs.categories;
+        },
+
+        get availableDevices() {
+          return this.$store.logs.availableDevices;
+        },
+
+        get isPaused() {
+          return this.$store.logs.paused;
+        },
+
+        get isLoading() {
+          return this.$store.logs.loading;
+        },
+
+        get filters() {
+          return this.$store.logs.filters;
+        },
+
+        get timeRange() {
+          return this.$store.logs.filters.timeRange;
+        },
+
+        loadMore() {
+          this.visibleCount += this.loadMoreStep;
+        },
+
+        togglePause() {
+          this.$store.logs.togglePause();
+        },
+
+        clearLogs() {
+          if (confirm('Clear all logs? This cannot be undone.')) {
+            this.$store.logs.clearLogs();
+          }
+        },
+
+        setTimeRange(range) {
+          this.$store.logs.setTimeRange(range);
+        },
+
+        toggleCategory(category) {
+          this.$store.logs.toggleCategory(category);
+        },
+
+        toggleSeverity(severity) {
+          this.$store.logs.toggleSeverity(severity);
+        },
+
+        toggleAnomaliesOnly() {
+          this.$store.logs.filters.anomaliesOnly = !this.$store.logs.filters.anomaliesOnly;
+        },
+
+        setDevice(device) {
+          this.$store.logs.filters.devices = device ? [device] : [];
+        },
+
+        clearFilters() {
+          this.$store.logs.clearFilters();
+          this.searchQuery = '';
+        },
+
+        onSearchInput() {
+          clearTimeout(this.searchDebounce);
+          this.searchDebounce = setTimeout(() => {
+            this.$store.logs.setSearch(this.searchQuery);
+          }, 300);
+        },
+
+        expandLog(id) {
+          this.$store.logs.expandLog(id);
+        },
+
+        isExpanded(id) {
+          return this.$store.logs.expandedLogId === id;
+        },
+
+        copyPayload(log) {
+          const text = JSON.stringify(log.payload, null, 2);
+          navigator.clipboard.writeText(text).then(() => {
+            console.log('Copied payload to clipboard');
+          });
+        },
+
+        getCategoryInfo(category) {
+          return this.categories[category] || { icon: '📋', label: category, color: '#6b7280' };
+        },
+
+        formatTime(timestamp) {
+          return this.$store.logs.formatTime(timestamp);
+        },
+
+        formatRelativeTime(timestamp) {
+          return this.$store.logs.formatRelativeTime(timestamp);
+        },
+
+        formatValues(values) {
+          return this.$store.logs.formatValues(values);
+        },
+
+        getSeverityColor(severity) {
+          return this.$store.logs.getSeverityColor(severity);
+        },
+
+        getSeverityBadge(severity) {
+          const badges = {
+            error: { icon: '🔴', label: 'Error' },
+            warning: { icon: '🟠', label: 'Warning' },
+            info: { icon: '🔵', label: 'Info' },
+            success: { icon: '🟢', label: 'Success' }
+          };
+          return badges[severity] || badges.info;
+        },
+
+        formatPayload(payload) {
+          if (!payload) return 'No payload';
+          return JSON.stringify(payload, null, 2);
+        },
+
+        isCategoryActive(category) {
+          return this.filters.categories.length === 0 || this.filters.categories.includes(category);
+        },
+
+        isSeverityActive(severity) {
+          return this.filters.severities.length === 0 || this.filters.severities.includes(severity);
+        },
+
+        applyPreset(preset) {
+          this.clearFilters();
+          switch (preset) {
+            case 'errors': this.$store.logs.filters.severities = ['error']; break;
+            case 'warnings': this.$store.logs.filters.severities = ['error', 'warning']; break;
+            case 'doors': this.$store.logs.filters.categories = ['contact']; break;
+            case 'heating': this.$store.logs.filters.categories = ['thermostat']; break;
+            case 'lights': this.$store.logs.filters.categories = ['light', 'plug']; break;
+            case 'anomalies': this.$store.logs.filters.anomaliesOnly = true; break;
+          }
+        },
+
+        getCategoryPercentage(category) {
+          const total = this.stats.total || 1;
+          const count = this.stats.byCategory[category] || 0;
+          return Math.round((count / total) * 100);
+        },
+
+        getHourlySparkline() {
+          const buckets = this.stats.hourlyBuckets || [];
+          const max = Math.max(...buckets, 1);
+          return buckets.map(v => Math.round((v / max) * 100));
+        }
       };
     }
   </script>
