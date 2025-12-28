@@ -635,4 +635,41 @@
 
 [data-theme="dark"] .logs-control-btn.danger:hover {
   background: rgba(239, 68, 68, 0.2);
+  border-color: #f87171;
+  color: #f87171;
+}
+
+/* Stat value colors for dark mode */
+[data-theme="dark"] .logs-stat-value.error {
+  color: #f87171;
+}
+
+[data-theme="dark"] .logs-stat-value.warning {
+  color: #fbbf24;
+}
+
+/* Anomaly entry background */
+[data-theme="dark"] .log-entry.anomaly {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Dark mode button text visibility */
+[data-theme="dark"] .logs-time-btn {
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .logs-preset-btn {
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .logs-severity-btn {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .logs-severity-btn.error {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+[data-theme="dark"] .logs-severity-btn.warning {
+  background: rgba(251, 191, 36, 0.15);
 }
