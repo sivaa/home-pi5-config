@@ -230,9 +230,24 @@
 
         </div>
 
-        <!-- Right: Theme Toggle + Date/Time -->
+        <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
+            <!-- Kiosk Controls (only on Pi, not localhost dev) -->
+            <div class="kiosk-controls" x-data x-show="$store.kiosk.isKioskAvailable" x-cloak>
+              <button class="kiosk-btn"
+                      @click="$store.kiosk.toggleFullscreen()"
+                      :disabled="$store.kiosk.isLoading"
+                      :class="{ 'is-fullscreen': $store.kiosk.isFullscreen }"
+                      :title="$store.kiosk.isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'">
+                <span x-show="$store.kiosk.isFullscreen">&#x26F6;</span>
+                <span x-show="!$store.kiosk.isFullscreen">&#x26F6;</span>
+              </button>
+              <button class="kiosk-btn"
+                      @click="$store.kiosk.refresh()"
+                      :disabled="$store.kiosk.isLoading"
+                      title="Refresh page">&#x1F504;</button>
+            </div>
             <!-- Theme Toggle -->
             <div class="theme-toggle" x-data>
               <button class="theme-toggle-btn"
@@ -975,17 +990,30 @@
                       </button>
                     </div>
 
-                    <!-- Troubleshooting Info -->
-                    <div class="thermostat-troubleshoot">
-                      <div class="troubleshoot-row">
-                        <span class="troubleshoot-icon">🕐</span>
-                        <span class="troubleshoot-label">Last:</span>
-                        <span class="troubleshoot-value" x-text="getLastStateChange(t)"></span>
+                    <!-- Heater Stats (Redesigned) -->
+                    <div class="heater-stats">
+                      <!-- Last Cycle Row -->
+                      <div class="stats-last">
+                        <span class="stats-icon">🏁</span>
+                        <span class="stats-text" x-text="getLastCycleText(t)"></span>
                       </div>
-                      <div class="troubleshoot-row">
-                        <span class="troubleshoot-icon">⏱️</span>
-                        <span class="troubleshoot-label">24h:</span>
-                        <span class="troubleshoot-value" x-text="getTodayStats(t)"></span>
+                      <!-- 24h Summary - Pill Grid -->
+                      <div class="stats-summary">
+                        <div class="stat-pill">
+                          <span class="pill-icon">🔄</span>
+                          <span class="pill-value" x-text="getCycleCount(t)"></span>
+                          <span class="pill-label">cycles</span>
+                        </div>
+                        <div class="stat-pill">
+                          <span class="pill-icon">⏱️</span>
+                          <span class="pill-value" x-text="getTotalTime(t)"></span>
+                          <span class="pill-label">total</span>
+                        </div>
+                        <div class="stat-pill" x-show="getAvgTime(t)">
+                          <span class="pill-icon">📈</span>
+                          <span class="pill-value" x-text="getAvgTime(t)"></span>
+                          <span class="pill-label">avg</span>
+                        </div>
                       </div>
                     </div>
 
@@ -2255,6 +2283,53 @@
           const avg = stats.avgCycleMinutes > 0 ? ` avg ${stats.avgCycleMinutes}m` : '';
 
           return `${stats.heatingCycles} cycles ${total}${avg}`;
+        },
+
+        // New pill-based stats helpers
+        getLastCycleText(t) {
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+          if (!stats?.cycles?.length) return 'No cycle data';
+
+          const isHeating = t.runningState === 'heat';
+          const mostRecent = stats.cycles[0];
+
+          // Currently heating - show live duration
+          if (isHeating && mostRecent && !mostRecent.completed) {
+            const runningMins = Math.round((Date.now() - mostRecent.startTime) / 60000);
+            return `Running ${runningMins}m...`;
+          }
+
+          // Find most recent COMPLETED cycle
+          const lastCompleted = stats.cycles.find(c => c.completed);
+          if (lastCompleted) {
+            const endTime = lastCompleted.endTime ? this.formatRelativeTime(lastCompleted.endTime) : '?';
+            const duration = lastCompleted.durationMinutes ?? '?';
+            return `${endTime} • ran ${duration}m`;
+          }
+
+          // No completed cycles
+          if (mostRecent) {
+            return `Started ${this.formatRelativeTime(mostRecent.startTime)}`;
+          }
+
+          return 'No cycle data';
+        },
+
+        getCycleCount(t) {
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+          return stats?.heatingCycles ?? 0;
+        },
+
+        getTotalTime(t) {
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+          if (!stats?.heatingMinutes) return '--';
+          return this.formatDuration(stats.heatingMinutes);
+        },
+
+        getAvgTime(t) {
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+          if (!stats?.avgCycleMinutes || stats.avgCycleMinutes === 0) return null;
+          return `${stats.avgCycleMinutes}m`;
         },
         formatTime(ts) {
           const date = new Date(ts);
@@ -3541,6 +3616,8 @@
       {
         id: 'visualize', name: 'Visualize', icon: '👁️',
         views: [
+          { id: 'floor', name: 'Floor', icon: '🏠', title: 'Floor Plan', key: '3' },
+          { id: 'ambient', name: 'Ambient', icon: '🌡️', title: 'Ambient Display', key: '6' },
           { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', key: 'N' }
         ]
       },
