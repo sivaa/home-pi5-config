@@ -268,6 +268,11 @@ input_boolean:
   bedroom_heater_was_on:
     name: Bedroom Heater Was On
     initial: off
+  # Guard flag to prevent state overwrite when multiple windows open
+  heaters_off_due_to_window:
+    name: Heaters Off Due To Window
+    initial: off
+    icon: mdi:window-open-variant
 
 # =============================================================================
 # AUTOMATIONS

@@ -587,12 +587,13 @@
 # Trigger: Balcony door or main door open for 2 minutes
 # Action: Turn off all heaters, notify user
 # Note: If door closes within 2 minutes, this automation does NOT fire
+# FIX: Uses guard flag to prevent state overwrite and duplicate notifications
 # -----------------------------------------------------------------------------
 - id: door_open_turn_off_heaters
   alias: "Door Open 2min - Turn Off All Heaters"
   description: "When balcony door or main door stays open for 2 minutes, turn off all heaters"
-  mode: parallel
-  max: 2
+  mode: single
+  max_exceeded: silent
 
   trigger:
     - platform: state
@@ -627,17 +628,26 @@
       {% endif %}
       {{ running | join(', ') if running else 'None' }}
 
-  # Only proceed if at least one heater is running
   condition:
+    # Guard flag must be OFF (heaters not already turned off by another window/door)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    # At least one heater must be in 'heat' mode
     - condition: template
       value_template: >
-        {{ state_attr('climate.study_thermostat', 'hvac_action') == 'heating'
-           or state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating'
-           or state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating'
-           or state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' }}
+        {{ states('climate.study_thermostat') == 'heat'
+           or states('climate.living_thermostat_inner') == 'heat'
+           or states('climate.living_thermostat_outer') == 'heat'
+           or states('climate.bed_thermostat') == 'heat' }}
 
   action:
-    # SAVE current heater states before turning off
+    # Set guard flag FIRST (prevents race conditions and duplicate notifications)
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.heaters_off_due_to_window
+
+    # SAVE current heater states (now protected by guard)
     - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
       target:
         entity_id: input_boolean.study_heater_was_on
@@ -676,7 +686,7 @@
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "🚪 Door Open 2min - Heaters Off"
+        title: "Door Open 2min - Heaters Off"
         message: >
           {{ door_name }} has been open for 2 minutes.
           Heaters turned off: {{ heaters_running }}.
@@ -690,12 +700,13 @@
 # Trigger: Any window open for 30 seconds
 # Action: Turn off all heaters, notify user
 # Note: If window closes within 30 seconds, this automation does NOT fire
+# FIX: Uses guard flag to prevent state overwrite and duplicate notifications
 # -----------------------------------------------------------------------------
 - id: window_open_turn_off_heaters
   alias: "Window Open 30s - Turn Off All Heaters"
   description: "When any window stays open for 30 seconds, turn off all heaters"
-  mode: parallel
-  max: 6
+  mode: single
+  max_exceeded: silent
 
   trigger:
     - platform: state
@@ -738,17 +749,26 @@
       {% endif %}
       {{ running | join(', ') if running else 'None' }}
 
-  # Only proceed if at least one heater is running
   condition:
+    # Guard flag must be OFF (heaters not already turned off by another window/door)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    # At least one heater must be in 'heat' mode
     - condition: template
       value_template: >
-        {{ state_attr('climate.study_thermostat', 'hvac_action') == 'heating'
-           or state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating'
-           or state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating'
-           or state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' }}
+        {{ states('climate.study_thermostat') == 'heat'
+           or states('climate.living_thermostat_inner') == 'heat'
+           or states('climate.living_thermostat_outer') == 'heat'
+           or states('climate.bed_thermostat') == 'heat' }}
 
   action:
-    # SAVE current heater states before turning off
+    # Set guard flag FIRST (prevents race conditions and duplicate notifications)
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.heaters_off_due_to_window
+
+    # SAVE current heater states (now protected by guard)
     - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
       target:
         entity_id: input_boolean.study_heater_was_on
@@ -787,7 +807,7 @@
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "🪟 Window Open 30s - Heaters Off"
+        title: "Window Open 30s - Heaters Off"
         message: >
           {{ window_name }} has been open for 30 seconds.
           Heaters turned off: {{ heaters_running }}.
@@ -799,8 +819,9 @@
 # -----------------------------------------------------------------------------
 # ALL WINDOWS CLOSED - RESUME HEATING
 # Trigger: ANY contact sensor closes
-# Condition: ALL 8 sensors must be closed
-# Action: Turn all thermostats back to heat mode
+# Condition: ALL 8 sensors must be closed AND guard flag is ON
+# Action: Restore heaters to saved state, clear guard flag
+# FIX: Only runs if heaters were previously turned off by window automation
 # -----------------------------------------------------------------------------
 - id: all_windows_closed_resume_heaters
   alias: "All Windows Closed - Resume Heaters"
@@ -821,6 +842,11 @@
       to: "off"
 
   condition:
+    # Guard flag must be ON (heaters were turned off by window automation)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "on"
+    # ALL windows/doors must be closed
     - condition: state
       entity_id: binary_sensor.bath_window_contact_sensor_contact
       state: "off"
@@ -864,7 +890,7 @@
       {{ restored | join(', ') if restored else 'None' }}
 
   action:
-    # Only restore heaters that were ON before window opened
+    # Restore heaters to their saved states
     - service: climate.set_hvac_mode
       target:
         entity_id: climate.study_thermostat
@@ -889,6 +915,11 @@
       data:
         hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
 
+    # Clear the guard flag (ready for next window event)
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.heaters_off_due_to_window
+
     - delay:
         seconds: 2
 
@@ -909,7 +940,7 @@
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "✅ All Windows Closed"
+        title: "All Windows Closed"
         message: >
           All windows and doors are closed.
           {% if heaters_restored != 'None' %}
