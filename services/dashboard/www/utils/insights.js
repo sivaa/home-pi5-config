@@ -3,8 +3,6 @@
  * Auto-generates human-readable insights from room data
  */
 
-import { calculateRoomComfort } from './comfort-algo.js';
-
 /**
  * Generate smart suggestions based on current conditions
  * @param {Array} rooms - Room data with temp/humidity

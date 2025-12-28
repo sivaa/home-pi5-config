@@ -16,8 +16,6 @@ import { initThemeStore } from './stores/theme-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
-import { comfortScoreView } from '../views/comfort-score.js';
-import { barCompareView } from '../views/bar-compare.js';
 import { floorPlanView } from '../views/floor-plan.js';
 import { ambientView } from '../views/ambient.js';
 import { timelineView } from '../views/timeline.js';
@@ -74,7 +72,7 @@ document.addEventListener('alpine:init', () => {
 // ========================================
 window.app = function() {
   return {
-    currentView: 'comfort',
+    currentView: 'classic',
     currentDateTime: '',
     now: Date.now(),
 
@@ -138,8 +136,6 @@ window.app = function() {
 // ========================================
 // REGISTER VIEW COMPONENTS
 // ========================================
-window.comfortScoreView = comfortScoreView;
-window.barCompareView = barCompareView;
 window.floorPlanView = floorPlanView;
 window.ambientView = ambientView;
 window.timelineView = timelineView;

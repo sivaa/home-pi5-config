@@ -18,7 +18,7 @@ export function navigationComponent() {
     // State
     moreMenuOpen: false,
     mobileMenuOpen: false,
-    currentView: 'comfort',
+    currentView: 'classic',
 
     // Data from config
     primaryViews: PRIMARY_VIEWS,

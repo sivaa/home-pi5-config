@@ -27,10 +27,8 @@
 
   <!-- Modularized CSS -->
   <link rel="stylesheet" href="styles/base.css">
-  <link rel="stylesheet" href="styles/layout.css?v=2">
+  <link rel="stylesheet" href="styles/layout.css?v=3">
   <link rel="stylesheet" href="styles/components.css">
-  <link rel="stylesheet" href="styles/views/comfort-score.css">
-  <link rel="stylesheet" href="styles/views/bar-compare.css">
   <link rel="stylesheet" href="styles/views/floor-plan.css">
   <link rel="stylesheet" href="styles/views/ambient.css">
   <link rel="stylesheet" href="styles/views/timeline.css">
@@ -215,11 +213,9 @@
         <!-- Left: Logo + Status + Nav -->
         <div class="header-nav">
           <span class="header-logo">🏠</span>
-          <div class="status-badge"
-               :class="{ 'disconnected': !$store.mqtt.connected && !$store.mqtt.connecting, 'connecting': $store.mqtt.connecting }">
+          <div class="status-indicator">
             <span class="loading-indicator loading-sm" x-show="$store.mqtt.connecting"></span>
-            <span class="status-dot-header" x-show="!$store.mqtt.connecting" :class="{ 'connected': $store.mqtt.connected }"></span>
-            <span x-text="$store.mqtt.connecting ? 'Connecting' : ($store.mqtt.connected ? 'Live' : 'Offline')"></span>
+            <span class="status-dot" x-show="!$store.mqtt.connecting" :class="{ 'online': $store.mqtt.connected, 'offline': !$store.mqtt.connected }"></span>
           </div>
 
           <!-- Navigation tabs - all views in single line -->
@@ -271,180 +267,6 @@
     <div class="app-body">
     <main class="app-main">
       <div class="view-container">
-
-        <!-- Vision 1: Comfort Score -->
-        <div x-show="currentView === 'comfort'" x-cloak x-data="comfortScoreView()">
-          <div class="comfort-score-view">
-            <div class="score-hero" @click="showBreakdown = !showBreakdown">
-              <div class="score-label-top">YOUR HOME IS</div>
-              <div class="score-circle" :style="{ '--score-color': getColor() }">
-                <svg viewBox="0 0 200 200" class="score-ring">
-                  <circle cx="100" cy="100" r="90" fill="none" stroke="var(--color-border)" stroke-width="8"/>
-                  <circle cx="100" cy="100" r="90" fill="none" :stroke="getColor()" stroke-width="8"
-                          stroke-linecap="round" :stroke-dasharray="getScoreArc()"
-                          transform="rotate(-90 100 100)" class="score-arc"/>
-                </svg>
-                <div class="score-content">
-                  <span class="score-number" :style="{ color: getColor() }" x-text="homeScore"></span>
-                  <span class="score-label" x-text="getLabel()"></span>
-                </div>
-              </div>
-              <div class="score-hint">Tap for breakdown</div>
-            </div>
-
-            <div class="score-breakdown" x-show="showBreakdown" x-transition>
-              <div class="breakdown-title">Score Components</div>
-              <div class="breakdown-item">
-                <span class="breakdown-label">Temperature (70%)</span>
-                <div class="breakdown-bar">
-                  <div class="breakdown-fill" :style="{ width: (homeScore * 0.7) + '%', background: 'var(--color-primary)' }"></div>
-                </div>
-              </div>
-              <div class="breakdown-item">
-                <span class="breakdown-label">Humidity (30%)</span>
-                <div class="breakdown-bar">
-                  <div class="breakdown-fill" :style="{ width: (homeScore * 0.3) + '%', background: 'var(--color-success)' }"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="room-scores">
-              <template x-for="room in roomScores" :key="room.id">
-                <button class="room-pill" @click="openRoom(room)" :style="{ '--pill-color': getRoomColor(room.score) }">
-                  <span class="pill-icon" x-text="room.icon"></span>
-                  <span class="pill-score" :style="{ color: getRoomColor(room.score) }" x-text="room.score"></span>
-                  <span class="pill-dot" :style="{ background: getRoomColor(room.score) }"></span>
-                </button>
-              </template>
-            </div>
-
-            <div class="room-labels">
-              <template x-for="room in roomScores" :key="room.id + '-label'">
-                <span class="room-label-text" x-text="room.name.split(' ')[0]"></span>
-              </template>
-            </div>
-
-            <div class="comfort-spectrum">
-              <div class="spectrum-bar">
-                <div class="spectrum-gradient"></div>
-                <div class="spectrum-marker" :style="{ left: homeScore + '%' }">
-                  <div class="marker-line"></div>
-                  <div class="marker-label">You</div>
-                </div>
-              </div>
-              <div class="spectrum-labels">
-                <span>Poor</span>
-                <span>Okay</span>
-                <span>Perfect</span>
-              </div>
-            </div>
-
-            <div class="suggestions" x-show="suggestions.length > 0">
-              <template x-for="(suggestion, index) in suggestions" :key="index">
-                <div class="suggestion-card" :class="'suggestion-' + suggestion.type">
-                  <span class="suggestion-icon" x-text="suggestion.icon"></span>
-                  <div class="suggestion-content">
-                    <div class="suggestion-title" x-text="suggestion.title"></div>
-                    <div class="suggestion-message" x-text="suggestion.message"></div>
-                  </div>
-                  <button class="suggestion-dismiss" @click="suggestions.splice(index, 1)">&times;</button>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <!-- Vision 2: Bar Compare -->
-        <div x-show="currentView === 'compare'" x-cloak x-data="barCompareView()">
-          <div class="bar-compare-view">
-            <div class="bar-controls">
-              <div class="view-toggle">
-                <button class="btn btn-secondary" :class="{ active: viewMode === 'temperature' }"
-                        @click="setViewMode('temperature')">🌡️ Temp</button>
-                <button class="btn btn-secondary" :class="{ active: viewMode === 'humidity' }"
-                        @click="setViewMode('humidity')">💧 Humid</button>
-                <button class="btn btn-secondary" :class="{ active: viewMode === 'both' }"
-                        @click="setViewMode('both')">Both</button>
-              </div>
-              <div class="sort-controls">
-                <select class="sort-select" x-model="sortBy">
-                  <option value="temperature">Sort: Temperature</option>
-                  <option value="humidity">Sort: Humidity</option>
-                  <option value="name">Sort: Name</option>
-                  <option value="score">Sort: Comfort</option>
-                </select>
-                <button class="sort-direction" @click="sortDirection = sortDirection === 'desc' ? 'asc' : 'desc'">
-                  <span x-text="sortDirection === 'desc' ? '↓' : '↑'"></span>
-                </button>
-              </div>
-            </div>
-
-            <div class="charts-container" :class="{ 'single-chart': viewMode !== 'both' }">
-              <div class="bar-chart" x-show="viewMode === 'temperature' || viewMode === 'both'">
-                <h3 class="chart-title">🌡️ Temperature</h3>
-                <div class="chart-wrapper">
-                  <div class="comfort-zone" :style="getComfortZoneStyle('temperature')"></div>
-                  <template x-for="room in sortedRooms" :key="room.id + '-temp'">
-                    <div class="bar-row" @click="openRoom(room)">
-                      <div class="bar-label">
-                        <span class="bar-icon" x-text="room.icon"></span>
-                        <span class="bar-name" x-text="room.name"></span>
-                      </div>
-                      <div class="bar-track">
-                        <div class="bar-fill" :style="{ width: getBarWidth(room.temperature, 'temperature') + '%', background: getBarColor(room.temperature, 'temperature') }"></div>
-                      </div>
-                      <div class="bar-value" x-text="room.temperature.toFixed(1) + '°'"></div>
-                    </div>
-                  </template>
-                  <div class="scale-labels">
-                    <template x-for="label in getScaleLabels('temperature')" :key="label">
-                      <span x-text="label"></span>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
-              <div class="bar-chart" x-show="viewMode === 'humidity' || viewMode === 'both'">
-                <h3 class="chart-title">💧 Humidity</h3>
-                <div class="chart-wrapper">
-                  <div class="comfort-zone" :style="getComfortZoneStyle('humidity')"></div>
-                  <template x-for="room in sortedRooms" :key="room.id + '-humid'">
-                    <div class="bar-row" @click="openRoom(room)">
-                      <div class="bar-label">
-                        <span class="bar-icon" x-text="room.icon"></span>
-                        <span class="bar-name" x-text="room.name"></span>
-                      </div>
-                      <div class="bar-track">
-                        <div class="bar-fill" :style="{ width: getBarWidth(room.humidity, 'humidity') + '%', background: getBarColor(room.humidity, 'humidity') }"></div>
-                      </div>
-                      <div class="bar-value" x-text="room.humidity.toFixed(0) + '%'"></div>
-                    </div>
-                  </template>
-                  <div class="scale-labels">
-                    <template x-for="label in getScaleLabels('humidity')" :key="label">
-                      <span x-text="label"></span>
-                    </template>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="insights-section" x-show="insights.length > 0">
-              <h3 class="insights-title">📊 Auto-Insights</h3>
-              <div class="insights-list">
-                <template x-for="insight in insights" :key="insight.message">
-                  <div class="insight-card" :class="getInsightClass(insight.type)">
-                    <span class="insight-icon" x-text="insight.icon"></span>
-                    <div class="insight-content">
-                      <div class="insight-title" x-text="insight.title"></div>
-                      <div class="insight-message" x-text="insight.message"></div>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Vision 3: Floor Plan -->
         <div x-show="currentView === 'floor'" x-cloak x-data="floorPlanView()">
@@ -1279,7 +1101,7 @@
                       </div>
                       <div class="troubleshoot-row">
                         <span class="troubleshoot-icon">⏱️</span>
-                        <span class="troubleshoot-label">Today:</span>
+                        <span class="troubleshoot-label">24h:</span>
                         <span class="troubleshoot-value" x-text="getTodayStats(t)"></span>
                       </div>
                     </div>
@@ -1294,9 +1116,8 @@
                         <span>📶</span>
                         <span x-text="t.linkquality !== null ? t.linkquality : '--'"></span>
                       </div>
-                      <div class="meta-item" :class="{ offline: !t.available }">
-                        <span x-text="t.available ? '🟢' : '🔴'"></span>
-                        <span x-text="t.available ? 'Online' : 'Offline'"></span>
+                      <div class="meta-item availability-dot">
+                        <span class="status-dot" :class="{ 'online': t.available, 'offline': !t.available }"></span>
                       </div>
                     </div>
                   </div>
@@ -1308,6 +1129,16 @@
                  TIMELINE TAB
                  ======================================== -->
             <div x-show="activeTab === 'timeline'">
+              <!-- Time Range Selector -->
+              <div class="timeline-time-range">
+                <template x-for="preset in timeRangePresets" :key="preset.key">
+                  <button class="time-range-btn"
+                          :class="{ active: timelineTimeRange === preset.key }"
+                          @click="setTimelineTimeRange(preset.key)"
+                          x-text="preset.label"></button>
+                </template>
+              </div>
+
               <!-- Filters -->
               <div class="timeline-filters">
                 <div class="filter-group">
@@ -1336,10 +1167,31 @@
                 <p style="font-size: var(--font-size-sm)">Events will appear here as thermostats change state</p>
               </div>
 
-              <!-- Important Events -->
+              <!-- Alerts & Warnings -->
+              <div class="alerts-section" x-show="alertsAndWarnings.length > 0">
+                <div class="section-header">
+                  <span class="section-title">🚨 Alerts & Warnings</span>
+                  <span class="section-count" :class="{ 'alert-badge': hasActiveAlerts }" x-text="alertsAndWarnings.length"></span>
+                </div>
+                <div class="alerts-list">
+                  <template x-for="event in alertsAndWarnings" :key="event.time + event.eventType">
+                    <div class="alert-card" :class="{ warning: event.info.priority === 'warning' }">
+                      <div class="alert-icon" x-text="event.info.icon"></div>
+                      <div class="alert-content">
+                        <div class="alert-title" x-text="event.info.label"></div>
+                        <div class="alert-device" x-text="event.deviceName"></div>
+                        <div class="alert-action" x-show="event.info.action" x-text="event.info.action"></div>
+                      </div>
+                      <div class="alert-time" x-text="formatRelativeTime(event.time)"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Activity Events (formerly Important) -->
               <div class="events-section" x-show="importantEvents.length > 0">
                 <div class="section-header">
-                  <span class="section-title">Important Events</span>
+                  <span class="section-title">Recent Activity</span>
                   <span class="section-count" x-text="importantEvents.length"></span>
                 </div>
                 <div class="important-events">
@@ -2041,72 +1893,114 @@
       <div class="panel-content">
 
         <!-- Section: Home Average -->
-        <div class="panel-section">
+        <div class="panel-section panel-section-primary">
           <div class="panel-section-title">HOME</div>
-          <div class="panel-metric">
-            <span class="panel-icon">🏠</span>
-            <span class="panel-value" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
-          </div>
-          <div class="panel-metric">
-            <span class="panel-icon">💧</span>
-            <span class="panel-value" x-text="($store.rooms.avgHumidity?.toFixed(0) || '--') + '%'"></span>
-          </div>
-          <div class="panel-metric" x-show="$store.rooms.co2Value">
-            <span class="panel-icon">💨</span>
-            <span class="panel-value" x-text="$store.rooms.co2Value"></span>
+          <div class="panel-metrics-grid">
+            <div class="panel-metric">
+              <span class="panel-icon">🏠</span>
+              <span class="panel-value" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
+            </div>
+            <div class="panel-metric">
+              <span class="panel-icon">💧</span>
+              <span class="panel-value" x-text="($store.rooms.avgHumidity?.toFixed(0) || '--') + '%'"></span>
+            </div>
+            <div class="panel-metric" x-show="$store.rooms.co2Value">
+              <span class="panel-icon">💨</span>
+              <span class="panel-value" x-text="$store.rooms.co2Value"></span>
+            </div>
           </div>
         </div>
 
         <!-- Section: Outside -->
-        <div class="panel-section">
+        <div class="panel-section panel-section-primary">
           <div class="panel-section-title">OUTSIDE</div>
-          <div class="panel-metric">
-            <span class="panel-icon">🌿</span>
-            <span class="panel-value" x-text="($store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) || '--') + '°'"></span>
-          </div>
-          <div class="panel-metric" x-show="$store.weather?.temperature != null">
-            <span class="panel-icon" x-text="$store.weather?.conditionIcon || '☁️'"></span>
-            <span class="panel-value" x-text="($store.weather?.temperature?.toFixed(0) || '--') + '°'"></span>
+          <div class="panel-metrics-grid">
+            <div class="panel-metric">
+              <span class="panel-icon">🌿</span>
+              <span class="panel-value" x-text="($store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) || '--') + '°'"></span>
+            </div>
+            <div class="panel-metric" x-show="$store.weather?.temperature != null">
+              <span class="panel-icon" x-text="$store.weather?.conditionIcon || '☁️'"></span>
+              <span class="panel-value" x-text="($store.weather?.temperature?.toFixed(0) || '--') + '°'"></span>
+            </div>
           </div>
         </div>
 
         <!-- Section: By Room -->
-        <div class="panel-section">
+        <div class="panel-section panel-section-primary">
           <div class="panel-section-title">ROOMS</div>
-          <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
-            <div class="panel-metric">
-              <span class="panel-icon" x-text="room.icon"></span>
-              <span class="panel-value" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
+          <div class="panel-metrics-grid">
+            <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
+              <div class="panel-metric">
+                <span class="panel-icon" x-text="room.icon"></span>
+                <span class="panel-value" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Section: Heating (icon + title + badge) -->
+        <div class="panel-section compact">
+          <div class="panel-section-header">
+            <span class="section-icon" x-text="($store.thermostats?.activeHeatingCount || 0) > 0 ? '🔥' : '❄️'"></span>
+            <span class="section-title">Heating</span>
+            <span class="status-badge"
+                  :class="($store.thermostats?.activeHeatingCount || 0) > 0 ? 'status-heating' : 'status-off'"
+                  x-text="($store.thermostats?.activeHeatingCount || 0) > 0 ? $store.thermostats?.activeHeatingCount : 'off'"></span>
+          </div>
+          <template x-if="($store.thermostats?.activeHeatingCount || 0) > 0">
+            <div class="panel-metrics-grid">
+              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
+                <div class="panel-metric heating-active full-width">
+                  <span class="panel-value" x-text="trv.name + ' ' + (trv.localTemp?.toFixed(1) || '--') + '→' + (trv.targetTemp || '--') + '°'"></span>
+                </div>
+              </template>
             </div>
           </template>
         </div>
 
-        <!-- Section: Heating (only active heaters) -->
-        <div class="panel-section">
-          <div class="panel-section-title">HEATING</div>
-          <div class="panel-metric">
-            <span class="panel-icon" x-text="($store.thermostats?.activeHeatingCount || 0) > 0 ? '🔥' : '❄️'"></span>
-            <span class="panel-value" x-text="($store.thermostats?.activeHeatingCount || 0) === 0 ? 'All off' : ($store.thermostats?.activeHeatingCount + ' heating')"></span>
+        <!-- Section: Doors (lock icon + title + badge) -->
+        <div class="panel-section compact">
+          <div class="panel-section-header">
+            <span class="section-icon" x-text="getDoorCount() > 0 ? '🔓' : '🔒'"></span>
+            <span class="section-title">Doors</span>
+            <span class="status-badge"
+                  :class="getDoorCount() > 0 ? 'status-warning' : 'status-ok'"
+                  x-text="getDoorCount() > 0 ? getDoorCount() : '✓'"></span>
           </div>
-          <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
-            <div class="panel-metric heating-active">
-              <span class="panel-icon" x-text="trv.icon || '🔥'"></span>
-              <span class="panel-value" x-text="(trv.localTemp?.toFixed(1) || '--') + '° → ' + (trv.targetTemp || '--') + '°'"></span>
+          <template x-if="getDoorCount() > 0">
+            <div class="panel-metrics-grid">
+              <template x-for="sensor in getOpenDoors()" :key="sensor.ieee_address">
+                <div class="panel-metric contact-open full-width">
+                  <span class="panel-value">
+                    <span x-text="getContactShortName(sensor.friendly_name)"></span>
+                    <span class="duration" x-text="$store.sensors.getOpenDuration(sensor.ieee_address) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
+                  </span>
+                </div>
+              </template>
             </div>
           </template>
         </div>
 
-        <!-- Section: Security (only open windows/doors) -->
-        <div class="panel-section">
-          <div class="panel-section-title">SECURITY</div>
-          <div class="panel-metric">
-            <span class="panel-icon" x-text="getOpenContactCount() === 0 ? '🔒' : '🔓'"></span>
-            <span class="panel-value" x-text="getOpenContactCount() === 0 ? '✓' : getOpenContactCount()"></span>
+        <!-- Section: Windows (lock icon + title + badge) -->
+        <div class="panel-section compact">
+          <div class="panel-section-header">
+            <span class="section-icon" x-text="getWindowCount() > 0 ? '🔓' : '🔒'"></span>
+            <span class="section-title">Windows</span>
+            <span class="status-badge"
+                  :class="getWindowCount() > 0 ? 'status-warning' : 'status-ok'"
+                  x-text="getWindowCount() > 0 ? getWindowCount() : '✓'"></span>
           </div>
-          <template x-for="sensor in ($store.sensors?.sensorsByType?.contact || []).filter(s => $store.sensors?.liveData?.[s.ieee_address]?.contact === false)" :key="sensor.ieee_address">
-            <div class="panel-metric contact-open">
-              <span class="panel-icon">🔓</span>
-              <span class="panel-value" x-text="getContactShortName(sensor.friendly_name)"></span>
+          <template x-if="getWindowCount() > 0">
+            <div class="panel-metrics-grid">
+              <template x-for="sensor in getOpenWindows()" :key="sensor.ieee_address">
+                <div class="panel-metric contact-open full-width">
+                  <span class="panel-value">
+                    <span x-text="getContactShortName(sensor.friendly_name)"></span>
+                    <span class="duration" x-text="$store.sensors.getOpenDuration(sensor.ieee_address) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
+                  </span>
+                </div>
+              </template>
             </div>
           </template>
         </div>
@@ -2119,8 +2013,7 @@
     <footer class="app-footer" x-show="currentView !== 'ambient'">
       <span class="footer-status">
         <span class="loading-indicator" x-show="$store.mqtt.connecting"></span>
-        <span class="status-dot" :class="{ 'connected': $store.mqtt.connected, 'disconnected': !$store.mqtt.connected }" x-show="!$store.mqtt.connecting"></span>
-        <span x-text="$store.mqtt.connecting ? 'Connecting...' : ($store.mqtt.connected ? 'Connected' : 'Reconnecting...')"></span>
+        <span class="status-dot" :class="{ 'online': $store.mqtt.connected, 'offline': !$store.mqtt.connected }" x-show="!$store.mqtt.connecting"></span>
       </span>
       <span> • </span>
       <span x-show="$store.rooms.loading" class="footer-status">
@@ -2357,12 +2250,22 @@
       return {
         activeTab: 'overview',
         timeRange: '24h',
+        timelineTimeRange: '24h',
         showBackground: false,
         filterRoom: '',
         filterEventType: '',
         tempHistory: {},
         loading: false,
         chartUpdateInterval: null,
+
+        // Time range presets for timeline filtering
+        timeRangePresets: [
+          { key: '1h', label: '1h' },
+          { key: '6h', label: '6h' },
+          { key: 'today', label: 'Today' },
+          { key: '24h', label: '24h' },
+          { key: '7d', label: '7d' }
+        ],
 
         init() {
           console.log('[thermostat-view] Stub initialized, waiting for module...');
@@ -2398,25 +2301,69 @@
           return Alpine.store('thermostats')?.list ?? [];
         },
 
+        // Get time cutoff based on selected timeline range
+        getTimelineCutoff() {
+          const now = Date.now();
+          const presetMap = {
+            '1h': 60 * 60 * 1000,
+            '6h': 6 * 60 * 60 * 1000,
+            '24h': 24 * 60 * 60 * 1000,
+            '7d': 7 * 24 * 60 * 60 * 1000
+          };
+
+          if (this.timelineTimeRange === 'today') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return today.getTime();
+          }
+
+          return now - (presetMap[this.timelineTimeRange] || presetMap['24h']);
+        },
+
         get events() {
           let events = [...(Alpine.store('thermostats')?.events ?? [])];
+
+          // Apply time filter first
+          const cutoff = this.getTimelineCutoff();
+          events = events.filter(e => e.time >= cutoff);
+
+          // Apply room filter
           if (this.filterRoom) {
             events = events.filter(e => e.roomId === this.filterRoom);
           }
+          // Apply event type filter
           if (this.filterEventType) {
             events = events.filter(e => e.eventType === this.filterEventType);
           }
           return events;
         },
 
-        get importantEvents() {
-          return this.events.filter(e => e.info?.priority === 'important').slice(0, 10);
+        // ALERTS & WARNINGS - Critical issues requiring attention
+        get alertsAndWarnings() {
+          return this.events.filter(e =>
+            e.info?.priority === 'alert' || e.info?.priority === 'warning'
+          ).slice(0, 10);
         },
 
+        get alertEvents() {
+          return this.events.filter(e => e.info?.priority === 'alert');
+        },
+
+        get hasActiveAlerts() {
+          return this.alertEvents.length > 0;
+        },
+
+        // ACTIVITY - Normal operations (demoted from "important")
         get activityEvents() {
-          return this.events.filter(e => e.info?.priority === 'activity').slice(0, 20);
+          return this.events.filter(e => e.info?.priority === 'activity').slice(0, 30);
         },
 
+        // IMPORTANT EVENTS - Activity events shown as "Recent Activity" (for backwards compatibility)
+        get importantEvents() {
+          return this.activityEvents;
+        },
+
+        // BACKGROUND - Routine events (collapsed)
         get backgroundEvents() {
           return this.events.filter(e => e.info?.priority === 'background');
         },
@@ -2452,6 +2399,7 @@
           }
         },
         clearFilters() { this.filterRoom = ''; this.filterEventType = ''; },
+        setTimelineTimeRange(range) { this.timelineTimeRange = range; },
 
         getDisplayTemp(t) {
           const temp = t?.pendingTarget ?? t?.targetTemp;
@@ -2506,18 +2454,44 @@
 
         // Troubleshooting helpers
         getLastStateChange(t) {
-          const events = this.$store.thermostats?.events || [];
-          const lastEvent = events.find(e =>
-            e.deviceId === t.id &&
-            (e.eventType === 'heating_started' || e.eventType === 'heating_stopped')
-          );
-          if (!lastEvent) return 'No data';
-          const action = lastEvent.eventType === 'heating_started' ? 'Started' : 'Stopped';
-          return `${action} ${this.formatRelativeTime(lastEvent.time)}`;
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24);
+          if (!stats?.cycles?.length) return 'No data';
+
+          const isHeating = t.runningState === 'heat';
+          const mostRecent = stats.cycles[0];  // Already sorted DESC
+
+          // Currently heating - show live duration
+          if (isHeating && mostRecent && !mostRecent.completed) {
+            const runningMins = Math.round((Date.now() - mostRecent.startTime) / 60000);
+            return `Running ${runningMins}m...`;
+          }
+
+          // Find most recent COMPLETED cycle (not just most recent start)
+          const lastCompleted = stats.cycles.find(c => c.completed);
+          if (lastCompleted) {
+            const endTime = lastCompleted.endTime ? this.formatRelativeTime(lastCompleted.endTime) : '?';
+            const duration = lastCompleted.durationMinutes ?? '?';
+            return `Ended ${endTime} (${duration}m)`;
+          }
+
+          // No completed cycles - show when last started (incomplete)
+          if (mostRecent) {
+            return `Started ${this.formatRelativeTime(mostRecent.startTime)} (incomplete)`;
+          }
+
+          return 'No data';
         },
         getTodayStats(t) {
-          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24) || { heatingCycles: 0, heatingMinutes: 0 };
-          return `${stats.heatingCycles} cycles, ${this.formatDuration(stats.heatingMinutes)}`;
+          const stats = this.$store.thermostats?.getStatsByDevice?.(t.id, 24) || {
+            heatingCycles: 0, heatingMinutes: 0, avgCycleMinutes: 0
+          };
+
+          if (stats.heatingCycles === 0) return 'No cycles';
+
+          const total = this.formatDuration(stats.heatingMinutes);
+          const avg = stats.avgCycleMinutes > 0 ? ` avg ${stats.avgCycleMinutes}m` : '';
+
+          return `${stats.heatingCycles} cycles ${total}${avg}`;
         },
         formatTime(ts) {
           const date = new Date(ts);
@@ -2542,16 +2516,25 @@
         },
         getEventInfo(type) {
           const types = {
-            heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'important' },
-            heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'important' },
-            target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'important' },
-            device_offline: { icon: '📡', color: '#ef4444', label: 'Device Offline', priority: 'important' },
-            low_battery: { icon: '🪫', color: '#f59e0b', label: 'Low Battery', priority: 'important' },
+            // ALERT - Requires immediate action
+            device_offline: { icon: '🔴', color: '#ef4444', label: 'Device Offline', priority: 'alert', action: 'Check device power and Zigbee signal' },
+            low_battery_critical: { icon: '🪫', color: '#ef4444', label: 'Battery Critical', priority: 'alert', action: 'Replace batteries immediately' },
+            // WARNING - Should investigate
+            low_battery: { icon: '🔋', color: '#f59e0b', label: 'Battery Low', priority: 'warning', action: 'Plan to replace batteries soon' },
+            window_detected: { icon: '🪟', color: '#f59e0b', label: 'Window Open', priority: 'warning', action: 'Heating paused - close window to resume' },
+            // ACTIVITY - Normal operations
+            heating_started: { icon: '🔥', color: '#ef4444', label: 'Heating Started', priority: 'activity' },
+            heating_stopped: { icon: '❄️', color: '#3b82f6', label: 'Heating Stopped', priority: 'activity' },
+            target_reached: { icon: '✅', color: '#22c55e', label: 'Target Reached', priority: 'activity' },
             setpoint_changed: { icon: '🎯', color: '#f59e0b', label: 'Setpoint Changed', priority: 'activity' },
             mode_changed: { icon: '⚙️', color: '#8b5cf6', label: 'Mode Changed', priority: 'activity' },
             preset_changed: { icon: '🚀', color: '#06b6d4', label: 'Preset Changed', priority: 'activity' },
+            child_lock_changed: { icon: '🔒', color: '#64748b', label: 'Child Lock Changed', priority: 'activity' },
+            initial_state: { icon: '📍', color: '#6366f1', label: 'Initial State', priority: 'activity' },
+            // BACKGROUND - Routine events
             device_online: { icon: '📡', color: '#22c55e', label: 'Device Online', priority: 'background' },
-            battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background' }
+            battery_ok: { icon: '🔋', color: '#22c55e', label: 'Battery OK', priority: 'background' },
+            temp_update: { icon: '🌡️', color: '#94a3b8', label: 'Temperature Update', priority: 'background' }
           };
           return types[type] || { icon: '📝', color: '#94a3b8', label: type, priority: 'background' };
         },
@@ -3191,6 +3174,14 @@
           if (sensorsStore && Alpine.store('mqtt')?.client) {
             sensorsStore.init();
             console.log('[sensor-config] Sensors MQTT subscriptions initialized');
+
+            // Start duration ticker for open contact sensors
+            sensorsStore.startDurationTicker();
+
+            // Load open timestamps from InfluxDB after sensors have loaded
+            setTimeout(() => {
+              sensorsStore.loadOpenSensorTimestamps(CONFIG);
+            }, 3000);
           }
         }, 2000);
       }
@@ -4080,7 +4071,7 @@
     // ========================================
     function app() {
       return {
-        currentView: 'comfort',
+        currentView: 'classic',
         currentDateTime: '',
         now: Date.now(),
         panelOpen: localStorage.getItem('panel-open') !== 'false',
@@ -4146,6 +4137,38 @@
           return contacts.filter(s => liveData[s.ieee_address]?.contact === false).length;
         },
 
+        // Check if a contact sensor is a door (vs window)
+        isDoor(friendlyName) {
+          return friendlyName.toLowerCase().includes('door');
+        },
+
+        // Get all open contact sensors
+        getOpenContacts() {
+          const contacts = Alpine.store('sensors')?.sensorsByType?.contact || [];
+          const liveData = Alpine.store('sensors')?.liveData || {};
+          return contacts.filter(s => liveData[s.ieee_address]?.contact === false);
+        },
+
+        // Get open doors only
+        getOpenDoors() {
+          return this.getOpenContacts().filter(s => this.isDoor(s.friendly_name));
+        },
+
+        // Get open windows only
+        getOpenWindows() {
+          return this.getOpenContacts().filter(s => !this.isDoor(s.friendly_name));
+        },
+
+        // Get count of open doors
+        getDoorCount() {
+          return this.getOpenDoors().length;
+        },
+
+        // Get count of open windows
+        getWindowCount() {
+          return this.getOpenWindows().length;
+        },
+
         // Short names for contact sensors in sidebar
         contactShortNames: {
           '[Bath] Window Contact Sensor': 'Bath Window',
@@ -4171,8 +4194,6 @@
       {
         id: 'monitor', name: 'Monitor', icon: '📈',
         views: [
-          { id: 'comfort', name: 'Score', icon: '🎯', title: 'Comfort Score', key: '1', primary: true },
-          { id: 'compare', name: 'Compare', icon: '📊', title: 'Room Comparison', key: '2', primary: true },
           { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
         ]
@@ -4224,7 +4245,7 @@
       return {
         moreMenuOpen: false,
         mobileMenuOpen: false,
-        currentView: 'comfort',
+        currentView: 'classic',
         primaryViews: PRIMARY_VIEWS,
         overflowCategories: OVERFLOW_CATEGORIES,
         allViews: ALL_VIEWS,
@@ -4296,224 +4317,6 @@
           this.mobileMenuOpen = !this.mobileMenuOpen;
           this.moreMenuOpen = false;
         }
-      };
-    }
-
-    // ========================================
-    // COMFORT SCORE VIEW (Vision 1)
-    // ========================================
-    function comfortScoreView() {
-      return {
-        homeScore: 0,
-        roomScores: [],
-        suggestions: [],
-        showBreakdown: false,
-
-        init() {
-          this.updateScores();
-          this.$watch('$store.rooms.list', () => this.updateScores());
-        },
-
-        updateScores() {
-          const rooms = this.$store.rooms.list;
-
-          this.roomScores = rooms
-            .filter(r => r.temperature !== null && r.humidity !== null)
-            .map(room => ({
-              ...room,
-              score: this.calculateComfort(room.temperature, room.humidity)
-            }))
-            .sort((a, b) => b.score - a.score);
-
-          this.homeScore = this.calculateHomeScore(rooms);
-          this.suggestions = this.generateSuggestions(rooms).slice(0, 2);
-        },
-
-        calculateComfort(temp, humidity) {
-          if (temp === null || humidity === null) return 0;
-          let tempScore = 70;
-          if (temp < 20) tempScore = Math.max(0, 70 - (20 - temp) * 10);
-          else if (temp > 26) tempScore = Math.max(0, 70 - (temp - 26) * 10);
-          else tempScore = 70 - Math.abs(temp - 23) * 2;
-
-          let humidScore = 30;
-          if (humidity < 40) humidScore = Math.max(0, 30 - (40 - humidity));
-          else if (humidity > 60) humidScore = Math.max(0, 30 - (humidity - 60) * 1.5);
-          else humidScore = 30 - Math.abs(humidity - 50) * 0.3;
-
-          return Math.round(Math.max(0, Math.min(100, tempScore + humidScore)));
-        },
-
-        calculateHomeScore(rooms) {
-          const weights = { 'Living Room': 1.5, 'Bedroom': 1.3, 'Study': 1.0, 'Kitchen': 0.8, 'Bathroom': 0.5 };
-          const valid = rooms.filter(r => r.temperature !== null);
-          if (valid.length === 0) return 0;
-
-          let sum = 0, total = 0;
-          valid.forEach(r => {
-            const w = weights[r.name] || 1;
-            sum += this.calculateComfort(r.temperature, r.humidity) * w;
-            total += w;
-          });
-          return Math.round(sum / total);
-        },
-
-        generateSuggestions(rooms) {
-          const valid = rooms.filter(r => r.temperature !== null && r.humidity !== null);
-          if (valid.length === 0) return [];
-
-          const suggestions = [];
-          const hottest = valid.reduce((a, b) => a.temperature > b.temperature ? a : b);
-          const mostHumid = valid.reduce((a, b) => a.humidity > b.humidity ? a : b);
-
-          if (mostHumid.humidity > 65) {
-            suggestions.push({ type: 'action', icon: '💨', title: 'Improve ventilation',
-              message: `${mostHumid.name} humidity is high (${mostHumid.humidity}%)` });
-          }
-          if (hottest.temperature > 28) {
-            const coldest = valid.reduce((a, b) => a.temperature < b.temperature ? a : b);
-            suggestions.push({ type: 'tip', icon: '🏃', title: 'Go to cooler room',
-              message: `${coldest.name} is ${(hottest.temperature - coldest.temperature).toFixed(1)}° cooler` });
-          }
-          return suggestions;
-        },
-
-        getLabel() {
-          if (this.homeScore >= 90) return 'Perfect';
-          if (this.homeScore >= 75) return 'Comfortable';
-          if (this.homeScore >= 60) return 'Okay';
-          if (this.homeScore >= 40) return 'Uncomfortable';
-          return 'Poor';
-        },
-
-        getColor() {
-          if (this.homeScore >= 90) return '#34C759';
-          if (this.homeScore >= 75) return '#30D158';
-          if (this.homeScore >= 60) return '#FFD60A';
-          if (this.homeScore >= 40) return '#FF9500';
-          return '#FF3B30';
-        },
-
-        getRoomColor(score) {
-          if (score >= 75) return 'var(--color-success)';
-          if (score >= 50) return 'var(--color-warning)';
-          return 'var(--color-danger)';
-        },
-
-        getScoreArc() {
-          const percent = this.homeScore / 100;
-          const circumference = 2 * Math.PI * 90;
-          return `${percent * circumference} ${circumference}`;
-        },
-
-        openRoom(room) { this.$store.roomDetail.open(room); }
-      };
-    }
-
-    // ========================================
-    // BAR COMPARE VIEW (Vision 2)
-    // ========================================
-    function barCompareView() {
-      return {
-        sortBy: 'temperature',
-        sortDirection: 'desc',
-        viewMode: 'both',
-        insights: [],
-        tempScale: { min: 18, max: 32 },
-        humidityScale: { min: 0, max: 100 },
-        comfortZone: { temp: { min: 22, max: 26 }, humidity: { min: 40, max: 60 } },
-
-        init() {
-          const saved = localStorage.getItem('bar-sort');
-          if (saved) this.sortBy = saved;
-          const savedView = localStorage.getItem('bar-view');
-          if (savedView) this.viewMode = savedView;
-          this.updateInsights();
-          this.$watch('$store.rooms.list', () => this.updateInsights());
-        },
-
-        get rooms() { return this.$store.rooms.list.filter(r => r.temperature !== null); },
-
-        get sortedRooms() {
-          return [...this.rooms].sort((a, b) => {
-            let cmp = 0;
-            if (this.sortBy === 'temperature') cmp = a.temperature - b.temperature;
-            else if (this.sortBy === 'humidity') cmp = a.humidity - b.humidity;
-            else if (this.sortBy === 'name') cmp = a.name.localeCompare(b.name);
-            return this.sortDirection === 'desc' ? -cmp : cmp;
-          });
-        },
-
-        updateInsights() {
-          const rooms = this.rooms;
-          if (rooms.length === 0) { this.insights = []; return; }
-
-          const insights = [];
-          const temps = rooms.map(r => r.temperature);
-          const spread = Math.max(...temps) - Math.min(...temps);
-
-          if (spread >= 2) {
-            const hottest = rooms.find(r => r.temperature === Math.max(...temps));
-            const coldest = rooms.find(r => r.temperature === Math.min(...temps));
-            insights.push({ type: spread > 4 ? 'warning' : 'info', icon: '🔺', title: 'TEMPERATURE GAP',
-              message: `${hottest.name} is ${spread.toFixed(1)}° warmer than ${coldest.name}` });
-          }
-
-          rooms.forEach(r => {
-            if (r.humidity > 70) {
-              insights.push({ type: 'alert', icon: '💧', title: 'HIGH HUMIDITY',
-                message: `${r.name} at ${r.humidity}% — risk of mold` });
-            }
-          });
-
-          const comfortable = rooms.filter(r => r.temperature >= 22 && r.temperature <= 26 && r.humidity >= 40 && r.humidity <= 60);
-          if (comfortable.length > 0) {
-            insights.push({ type: 'success', icon: '✓', title: 'COMFORT ZONES',
-              message: `${comfortable.map(r => r.name).join(', ')} ${comfortable.length === 1 ? 'is' : 'are'} comfortable` });
-          }
-
-          this.insights = insights.slice(0, 4);
-        },
-
-        setViewMode(mode) { this.viewMode = mode; localStorage.setItem('bar-view', mode); },
-
-        getBarWidth(value, type) {
-          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
-          return Math.max(0, Math.min(100, ((value - scale.min) / (scale.max - scale.min)) * 100));
-        },
-
-        getBarColor(value, type) {
-          const zone = type === 'temperature' ? this.comfortZone.temp : this.comfortZone.humidity;
-          if (type === 'temperature') {
-            if (value < zone.min) return 'var(--color-cold)';
-            if (value > zone.max) return 'var(--color-hot)';
-            return 'var(--color-comfortable)';
-          } else {
-            if (value < zone.min) return 'var(--color-warning)';
-            if (value > zone.max) return 'var(--color-info)';
-            return 'var(--color-comfortable)';
-          }
-        },
-
-        getComfortZoneStyle(type) {
-          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
-          const zone = type === 'temperature' ? this.comfortZone.temp : this.comfortZone.humidity;
-          const left = ((zone.min - scale.min) / (scale.max - scale.min)) * 100;
-          const width = ((zone.max - zone.min) / (scale.max - scale.min)) * 100;
-          return { left: left + '%', width: width + '%' };
-        },
-
-        getScaleLabels(type) {
-          const scale = type === 'temperature' ? this.tempScale : this.humidityScale;
-          const unit = type === 'temperature' ? '°' : '%';
-          return [scale.min + unit, ((scale.min + scale.max) / 2) + unit, scale.max + unit];
-        },
-
-        getInsightClass(type) {
-          return { success: 'insight-success', warning: 'insight-warning', alert: 'insight-alert', info: 'insight-info' }[type] || 'insight-info';
-        },
-
-        openRoom(room) { this.$store.roomDetail.open(room); }
       };
     }
 

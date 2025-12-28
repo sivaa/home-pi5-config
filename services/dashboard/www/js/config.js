@@ -291,8 +291,6 @@ export const VIEW_CATEGORIES = [
     name: 'Monitor',
     icon: '📈',
     views: [
-      { id: 'comfort', name: 'Score', icon: '🎯', title: 'Comfort Score', key: '1', primary: true },
-      { id: 'compare', name: 'Compare', icon: '📊', title: 'Room Comparison', key: '2', primary: true },
       { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
       { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
     ]
