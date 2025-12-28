@@ -563,3 +563,72 @@
       }
     }
 
+/* ============================================
+   DARK MODE
+   ============================================ */
+
+/* Master control "on" state */
+[data-theme="dark"] .master-control.master-on {
+  background: linear-gradient(135deg, #3D3520 0%, #4A4025 100%);
+  box-shadow: var(--shadow-md), 0 0 20px rgba(255, 193, 7, 0.15);
+}
+
+/* Unavailable text overlay */
+[data-theme="dark"] .unavailable-text {
+  background: rgba(44, 44, 46, 0.95);
+  color: var(--color-text-secondary);
+}
+
+/* Syncing overlay */
+[data-theme="dark"] .light-syncing-overlay {
+  background: rgba(28, 28, 30, 0.8);
+}
+
+/* Toggle switch thumb */
+[data-theme="dark"] .toggle-thumb {
+  background: var(--color-text);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Slider thumbs - WebKit */
+[data-theme="dark"] .slider::-webkit-slider-thumb {
+  background: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Slider thumbs - Firefox */
+[data-theme="dark"] .slider::-moz-range-thumb {
+  background: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Slider percent label */
+[data-theme="dark"] .slider-percent {
+  color: rgba(200, 180, 130, 0.8);
+}
+
+/* Light card "on" state */
+[data-theme="dark"] .light-card.light-on {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 20px rgba(255, 200, 0, 0.1);
+}
+
+/* Brightness slider - warm glow for dark mode */
+[data-theme="dark"] .brightness-slider {
+  background: linear-gradient(90deg,
+    rgba(100, 80, 50, 0.6) 0%,
+    rgba(60, 60, 65, 1) 100%
+  );
+}
+
+/* Color temp slider - adjusted for dark */
+[data-theme="dark"] .colortemp-slider {
+  background: linear-gradient(90deg,
+    #2A3040 0%,
+    #353540 50%,
+    #4A4030 100%
+  );
+}
+
