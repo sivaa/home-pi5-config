@@ -13,7 +13,7 @@ import { initEventsStore } from './stores/events-store.js';
 import { initThermostatStore } from './stores/thermostat-store.js';
 import { initWeatherStore } from './stores/weather-store.js';
 import { initThemeStore } from './stores/theme-store.js';
-import { initKioskStore } from './stores/kiosk-store.js';
+import { initLogsStore } from './stores/logs-store.js';
 import { OrbitControls } from './three/orbit-controls.js';
 
 // Import view components
@@ -26,6 +26,7 @@ import { co2View } from '../views/co2-monitor.js';
 import { networkView } from '../views/network.js';
 import { thermostatView } from '../views/thermostat.js';
 import { mailboxView } from '../views/mailbox.js';
+import { logsView } from '../views/logs.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -39,7 +40,6 @@ document.addEventListener('alpine:init', () => {
   // Register stores
   Alpine.store('config', CONFIG);
   initThemeStore(Alpine);  // Theme store (no config needed)
-  initKioskStore(Alpine);  // Kiosk control store (no config needed)
   initMqttStore(Alpine, CONFIG);
   initRoomsStore(Alpine, CONFIG);
   initLightsStore(Alpine, CONFIG);
@@ -48,6 +48,7 @@ document.addEventListener('alpine:init', () => {
   initEventsStore(Alpine, CONFIG);
   initThermostatStore(Alpine, CONFIG);
   initWeatherStore(Alpine, CONFIG);
+  initLogsStore(Alpine, CONFIG);
 
   // Initialize weather store after a short delay
   setTimeout(() => {
@@ -152,5 +153,8 @@ window.thermostatView = thermostatView;
 
 // Mailbox view
 window.mailboxView = mailboxView;
+
+// Activity Logs view
+window.logsView = logsView;
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');

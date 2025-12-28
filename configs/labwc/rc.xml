@@ -10,9 +10,9 @@
     </keybind>
   </keyboard>
 
-  <!-- Window rules for kiosk mode -->
+  <!-- Auto-fullscreen browser windows on startup -->
+  <!-- Toggle via kiosk-control API (wlrctl + browser restart approach) -->
   <windowRules>
-    <!-- Auto-fullscreen Epiphany browser windows -->
     <windowRule identifier="org.gnome.Epiphany*">
       <action name="ToggleFullscreen"/>
     </windowRule>

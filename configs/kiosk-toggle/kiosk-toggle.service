@@ -1,0 +1,29 @@
+[Unit]
+Description=Kiosk Toggle Overlay - Floating button to toggle kiosk mode
+# Start after labwc is running
+After=default.target
+
+[Service]
+Type=simple
+
+# Environment for Wayland
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+# Preload gtk4-layer-shell to fix linking order issue
+Environment=LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgtk4-layer-shell.so.0
+# Disable accessibility warnings
+Environment=GTK_A11Y=none
+
+# Run the GTK4 overlay app
+ExecStart=/usr/bin/python3 /opt/kiosk-toggle/kiosk-toggle.py
+
+# Auto-restart on failure
+Restart=on-failure
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
