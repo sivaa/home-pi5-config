@@ -409,25 +409,11 @@
       flex: 0 0 auto;
     }
 
-    /* HEATING, DOORS & WINDOWS - default: shrink when empty (header only) */
+    /* HEATING, DOORS & WINDOWS - always fit content, never grow */
     .panel-section.compact.heating-section,
     .panel-section.compact.doors-section,
     .panel-section.compact.windows-section {
       flex: 0 0 auto;
-      overflow-y: auto;
-    }
-
-    /* HEATING - expand when has active items */
-    .panel-section.compact.heating-section:has(.panel-metrics-grid) {
-      flex: 1 1 auto;
-      min-height: 50px;
-    }
-
-    /* DOORS & WINDOWS - expand when has items (more growth than heating) */
-    .panel-section.compact.doors-section:has(.panel-metrics-grid),
-    .panel-section.compact.windows-section:has(.panel-metrics-grid) {
-      flex: 2 1 auto;
-      min-height: 80px;
     }
 
     .panel-section-title {
