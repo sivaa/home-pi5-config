@@ -8,6 +8,7 @@ export function initMqttStore(Alpine, CONFIG) {
     connected: false,
     connecting: true,
     client: null,
+    connectionCount: 0,  // Track connection count for reconnect detection
 
     connect() {
       this.connecting = true;
@@ -19,26 +20,40 @@ export function initMqttStore(Alpine, CONFIG) {
       });
 
       this.client.on('connect', () => {
+        const isReconnect = this.connectionCount > 0;
+        this.connectionCount++;
         this.connected = true;
         this.connecting = false;
 
-        // Subscribe to ALL room sensors (primary + additional)
-        const sensorTopics = Alpine.store('rooms').getAllSensorTopics();
-        sensorTopics.forEach(sensorName => {
-          this.client.subscribe(`${CONFIG.baseTopic}/${sensorName}`, { qos: 0 });
-        });
-        console.log(`📡 Subscribed to ${sensorTopics.length} sensor topics`);
+        // Subscribe to ALL zigbee2mqtt topics (for logs view)
+        this.client.subscribe(`${CONFIG.baseTopic}/#`, { qos: 0 });
+        console.log(`📋 Subscribed to ${CONFIG.baseTopic}/# (all topics for logs)`);
 
-        // Subscribe to light topics and their availability
-        Alpine.store('lights').list.forEach(light => {
-          this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}`, { qos: 0 });
-          this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}/availability`, { qos: 0 });
-        });
+        // Subscribe to dashboard audit topics
+        this.client.subscribe('dashboard/#', { qos: 0 });
+
+        // Note: Individual sensor/light subscriptions now covered by wildcard
+        const sensorTopics = Alpine.store('rooms').getAllSensorTopics();
+        console.log(`📡 Tracking ${sensorTopics.length} sensors via wildcard`);
+
+        // On reconnect, reload open timestamps from InfluxDB
+        // This fixes timer disappearing after MQTT disconnect/reconnect
+        if (isReconnect) {
+          console.log('[mqtt] Reconnected - reloading open sensor timestamps');
+          setTimeout(() => {
+            const sensorsStore = Alpine.store('sensors');
+            sensorsStore?.loadOpenSensorTimestamps?.(CONFIG);
+          }, 5000);  // Wait for sensors to send current state
+        }
       });
 
       this.client.on('message', (topic, message) => {
         try {
           const data = JSON.parse(message.toString());
+
+          // Capture ALL messages for logs store (first, before any routing)
+          Alpine.store('logs')?.captureMessage(topic, data);
+
           const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
 
           // Check if it's an availability message
