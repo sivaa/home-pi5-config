@@ -473,6 +473,14 @@
       font-size: 48px;
     }
 
+    /* Temperature decimal styling - subtle and secondary */
+    .temp-decimal {
+      font-size: 0.55em;
+      font-weight: 400;
+      opacity: 0.55;
+      letter-spacing: -0.02em;
+    }
+
     /* Secondary metrics (humidity, CO2) - inline below temperature */
     .panel-section-primary.home-section .panel-secondary-row {
       display: flex;

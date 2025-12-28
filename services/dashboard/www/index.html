@@ -464,7 +464,7 @@
                   <!-- Average Values - Prominent Display -->
                   <div class="room-averages-section">
                     <div class="avg-temp-display">
-                      <span x-text="room.avgTemperature != null ? room.avgTemperature.toFixed(1) : (room.temperature != null ? room.temperature.toFixed(1) : '--')"></span>
+                      <span x-html="formatTempStyled(room.avgTemperature ?? room.temperature, false)"></span>
                       <span class="avg-unit">°C</span>
                       <span class="trend-indicator" :class="'trend-' + $store.rooms.getTempTrend(room)" x-text="$store.rooms.getTempTrend(room) === 'rising' ? '▲' : ($store.rooms.getTempTrend(room) === 'falling' ? '▼' : '')"></span>
                     </div>
@@ -483,13 +483,13 @@
                         <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
                         <template x-if="sensor.type === 'climate' || !sensor.type">
                           <div class="sensor-values">
-                            <span class="sensor-temp" x-text="sensor.temperature != null ? sensor.temperature.toFixed(1) + '°' : '--°'"></span>
+                            <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
                             <span class="sensor-humid" x-show="sensor.humidity != null">💧<span x-text="sensor.humidity ? sensor.humidity.toFixed(0) + '%' : ''"></span></span>
                           </div>
                         </template>
                         <template x-if="sensor.type === 'thermostat'">
                           <div class="sensor-values">
-                            <span class="sensor-temp" x-text="sensor.temperature != null ? sensor.temperature.toFixed(1) + '°' : '--°'"></span>
+                            <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
                           </div>
                         </template>
                         <template x-if="sensor.type === 'co2'">
@@ -1775,7 +1775,7 @@
           <!-- Primary: Large temperature -->
           <div class="panel-metric">
             <span class="panel-icon">🏠</span>
-            <span class="panel-value temp-primary" x-text="($store.rooms.avgTemperature?.toFixed(1) || '--') + '°'"></span>
+            <span class="panel-value temp-primary" x-html="formatTempStyled($store.rooms.avgTemperature)"></span>
           </div>
           <!-- Secondary: Humidity and CO2 on next line with color coding -->
           <div class="panel-secondary-row">
@@ -1808,7 +1808,7 @@
           <div class="panel-metrics-grid">
             <div class="panel-metric">
               <span class="panel-icon">🌿</span>
-              <span class="panel-value" x-text="($store.rooms.list.find(r => r.id === 'balcony')?.temperature?.toFixed(1) || '--') + '°'"></span>
+              <span class="panel-value" x-html="formatTempStyled($store.rooms.list.find(r => r.id === 'balcony')?.temperature)"></span>
             </div>
             <div class="panel-metric" x-show="$store.weather?.temperature != null">
               <span class="panel-icon" x-text="$store.weather?.conditionIcon || '☁️'"></span>
@@ -1824,7 +1824,7 @@
             <template x-for="room in $store.rooms.list.filter(r => r.id !== 'balcony')" :key="room.id">
               <div class="panel-metric">
                 <span class="panel-icon" x-text="room.icon"></span>
-                <span class="panel-value" x-text="(room.temperature?.toFixed(1) || '--') + '°'"></span>
+                <span class="panel-value" x-html="formatTempStyled(room.temperature)"></span>
               </div>
             </template>
           </div>
@@ -2353,6 +2353,13 @@
         },
         getBatteryIcon(b) { return b === null || b < 20 ? '🪫' : '🔋'; },
         formatTemp(temp) { return temp?.toFixed(1) ?? '--'; },
+        // Format temperature with subtle decimal styling (returns HTML)
+        formatTempStyled(temp, showDegree = true) {
+          if (temp == null) return '--' + (showDegree ? '°' : '');
+          const fixed = temp.toFixed(1);
+          const [integer, decimal] = fixed.split('.');
+          return `${integer}<span class="temp-decimal">.${decimal}</span>${showDegree ? '°' : ''}`;
+        },
         // Split temp into whole and decimal parts for styling
         tempParts(temp) {
           if (temp == null) return { whole: '--', decimal: '' };
@@ -2953,6 +2960,14 @@
     // Make CONFIG globally available for modules
     window.CONFIG = CONFIG;
     window.ROOM_SENSORS = ROOM_SENSORS;
+
+    // Global temperature formatting helper (subtle decimal styling)
+    window.formatTempStyled = function(temp, showDegree = true) {
+      if (temp == null) return '--' + (showDegree ? '°' : '');
+      const fixed = temp.toFixed(1);
+      const [integer, decimal] = fixed.split('.');
+      return `${integer}<span class="temp-decimal">.${decimal}</span>${showDegree ? '°' : ''}`;
+    };
 
     // ========================================
     // ALPINE STORES
