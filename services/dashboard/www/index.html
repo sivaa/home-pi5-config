@@ -760,8 +760,19 @@
                          heating: t.runningState === 'heat' && t.systemMode !== 'off',
                          off: t.systemMode === 'off',
                          unavailable: !t.available,
-                         syncing: t.syncing
+                         syncing: t.syncing,
+                         'left-network': t.leftNetwork
                        }">
+
+                    <!-- Offline/Left Network Overlay -->
+                    <div class="offline-overlay" x-show="!t.available || t.leftNetwork" x-cloak>
+                      <div class="offline-content">
+                        <span class="offline-icon" x-text="t.leftNetwork ? '🚨' : '📡'"></span>
+                        <span class="offline-text" x-text="t.leftNetwork ? 'DEVICE LEFT NETWORK' : 'DEVICE OFFLINE'"></span>
+                        <span class="offline-action" x-show="t.leftNetwork">Needs re-pairing</span>
+                        <span class="offline-since" x-show="t.leftAt" x-text="getOfflineDuration(t)"></span>
+                      </div>
+                    </div>
 
                     <!-- Card Header -->
                     <div class="thermostat-card-header">
@@ -2683,7 +2694,7 @@
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
     import { initThermostatStore } from './js/stores/thermostat-store.js?v=3';
-    import { thermostatView } from './views/thermostat.js?v=6';
+    import { thermostatView } from './views/thermostat.js?v=7';
 
     // Expose thermostatView globally for Alpine x-data
     window.thermostatView = thermostatView;
@@ -4084,6 +4095,19 @@
               this.currentView = e.detail.view;
             }
           });
+
+          // Request browser notification permission on first user interaction
+          // This enables device offline alerts to show as push notifications
+          const requestNotificationPermission = () => {
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission().then(permission => {
+                console.log(`[app] Notification permission: ${permission}`);
+              });
+            }
+            // Only request once
+            document.removeEventListener('click', requestNotificationPermission);
+          };
+          document.addEventListener('click', requestNotificationPermission, { once: true });
         },
 
         setView(view) {

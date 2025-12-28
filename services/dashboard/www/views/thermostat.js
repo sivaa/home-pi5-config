@@ -4,8 +4,15 @@
  */
 
 // Event type definitions for thermostat timeline
-// Priority levels: alert (red, requires action) > warning (yellow, monitor) > activity (blue, normal ops) > background (gray, routine)
+// Priority levels: critical (device left) > alert (red, requires action) > warning (yellow, monitor) > activity (blue, normal ops) > background (gray, routine)
 const THERMOSTAT_EVENT_TYPES = {
+  // CRITICAL - Device left network, requires re-pairing (highest priority)
+  device_leave: {
+    icon: '🚨', color: '#dc2626', label: 'Device Left Network',
+    priority: 'critical', category: 'system',
+    action: 'Device needs to be re-paired to Zigbee network'
+  },
+
   // ALERT - Requires immediate attention (shown prominently)
   device_offline: {
     icon: '🔴', color: '#ef4444', label: 'Device Offline',
@@ -196,11 +203,16 @@ export function thermostatView() {
       return this.events.filter(e => e.info?.priority === 'warning');
     },
 
-    // Combined alerts & warnings for the "Alerts & Warnings" section
+    // Combined critical, alerts & warnings for the "Alerts & Warnings" section
     get alertsAndWarnings() {
       return this.events.filter(e =>
-        e.info?.priority === 'alert' || e.info?.priority === 'warning'
+        e.info?.priority === 'critical' || e.info?.priority === 'alert' || e.info?.priority === 'warning'
       ).slice(0, 10);
+    },
+
+    // CRITICAL - Device left network events (highest priority)
+    get criticalEvents() {
+      return this.events.filter(e => e.info?.priority === 'critical');
     },
 
     // ACTIVITY - Normal operations (demoted from "important")
@@ -213,9 +225,9 @@ export function thermostatView() {
       return this.events.filter(e => e.info?.priority === 'background');
     },
 
-    // Check if there are any active alerts (for badge display)
+    // Check if there are any active alerts or critical events (for badge display)
     get hasActiveAlerts() {
-      return this.alertEvents.length > 0;
+      return this.criticalEvents.length > 0 || this.alertEvents.length > 0;
     },
 
     get stats() {
@@ -385,6 +397,20 @@ export function thermostatView() {
       if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
       if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
       return `${Math.floor(seconds / 86400)}d ago`;
+    },
+
+    // Get offline duration text for overlay display
+    getOfflineDuration(thermostat) {
+      if (!thermostat?.leftAt) return '';
+      const seconds = Math.floor((Date.now() - thermostat.leftAt) / 1000);
+      if (seconds < 60) return 'Left just now';
+      if (seconds < 3600) return `Left ${Math.floor(seconds / 60)} minutes ago`;
+      if (seconds < 86400) {
+        const hours = Math.floor(seconds / 3600);
+        return `Left ${hours} hour${hours > 1 ? 's' : ''} ago`;
+      }
+      const days = Math.floor(seconds / 86400);
+      return `Left ${days} day${days > 1 ? 's' : ''} ago`;
     },
 
     formatDuration(minutes) {
@@ -656,3 +682,66 @@ export function thermostatView() {
     }
   };
 }
+
+// ============================================
+// GLOBAL HELPER FUNCTIONS
+// Exposed on window for nested x-data scopes
+// ============================================
+
+window.getOfflineDuration = function(thermostat) {
+  if (!thermostat?.leftAt) return '';
+  const seconds = Math.floor((Date.now() - thermostat.leftAt) / 1000);
+  if (seconds < 60) return 'Left just now';
+  if (seconds < 3600) return `Left ${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    return `Left ${hours} hour${hours > 1 ? 's' : ''} ago`;
+  }
+  const days = Math.floor(seconds / 86400);
+  return `Left ${days} day${days > 1 ? 's' : ''} ago`;
+};
+
+window.getTempProgressLabel = function(t) {
+  if (!t?.localTemp || !t?.targetTemp) return 'Unknown';
+  if (t?.runningState === 'heat') return 'Heating...';
+  if (Math.abs(t.localTemp - t.targetTemp) <= 0.5) return 'At target';
+  if (t.localTemp > t.targetTemp) return 'Above target';
+  return 'Below target';
+};
+
+window.getTempProgressPercent = function(t) {
+  if (!t?.localTemp || !t?.targetTemp) return 0;
+  const percent = (t.localTemp / t.targetTemp) * 100;
+  return Math.min(100, Math.max(0, Math.round(percent)));
+};
+
+window.getTempProgressColor = function(t) {
+  if (!t?.localTemp || !t?.targetTemp) return '#666';
+  const percent = (t.localTemp / t.targetTemp) * 100;
+
+  if (percent >= 100) return '#22c55e';
+  else if (percent >= 90) return 'linear-gradient(90deg, #eab308, #22c55e)';
+  else if (percent >= 70) return 'linear-gradient(90deg, #f97316, #eab308, #22c55e)';
+  else return 'linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e)';
+};
+
+window.getStatusIcon = function(thermostat) {
+  if (!thermostat.available) return '📡';
+  if (thermostat.systemMode === 'off') return '⏹️';
+  if (thermostat.runningState === 'heat') return '🔥';
+  return '❄️';
+};
+
+window.getStatusText = function(thermostat) {
+  if (!thermostat.available) return 'Offline';
+  if (thermostat.systemMode === 'off') return 'Off';
+  if (thermostat.runningState === 'heat') return 'Heating';
+  return 'Idle';
+};
+
+window.tempParts = function(temp) {
+  if (temp == null) return { whole: '--', decimal: '' };
+  const fixed = temp.toFixed(1);
+  const [whole, decimal] = fixed.split('.');
+  return { whole, decimal: '.' + decimal };
+};

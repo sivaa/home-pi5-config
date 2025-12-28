@@ -6,6 +6,13 @@
 // Event type definitions for thermostat timeline
 // Priority levels: alert (red, requires action) > warning (yellow, monitor) > activity (blue, normal ops) > background (gray, routine)
 const THERMOSTAT_EVENT_TYPES = {
+  // CRITICAL - Device left network, requires re-pairing (highest priority)
+  device_leave: {
+    icon: '🚨', color: '#dc2626', label: 'Device Left Network',
+    priority: 'critical', category: 'system',
+    action: 'Device needs to be re-paired to Zigbee network'
+  },
+
   // ALERT - Requires immediate attention (shown prominently)
   device_offline: {
     icon: '🔴', color: '#ef4444', label: 'Device Offline',
@@ -64,6 +71,9 @@ export function initThermostatStore(Alpine, CONFIG) {
       lastSeen: null,
       available: true,
       syncing: false,
+      // Network status (for device_leave detection)
+      leftNetwork: false,       // True if device left Zigbee network
+      leftAt: null,             // Timestamp when device left
       // Extra TRV features
       childLock: 'UNLOCK',
       openWindow: false,
@@ -101,8 +111,29 @@ export function initThermostatStore(Alpine, CONFIG) {
         console.log(`[thermostat-store] Subscribed to ${topic}`);
       });
 
+      // Subscribe to bridge events to catch device_leave
+      mqtt.client.subscribe('zigbee2mqtt/bridge/event', { qos: 0 });
+      console.log('[thermostat-store] Subscribed to zigbee2mqtt/bridge/event');
+
       // Handle incoming messages
       mqtt.client.on('message', (topic, message) => {
+        // Handle bridge events (device_leave, etc.)
+        if (topic === 'zigbee2mqtt/bridge/event') {
+          try {
+            const event = JSON.parse(message.toString());
+            if (event.type === 'device_leave') {
+              const thermostat = this.list.find(t => t.sensor === event.data?.friendly_name);
+              if (thermostat) {
+                console.warn(`[thermostat-store] 🚨 Device LEFT network: ${thermostat.name}`);
+                this.handleDeviceLeave(thermostat, event.data);
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+          return;
+        }
+
         if (!topic.startsWith(CONFIG.baseTopic + '/')) return;
 
         const deviceName = topic.replace(CONFIG.baseTopic + '/', '').replace('/availability', '');
@@ -317,6 +348,83 @@ export function initThermostatStore(Alpine, CONFIG) {
           eventType: thermostat.available ? 'device_online' : 'device_offline',
           time: Date.now()
         });
+      }
+    },
+
+    // Handle device leaving the Zigbee network (requires re-pairing)
+    handleDeviceLeave(thermostat, eventData) {
+      // Mark as unavailable with special flag
+      thermostat.available = false;
+      thermostat.leftNetwork = true;
+      thermostat.leftAt = Date.now();
+
+      // Add high-priority critical event
+      this.addEvent({
+        deviceId: thermostat.id,
+        deviceName: thermostat.name,
+        deviceIcon: thermostat.icon,
+        roomId: thermostat.roomId,
+        eventType: 'device_leave',
+        time: Date.now(),
+        message: `${thermostat.name} LEFT THE NETWORK - requires re-pairing`,
+        ieeeAddress: eventData?.ieee_address
+      });
+
+      console.error(`[thermostat-store] 🚨 CRITICAL: ${thermostat.name} has LEFT the Zigbee network!`);
+      console.error(`[thermostat-store] IEEE Address: ${eventData?.ieee_address}`);
+      console.error(`[thermostat-store] Device needs to be re-paired to restore functionality.`);
+
+      // Trigger notifications
+      this.sendOfflineNotifications(thermostat);
+    },
+
+    // Send multi-channel notifications when device goes offline
+    async sendOfflineNotifications(thermostat) {
+      const message = `🚨 ${thermostat.name} thermostat LEFT the Zigbee network and needs re-pairing!`;
+
+      // 1. Browser Push Notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('Thermostat Offline Alert', {
+            body: message,
+            icon: '/icons/warning.png',
+            tag: `offline-${thermostat.id}`,
+            requireInteraction: true,
+            silent: false
+          });
+          console.log('[thermostat-store] Browser notification sent');
+        } catch (e) {
+          console.warn('[thermostat-store] Browser notification failed:', e);
+        }
+      }
+
+      // 2. Home Assistant Notification (via MQTT)
+      const mqtt = Alpine.store('mqtt');
+      if (mqtt?.client && mqtt?.connected) {
+        try {
+          mqtt.client.publish('homeassistant/notify', JSON.stringify({
+            title: 'Thermostat Offline',
+            message: message,
+            data: {
+              push: { sound: 'alarm' },
+              urgency: 'high'
+            }
+          }));
+          console.log('[thermostat-store] Home Assistant notification published');
+        } catch (e) {
+          console.warn('[thermostat-store] Home Assistant notification failed:', e);
+        }
+
+        // 3. TTS Announcement
+        try {
+          mqtt.client.publish('dashboard/tts', JSON.stringify({
+            message: `Warning! ${thermostat.name} thermostat has disconnected and needs attention.`,
+            priority: 'high'
+          }));
+          console.log('[thermostat-store] TTS announcement published');
+        } catch (e) {
+          console.warn('[thermostat-store] TTS announcement failed:', e);
+        }
       }
     },
 

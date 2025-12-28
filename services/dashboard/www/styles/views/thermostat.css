@@ -322,7 +322,85 @@
   filter: grayscale(40%);
 }
 
+.thermostat-card.left-network {
+  border-color: #dc2626 !important;
+  animation: criticalPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(220, 38, 38, 0.6);
+  }
+}
+
 .thermostat-card.syncing {
+  opacity: 0.8;
+}
+
+/* ========================================
+   OFFLINE OVERLAY
+   Red alert overlay when device is offline or left network
+   ======================================== */
+
+.offline-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(220, 38, 38, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  border-radius: inherit;
+  backdrop-filter: blur(4px);
+}
+
+.offline-content {
+  text-align: center;
+  color: white;
+  padding: var(--space-lg);
+}
+
+.offline-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: var(--space-md);
+  animation: alertPulse 2s infinite;
+}
+
+@keyframes alertPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.offline-text {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  display: block;
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.offline-action {
+  font-size: var(--font-size-md);
+  display: block;
+  margin-bottom: var(--space-sm);
+  opacity: 0.9;
+  font-weight: var(--font-weight-medium);
+}
+
+.offline-since {
+  font-size: var(--font-size-sm);
+  display: block;
   opacity: 0.8;
 }
 
