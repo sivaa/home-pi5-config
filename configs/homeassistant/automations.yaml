@@ -89,12 +89,12 @@
            else true }}
 
   action:
-    - service: tts.google_translate_say
+    # Smart TTS with retry logic - waits up to 5 min if Kitchen Display unavailable
+    - service: script.smart_tts_co2_alert
       data:
-        entity_id: media_player.kitchen_display
         message: >
           Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
-        language: "en"
+        co2_threshold: 1200
     - service: notify.mobile_app_22111317pg
       data:
         title: "⚠️ CO2 High"
@@ -130,12 +130,12 @@
       above: 1600
 
   action:
-    - service: tts.google_translate_say
+    # Smart TTS with retry logic - waits up to 5 min if Kitchen Display unavailable
+    - service: script.smart_tts_co2_alert
       data:
-        entity_id: media_player.kitchen_display
         message: >
           Warning! CO2 level is critical at {{ states('sensor.hallway_co2_co2') | int }}. Please open windows immediately!
-        language: "en"
+        co2_threshold: 1600
     - service: notify.mobile_app_22111317pg
       data:
         title: "🚨 CO2 CRITICAL"
@@ -181,9 +181,13 @@
         {{ alerts | length > 0 and (now() - alerts | max).total_seconds() < 7200 }}
 
   action:
+    # Good news announcement - use all speakers for reliability
     - service: tts.google_translate_say
       data:
-        entity_id: media_player.kitchen_display
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
         message: >
           {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
           {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}

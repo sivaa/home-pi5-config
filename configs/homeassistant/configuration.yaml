@@ -279,3 +279,9 @@ input_boolean:
 # Purpose: Event-driven actions for smart home
 # =============================================================================
 automation: !include automations.yaml
+
+# =============================================================================
+# SCRIPTS
+# Purpose: Reusable automation actions (smart TTS with retry, etc.)
+# =============================================================================
+script: !include scripts.yaml

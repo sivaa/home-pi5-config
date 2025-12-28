@@ -1,0 +1,129 @@
+# =============================================================================
+# HOME ASSISTANT SCRIPTS
+# Purpose: Reusable automation actions
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SMART TTS - CO2 ALERT WITH RETRY
+# Purpose: TTS announcement with primary speaker preference, retry, and obsolescence check
+#
+# Flow:
+#   1. Check if primary speaker (kitchen_display) is available
+#   2. If available AND CO2 still high: play immediately
+#   3. If unavailable: wait up to 5 minutes (event-driven with wait_template)
+#   4. If primary becomes available AND CO2 still high: play on primary
+#   5. If timeout (5 min) AND CO2 still high: play on fallback speakers
+#   6. If CO2 drops below threshold during wait: skip (announcement obsolete)
+#   7. If ALL speakers unavailable: send mobile notification warning
+#
+# Usage:
+#   service: script.smart_tts_co2_alert
+#   data:
+#     message: "Your message here"
+#     co2_threshold: 1200  # or 1600 for critical
+# -----------------------------------------------------------------------------
+smart_tts_co2_alert:
+  alias: "Smart TTS - CO2 Alert with Retry"
+  description: "TTS with primary speaker preference, retry logic, and obsolescence check"
+  mode: single
+  max_exceeded: silent
+
+  fields:
+    message:
+      description: "The message to announce"
+      example: "CO2 level is high. Please ventilate."
+    co2_threshold:
+      description: "CO2 threshold for obsolescence check"
+      example: 1200
+      default: 1200
+
+  sequence:
+    # Check if primary speaker is immediately available
+    - if:
+        # Kitchen Display is available (not unavailable/unknown) AND CO2 still above threshold
+        - condition: template
+          value_template: >
+            {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+               and states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+      then:
+        # Play immediately on primary speaker
+        - service: tts.google_translate_say
+          data:
+            entity_id: media_player.kitchen_display
+            message: "{{ message }}"
+            language: "en"
+      else:
+        # Primary speaker unavailable - wait for it (up to 5 min) or for obsolescence
+        - wait_template: >
+            {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+               or states('sensor.hallway_co2_co2') | int < co2_threshold | int }}
+          timeout: "00:05:00"
+          continue_on_timeout: true
+
+        # Check what caused the wait to end
+        - choose:
+            # Case 1: CO2 dropped below threshold - announcement is obsolete
+            - conditions:
+                - condition: template
+                  value_template: >
+                    {{ states('sensor.hallway_co2_co2') | int < co2_threshold | int }}
+              sequence:
+                - stop: "CO2 dropped below threshold - announcement obsolete"
+
+            # Case 2: Primary speaker became available AND CO2 still high
+            - conditions:
+                - condition: template
+                  value_template: >
+                    {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+                       and states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+              sequence:
+                # Play on primary speaker (Kitchen Display)
+                - service: tts.google_translate_say
+                  data:
+                    entity_id: media_player.kitchen_display
+                    message: "{{ message }}"
+                    language: "en"
+
+          # Default: Timeout reached (5 min) - use fallback speakers if CO2 still high
+          default:
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+              then:
+                # Check if ANY fallback speaker is available
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ states('media_player.broken_display') not in ['unavailable', 'unknown']
+                           or states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}
+                  then:
+                    # Notify that we're using fallback (Kitchen Display was unavailable)
+                    - service: notify.mobile_app_22111317pg
+                      data:
+                        title: "🔇 TTS Fallback"
+                        message: "Kitchen Display unavailable for 5 min. Using fallback speakers."
+                        data:
+                          channel: "Alerts"
+                          importance: default
+                          tag: "tts_fallback"
+                    # Play on fallback speakers
+                    - service: tts.google_translate_say
+                      data:
+                        entity_id:
+                          - media_player.broken_display
+                          - media_player.master_bedroom_clock
+                        message: "{{ message }}"
+                        language: "en"
+                  else:
+                    # ALL speakers unavailable - critical notification!
+                    - service: notify.mobile_app_22111317pg
+                      data:
+                        title: "🔇 TTS FAILED - No Speakers!"
+                        message: >
+                          CO2 is {{ states('sensor.hallway_co2_co2') }} ppm but ALL Google Home speakers are unavailable!
+                          Kitchen Display, Broken Display, and Bedroom Clock are all offline.
+                        data:
+                          channel: "Critical"
+                          importance: max
+                          tag: "tts_failed"
