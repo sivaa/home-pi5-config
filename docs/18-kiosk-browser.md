@@ -1,6 +1,7 @@
 # Kiosk Browser: Auto-Launch Dashboard on Boot
 
 > **Date:** December 28, 2025
+> **Updated:** December 28, 2025 (Added standalone kiosk toggle overlay)
 > **Purpose:** Automatically open dashboard in fullscreen browser when Pi restarts
 
 ---
@@ -47,6 +48,84 @@ BOOT SEQUENCE TIMELINE
 17s   labwc window rule triggers fullscreen
       |
 20s   Dashboard visible, touch-ready!
+```
+
+---
+
+## Kiosk Toggle Overlay
+
+A standalone GTK4 floating button that allows toggling between fullscreen and windowed mode **without a physical keyboard**.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Browser (fullscreen)                                           │
+│                                                                 │
+│   Dashboard content...                                          │
+│                                                                 │
+│  ┌────┐                                                         │
+│  │ ⛶  │  ← Floating overlay button (always on top)              │
+│  └────┘    Tap to toggle kiosk mode                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Why Standalone?
+
+| Approach | Problem |
+|----------|---------|
+| Browser JS Fullscreen API | Doesn't work with compositor-level fullscreen |
+| wtype F11 | Sends to focused app, not intercepted by labwc |
+| wlrctl | Can enter fullscreen, but cannot exit |
+
+**Solution:** A separate GTK4 app using Wayland layer-shell protocol that floats above everything and controls the compositor directly.
+
+### Toggle Mechanism
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ENTER FULLSCREEN                │  EXIT FULLSCREEN             │
+├──────────────────────────────────┼──────────────────────────────┤
+│  wlrctl toplevel fullscreen      │  1. Kill browser (pkill)     │
+│                                  │  2. Clear session state      │
+│  (compositor-level control)      │  3. Restart browser service  │
+│                                  │  4. Focus & maximize window  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Files
+
+| File | Location (Repo) | Location (Pi) |
+|------|-----------------|---------------|
+| Overlay App | `configs/kiosk-toggle/kiosk-toggle.py` | `/opt/kiosk-toggle/kiosk-toggle.py` |
+| Service | `configs/kiosk-toggle/kiosk-toggle.service` | `~/.config/systemd/user/kiosk-toggle.service` |
+
+### Installation
+
+```bash
+# Install dependencies
+sudo apt install gir1.2-gtk-4.0 gir1.2-gtk4layershell-1.0 libgtk4-layer-shell0
+
+# Deploy overlay app
+sudo mkdir -p /opt/kiosk-toggle
+sudo cp configs/kiosk-toggle/kiosk-toggle.py /opt/kiosk-toggle/
+sudo chmod 755 /opt/kiosk-toggle/kiosk-toggle.py
+
+# Deploy and enable service
+cp configs/kiosk-toggle/kiosk-toggle.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now kiosk-toggle.service
+```
+
+### Service Control
+
+```bash
+# Check status
+systemctl --user status kiosk-toggle.service
+
+# View logs
+journalctl --user -u kiosk-toggle -f
+
+# Restart overlay
+systemctl --user restart kiosk-toggle.service
 ```
 
 ---
@@ -268,9 +347,11 @@ sudo reboot
 
 | File | Purpose |
 |------|---------|
-| `configs/kiosk-browser/kiosk-browser.service` | Systemd service unit |
-| `configs/kiosk-browser/README.md` | Quick reference |
-| `configs/labwc/rc.xml` | Window rules for fullscreen |
+| `configs/kiosk-browser/kiosk-browser.service` | Browser auto-start service |
+| `configs/kiosk-toggle/kiosk-toggle.py` | GTK4 floating toggle overlay |
+| `configs/kiosk-toggle/kiosk-toggle.service` | Overlay systemd service |
+| `configs/kiosk-control/kiosk-control.py` | HTTP API for kiosk control |
+| `configs/labwc/rc.xml` | Window rules for auto-fullscreen |
 | `docs/18-kiosk-browser.md` | This documentation |
 
 ---
