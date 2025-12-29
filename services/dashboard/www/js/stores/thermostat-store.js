@@ -64,8 +64,7 @@ export function initThermostatStore(Alpine, CONFIG) {
       // Current state from MQTT
       localTemp: null,          // Current temperature at valve
       targetTemp: null,         // Setpoint (occupied_heating_setpoint)
-      runningState: 'idle',     // 'idle' or 'heat' (system MODE, not actual heating)
-      valveOpeningDegree: 0,    // Valve position 0-100% (actual heating indicator)
+      runningState: 'idle',     // 'idle' or 'heat' - only reliable indicator for SONOFF TRVZB
       systemMode: 'heat',       // 'heat' or 'off'
       battery: null,
       linkquality: null,
@@ -241,8 +240,9 @@ export function initThermostatStore(Alpine, CONFIG) {
     // ============================================
 
     get activeHeatingCount() {
-      // Use valve_opening_degree (valve position) to detect actual heating, not running_state (system mode)
-      return this.list.filter(t => t.valveOpeningDegree > 0).length;
+      // SONOFF TRVZB only exposes running_state for heating detection
+      // (pi_heating_demand doesn't exist, valve_opening_degree is a config limit)
+      return this.list.filter(t => t.runningState === 'heat').length;
     },
 
     get offlineCount() {
@@ -287,9 +287,7 @@ export function initThermostatStore(Alpine, CONFIG) {
       if (data.running_state !== undefined) {
         thermostat.runningState = data.running_state === 'heat' ? 'heat' : 'idle';
       }
-      if (data.valve_opening_degree !== undefined) {
-        thermostat.valveOpeningDegree = data.valve_opening_degree;
-      }
+      // Note: valve_opening_degree is a config limit, not current position - not useful for heating detection
       if (data.system_mode !== undefined) {
         thermostat.systemMode = data.system_mode;
       }

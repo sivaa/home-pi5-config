@@ -232,6 +232,12 @@
         <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
+            <!-- Hard Refresh Button (for kiosk mode) -->
+            <button class="refresh-btn"
+                    @click="location.reload(true)"
+                    title="Hard refresh (bypass cache)">
+              🔄
+            </button>
             <!-- Theme Toggle -->
             <div class="theme-toggle" x-data>
               <button class="theme-toggle-btn"
@@ -1881,7 +1887,7 @@
           </div>
           <template x-if="($store.thermostats?.activeHeatingCount || 0) > 0">
             <div class="panel-metrics-grid">
-              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.valveOpeningDegree > 0)" :key="trv.id">
+              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
                 <div class="panel-metric heating-active full-width heating-row">
                   <span class="heating-room-name" x-text="trv.name"></span>
                   <span class="heating-temp-value">
@@ -2740,7 +2746,7 @@
 
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
-    import { initThermostatStore } from './js/stores/thermostat-store.js?v=4';
+    import { initThermostatStore } from './js/stores/thermostat-store.js?v=5';
     import { thermostatView } from './views/thermostat.js?v=7';
 
     // Expose thermostatView globally for Alpine x-data
@@ -4163,6 +4169,36 @@
             document.removeEventListener('click', requestNotificationPermission);
           };
           document.addEventListener('click', requestNotificationPermission, { once: true });
+
+          // Check panel overflow and toggle compact mode
+          this.checkPanelOverflow();
+          // Re-check on window resize
+          window.addEventListener('resize', () => this.checkPanelOverflow());
+          // Re-check when data changes (via mutation observer on panel content)
+          const panelContent = document.querySelector('.panel-content');
+          if (panelContent) {
+            const observer = new MutationObserver(() => {
+              requestAnimationFrame(() => this.checkPanelOverflow());
+            });
+            observer.observe(panelContent, { childList: true, subtree: true, characterData: true });
+          }
+        },
+
+        // Check if panel content overflows and toggle compact mode
+        checkPanelOverflow() {
+          const panel = document.querySelector('.panel-content');
+          if (!panel) return;
+
+          // First, remove compact mode to measure natural height
+          panel.classList.remove('compact-mode');
+
+          // Wait for reflow
+          requestAnimationFrame(() => {
+            const hasOverflow = panel.scrollHeight > panel.clientHeight;
+            if (hasOverflow) {
+              panel.classList.add('compact-mode');
+            }
+          });
         },
 
         setView(view) {
