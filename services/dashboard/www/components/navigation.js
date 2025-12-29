@@ -71,15 +71,26 @@ export function navigationComponent() {
         }
       });
 
-      // Close menus on outside click
+      // Close menus on outside click (optimized: early exit when no menus open)
       document.addEventListener('click', (e) => {
-        if (!e.target.closest('.nav-more') && !e.target.closest('.nav-mobile-trigger')) {
-          this.moreMenuOpen = false;
+        // Early exit if no menus are open - avoids DOM queries on every tap
+        if (!this.moreMenuOpen && !this.mobileMenuOpen) return;
+
+        // Cache target once to avoid repeated property access
+        const target = e.target;
+
+        if (this.moreMenuOpen) {
+          if (!target.closest('.nav-more') && !target.closest('.nav-mobile-trigger')) {
+            this.moreMenuOpen = false;
+          }
         }
-        if (!e.target.closest('.nav-mobile-drawer') && !e.target.closest('.nav-mobile-trigger')) {
-          this.mobileMenuOpen = false;
+
+        if (this.mobileMenuOpen) {
+          if (!target.closest('.nav-mobile-drawer') && !target.closest('.nav-mobile-trigger')) {
+            this.mobileMenuOpen = false;
+          }
         }
-      });
+      }, { passive: true });
     },
 
     setView(viewId) {
