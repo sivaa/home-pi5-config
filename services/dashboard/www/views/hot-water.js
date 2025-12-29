@@ -39,6 +39,12 @@ export function hotWaterView() {
     // Loading state
     loading: false,
 
+    // Tooltip state
+    tooltipVisible: false,
+    tooltipX: 0,
+    tooltipY: 0,
+    tooltipContent: '',
+
     // MQTT setup tracking
     _mqttSetup: false,
 
@@ -403,8 +409,13 @@ export function hotWaterView() {
         const barHeight = Math.max(2, (d.seconds / maxSeconds) * chartHeight);
         const y = padding.top + chartHeight - barHeight;
 
-        // Bar
-        svgContent += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="url(#water-gradient)" rx="${Math.min(4, barWidth / 2)}"/>`;
+        // Bar with hover area (invisible rect for better touch/hover target)
+        const hoverHeight = chartHeight;
+        const hoverY = padding.top;
+        svgContent += `<rect class="hot-water-bar-hover" data-index="${i}" x="${x}" y="${hoverY}" width="${barWidth}" height="${hoverHeight}" fill="transparent" style="cursor: pointer"/>`;
+
+        // Visible bar
+        svgContent += `<rect class="hot-water-bar" data-index="${i}" x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="url(#water-gradient)" rx="${Math.min(4, barWidth / 2)}" style="pointer-events: none"/>`;
 
         // Label (show every Nth label based on data density)
         if (i % labelFrequency === 0 || i === data.length - 1) {
@@ -414,6 +425,77 @@ export function hotWaterView() {
       });
 
       svg.innerHTML = svgContent;
+
+      // Add hover event listeners
+      this.attachBarHoverEvents(svg, data);
+    },
+
+    attachBarHoverEvents(svg, data) {
+      const hoverBars = svg.querySelectorAll('.hot-water-bar-hover');
+      const self = this;
+
+      hoverBars.forEach(bar => {
+        bar.addEventListener('mouseenter', function(e) {
+          const index = parseInt(this.dataset.index);
+          const d = data[index];
+          if (d) {
+            self.showTooltip(e, d);
+          }
+        });
+
+        bar.addEventListener('mousemove', function(e) {
+          self.moveTooltip(e);
+        });
+
+        bar.addEventListener('mouseleave', function() {
+          self.hideTooltip();
+        });
+
+        // Touch support
+        bar.addEventListener('touchstart', function(e) {
+          const index = parseInt(this.dataset.index);
+          const d = data[index];
+          if (d) {
+            self.showTooltip(e.touches[0], d);
+          }
+        }, { passive: true });
+
+        bar.addEventListener('touchend', function() {
+          setTimeout(() => self.hideTooltip(), 1500);
+        }, { passive: true });
+      });
+    },
+
+    showTooltip(e, bucket) {
+      const startTime = this.formatTooltipTime(bucket.start);
+      const endTime = this.formatTooltipTime(bucket.end);
+      const duration = this.formatDuration(bucket.seconds);
+
+      this.tooltipContent = `${startTime} → ${endTime}\n${duration}`;
+      this.tooltipX = e.clientX;
+      this.tooltipY = e.clientY;
+      this.tooltipVisible = true;
+    },
+
+    moveTooltip(e) {
+      this.tooltipX = e.clientX;
+      this.tooltipY = e.clientY;
+    },
+
+    hideTooltip() {
+      this.tooltipVisible = false;
+    },
+
+    formatTooltipTime(date) {
+      const bucketMs = this.chartHistory[0]?.bucketMs || 0;
+
+      if (bucketMs >= 24 * 60 * 60 * 1000) {
+        // Daily: show date
+        return date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      } else {
+        // Hourly/minute: show time
+        return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true });
+      }
     },
 
     formatBucketLabel(bucket) {
