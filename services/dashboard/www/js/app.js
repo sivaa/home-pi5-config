@@ -27,6 +27,7 @@ import { networkView } from '../views/network.js';
 import { thermostatView } from '../views/thermostat.js';
 import { mailboxView } from '../views/mailbox.js';
 import { logsView } from '../views/logs.js';
+import { hotWaterView } from '../views/hot-water.js';
 
 // Make OrbitControls available to Three.js
 if (typeof THREE !== 'undefined') {
@@ -156,5 +157,8 @@ window.mailboxView = mailboxView;
 
 // Activity Logs view
 window.logsView = logsView;
+
+// Hot Water view
+window.hotWaterView = hotWaterView;
 
 console.log('🏠 Smart Home Dashboard loaded (modular)');

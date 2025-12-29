@@ -292,7 +292,8 @@ export const VIEW_CATEGORIES = [
     views: [
       { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
       { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
-      { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' }
+      { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
+      { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W', primary: true }
     ]
   },
   {

@@ -66,6 +66,8 @@ influxdb:
       - sensor.*battery*
       - sensor.*co2*
       - sensor.*air_quality*
+      - binary_sensor.hot_water_running
+      - sensor.hot_water_*
 
 # Recorder for local history
 recorder:
@@ -78,6 +80,8 @@ recorder:
       - sensor.*co2*
       - sensor.*air_quality*
       - media_player.*  # Track Cast device availability for TTS debugging
+      - binary_sensor.hot_water_running
+      - sensor.hot_water_*
 
 logger:
   default: warning
@@ -307,6 +311,80 @@ input_number:
     step: 0.5
     unit_of_measurement: "°C"
     icon: mdi:thermometer
+
+# =============================================================================
+# HOT WATER USAGE TRACKING
+# Purpose: Track hot water usage via vibration sensor on hot water pipe
+# Sensor: HOBEIAN ZG-102ZM (address: 0xa4c13863257ea097)
+# Behavior: Maintains vibration:true/false state (tested live 2024-12-29)
+# =============================================================================
+
+# MQTT binary sensor to expose vibration as hot water running state
+mqtt:
+  binary_sensor:
+    - name: "Hot Water Running"
+      unique_id: hot_water_running
+      state_topic: "zigbee2mqtt/Vibration Sensor"
+      value_template: "{{ 'ON' if value_json.vibration == true else 'OFF' }}"
+      device_class: running
+      icon: mdi:water-boiler
+
+# History tracking sensors (history_stats)
+sensor:
+  - platform: history_stats
+    name: Hot Water Today
+    entity_id: binary_sensor.hot_water_running
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00') }}"
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: Hot Water Yesterday
+    entity_id: binary_sensor.hot_water_running
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00') - timedelta(days=1) }}"
+    end: "{{ today_at('00:00') }}"
+
+  - platform: history_stats
+    name: Hot Water 7 Days
+    entity_id: binary_sensor.hot_water_running
+    state: "on"
+    type: time
+    start: "{{ today_at('00:00') - timedelta(days=7) }}"
+    end: "{{ now() }}"
+
+# Template sensors for user-friendly units (seconds/minutes)
+template:
+  - sensor:
+      - name: "Hot Water Today Seconds"
+        unique_id: hot_water_today_seconds
+        unit_of_measurement: "s"
+        state_class: measurement
+        icon: mdi:water-boiler
+        state: "{{ (states('sensor.hot_water_today') | float(0) * 3600) | round(0) }}"
+
+      - name: "Hot Water Today Minutes"
+        unique_id: hot_water_today_minutes
+        unit_of_measurement: "min"
+        state_class: measurement
+        icon: mdi:clock-outline
+        state: "{{ (states('sensor.hot_water_today') | float(0) * 60) | round(1) }}"
+
+      - name: "Hot Water Yesterday Seconds"
+        unique_id: hot_water_yesterday_seconds
+        unit_of_measurement: "s"
+        state_class: measurement
+        icon: mdi:water-boiler
+        state: "{{ (states('sensor.hot_water_yesterday') | float(0) * 3600) | round(0) }}"
+
+      - name: "Hot Water 7 Days Minutes"
+        unique_id: hot_water_7_days_minutes
+        unit_of_measurement: "min"
+        state_class: measurement
+        icon: mdi:chart-bar
+        state: "{{ (states('sensor.hot_water_7_days') | float(0) * 60) | round(1) }}"
 
 # =============================================================================
 # AUTOMATIONS

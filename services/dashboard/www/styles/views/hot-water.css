@@ -1,0 +1,308 @@
+/* ========================================
+   HOT WATER MONITOR VIEW
+   Dashboard for hot water usage tracking
+   ======================================== */
+
+/* ---------- Color Tokens ---------- */
+:root {
+  --color-water-primary: #0ea5e9;
+  --color-water-light: #38bdf8;
+  --color-water-dark: #0284c7;
+  --color-water-glow: rgba(14, 165, 233, 0.3);
+}
+
+/* ---------- Main Container ---------- */
+.hot-water-view {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  gap: var(--space-lg);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---------- Hero Section - Live Indicator ---------- */
+.hot-water-hero {
+  background: linear-gradient(135deg, var(--color-water-primary) 0%, var(--color-water-dark) 100%);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  text-align: center;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.hot-water-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  animation: water-shimmer 6s ease-in-out infinite;
+}
+
+@keyframes water-shimmer {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(5%, 5%) rotate(3deg); }
+}
+
+.hot-water-hero-icon {
+  font-size: 72px;
+  margin-bottom: var(--space-md);
+  position: relative;
+  display: inline-block;
+}
+
+/* Pulse animation when water is running */
+.hot-water-hero.is-running .hot-water-hero-icon {
+  animation: water-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes water-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Ripple effect when running */
+.hot-water-hero.is-running::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  animation: water-ripple 2s ease-out infinite;
+}
+
+@keyframes water-ripple {
+  0% {
+    width: 80px;
+    height: 80px;
+    opacity: 1;
+  }
+  100% {
+    width: 300px;
+    height: 300px;
+    opacity: 0;
+  }
+}
+
+.hot-water-hero-status {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-xs);
+  position: relative;
+}
+
+.hot-water-hero-detail {
+  font-size: var(--font-size-md);
+  opacity: 0.85;
+  position: relative;
+}
+
+/* Idle state */
+.hot-water-hero.is-idle {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+}
+
+.hot-water-hero.is-idle::before,
+.hot-water-hero.is-idle::after {
+  display: none;
+}
+
+/* ---------- Stats Grid ---------- */
+.hot-water-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.hot-water-stat-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (hover: hover) {
+  .hot-water-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.hot-water-stat-icon {
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--space-sm);
+}
+
+.hot-water-stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-water-primary);
+  line-height: 1;
+}
+
+.hot-water-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: var(--space-xs);
+}
+
+/* ---------- History Chart Section ---------- */
+.hot-water-chart-section {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.hot-water-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.hot-water-chart-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hot-water-chart-refresh {
+  padding: var(--space-xs) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+@media (hover: hover) {
+  .hot-water-chart-refresh:hover {
+    background: var(--color-border);
+    color: var(--color-text);
+  }
+}
+
+.hot-water-chart {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
+/* ---------- Loading State ---------- */
+.hot-water-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  color: var(--color-text-tertiary);
+}
+
+.hot-water-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-water-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Footer ---------- */
+.hot-water-footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.hot-water-footer-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .hot-water-view {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .hot-water-hero {
+    padding: var(--space-xl);
+  }
+
+  .hot-water-hero-icon {
+    font-size: 56px;
+  }
+
+  .hot-water-hero-status {
+    font-size: var(--font-size-xl);
+  }
+
+  .hot-water-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .hot-water-stat-card {
+    padding: var(--space-md);
+  }
+
+  .hot-water-stat-value {
+    font-size: var(--font-size-xl);
+  }
+
+  .hot-water-chart {
+    height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hot-water-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .hot-water-stat-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    text-align: left;
+  }
+
+  .hot-water-stat-icon {
+    margin-bottom: 0;
+    font-size: var(--font-size-2xl);
+  }
+
+  .hot-water-stat-content {
+    flex: 1;
+  }
+}

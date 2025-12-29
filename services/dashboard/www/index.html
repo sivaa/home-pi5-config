@@ -37,6 +37,7 @@
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=6">
   <link rel="stylesheet" href="styles/views/mailbox.css">
+  <link rel="stylesheet" href="styles/views/hot-water.css">
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1754,6 +1755,72 @@
           </div>
         </div>
 
+        <!-- Hot Water View -->
+        <div x-show="currentView === 'hotwater'" x-cloak x-data="hotWaterView()" x-init="init()" @destroy.window="destroy()">
+          <div class="hot-water-view">
+
+            <!-- Hero Section - Live Indicator -->
+            <div class="hot-water-hero" :class="{ 'is-running': isRunning, 'is-idle': !isRunning }">
+              <div class="hot-water-hero-icon">🚿</div>
+              <div class="hot-water-hero-status" x-text="statusText"></div>
+              <div class="hot-water-hero-detail" x-text="lastUpdateText"></div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="hot-water-stats">
+              <div class="hot-water-stat-card">
+                <div class="hot-water-stat-icon">📅</div>
+                <div class="hot-water-stat-content">
+                  <div class="hot-water-stat-value" x-text="todayFormatted"></div>
+                  <div class="hot-water-stat-label">Today</div>
+                </div>
+              </div>
+              <div class="hot-water-stat-card">
+                <div class="hot-water-stat-icon">⏪</div>
+                <div class="hot-water-stat-content">
+                  <div class="hot-water-stat-value" x-text="yesterdayFormatted"></div>
+                  <div class="hot-water-stat-label">Yesterday</div>
+                </div>
+              </div>
+              <div class="hot-water-stat-card">
+                <div class="hot-water-stat-icon">📊</div>
+                <div class="hot-water-stat-content">
+                  <div class="hot-water-stat-value" x-text="weekFormatted"></div>
+                  <div class="hot-water-stat-label">This Week</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- History Chart Section -->
+            <div class="hot-water-chart-section">
+              <div class="hot-water-chart-header">
+                <div class="hot-water-chart-title">📈 7-Day History</div>
+                <button class="hot-water-chart-refresh" @click="refresh()">🔄 Refresh</button>
+              </div>
+
+              <!-- Loading State -->
+              <template x-if="loading">
+                <div class="hot-water-loading">
+                  <div class="hot-water-loading-spinner"></div>
+                  <span>Loading usage data...</span>
+                </div>
+              </template>
+
+              <!-- Chart -->
+              <svg id="hot-water-chart" class="hot-water-chart" x-show="!loading"></svg>
+            </div>
+
+            <!-- Footer -->
+            <div class="hot-water-footer">
+              <div class="hot-water-footer-item">
+                <span>💧</span>
+                <span>Vibration sensor on hot water pipe</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -2793,6 +2860,13 @@
       console.log('[mailbox] Stub found, enhancing with methods...');
       window._mailboxViewComponent._checkForModule();
     }
+  </script>
+
+  <!-- Hot Water View Module -->
+  <script type="module">
+    import { hotWaterView } from './views/hot-water.js';
+    window.hotWaterView = hotWaterView;
+    console.log('[hot-water] Module loaded, hotWaterView ready');
   </script>
 
   <!-- CO2 View Module - loads methods and triggers stub enhancement -->
@@ -4313,7 +4387,8 @@
         views: [
           { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
-          { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' }
+          { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
+          { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' }
         ]
       },
       {

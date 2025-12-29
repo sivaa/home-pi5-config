@@ -47,6 +47,15 @@ const influx = new Influx.InfluxDB({
         'automation',  // Parent automation ID (e.g., co2_high_alert)
         'status'       // success, partial, all_failed
       ]
+    },
+    {
+      measurement: 'hot_water',
+      fields: {
+        running: Influx.FieldType.BOOLEAN
+      },
+      tags: [
+        'device_name'
+      ]
     }
   ]
 });
@@ -102,8 +111,19 @@ client.on('connect', () => {
       console.error('Subscribe error (tts):', err);
     } else {
       console.log('Subscribed to TTS events');
+    }
+  });
+
+  // Subscribe to hot water vibration sensor (for usage tracking)
+  const hotWaterTopic = 'zigbee2mqtt/Vibration Sensor';
+  console.log(`Subscribing to ${hotWaterTopic}...`);
+  client.subscribe(hotWaterTopic, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Subscribe error (hot_water):', err);
+    } else {
+      console.log('Subscribed to Hot Water sensor');
       console.log('');
-      console.log('Listening for Zigbee, audit, and TTS events...');
+      console.log('Listening for Zigbee, audit, TTS, and hot water events...');
       console.log('─'.repeat(60));
     }
   });
@@ -133,6 +153,12 @@ client.on('message', async (topic, message) => {
     // Route TTS messages to TTS handler (persistent logging)
     if (topic === CONFIG.tts.topic) {
       await writeTTSEvent(payload);
+      return;
+    }
+
+    // Route hot water vibration sensor messages
+    if (topic === 'zigbee2mqtt/Vibration Sensor' && typeof payload === 'object' && payload.vibration !== undefined) {
+      await writeHotWaterEvent(payload);
       return;
     }
 
@@ -238,6 +264,35 @@ async function writeTTSEvent(payload) {
     );
   } catch (err) {
     console.error('TTS write error:', err.message);
+    stats.errors++;
+  }
+}
+
+/**
+ * Write hot water event to InfluxDB
+ */
+async function writeHotWaterEvent(payload) {
+  try {
+    const running = payload.vibration === true;
+
+    await influx.writePoints([{
+      measurement: 'hot_water',
+      tags: {
+        device_name: 'Vibration Sensor'
+      },
+      fields: {
+        running: running
+      },
+      timestamp: new Date()
+    }]);
+
+    stats.eventsWritten++;
+
+    // Log hot water event
+    const icon = running ? '🚿' : '💧';
+    console.log(`${icon} [Hot Water] running=${running}`);
+  } catch (err) {
+    console.error('Hot water write error:', err.message);
     stats.errors++;
   }
 }
