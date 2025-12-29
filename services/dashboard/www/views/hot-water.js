@@ -102,6 +102,64 @@ export function hotWaterView() {
     // DATA LOADING
     // ========================================
 
+    /**
+     * Calculate total duration from ON→OFF event pairs
+     * @param {Array} events - Array of {time, running} objects sorted by time
+     * @returns {number} Total seconds of water usage
+     */
+    calculateDurationFromEvents(events) {
+      if (!events || events.length === 0) return 0;
+
+      let totalSeconds = 0;
+      let lastOnTime = null;
+
+      for (const event of events) {
+        if (event.running === true) {
+          lastOnTime = new Date(event.time).getTime();
+        } else if (event.running === false && lastOnTime !== null) {
+          const offTime = new Date(event.time).getTime();
+          const duration = (offTime - lastOnTime) / 1000;
+          if (duration > 0 && duration < 3600) { // Sanity check: max 1 hour per event
+            totalSeconds += duration;
+          }
+          lastOnTime = null;
+        }
+      }
+
+      return Math.round(totalSeconds);
+    },
+
+    /**
+     * Query all events for a time range and return as array
+     */
+    async queryEventsForRange(influxUrl, influxDb, startTime, endTime = null) {
+      let query = `
+        SELECT time, running
+        FROM hot_water
+        WHERE time >= '${startTime.toISOString()}'
+      `;
+      if (endTime) {
+        query += ` AND time < '${endTime.toISOString()}'`;
+      }
+      query += ' ORDER BY time ASC';
+
+      try {
+        const fullUrl = `${influxUrl}/query?db=${influxDb}&q=${encodeURIComponent(query)}`;
+        const response = await fetch(fullUrl);
+        const data = await response.json();
+
+        if (data.results?.[0]?.series?.[0]?.values) {
+          return data.results[0].series[0].values.map(v => ({
+            time: v[0],
+            running: v[1]
+          }));
+        }
+      } catch (e) {
+        console.warn('[hot-water] Failed to query events:', e);
+      }
+      return [];
+    },
+
     async loadStats() {
       this.loading = true;
 
@@ -116,39 +174,16 @@ export function hotWaterView() {
         const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
         const weekStart = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        // Query running time for today
-        // Count transitions where running=true, then calculate duration
-        // For now, we'll estimate from the state sensor data
-        const todayQuery = `
-          SELECT COUNT(running) as count
-          FROM hot_water
-          WHERE time >= '${todayStart.toISOString()}'
-            AND running = true
-        `;
-        const todayResult = await this.queryInflux(influxUrl, influxDb, todayQuery);
-        // Each data point when running=true is ~1 second of usage (sensor reports ~once per second when active)
-        this.todaySeconds = todayResult?.count || 0;
+        // Query all events and calculate duration from ON→OFF pairs
+        const todayEvents = await this.queryEventsForRange(influxUrl, influxDb, todayStart);
+        this.todaySeconds = this.calculateDurationFromEvents(todayEvents);
 
-        // Query yesterday
-        const yesterdayQuery = `
-          SELECT COUNT(running) as count
-          FROM hot_water
-          WHERE time >= '${yesterdayStart.toISOString()}'
-            AND time < '${todayStart.toISOString()}'
-            AND running = true
-        `;
-        const yesterdayResult = await this.queryInflux(influxUrl, influxDb, yesterdayQuery);
-        this.yesterdaySeconds = yesterdayResult?.count || 0;
+        const yesterdayEvents = await this.queryEventsForRange(influxUrl, influxDb, yesterdayStart, todayStart);
+        this.yesterdaySeconds = this.calculateDurationFromEvents(yesterdayEvents);
 
-        // Query this week (in minutes)
-        const weekQuery = `
-          SELECT COUNT(running) as count
-          FROM hot_water
-          WHERE time >= '${weekStart.toISOString()}'
-            AND running = true
-        `;
-        const weekResult = await this.queryInflux(influxUrl, influxDb, weekQuery);
-        this.weekMinutes = Math.round((weekResult?.count || 0) / 60);
+        const weekEvents = await this.queryEventsForRange(influxUrl, influxDb, weekStart);
+        const weekSeconds = this.calculateDurationFromEvents(weekEvents);
+        this.weekMinutes = Math.round(weekSeconds / 60);
 
         console.log(`[hot-water] Stats: today=${this.todaySeconds}s, yesterday=${this.yesterdaySeconds}s, week=${this.weekMinutes}m`);
       } catch (e) {
@@ -164,30 +199,34 @@ export function hotWaterView() {
         const influxUrl = config.influxUrl || `http://${window.location.hostname}:8086`;
         const influxDb = config.influxDb || 'homeassistant';
 
-        // Query daily totals for past 7 days
-        const query = `
-          SELECT COUNT(running) as total
-          FROM hot_water
-          WHERE time > now() - 7d
-            AND running = true
-          GROUP BY time(1d)
-          fill(0)
-        `;
+        // Get all events for the past 8 days and calculate duration per day
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const eightDaysAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        const fullUrl = `${influxUrl}/query?db=${influxDb}&q=${encodeURIComponent(query)}`;
-        const res = await fetch(fullUrl);
-        const data = await res.json();
+        const allEvents = await this.queryEventsForRange(influxUrl, influxDb, eightDaysAgo);
 
-        if (data.results?.[0]?.series?.[0]?.values) {
-          this.dailyHistory = data.results[0].series[0].values.map(v => ({
-            date: new Date(v[0]),
-            seconds: v[1] || 0
-          }));
-          console.log(`[hot-water] Loaded ${this.dailyHistory.length} days of history`);
-        } else {
-          // No data yet - initialize with empty
-          this.dailyHistory = [];
+        // Group events by day and calculate duration for each day
+        const dailyData = [];
+        for (let i = 7; i >= 0; i--) {
+          const dayStart = new Date(todayStart.getTime() - i * 24 * 60 * 60 * 1000);
+          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+          // Filter events for this day
+          const dayEvents = allEvents.filter(e => {
+            const eventTime = new Date(e.time).getTime();
+            return eventTime >= dayStart.getTime() && eventTime < dayEnd.getTime();
+          });
+
+          const seconds = this.calculateDurationFromEvents(dayEvents);
+          dailyData.push({
+            date: dayStart,
+            seconds: seconds
+          });
         }
+
+        this.dailyHistory = dailyData;
+        console.log(`[hot-water] Loaded ${this.dailyHistory.length} days of history`);
 
         this.$nextTick(() => this.drawChart());
       } catch (e) {
