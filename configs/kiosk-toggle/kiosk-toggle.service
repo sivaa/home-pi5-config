@@ -1,7 +1,8 @@
 [Unit]
 Description=Kiosk Toggle Overlay - Floating button to toggle kiosk mode
-# Start after labwc is running
-After=default.target
+# Start after display is ready (same pattern as kiosk-browser)
+After=default.target display-boot-check.service
+Wants=display-boot-check.service
 
 [Service]
 Type=simple
@@ -14,12 +15,18 @@ Environment=LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgtk4-layer-shell.so.0
 # Disable accessibility warnings
 Environment=GTK_A11Y=none
 
+# Wait for display to be ready
+ExecStartPre=/bin/sleep 8
+
 # Run the GTK4 overlay app
 ExecStart=/usr/bin/python3 /opt/kiosk-toggle/kiosk-toggle.py
 
-# Auto-restart on failure
-Restart=on-failure
+# Always restart (GTK may exit cleanly even on failure)
+# But limit to 5 restarts per 5 minutes to prevent infinite loops
+Restart=always
 RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 # Logging
 StandardOutput=journal

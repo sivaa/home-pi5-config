@@ -1,7 +1,7 @@
 # Kiosk Browser: Auto-Launch Dashboard on Boot
 
 > **Date:** December 28, 2025
-> **Updated:** December 28, 2025 (Added standalone kiosk toggle overlay)
+> **Updated:** December 29, 2025 (Fixed kiosk-toggle timing issue)
 > **Purpose:** Automatically open dashboard in fullscreen browser when Pi restarts
 
 ---
@@ -46,6 +46,9 @@ BOOT SEQUENCE TIMELINE
       |-> Launches Epiphany in application mode
       |
 17s   labwc window rule triggers fullscreen
+      |
+18s   kiosk-toggle.service starts (8s delay after display-boot-check)
+      |-> Floating toggle button appears
       |
 20s   Dashboard visible, touch-ready!
 ```
@@ -114,6 +117,38 @@ cp configs/kiosk-toggle/kiosk-toggle.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now kiosk-toggle.service
 ```
+
+### Service Configuration
+
+```ini
+[Unit]
+Description=Kiosk Toggle Overlay - Floating button to toggle kiosk mode
+After=default.target display-boot-check.service
+Wants=display-boot-check.service
+
+[Service]
+Type=simple
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgtk4-layer-shell.so.0
+Environment=GTK_A11Y=none
+ExecStartPre=/bin/sleep 8
+ExecStart=/usr/bin/python3 /opt/kiosk-toggle/kiosk-toggle.py
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=default.target
+```
+
+**Key Features:**
+- Waits for `display-boot-check.service` (same as kiosk-browser)
+- 8-second delay ensures Wayland compositor is fully ready
+- `Restart=always` handles GTK exiting cleanly on failure
+- Restart limits: max 5 restarts per 5 minutes (prevents infinite loops)
+- `LD_PRELOAD` fixes GTK4 layer-shell library linking order
 
 ### Service Control
 
@@ -315,6 +350,28 @@ curl -v http://localhost:8888
 # Check Docker logs
 docker logs dashboard --tail 50
 ```
+
+### Kiosk toggle button not visible
+
+```bash
+# 1. Check service status
+systemctl --user status kiosk-toggle.service
+
+# 2. Check for GTK initialization errors
+journalctl --user -u kiosk-toggle --since "5 min ago" | grep -i "gtk\|display"
+
+# 3. Verify Wayland display is available
+echo $WAYLAND_DISPLAY
+ls -la /run/user/1000/wayland-0
+
+# 4. Restart the service
+systemctl --user restart kiosk-toggle.service
+
+# 5. If still failing, check if display-boot-check ran
+systemctl --user status display-boot-check.service
+```
+
+**Common cause:** Service starts before Wayland compositor is ready. The 8-second delay should handle this, but if issues persist, increase the delay in the service file.
 
 ---
 
