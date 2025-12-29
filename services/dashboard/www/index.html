@@ -1881,7 +1881,7 @@
           </div>
           <template x-if="($store.thermostats?.activeHeatingCount || 0) > 0">
             <div class="panel-metrics-grid">
-              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.piHeatingDemand > 0)" :key="trv.id">
+              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.valveOpeningDegree > 0)" :key="trv.id">
                 <div class="panel-metric heating-active full-width heating-row">
                   <span class="heating-room-name" x-text="trv.name"></span>
                   <span class="heating-temp-value">
@@ -2740,7 +2740,7 @@
 
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
-    import { initThermostatStore } from './js/stores/thermostat-store.js?v=3';
+    import { initThermostatStore } from './js/stores/thermostat-store.js?v=4';
     import { thermostatView } from './views/thermostat.js?v=7';
 
     // Expose thermostatView globally for Alpine x-data
