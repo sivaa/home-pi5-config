@@ -1827,9 +1827,13 @@
                  x-show="tooltipVisible"
                  x-cloak
                  :style="`left: ${tooltipX + 12}px; top: ${tooltipY - 40}px;`">
-              <template x-for="line in tooltipContent.split('\n')">
-                <div x-text="line"></div>
+              <template x-for="(line, idx) in tooltipContent.split('\n')" :key="idx">
+                <div class="hot-water-tooltip-row" x-show="line.includes('|')">
+                  <span class="hot-water-tooltip-time" x-text="line.split('|')[0]"></span>
+                  <span class="hot-water-tooltip-duration" x-text="line.split('|')[1]"></span>
+                </div>
               </template>
+              <div class="hot-water-tooltip-empty" x-show="!tooltipContent.includes('|')" x-text="tooltipContent"></div>
             </div>
 
             <!-- Footer -->
@@ -2886,7 +2890,7 @@
 
   <!-- Hot Water View Module -->
   <script type="module">
-    import { hotWaterView } from './views/hot-water.js?v=4';
+    import { hotWaterView } from './views/hot-water.js?v=5';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
   </script>

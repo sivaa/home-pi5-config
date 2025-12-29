@@ -123,30 +123,44 @@ export function hotWaterView() {
     // ========================================
 
     /**
-     * Calculate total duration from ON→OFF event pairs
+     * Extract flow events (ON→OFF pairs) from raw events
      * @param {Array} events - Array of {time, running} objects sorted by time
-     * @returns {number} Total seconds of water usage
+     * @returns {Array} Array of {start, end, seconds} flow events
      */
-    calculateDurationFromEvents(events) {
-      if (!events || events.length === 0) return 0;
+    extractFlowEvents(events) {
+      if (!events || events.length === 0) return [];
 
-      let totalSeconds = 0;
+      const flows = [];
       let lastOnTime = null;
 
       for (const event of events) {
         if (event.running === true) {
-          lastOnTime = new Date(event.time).getTime();
+          lastOnTime = new Date(event.time);
         } else if (event.running === false && lastOnTime !== null) {
-          const offTime = new Date(event.time).getTime();
-          const duration = (offTime - lastOnTime) / 1000;
+          const offTime = new Date(event.time);
+          const duration = (offTime.getTime() - lastOnTime.getTime()) / 1000;
           if (duration > 0 && duration < 3600) { // Sanity check: max 1 hour per event
-            totalSeconds += duration;
+            flows.push({
+              start: lastOnTime,
+              end: offTime,
+              seconds: Math.round(duration)
+            });
           }
           lastOnTime = null;
         }
       }
 
-      return Math.round(totalSeconds);
+      return flows;
+    },
+
+    /**
+     * Calculate total duration from ON→OFF event pairs
+     * @param {Array} events - Array of {time, running} objects sorted by time
+     * @returns {number} Total seconds of water usage
+     */
+    calculateDurationFromEvents(events) {
+      const flows = this.extractFlowEvents(events);
+      return flows.reduce((total, flow) => total + flow.seconds, 0);
     },
 
     /**
@@ -257,12 +271,14 @@ export function hotWaterView() {
             return eventTime >= bucketStart.getTime() && eventTime < bucketEnd.getTime();
           });
 
-          const seconds = this.calculateDurationFromEvents(bucketEvents);
+          const flows = this.extractFlowEvents(bucketEvents);
+          const seconds = flows.reduce((total, flow) => total + flow.seconds, 0);
           chartData.push({
             start: bucketStart,
             end: bucketEnd,
             seconds: seconds,
-            bucketMs: bucketMs
+            bucketMs: bucketMs,
+            flows: flows  // Individual water flow events
           });
         }
 
@@ -467,11 +483,25 @@ export function hotWaterView() {
     },
 
     showTooltip(e, bucket) {
-      const startTime = this.formatTooltipTime(bucket.start);
-      const endTime = this.formatTooltipTime(bucket.end);
-      const duration = this.formatDuration(bucket.seconds);
+      const flows = bucket.flows || [];
 
-      this.tooltipContent = `${startTime} → ${endTime}\n${duration}`;
+      if (flows.length === 0) {
+        this.tooltipContent = 'No water usage';
+        this.tooltipX = e.clientX;
+        this.tooltipY = e.clientY;
+        this.tooltipVisible = true;
+        return;
+      }
+
+      // Build tooltip content with each flow event
+      const lines = flows.map(flow => {
+        const startTime = this.formatFlowTime(flow.start);
+        const endTime = this.formatFlowTime(flow.end);
+        const duration = this.formatDuration(flow.seconds);
+        return `${startTime} → ${endTime}|${duration}`;
+      });
+
+      this.tooltipContent = lines.join('\n');
       this.tooltipX = e.clientX;
       this.tooltipY = e.clientY;
       this.tooltipVisible = true;
@@ -486,15 +516,23 @@ export function hotWaterView() {
       this.tooltipVisible = false;
     },
 
-    formatTooltipTime(date) {
-      const bucketMs = this.chartHistory[0]?.bucketMs || 0;
+    formatFlowTime(date) {
+      const range = this.timeRanges.find(r => r.id === this.selectedRange);
+      const includeDate = range && range.minutes > 1440; // > 24h
 
-      if (bucketMs >= 24 * 60 * 60 * 1000) {
-        // Daily: show date
-        return date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+      if (includeDate) {
+        // Include date for multi-day ranges (e.g., "29 Dec 15:06:44")
+        return date.toLocaleString('en-AU', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
       } else {
-        // Hourly/minute: show time
-        return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true });
+        // Time only for shorter ranges (e.g., "15:06:44")
+        return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       }
     },
 

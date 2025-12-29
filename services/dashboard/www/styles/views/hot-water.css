@@ -260,17 +260,37 @@
   z-index: 100;
   white-space: nowrap;
   transform: translateY(-100%);
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.hot-water-tooltip div:first-child {
+.hot-water-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.hot-water-tooltip-row:last-child {
+  border-bottom: none;
+}
+
+.hot-water-tooltip-time {
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
 }
 
-.hot-water-tooltip div:last-child {
+.hot-water-tooltip-duration {
   color: var(--color-water-primary);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
+}
+
+.hot-water-tooltip-empty {
+  color: var(--color-text-tertiary);
+  font-style: italic;
 }
 
 /* ---------- Loading State ---------- */
