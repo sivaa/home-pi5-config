@@ -7,26 +7,6 @@
       margin: 0 auto;
     }
 
-    .lights-header {
-      text-align: center;
-      margin-bottom: var(--space-xl);
-    }
-
-    .lights-header h2 {
-      font-size: var(--font-size-2xl);
-      font-weight: var(--font-weight-semibold);
-      margin-bottom: var(--space-xs);
-    }
-
-    .lights-subtitle {
-      color: var(--color-text-secondary);
-      font-size: var(--font-size-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-sm);
-    }
-
     /* Loading states */
     .lights-initializing,
     .lights-warning {
@@ -62,8 +42,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: var(--space-lg);
-      margin-bottom: var(--space-xl);
+      padding: var(--space-md) var(--space-lg);
+      margin-bottom: var(--space-lg);
       background: var(--color-surface);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow-md);
@@ -114,8 +94,8 @@
     }
 
     .master-toggle {
-      transform: scale(1.8);
-      margin-right: var(--space-lg);
+      transform: scale(1.5);
+      margin-right: var(--space-sm);
     }
 
     /* Disabled state for all lights controls */
@@ -549,6 +529,25 @@
     }
 
     @media (max-width: 600px) {
+      .lights-top-row {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+
+      .lights-top-row .lights-header {
+        text-align: center;
+      }
+
+      .lights-top-row .lights-subtitle {
+        justify-content: center;
+      }
+
+      .lights-top-row .master-control {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+      }
+
       .lights-grid {
         grid-template-columns: 1fr;
       }
