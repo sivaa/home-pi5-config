@@ -170,7 +170,86 @@ ssh pi@pi "sudo reboot"
 
 ---
 
+## Dashboard Touch Responsiveness
+
+> **Added:** December 2025
+> **Issue:** Menu bar (navigation tabs, theme toggle, refresh button) felt slow/unresponsive when tapping
+
+### Problem
+
+The dashboard header bar had multiple layered issues causing perceived touch lag:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    TOUCH ISSUES IDENTIFIED                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. Global 250ms transitions on EVERY DOM element               │
+│     → Every tap triggered animations everywhere                 │
+│                                                                 │
+│  2. transition: all on buttons                                  │
+│     → Animated layout properties causing reflows                │
+│                                                                 │
+│  3. Touch targets too small (28-32px)                           │
+│     → Required precise tapping, caused missed taps              │
+│                                                                 │
+│  4. Hover states stuck on touch devices                         │
+│     → Visual confusion after tapping                            │
+│                                                                 │
+│  5. Global click handler ran on every tap                       │
+│     → Unnecessary DOM queries (.closest()) on each touch        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Solution
+
+| File | Changes |
+|------|---------|
+| `base.css` | Scoped theme transitions to `.theme-transitioning` class only |
+| `base.css` | Added `touch-action: manipulation` (prevents 300ms tap delay) |
+| `base.css` | Added `-webkit-tap-highlight-color: transparent` |
+| `layout.css` | Replaced `transition: all` with specific properties (100ms) |
+| `layout.css` | Increased touch targets to 44px minimum (Apple HIG) |
+| `layout.css` | Added `@media (hover: hover)` guards for hover effects |
+| `layout.css` | Added `:active` states for instant touch feedback |
+| `navigation.js` | Added early exit when no menus are open |
+| `theme-store.js` | Adds/removes `theme-transitioning` class during theme switch |
+
+### Key CSS Patterns
+
+```css
+/* Touch optimization */
+button, .nav-tab, .refresh-btn {
+  touch-action: manipulation;          /* No 300ms delay */
+  -webkit-tap-highlight-color: transparent;
+  min-height: 44px;                    /* Apple HIG minimum */
+}
+
+/* Hover only for mouse/trackpad */
+@media (hover: hover) and (pointer: fine) {
+  .nav-tab:hover { /* hover effects */ }
+}
+
+/* Instant touch feedback */
+.nav-tab:active {
+  transform: scale(0.97);              /* Immediate visual response */
+}
+
+/* Specific transitions, not "all" */
+.nav-tab {
+  transition: background-color 100ms ease, color 100ms ease;
+}
+```
+
+### Result
+
+Menu bar taps now feel **instant** instead of sluggish.
+
+---
+
 ## Related
 
 - [Display Scheduling](10-display-scheduling.md) - Uses touch wake detection
 - [Browser Setup](13-browser-setup.md) - Firefox/Chromium configuration
+- [Kiosk Browser](18-kiosk-browser.md) - Dashboard kiosk mode setup
