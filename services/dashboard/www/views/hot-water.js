@@ -19,8 +19,22 @@ export function hotWaterView() {
     yesterdaySeconds: 0,
     weekMinutes: 0,
 
-    // 7-day history for chart
-    dailyHistory: [],
+    // Chart history data
+    chartHistory: [],
+
+    // Time range options for chart
+    timeRanges: [
+      { id: '15m', label: '15m', minutes: 15 },
+      { id: '1h', label: '1h', minutes: 60 },
+      { id: '3h', label: '3h', minutes: 180 },
+      { id: '6h', label: '6h', minutes: 360 },
+      { id: '12h', label: '12h', minutes: 720 },
+      { id: '24h', label: '24h', minutes: 1440 },
+      { id: '2d', label: '2d', minutes: 2880 },
+      { id: '4d', label: '4d', minutes: 5760 },
+      { id: '7d', label: '7d', minutes: 10080 }
+    ],
+    selectedRange: '7d',
 
     // Loading state
     loading: false,
@@ -43,12 +57,12 @@ export function hotWaterView() {
 
       // Load stats from InfluxDB
       this.loadStats();
-      this.loadDailyHistory();
+      this.loadChartHistory();
 
       // Refresh stats every 5 minutes
       this._refreshInterval = setInterval(() => {
         this.loadStats();
-        this.loadDailyHistory();
+        this.loadChartHistory();
       }, 5 * 60 * 1000);
     },
 
@@ -193,45 +207,71 @@ export function hotWaterView() {
       this.loading = false;
     },
 
-    async loadDailyHistory() {
+    async loadChartHistory() {
       try {
         const config = this.$store?.config || {};
         const influxUrl = config.influxUrl || `http://${window.location.hostname}:8086`;
         const influxDb = config.influxDb || 'homeassistant';
 
-        // Get all events for the past 8 days and calculate duration per day
+        const range = this.timeRanges.find(r => r.id === this.selectedRange) || this.timeRanges[8];
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const eightDaysAgo = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const startTime = new Date(now.getTime() - range.minutes * 60 * 1000);
 
-        const allEvents = await this.queryEventsForRange(influxUrl, influxDb, eightDaysAgo);
+        const allEvents = await this.queryEventsForRange(influxUrl, influxDb, startTime);
 
-        // Group events by day and calculate duration for each day
-        const dailyData = [];
-        for (let i = 7; i >= 0; i--) {
-          const dayStart = new Date(todayStart.getTime() - i * 24 * 60 * 60 * 1000);
-          const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+        // Determine bucket size based on range
+        let bucketMs, bucketCount;
+        if (range.minutes <= 60) {
+          // 15m-1h: 5-minute buckets
+          bucketMs = 5 * 60 * 1000;
+          bucketCount = Math.ceil(range.minutes / 5);
+        } else if (range.minutes <= 360) {
+          // 3h-6h: 15-minute buckets
+          bucketMs = 15 * 60 * 1000;
+          bucketCount = Math.ceil(range.minutes / 15);
+        } else if (range.minutes <= 1440) {
+          // 12h-24h: 1-hour buckets
+          bucketMs = 60 * 60 * 1000;
+          bucketCount = Math.ceil(range.minutes / 60);
+        } else {
+          // 2d-7d: daily buckets
+          bucketMs = 24 * 60 * 60 * 1000;
+          bucketCount = Math.ceil(range.minutes / 1440);
+        }
 
-          // Filter events for this day
-          const dayEvents = allEvents.filter(e => {
+        // Group events into buckets
+        const chartData = [];
+        for (let i = bucketCount - 1; i >= 0; i--) {
+          const bucketEnd = new Date(now.getTime() - i * bucketMs);
+          const bucketStart = new Date(bucketEnd.getTime() - bucketMs);
+
+          // Filter events for this bucket
+          const bucketEvents = allEvents.filter(e => {
             const eventTime = new Date(e.time).getTime();
-            return eventTime >= dayStart.getTime() && eventTime < dayEnd.getTime();
+            return eventTime >= bucketStart.getTime() && eventTime < bucketEnd.getTime();
           });
 
-          const seconds = this.calculateDurationFromEvents(dayEvents);
-          dailyData.push({
-            date: dayStart,
-            seconds: seconds
+          const seconds = this.calculateDurationFromEvents(bucketEvents);
+          chartData.push({
+            start: bucketStart,
+            end: bucketEnd,
+            seconds: seconds,
+            bucketMs: bucketMs
           });
         }
 
-        this.dailyHistory = dailyData;
-        console.log(`[hot-water] Loaded ${this.dailyHistory.length} days of history`);
+        this.chartHistory = chartData;
+        console.log(`[hot-water] Loaded ${this.chartHistory.length} buckets for ${this.selectedRange}`);
 
         this.$nextTick(() => this.drawChart());
       } catch (e) {
         console.error('[hot-water] Failed to load history:', e);
       }
+    },
+
+    setTimeRange(rangeId) {
+      this.selectedRange = rangeId;
+      this.loadChartHistory();
     },
 
     async queryInflux(url, db, query) {
@@ -319,7 +359,7 @@ export function hotWaterView() {
       const svg = document.getElementById('hot-water-chart');
       if (!svg) return;
 
-      const data = this.dailyHistory;
+      const data = this.chartHistory;
       if (data.length === 0) {
         svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--color-text-tertiary)" font-size="14">No data yet</text>';
         return;
@@ -331,7 +371,8 @@ export function hotWaterView() {
       const chartWidth = width - padding.left - padding.right;
       const chartHeight = height - padding.top - padding.bottom;
 
-      const barWidth = Math.max(20, (chartWidth / data.length) - 8);
+      const barGap = data.length > 20 ? 2 : (data.length > 10 ? 4 : 8);
+      const barWidth = Math.max(8, (chartWidth / data.length) - barGap);
       const maxSeconds = Math.max(...data.map(d => d.seconds), 60);
 
       let svgContent = '';
@@ -355,21 +396,40 @@ export function hotWaterView() {
         svgContent += `<text x="${padding.left - 8}" y="${y + 4}" text-anchor="end" fill="var(--color-text-tertiary)" font-size="10">${this.formatDuration(val)}</text>`;
       }
 
-      // Bars
+      // Bars with dynamic labels
+      const labelFrequency = data.length > 20 ? 4 : (data.length > 10 ? 2 : 1);
       data.forEach((d, i) => {
-        const x = padding.left + (i * (chartWidth / data.length)) + 4;
+        const x = padding.left + (i * (chartWidth / data.length)) + barGap / 2;
         const barHeight = Math.max(2, (d.seconds / maxSeconds) * chartHeight);
         const y = padding.top + chartHeight - barHeight;
 
         // Bar
-        svgContent += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="url(#water-gradient)" rx="4"/>`;
+        svgContent += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="url(#water-gradient)" rx="${Math.min(4, barWidth / 2)}"/>`;
 
-        // Day label
-        const dayLabel = d.date.toLocaleDateString('en-AU', { weekday: 'short' });
-        svgContent += `<text x="${x + barWidth / 2}" y="${height - 10}" text-anchor="middle" fill="var(--color-text-tertiary)" font-size="11">${dayLabel}</text>`;
+        // Label (show every Nth label based on data density)
+        if (i % labelFrequency === 0 || i === data.length - 1) {
+          const label = this.formatBucketLabel(d);
+          svgContent += `<text x="${x + barWidth / 2}" y="${height - 10}" text-anchor="middle" fill="var(--color-text-tertiary)" font-size="10">${label}</text>`;
+        }
       });
 
       svg.innerHTML = svgContent;
+    },
+
+    formatBucketLabel(bucket) {
+      const bucketMs = bucket.bucketMs;
+      const date = bucket.end;
+
+      if (bucketMs >= 24 * 60 * 60 * 1000) {
+        // Daily: show day name
+        return date.toLocaleDateString('en-AU', { weekday: 'short' });
+      } else if (bucketMs >= 60 * 60 * 1000) {
+        // Hourly: show hour
+        return date.toLocaleTimeString('en-AU', { hour: 'numeric', hour12: true });
+      } else {
+        // Minutes: show HH:MM
+        return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
     },
 
     // ========================================
@@ -378,7 +438,21 @@ export function hotWaterView() {
 
     refresh() {
       this.loadStats();
-      this.loadDailyHistory();
+      this.loadChartHistory();
+    },
+
+    get chartTitleText() {
+      const range = this.timeRanges.find(r => r.id === this.selectedRange);
+      if (!range) return 'History';
+      if (range.minutes >= 1440) {
+        const days = Math.round(range.minutes / 1440);
+        return `${days}-Day History`;
+      } else if (range.minutes >= 60) {
+        const hours = Math.round(range.minutes / 60);
+        return `${hours}-Hour History`;
+      } else {
+        return `${range.minutes}-Min History`;
+      }
     }
   };
 }

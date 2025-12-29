@@ -1794,8 +1794,20 @@
             <!-- History Chart Section -->
             <div class="hot-water-chart-section">
               <div class="hot-water-chart-header">
-                <div class="hot-water-chart-title">📈 7-Day History</div>
-                <button class="hot-water-chart-refresh" @click="refresh()">🔄 Refresh</button>
+                <div class="hot-water-chart-title">📈 <span x-text="chartTitleText"></span></div>
+                <button class="hot-water-chart-refresh" @click="refresh()">🔄</button>
+              </div>
+
+              <!-- Time Range Filter -->
+              <div class="hot-water-time-filters">
+                <template x-for="range in timeRanges" :key="range.id">
+                  <button
+                    class="hot-water-time-btn"
+                    :class="{ 'active': selectedRange === range.id }"
+                    @click="setTimeRange(range.id)"
+                    x-text="range.label">
+                  </button>
+                </template>
               </div>
 
               <!-- Loading State -->
@@ -2864,7 +2876,7 @@
 
   <!-- Hot Water View Module -->
   <script type="module">
-    import { hotWaterView } from './views/hot-water.js?v=2';
+    import { hotWaterView } from './views/hot-water.js?v=3';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
   </script>
