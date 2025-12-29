@@ -47,7 +47,13 @@ export function initThemeStore(Alpine) {
      */
     applyTheme(theme) {
       this.resolved = theme;
+      // Enable smooth transitions during theme change
+      document.documentElement.classList.add('theme-transitioning');
       document.documentElement.setAttribute('data-theme', theme);
+      // Remove transition class after animation completes
+      setTimeout(() => {
+        document.documentElement.classList.remove('theme-transitioning');
+      }, 300);
     },
 
     /**

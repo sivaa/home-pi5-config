@@ -125,15 +125,41 @@
       --color-very-hot: #EF5350;
     }
 
-    /* Smooth theme transitions */
-    html,
-    html *,
-    html *::before,
-    html *::after {
+    /* ========================================
+       TOUCH DEVICE OPTIMIZATIONS
+       ======================================== */
+    button,
+    a,
+    [role="button"],
+    .nav-tab,
+    .refresh-btn,
+    .theme-toggle-btn,
+    .panel-toggle,
+    .ctrl-btn,
+    .temp-adjust-btn {
+      /* Prevent 300ms tap delay on touch devices */
+      touch-action: manipulation;
+      /* Remove default tap highlight */
+      -webkit-tap-highlight-color: transparent;
+      /* Prevent text selection on double-tap */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* ========================================
+       THEME TRANSITIONS (Scoped)
+       Only animate during explicit theme changes
+       ======================================== */
+    html.theme-transitioning .app-container,
+    html.theme-transitioning .app-header,
+    html.theme-transitioning .app-main,
+    html.theme-transitioning .overview-panel,
+    html.theme-transitioning .panel-section,
+    html.theme-transitioning .nav-tab.active,
+    html.theme-transitioning .theme-toggle-btn.active {
       transition: background-color 250ms ease,
                   color 250ms ease,
-                  border-color 250ms ease,
-                  box-shadow 250ms ease;
+                  border-color 250ms ease;
     }
 
     /* Disable transitions on initial page load */

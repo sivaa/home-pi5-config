@@ -181,7 +181,8 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 4px 8px;
+      padding: 10px 12px;
+      min-height: 44px;
       border: none;
       background: transparent;
       border-radius: var(--radius-full);
@@ -189,13 +190,23 @@
       font-weight: var(--font-weight-medium);
       color: var(--color-text-secondary);
       cursor: pointer;
-      transition: all var(--transition-fast);
+      transition: background-color 100ms ease, color 100ms ease;
       white-space: nowrap;
     }
 
-    .nav-tab:hover {
+    /* Hover effects - only on devices with hover capability */
+    @media (hover: hover) and (pointer: fine) {
+      .nav-tab:hover {
+        background: var(--color-bg);
+        color: var(--color-text);
+      }
+    }
+
+    /* Active state - instant feedback for touch */
+    .nav-tab:active {
       background: var(--color-bg);
       color: var(--color-text);
+      transform: scale(0.97);
     }
 
     .nav-tab.active {
@@ -962,44 +973,55 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 28px;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
       border: 1px solid var(--color-border);
       background: var(--color-bg);
       border-radius: var(--radius-sm);
       cursor: pointer;
-      font-size: 16px;
+      font-size: 18px;
       color: var(--color-text-secondary);
-      transition: all var(--transition-fast);
+      transition: background-color 100ms ease, color 100ms ease, border-color 100ms ease;
       margin-right: var(--space-sm);
     }
 
-    .refresh-btn:hover {
-      background: var(--color-primary);
-      color: white;
-      border-color: var(--color-primary);
-      transform: rotate(180deg);
-    }
-
-    .refresh-btn:active {
-      transform: rotate(360deg);
-    }
-
-    /* Responsive: smaller on tablets */
-    @media (max-width: 900px) {
-      .refresh-btn {
-        width: 28px;
-        height: 24px;
-        font-size: 14px;
+    /* Hover effects - only on devices with hover capability */
+    @media (hover: hover) and (pointer: fine) {
+      .refresh-btn:hover {
+        background: var(--color-primary);
+        color: white;
+        border-color: var(--color-primary);
+        transform: rotate(180deg);
       }
     }
 
-    /* Responsive: compact on mobile */
+    /* Active state - instant feedback for touch */
+    .refresh-btn:active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+      transform: scale(0.95);
+    }
+
+    /* Responsive: maintain touch targets on tablets */
+    @media (max-width: 900px) {
+      .refresh-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+      }
+    }
+
+    /* Responsive: slightly smaller on mobile but still touchable */
     @media (max-width: 600px) {
       .refresh-btn {
-        width: 24px;
-        height: 20px;
-        font-size: 12px;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 14px;
         margin-right: var(--space-xs);
       }
     }
@@ -1022,19 +1044,30 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 24px;
+      width: 44px;
+      height: 40px;
+      min-width: 44px;
+      min-height: 40px;
       border: none;
       background: transparent;
       border-radius: var(--radius-full);
       cursor: pointer;
-      font-size: 14px;
+      font-size: 16px;
       color: var(--color-text-tertiary);
-      transition: all var(--transition-fast);
+      transition: background-color 100ms ease, color 100ms ease, box-shadow 100ms ease;
     }
 
-    .theme-toggle-btn:hover {
+    /* Hover effects - only on devices with hover capability */
+    @media (hover: hover) and (pointer: fine) {
+      .theme-toggle-btn:hover {
+        color: var(--color-text);
+      }
+    }
+
+    /* Active state - instant feedback for touch */
+    .theme-toggle-btn:active {
       color: var(--color-text);
+      transform: scale(0.95);
     }
 
     .theme-toggle-btn.active {
@@ -1048,25 +1081,27 @@
       background: var(--color-border);
     }
 
-    /* Responsive: smaller on tablets */
+    /* Responsive: maintain touch targets on tablets */
     @media (max-width: 900px) {
       .theme-toggle-btn {
-        width: 24px;
-        height: 20px;
-        font-size: 12px;
+        width: 40px;
+        height: 36px;
+        font-size: 14px;
       }
     }
 
-    /* Responsive: compact toggle on mobile */
+    /* Responsive: maintain touch targets on mobile */
     @media (max-width: 600px) {
       .theme-toggle {
         padding: 1px;
         margin-right: var(--space-xs);
       }
       .theme-toggle-btn {
-        width: 20px;
-        height: 16px;
-        font-size: 10px;
+        width: 36px;
+        height: 32px;
+        min-width: 36px;
+        min-height: 32px;
+        font-size: 12px;
       }
     }
 
