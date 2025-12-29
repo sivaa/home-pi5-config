@@ -64,7 +64,8 @@ export function initThermostatStore(Alpine, CONFIG) {
       // Current state from MQTT
       localTemp: null,          // Current temperature at valve
       targetTemp: null,         // Setpoint (occupied_heating_setpoint)
-      runningState: 'idle',     // 'idle' or 'heat'
+      runningState: 'idle',     // 'idle' or 'heat' (system MODE, not actual heating)
+      piHeatingDemand: 0,       // Valve position 0-100% (actual heating indicator)
       systemMode: 'heat',       // 'heat' or 'off'
       battery: null,
       linkquality: null,
@@ -240,7 +241,8 @@ export function initThermostatStore(Alpine, CONFIG) {
     // ============================================
 
     get activeHeatingCount() {
-      return this.list.filter(t => t.runningState === 'heat').length;
+      // Use pi_heating_demand (valve position) to detect actual heating, not running_state (system mode)
+      return this.list.filter(t => t.piHeatingDemand > 0).length;
     },
 
     get offlineCount() {
@@ -284,6 +286,9 @@ export function initThermostatStore(Alpine, CONFIG) {
       }
       if (data.running_state !== undefined) {
         thermostat.runningState = data.running_state === 'heat' ? 'heat' : 'idle';
+      }
+      if (data.pi_heating_demand !== undefined) {
+        thermostat.piHeatingDemand = data.pi_heating_demand;
       }
       if (data.system_mode !== undefined) {
         thermostat.systemMode = data.system_mode;

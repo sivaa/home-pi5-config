@@ -1830,25 +1830,25 @@
               </g>
               <!-- Temperature labels with styled decimals -->
               <g class="floor-plan-labels">
-                <!-- Right side - Study (55-92.39), Living (45-92.39) -->
-                <text class="floor-label" x="74" y="20" :class="getRoomTempClass('study')">
+                <!-- Right side - Study (55-92.39, y=0-40), Living (45-92.39, y=40-66.65) -->
+                <text class="floor-label" x="74" y="22" :class="getRoomTempClass('study')">
                   <tspan x-text="getRoomTempInt('study')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('study')"></tspan>
                 </text>
-                <text class="floor-label" x="69" y="53" :class="getRoomTempClass('living')">
+                <text class="floor-label" x="69" y="55" :class="getRoomTempClass('living')">
                   <tspan x-text="getRoomTempInt('living')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('living')"></tspan>
                 </text>
-                <!-- Left column (0-35) -->
-                <text class="floor-label floor-label-small" x="17" y="10" :class="getRoomTempClass('bathroom')">
+                <!-- Left column (0-35) - Bathroom (y=0-20), Kitchen (y=20-40), Bedroom (y=40-66.65) -->
+                <text class="floor-label floor-label-small" x="17" y="12" :class="getRoomTempClass('bathroom')">
                   <tspan x-text="getRoomTempInt('bathroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bathroom')"></tspan>
                 </text>
-                <text class="floor-label floor-label-small" x="17" y="30" :class="getRoomTempClass('kitchen')">
+                <text class="floor-label floor-label-small" x="17" y="32" :class="getRoomTempClass('kitchen')">
                   <tspan x-text="getRoomTempInt('kitchen')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('kitchen')"></tspan>
                 </text>
-                <text class="floor-label" x="22" y="53" :class="getRoomTempClass('bedroom')">
+                <text class="floor-label" x="22" y="55" :class="getRoomTempClass('bedroom')">
                   <tspan x-text="getRoomTempInt('bedroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bedroom')"></tspan>
                 </text>
-                <!-- Hallway (vertical corridor 35-55) -->
-                <text class="floor-label" x="45" y="20" :class="getRoomTempClass('hallway')">
+                <!-- Hallway (vertical corridor 35-55, y=0-40) -->
+                <text class="floor-label" x="45" y="22" :class="getRoomTempClass('hallway')">
                   <tspan style="font-size: 11px" x-text="getRoomTempInt('hallway')"></tspan>
                   <tspan x="45" dy="10" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
@@ -1881,7 +1881,7 @@
           </div>
           <template x-if="($store.thermostats?.activeHeatingCount || 0) > 0">
             <div class="panel-metrics-grid">
-              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.runningState === 'heat')" :key="trv.id">
+              <template x-for="trv in ($store.thermostats?.list || []).filter(t => t.piHeatingDemand > 0)" :key="trv.id">
                 <div class="panel-metric heating-active full-width heating-row">
                   <span class="heating-room-name" x-text="trv.name"></span>
                   <span class="heating-temp-value">
