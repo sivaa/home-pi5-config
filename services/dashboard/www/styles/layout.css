@@ -2,9 +2,10 @@
        LAYOUT
        ======================================== */
     .app-container {
-      min-height: 100%;
+      height: 100%;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     /* ========================================
@@ -375,6 +376,12 @@
       overflow-x: hidden;
     }
 
+    /* Compact mode - when content overflows, reduce spacing */
+    .panel-content.compact-mode {
+      padding: var(--space-xs);
+      gap: var(--space-xs);
+    }
+
     /* ========================================
        PANEL SECTION CARDS
        All sections styled as professional cards
@@ -382,11 +389,19 @@
     .panel-section {
       background: var(--color-surface);
       border-radius: var(--radius-lg);
-      padding: var(--space-lg);  /* Increased padding for more spacious cards */
+      padding: var(--space-md);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       border: 1px solid rgba(0, 0, 0, 0.06);
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
       flex-shrink: 0;
+    }
+
+    /* Compact mode - reduced padding for sections */
+    .compact-mode .panel-section {
+      border-radius: var(--radius-md);
+      padding: var(--space-sm);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      border: 1px solid rgba(0, 0, 0, 0.04);
     }
 
     .panel-section:hover {
@@ -421,15 +436,25 @@
       font-weight: 600;
       color: var(--color-text-tertiary);
       letter-spacing: 1px;
-      margin-bottom: var(--space-md);  /* Increased spacing after title */
+      margin-bottom: var(--space-sm);
       text-transform: uppercase;
+    }
+
+    .compact-mode .panel-section-title {
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      margin-bottom: var(--space-xs);
     }
 
     /* Two-column grid for metrics */
     .panel-metrics-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--space-sm) var(--space-md);  /* Increased row and column gap */
+      gap: var(--space-xs) var(--space-md);
+    }
+
+    .compact-mode .panel-metrics-grid {
+      gap: 2px var(--space-sm);
     }
 
     /* Full-width item in grid (spans both columns) */
@@ -441,7 +466,12 @@
       display: flex;
       align-items: center;
       gap: var(--space-sm);
-      padding: var(--space-sm) 0;  /* Increased vertical padding */
+      padding: var(--space-xs) 0;
+    }
+
+    .compact-mode .panel-metric {
+      gap: var(--space-xs);
+      padding: 2px 0;
     }
 
     .panel-icon {
@@ -451,6 +481,11 @@
       flex-shrink: 0;
     }
 
+    .compact-mode .panel-icon {
+      font-size: 16px;
+      width: 20px;
+    }
+
     .panel-value {
       font-size: 18px;
       font-weight: 600;
@@ -458,9 +493,17 @@
       white-space: nowrap;
     }
 
+    .compact-mode .panel-value {
+      font-size: 16px;
+    }
+
     /* Larger values for primary sections (HOME, OUTSIDE, ROOMS) */
     .panel-section-primary .panel-value {
       font-size: 24px;
+    }
+
+    .compact-mode .panel-section-primary .panel-value {
+      font-size: 20px;
     }
 
     /* HOME section - center aligned content */
@@ -471,6 +514,10 @@
     /* 2x larger font for HOME inside temperature only */
     .panel-section-primary.home-section .panel-value.temp-primary {
       font-size: 48px;
+    }
+
+    .compact-mode .panel-section-primary.home-section .panel-value.temp-primary {
+      font-size: 36px;
     }
 
     /* Temperature decimal styling - subtle and secondary */
@@ -484,9 +531,9 @@
     /* Secondary metrics (humidity, CO2) - inline below temperature */
     .panel-section-primary.home-section .panel-secondary-row {
       display: flex;
-      justify-content: center;  /* Center the row */
-      gap: var(--space-lg);  /* More space between humidity and CO2 */
-      margin-top: var(--space-sm);  /* More space below temperature */
+      justify-content: center;
+      gap: var(--space-lg);
+      margin-top: var(--space-xs);
     }
 
     .panel-section-primary.home-section .panel-secondary-row .panel-metric {
@@ -494,7 +541,20 @@
     }
 
     .panel-section-primary.home-section .panel-secondary-row .panel-value {
-      font-size: 24px;  /* 18px * 1.3 = ~24px */
+      font-size: 24px;
+    }
+
+    .compact-mode .panel-section-primary.home-section .panel-secondary-row {
+      gap: var(--space-md);
+      margin-top: 2px;
+    }
+
+    .compact-mode .panel-section-primary.home-section .panel-secondary-row .panel-metric {
+      padding: 0;
+    }
+
+    .compact-mode .panel-section-primary.home-section .panel-secondary-row .panel-value {
+      font-size: 18px;
     }
 
     /* ========================================
@@ -601,15 +661,23 @@
        Uses stretch + nested flex for guaranteed vertical alignment
        ======================================== */
     .panel-section.compact {
-      /* Card padding already applied via .panel-section */
       padding: var(--space-sm) var(--space-md);
+    }
+
+    .compact-mode .panel-section.compact {
+      padding: var(--space-xs) var(--space-sm);
     }
 
     .panel-section.compact .panel-section-header {
       display: flex;
-      align-items: stretch;  /* Force all children to same height */
+      align-items: stretch;
       gap: var(--space-sm);
-      height: 32px;          /* Slightly reduced for compact look */
+      height: 32px;
+    }
+
+    .compact-mode .panel-section.compact .panel-section-header {
+      gap: var(--space-xs);
+      height: 26px;
     }
 
     /* Every child is a flex container that centers its content */
@@ -623,9 +691,14 @@
     .panel-section.compact .section-icon {
       font-size: 20px;
       width: 28px;
-      height: 100%;  /* Force stretch to container height */
+      height: 100%;
       justify-content: center;
       flex-shrink: 0;
+    }
+
+    .compact-mode .panel-section.compact .section-icon {
+      font-size: 16px;
+      width: 22px;
     }
 
     .panel-section.compact .section-title {
@@ -633,20 +706,31 @@
       font-weight: 500;
       color: var(--color-text-secondary);
       flex: 1;
-      height: 100%;  /* Force stretch to container height */
+      height: 100%;
+    }
+
+    .compact-mode .panel-section.compact .section-title {
+      font-size: 12px;
     }
 
     /* Status badges - styled pills */
     .panel-section.compact .status-badge {
       justify-content: center;
       min-width: 40px;
-      height: 28px;  /* Fixed badge height, smaller than 40px container */
+      height: 28px;
       padding: 0 12px;
       border-radius: var(--radius-full);
       font-size: 11px;
       font-weight: 600;
       flex-shrink: 0;
-      align-self: center;  /* Center badge vertically in 40px container */
+      align-self: center;
+    }
+
+    .compact-mode .panel-section.compact .status-badge {
+      min-width: 32px;
+      height: 22px;
+      padding: 0 8px;
+      font-size: 10px;
     }
 
     /* Green badge - all secure/closed */
@@ -684,17 +768,32 @@
     /* Heating row alignment: label left, value right */
     .panel-metric.heating-row {
       justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    .compact-mode .panel-metric.heating-row {
+      padding: 1px 0;
     }
 
     .heating-room-name {
       font-weight: 500;
+      font-size: 13px;
       color: var(--color-text);
+    }
+
+    .compact-mode .heating-room-name {
+      font-size: 12px;
     }
 
     .heating-temp-value {
       font-weight: 600;
+      font-size: 13px;
       font-variant-numeric: tabular-nums;
       color: var(--color-danger);
+    }
+
+    .compact-mode .heating-temp-value {
+      font-size: 12px;
     }
 
     .heating-arrow {
@@ -702,10 +801,19 @@
       margin: 0 3px;
     }
 
+    .compact-mode .heating-arrow {
+      margin: 0 2px;
+    }
+
     /* Compact section details (when expanded) */
     .panel-section.compact .panel-metrics-grid {
       margin-top: var(--space-xs);
       padding-left: 28px;
+    }
+
+    .compact-mode .panel-section.compact .panel-metrics-grid {
+      margin-top: 2px;
+      padding-left: 22px;
     }
 
     /* ========================================
@@ -844,6 +952,55 @@
       50% {
         box-shadow: 0 0 10px 4px rgba(34, 197, 94, 0.7);
         transform: scale(1.1);
+      }
+    }
+
+    /* ========================================
+       HARD REFRESH BUTTON (Kiosk Mode)
+       ======================================== */
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 28px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      transition: all var(--transition-fast);
+      margin-right: var(--space-sm);
+    }
+
+    .refresh-btn:hover {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+      transform: rotate(180deg);
+    }
+
+    .refresh-btn:active {
+      transform: rotate(360deg);
+    }
+
+    /* Responsive: smaller on tablets */
+    @media (max-width: 900px) {
+      .refresh-btn {
+        width: 28px;
+        height: 24px;
+        font-size: 14px;
+      }
+    }
+
+    /* Responsive: compact on mobile */
+    @media (max-width: 600px) {
+      .refresh-btn {
+        width: 24px;
+        height: 20px;
+        font-size: 12px;
+        margin-right: var(--space-xs);
       }
     }
 
