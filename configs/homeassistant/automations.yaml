@@ -665,6 +665,29 @@
       target:
         entity_id: input_boolean.bedroom_heater_was_on
 
+    # SAVE current setpoints BEFORE turning off
+    # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.study_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.living_inner_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.living_outer_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.bedroom_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+
     # Turn off all heaters
     - service: climate.set_hvac_mode
       target:
@@ -785,6 +808,29 @@
     - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
       target:
         entity_id: input_boolean.bedroom_heater_was_on
+
+    # SAVE current setpoints BEFORE turning off
+    # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.study_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.living_inner_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.living_outer_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.bedroom_heater_saved_temp
+      data:
+        value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
 
     # Turn off all heaters
     - service: climate.set_hvac_mode
@@ -918,6 +964,50 @@
         entity_id: climate.bed_thermostat
       data:
         hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
+
+    # Reset open_window flag on TRVs (TRVZB sets this when mode=off)
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Study] Thermostat/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Thermostat/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
+        payload: '{"open_window": "OFF"}'
+
+    # Small delay for TRV to process
+    - delay:
+        seconds: 1
+
+    # Restore saved setpoints (TRVZB drops setpoint to frost protection when turned off)
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.study_thermostat
+      data:
+        temperature: "{{ states('input_number.study_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.living_thermostat_inner
+      data:
+        temperature: "{{ states('input_number.living_inner_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.living_thermostat_outer
+      data:
+        temperature: "{{ states('input_number.living_outer_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.bed_thermostat
+      data:
+        temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
 
     # Clear the guard flag (ready for next window event)
     - service: input_boolean.turn_off

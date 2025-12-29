@@ -1,6 +1,6 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2025-12-27
+> **Last Updated:** 2025-12-29
 > **Total Automations:** 21
 > **File:** `configs/homeassistant/automations.yaml`
 
@@ -193,16 +193,50 @@ These automations protect against heating waste when windows/doors are open.
 │       │ (still open?)                      │ (still open?)                      │
 │       ▼                                    ▼                                    │
 │  ┌──────────────────────────────────────────────────────────────────┐           │
-│  │ TURN OFF all 4 heaters + TTS announcement + mobile notification  │           │
+│  │ 1. SAVE current setpoints to input_number entities               │           │
+│  │ 2. SAVE current HVAC mode to input_boolean entities              │           │
+│  │ 3. TURN OFF all 4 heaters + TTS + mobile notification            │           │
 │  └──────────────────────────────────────────────────────────────────┘           │
 │                                                                                 │
 │                         ALL WINDOWS/DOORS CLOSED                                │
 │                                    │                                            │
 │                                    ▼                                            │
-│                    ┌────────────────────────────────┐                           │
-│                    │ TURN ON all heaters (heat mode)│                           │
-│                    │ + TTS + mobile notification    │                           │
-│                    └────────────────────────────────┘                           │
+│                    ┌────────────────────────────────────────────┐               │
+│                    │ 1. RESTORE HVAC mode from input_boolean    │               │
+│                    │ 2. Reset open_window flag via MQTT         │               │
+│                    │ 3. RESTORE setpoints from input_number     │               │
+│                    │ 4. TTS + mobile notification               │               │
+│                    └────────────────────────────────────────────┘               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Why Temperature Save/Restore is Needed
+
+The Sonoff TRVZB thermostats have firmware behavior that causes setpoint loss:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    TRVZB FIRMWARE BEHAVIOR (The Problem)                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  When system_mode is set to "off":                                              │
+│                                                                                 │
+│    ┌─────────────────┐                                                          │
+│    │ Thermostat at   │                                                          │
+│    │ 18°C, mode=heat │                                                          │
+│    └────────┬────────┘                                                          │
+│             │                                                                   │
+│             │  climate.set_hvac_mode: off                                       │
+│             ▼                                                                   │
+│    ┌─────────────────────────────────────┐                                      │
+│    │ TRVZB firmware automatically:       │                                      │
+│    │  • Sets open_window: "ON"           │                                      │
+│    │  • Drops setpoint to 7°C            │  ← SETPOINT LOST!                    │
+│    │    (frost_protection_temperature)   │                                      │
+│    └─────────────────────────────────────┘                                      │
+│                                                                                 │
+│  Without save/restore, turning heater back ON would use 7°C setpoint!           │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -299,6 +333,29 @@ These automations protect against heating waste when windows/doors are open.
 | `sensor.balcony_temperature_humidity_temperature` | Outdoor temperature reference |
 | `binary_sensor.motion_detector_occupancy` | Mailbox motion sensor |
 
+### State Memory (input_boolean)
+
+Used to remember heater states before window-triggered shutoff:
+
+| Entity ID | Purpose |
+|-----------|---------|
+| `input_boolean.study_heater_was_on` | Was Study heater on before shutoff? |
+| `input_boolean.living_inner_heater_was_on` | Was Living Inner heater on? |
+| `input_boolean.living_outer_heater_was_on` | Was Living Outer heater on? |
+| `input_boolean.bedroom_heater_was_on` | Was Bedroom heater on? |
+| `input_boolean.heaters_off_due_to_window` | Guard flag to prevent state overwrite |
+
+### Saved Setpoints (input_number)
+
+Used to save thermostat setpoints before window-triggered shutoff (TRVZB firmware drops setpoint to 7°C frost protection when turned off):
+
+| Entity ID | Purpose | Range |
+|-----------|---------|-------|
+| `input_number.study_heater_saved_temp` | Study setpoint backup | 5-22°C |
+| `input_number.living_inner_heater_saved_temp` | Living Inner setpoint backup | 5-22°C |
+| `input_number.living_outer_heater_saved_temp` | Living Outer setpoint backup | 5-22°C |
+| `input_number.bedroom_heater_saved_temp` | Bedroom setpoint backup | 5-22°C |
+
 ---
 
 ## Troubleshooting
@@ -322,12 +379,27 @@ These automations protect against heating waste when windows/doors are open.
 2. Look for stuck sensors (battery dead, out of range)
 3. Manually call `climate.set_hvac_mode` with `heat` to verify thermostats respond
 
+### Heaters Resume But Wrong Temperature
+
+This happens when TRVZB firmware drops setpoint to frost protection (7°C).
+
+1. Check `input_number.*_saved_temp` entities have correct values
+2. Verify `open_window` flag is "OFF" on thermostats (check via Zigbee2MQTT)
+3. Manual fix via MQTT:
+   ```bash
+   docker exec mosquitto mosquitto_pub \
+     -t "zigbee2mqtt/[Study] Thermostat/set" \
+     -m '{"system_mode": "heat", "occupied_heating_setpoint": 18, "open_window": "OFF"}'
+   ```
+4. Check automation logs: `docker logs homeassistant 2>&1 | grep all_windows_closed`
+
 ---
 
 ## Changelog
 
 | Date | Change |
 |------|--------|
+| 2025-12-29 | **Fixed temperature restoration** - Added input_number entities to save/restore thermostat setpoints when windows trigger heater shutoff. TRVZB firmware drops setpoint to 7°C frost protection when mode=off; now setpoints are explicitly saved before shutoff and restored after. Also resets `open_window` flag via MQTT on restore. |
 | 2025-12-27 | Added cool-off delays: doors (2min), windows (30sec) |
 | 2025-12-27 | Added cold weather alert (15min + <18°C) |
 | 2025-12-14 | Initial window-heater safety automations |
