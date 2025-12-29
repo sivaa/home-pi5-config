@@ -888,12 +888,13 @@
       opacity: 0.6;
     }
 
-    /* Temperature color coding */
-    .floor-temp-cold { fill: #60a5fa; }
-    .floor-temp-cool { fill: #4ade80; }
-    .floor-temp-comfortable { fill: #22c55e; }
-    .floor-temp-warm { fill: #fbbf24; }
-    .floor-temp-hot { fill: #f97316; }
+    /* Temperature color coding - centered on 17°C ideal */
+    .floor-temp-freezing { fill: #1E88E5; }     /* Deep blue: <15°C */
+    .floor-temp-cold { fill: #42A5F5; }         /* Light blue: 15-16°C */
+    .floor-temp-comfortable { fill: #4CAF50; }  /* Green: 16-18°C (IDEAL) */
+    .floor-temp-warm { fill: #FFB74D; }         /* Light orange: 18-19°C */
+    .floor-temp-hot { fill: #FF9800; }          /* Orange: 19-21°C */
+    .floor-temp-very-hot { fill: #F44336; }     /* Red: >21°C */
 
     /* Dark mode adjustments */
     [data-theme="dark"] .floor-room {

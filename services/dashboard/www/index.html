@@ -4337,15 +4337,17 @@
         },
 
         // Get temperature color class for floor plan
+        // Centered on 17°C ideal, 16-18°C comfortable zone
         getRoomTempClass(roomId) {
           const room = Alpine.store('rooms').list.find(r => r.id === roomId);
           const temp = room?.avgTemperature ?? room?.temperature;
           if (temp == null) return '';
-          if (temp < 18) return 'floor-temp-cold';
-          if (temp < 20) return 'floor-temp-cool';
-          if (temp < 23) return 'floor-temp-comfortable';
-          if (temp < 26) return 'floor-temp-warm';
-          return 'floor-temp-hot';
+          if (temp < 15) return 'floor-temp-freezing';     // Deep blue
+          if (temp < 16) return 'floor-temp-cold';         // Light blue
+          if (temp <= 18) return 'floor-temp-comfortable'; // Green (ideal zone)
+          if (temp < 19) return 'floor-temp-warm';         // Light orange
+          if (temp < 21) return 'floor-temp-hot';          // Orange
+          return 'floor-temp-very-hot';                    // Red
         },
 
         getOpenContactCount() {
