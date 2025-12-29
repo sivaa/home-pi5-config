@@ -395,10 +395,128 @@ This happens when TRVZB firmware drops setpoint to frost protection (7°C).
 
 ---
 
+## Complete Heating Scenarios Matrix
+
+This section documents all possible heating scenarios and their expected behaviors across both layers of protection.
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           HEATING CONTROL LAYERS                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ LAYER 1: HA Automations (Event-Driven, ~1s response)                     │   │
+│  │  ├─ window_open_turn_off_heaters (30s delay for windows)                │   │
+│  │  ├─ door_open_turn_off_heaters (2min delay for doors)                   │   │
+│  │  ├─ prevent_heating_if_window_open (immediate block)                    │   │
+│  │  └─ all_windows_closed_resume_heaters (auto-restore)                    │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                            │
+│                                    ▼                                            │
+│  ┌─────────────────────────────────────────────────────────────────────────┐   │
+│  │ LAYER 2: Heater Watchdog (Poll-Based, 5min intervals)                    │   │
+│  │  ├─ Independent Python service running in Docker                        │   │
+│  │  ├─ Catches anything Layer 1 might miss                                 │   │
+│  │  ├─ Survives HA restarts                                                │   │
+│  │  └─ Hybrid approach: Safety first, best-effort state save              │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Category A: Normal Operation
+
+| # | Scenario | Trigger | Expected Behavior | Status |
+|---|----------|---------|-------------------|--------|
+| A1 | Heater reaches target | localTemp >= targetTemp | running_state → idle, notification sent | ✅ Working |
+| A2 | User adjusts setpoint via dashboard | MQTT command | Setpoint changes, audit logged | ✅ Working |
+| A3 | User toggles power via dashboard | MQTT mode command | Mode changes, event logged | ✅ Working |
+| A4 | User adjusts setpoint via HA | climate.set_temperature | Setpoint changes, audit notification | ✅ Working |
+| A5 | Heater starts heating | Temp drops below setpoint | running_state → heat, notification sent | ✅ Working |
+
+### Category B: Window/Door Safety
+
+| # | Scenario | Trigger | Expected Behavior | Status |
+|---|----------|---------|-------------------|--------|
+| B1 | Window opens, heater ON | Window sensor → on | Wait 30s → save state → turn off → TTS + notify | ✅ Working |
+| B2 | Door opens, heater ON | Door sensor → on | Wait 2min → save state → turn off → TTS + notify | ✅ Working |
+| B3 | Window closes within 30s | Window sensor → off | Timer cancelled, no action | ✅ Working |
+| B4 | All windows close | Last sensor → off | Restore modes → reset flags → restore temps → TTS | ✅ Working |
+| B5 | Heater tries to start, window open | hvac_action → heating | Save state → turn off that heater → TTS + notify | ✅ Fixed |
+| B6 | Multiple windows open | 2nd window opens | Guard flag prevents duplicate save action | ✅ Working |
+| B7 | Door + Window open together | Both open | First to timeout triggers; guard blocks other | ✅ Working |
+| B8 | Window open > 15min, cold outside | Open + temp < 18°C | Cold weather alert every 2min | ✅ Working |
+
+### Category C: State Recovery
+
+| # | Scenario | Trigger | Expected Behavior | Status |
+|---|----------|---------|-------------------|--------|
+| C1 | Resume after window shutoff | All sensors closed | Setpoints restored to saved values | ✅ Working |
+| C2 | HA restarts during window shutoff | HA container restart | Guard flag preserved (no initial:) | ✅ Fixed |
+| C3 | Watchdog detects violation | 5-min poll | Save state → turn off → notify with status | ✅ Fixed |
+| C4 | Partial sensor failure | 1 sensor unavailable | Resume blocked, heaters stay off | ⚠️ Edge case |
+| C5 | Power outage during shutoff | Pi loses power | All state lost, heaters boot to last known | ℹ️ Known limitation |
+
+### Category D: Dashboard Control
+
+| # | Scenario | Trigger | Expected Behavior | Status |
+|---|----------|---------|-------------------|--------|
+| D1 | Dashboard offline | MQTT disconnected | Controls disabled, stale indicator | ✅ Working |
+| D2 | Thermostat leaves network | Zigbee device_leave | Critical alert, multi-channel notification | ✅ Working |
+| D3 | Low battery warning | Battery < 20% | Event logged, shown in timeline | ✅ Working |
+| D4 | Critical battery | Battery < 10% | Alert priority event | ✅ Working |
+| D5 | User tries to heat with window open | Dashboard mode=heat | HA blocks if valve opens | ✅ Working |
+
+### Category E: Watchdog Scenarios
+
+| # | Scenario | Trigger | Expected Behavior | Status |
+|---|----------|---------|-------------------|--------|
+| E1 | Normal check, no violation | 5-min poll | Log "OK", continue | ✅ Working |
+| E2 | Violation detected | Window open + heating | Save state (best-effort) → turn off → notify | ✅ Fixed |
+| E3 | HA unreachable | Network/container issue | Retry once, then fail | ✅ Working |
+| E4 | Token expired | Invalid auth | HTTP 401, exit | ✅ Working |
+| E5 | State save fails during violation | HA API slow | Turn off heaters → notify with "manual intervention required" | ✅ Fixed |
+
+### Edge Cases & Known Limitations
+
+#### EDGE-1: Sensor Unavailable Blocks Resume
+
+If ANY of 8 sensors is unavailable, the resume condition fails because `unavailable` != `off`. Heaters stay off indefinitely until sensor returns.
+
+**Workaround:** Manually enable heaters via dashboard or check sensor battery/connectivity.
+
+#### EDGE-2: Manual Override Not Possible
+
+If user intentionally wants to ventilate while heating (brief fresh air), there's no way to temporarily disable safety. This is intentional safety design.
+
+#### EDGE-3: Dashboard Mode Change While Window Open
+
+If user sets mode=heat via dashboard while window open:
+1. Mode changes to 'heat'
+2. If temp below setpoint, valve opens
+3. `prevent_heating_if_window_open` catches `hvac_action: heating`
+4. Saves state and turns off that specific heater
+
+### Watchdog vs HA Automation Behavior
+
+| Aspect | HA Automation | Watchdog |
+|--------|---------------|----------|
+| TTS Announcement | Yes (all 3 speakers) | No |
+| State Preservation | Always | Best-effort |
+| Auto-Resume | Yes | Yes (if state save succeeded) |
+| Response Time | ~1 second | 5 minutes |
+| Notification | "Window Open - Heaters Off" | "WATCHDOG: Heaters Emergency Off" |
+| Manual Intervention | Never needed | Only if state save failed |
+
+---
+
 ## Changelog
 
 | Date | Change |
 |------|--------|
+| 2025-12-29 | **Fixed 4 bugs in heating safety system:** (1) Removed `initial:` from input helpers so state persists across HA restarts, (2) Fixed `prevent_heating_if_window_open` to save heater state before turning off, (3) Updated heater-watchdog to use hybrid approach (safety first, best-effort state save), (4) Increased resume delay from 1s to 3s for TRVZB timing. Added complete scenarios matrix documentation. |
 | 2025-12-29 | **Fixed temperature restoration** - Added input_number entities to save/restore thermostat setpoints when windows trigger heater shutoff. TRVZB firmware drops setpoint to 7°C frost protection when mode=off; now setpoints are explicitly saved before shutoff and restored after. Also resets `open_window` flag via MQTT on restore. |
 | 2025-12-27 | Added cool-off delays: doors (2min), windows (30sec) |
 | 2025-12-27 | Added cold weather alert (15min + <18°C) |

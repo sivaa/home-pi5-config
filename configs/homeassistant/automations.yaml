@@ -983,9 +983,10 @@
         topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
         payload: '{"open_window": "OFF"}'
 
-    # Small delay for TRV to process
+    # Delay for TRV to process mode change and open_window reset
+    # TRVZB needs time between mode change and setpoint change (verified: 1s may be too short)
     - delay:
-        seconds: 1
+        seconds: 3
 
     # Restore saved setpoints (TRVZB drops setpoint to frost protection when turned off)
     - service: climate.set_temperature
@@ -1221,6 +1222,20 @@
       } %}
       {{ names.get(trigger.entity_id, trigger.entity_id) }}
 
+    # Map entity_id to helper IDs for state saving
+    heater_id: >
+      {% set ids = {
+        'climate.study_thermostat': 'study',
+        'climate.living_thermostat_inner': 'living_inner',
+        'climate.living_thermostat_outer': 'living_outer',
+        'climate.bed_thermostat': 'bedroom'
+      } %}
+      {{ ids.get(trigger.entity_id, 'unknown') }}
+
+    bool_entity: "input_boolean.{{ heater_id }}_heater_was_on"
+    number_entity: "input_number.{{ heater_id }}_heater_saved_temp"
+    current_setpoint: "{{ state_attr(trigger.entity_id, 'temperature') | float(18) }}"
+
     open_windows: >
       {% set open = [] %}
       {% if is_state('binary_sensor.bath_window_contact_sensor_contact', 'on') %}
@@ -1250,6 +1265,22 @@
       {{ open | join(', ') }}
 
   action:
+    # -------------------------------------------------------------------------
+    # FIX: Save THIS heater's state before turning off
+    # NOTE: Do NOT set guard flag here - let window_open timer save ALL heaters
+    # This prevents race condition where guard flag blocks window_open from saving
+    # -------------------------------------------------------------------------
+    - service: input_boolean.turn_on
+      target:
+        entity_id: "{{ bool_entity }}"
+
+    - service: input_number.set_value
+      target:
+        entity_id: "{{ number_entity }}"
+      data:
+        value: "{{ current_setpoint }}"
+
+    # Now turn off this specific heater
     - service: climate.set_hvac_mode
       target:
         entity_id: "{{ trigger.entity_id }}"

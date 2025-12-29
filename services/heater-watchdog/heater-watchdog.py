@@ -77,6 +77,33 @@ THERMOSTAT_NAMES = {
     "climate.bed_thermostat": "Bedroom",
 }
 
+# Mapping: thermostat entity_id -> (input_boolean, input_number)
+# Used for saving state before turning off heaters
+THERMOSTAT_HELPERS = {
+    "climate.study_thermostat": (
+        "input_boolean.study_heater_was_on",
+        "input_number.study_heater_saved_temp",
+    ),
+    "climate.living_thermostat_inner": (
+        "input_boolean.living_inner_heater_was_on",
+        "input_number.living_inner_heater_saved_temp",
+    ),
+    "climate.living_thermostat_outer": (
+        "input_boolean.living_outer_heater_was_on",
+        "input_number.living_outer_heater_saved_temp",
+    ),
+    "climate.bed_thermostat": (
+        "input_boolean.bedroom_heater_was_on",
+        "input_number.bedroom_heater_saved_temp",
+    ),
+}
+
+# Guard flag entity
+GUARD_FLAG_ENTITY = "input_boolean.heaters_off_due_to_window"
+
+# State save timeout (seconds) - don't block core safety action
+STATE_SAVE_TIMEOUT = 5
+
 # =============================================================================
 # LOGGING
 # =============================================================================
@@ -137,6 +164,75 @@ def get_entity_state(entity_id):
 def call_service(domain, service, data=None):
     """Call a Home Assistant service."""
     return ha_request(f"services/{domain}/{service}", method="POST", data=data or {})
+
+
+# =============================================================================
+# STATE SAVE HELPERS (Best-Effort for Hybrid Approach)
+# =============================================================================
+
+
+def save_heater_states():
+    """
+    Save current state of all thermostats in heat mode to input helpers.
+    This is BEST EFFORT - failures don't block safety action.
+    Returns: (success_count, fail_count)
+    """
+    success = 0
+    fail = 0
+
+    for thermostat in THERMOSTATS:
+        try:
+            state = get_entity_state(thermostat)
+            attrs = state.get("attributes", {})
+            hvac_mode = state.get("state")  # 'heat', 'off', etc.
+            setpoint = attrs.get("temperature", 18)
+
+            # Only save if heater was in heat mode
+            if hvac_mode == "heat":
+                bool_entity, number_entity = THERMOSTAT_HELPERS[thermostat]
+                name = THERMOSTAT_NAMES.get(thermostat, thermostat)
+
+                # Save "was on" state
+                call_service(
+                    "input_boolean",
+                    "turn_on",
+                    {"entity_id": bool_entity},
+                )
+
+                # Save setpoint
+                call_service(
+                    "input_number",
+                    "set_value",
+                    {"entity_id": number_entity, "value": float(setpoint)},
+                )
+
+                log(f"  Saved state: {name} (setpoint={setpoint}°C)", "INFO")
+                success += 1
+        except Exception as e:
+            fail += 1
+            log(f"  Failed to save state for {thermostat}: {e}", "WARN")
+
+    return success, fail
+
+
+def set_guard_flag(value):
+    """
+    Set the guard flag (heaters_off_due_to_window).
+    This is BEST EFFORT - failures don't block safety action.
+    Returns: True if successful, False otherwise
+    """
+    try:
+        service = "turn_on" if value else "turn_off"
+        call_service(
+            "input_boolean",
+            service,
+            {"entity_id": GUARD_FLAG_ENTITY},
+        )
+        log(f"  Guard flag set to {'ON' if value else 'OFF'}", "INFO")
+        return True
+    except Exception as e:
+        log(f"  Failed to set guard flag: {e}", "WARN")
+        return False
 
 
 # =============================================================================
@@ -218,7 +314,12 @@ def send_notification(title, message, importance="max"):
 
 
 def perform_safety_check():
-    """Main safety check logic."""
+    """
+    Main safety check logic with HYBRID APPROACH:
+    1. CORE SAFETY: Turn off heaters FIRST (must succeed)
+    2. BEST EFFORT: Try to save state (won't block safety action)
+    3. NOTIFICATION: Clearly indicate if manual intervention needed
+    """
     log("=" * 60)
     log("Performing safety check...")
 
@@ -241,25 +342,59 @@ def perform_safety_check():
         log("SAFETY VIOLATION: Windows open AND heaters running!", "WARN")
         log("!" * 60, "WARN")
 
-        # Turn off all heaters
+        # =================================================================
+        # HYBRID APPROACH: Safety first, state save is best-effort
+        # =================================================================
+
+        # 1. BEST EFFORT: Try to save heater states FIRST
+        #    (So we capture setpoints before they drop to 7°C)
+        log("Attempting to save heater states (best-effort)...", "INFO")
+        save_success, save_fail = save_heater_states()
+        state_saved = save_fail == 0 and save_success > 0
+
+        # 2. BEST EFFORT: Try to set guard flag
+        log("Attempting to set guard flag (best-effort)...", "INFO")
+        guard_set = set_guard_flag(True)
+
+        # 3. CORE SAFETY: Turn off all heaters (MUST succeed)
+        log("CORE SAFETY: Turning off all heaters...", "WARN")
         turn_off_result = turn_off_all_heaters()
 
-        # Send notification
+        # 4. Build notification message based on state save status
         open_list = ", ".join(open_windows)
         heating_list = ", ".join(heating)
 
-        send_notification(
-            title="WATCHDOG: Heaters Emergency Off",
-            message=(
+        if state_saved and guard_set:
+            # Full success: state saved, will auto-resume
+            message = (
                 f"Safety violation detected!\n"
                 f"Open: {open_list}\n"
                 f"Heating: {heating_list}\n"
-                f"All heaters have been turned off."
-            ),
+                f"All heaters turned off.\n"
+                f"✅ State saved - will auto-resume when windows close."
+            )
+            log("State saved successfully - auto-resume will work", "INFO")
+        else:
+            # Partial failure: manual intervention needed
+            message = (
+                f"Safety violation detected!\n"
+                f"Open: {open_list}\n"
+                f"Heating: {heating_list}\n"
+                f"All heaters turned off.\n"
+                f"⚠️ State save failed - MANUAL re-enable required after closing windows!"
+            )
+            log("STATE SAVE FAILED - manual intervention required!", "WARN")
+
+        send_notification(
+            title="WATCHDOG: Heaters Emergency Off",
+            message=message,
             importance="max",
         )
 
-        log(f"Action taken: heaters_off={turn_off_result}", "INFO")
+        log(
+            f"Action summary: heaters_off={turn_off_result}, state_saved={state_saved}, guard_set={guard_set}",
+            "INFO",
+        )
         return "VIOLATION"
     else:
         log("Safety check: OK", "INFO")
