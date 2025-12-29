@@ -1997,7 +1997,7 @@
                 <div class="panel-metric contact-open full-width">
                   <span class="panel-value">
                     <span x-text="getContactShortName(sensor.friendly_name)"></span>
-                    <span class="duration" x-text="$store.sensors.getOpenDuration(sensor.ieee_address) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
+                    <span class="duration" x-text="($store.sensors.durationTick, $store.sensors.getOpenDuration(sensor.ieee_address)) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
                   </span>
                 </div>
               </template>
@@ -2020,7 +2020,7 @@
                 <div class="panel-metric contact-open full-width">
                   <span class="panel-value">
                     <span x-text="getContactShortName(sensor.friendly_name)"></span>
-                    <span class="duration" x-text="$store.sensors.getOpenDuration(sensor.ieee_address) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
+                    <span class="duration" x-text="($store.sensors.durationTick, $store.sensors.getOpenDuration(sensor.ieee_address)) ? '(' + $store.sensors.getOpenDuration(sensor.ieee_address) + ')' : ''"></span>
                   </span>
                 </div>
               </template>
