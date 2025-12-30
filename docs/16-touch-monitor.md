@@ -73,14 +73,20 @@ Disable mouse emulation to allow native touch events:
 
 ```
 configs/labwc/
-└── rc.xml              # labwc touch configuration
+└── rc.xml                    # labwc touch configuration
+
+configs/touch-udev/
+└── 99-touch-usb.rules        # USB autosuspend disable rule
 ```
 
 ### Pi Destination
 
 ```
 ~/.config/labwc/
-└── rc.xml              # Active labwc config
+└── rc.xml                           # Active labwc config
+
+/etc/udev/rules.d/
+└── 99-touch-usb.rules               # USB autosuspend disable rule
 ```
 
 ---
@@ -167,6 +173,79 @@ ssh pi@pi "sudo reboot"
 | `mouseEmulation="no"` | Allows native touch gestures in Wayland apps |
 | No gesture daemon | Browser handles gestures natively; simpler setup |
 | labwc config | Compositor-level setting applies to all apps |
+
+---
+
+## USB Power Management (Autosuspend Fix)
+
+> **Added:** December 2025
+> **Issue:** Touch intermittently unresponsive - need to press harder or twice
+
+### Problem
+
+The Linux kernel's USB autosuspend was putting the touch controller to sleep after 2 seconds of inactivity:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    USB AUTOSUSPEND ISSUE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Symptom                        Root Cause                      │
+│  ─────────────────────────────  ─────────────────────────────   │
+│  Press harder sometimes         First touch wakes device        │
+│  Need to press twice            First touch lost during wake    │
+│  Intermittent response          Device suspended after 2s idle  │
+│  Slow response after idle       USB resume latency              │
+│                                                                 │
+│  Default: autosuspend = 2 (suspend after 2 seconds)             │
+│  Fixed:   autosuspend = -1 (never suspend)                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Solution
+
+Created udev rule to disable USB autosuspend for the ILITEK touch controller.
+
+**File:** `configs/touch-udev/99-touch-usb.rules`
+
+```bash
+# Matches by Vendor:Product ID - works on ANY USB port
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="222a", ATTR{idProduct}=="0001", ATTR{power/autosuspend}="-1"
+```
+
+### Installation
+
+```bash
+# Copy to Pi
+scp configs/touch-udev/99-touch-usb.rules pi@pi:/tmp/
+
+# Install
+ssh pi@pi "sudo cp /tmp/99-touch-usb.rules /etc/udev/rules.d/"
+ssh pi@pi "sudo chmod 644 /etc/udev/rules.d/99-touch-usb.rules"
+
+# Reload and apply immediately
+ssh pi@pi "sudo udevadm control --reload-rules"
+ssh pi@pi "echo -1 | sudo tee /sys/bus/usb/devices/*/power/autosuspend"  # Apply now
+```
+
+### Verification
+
+```bash
+# Check autosuspend is disabled (should show -1)
+ssh pi@pi "cat /sys/bus/usb/devices/3-2.4/power/autosuspend"
+
+# Note: USB path (3-2.4) may change if device is moved to different port
+# Use lsusb to find current path:
+ssh pi@pi "lsusb -t | grep -A1 222a"
+```
+
+### Port Flexibility
+
+The udev rule matches by **Vendor:Product ID** (222a:0001), not by USB port:
+- Device can be moved to any USB port
+- Works through USB hubs
+- Same approach as Zigbee dongle udev rule
 
 ---
 

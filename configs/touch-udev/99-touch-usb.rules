@@ -1,0 +1,14 @@
+# Disable USB autosuspend for ILITEK Touch Screen
+# Prevents the kernel from putting the touch controller to sleep, which causes
+# intermittent touch response (missed first taps, need to press twice).
+#
+# Vendor ID:  222a (ILI Technology Corp.)
+# Product ID: 0001 (Multi-Touch Screen)
+#
+# NOTE: This rule matches by Vendor/Product ID, NOT by USB port!
+#       Device can be moved to any USB port and rule still applies.
+#
+# Deploy: sudo cp 99-touch-usb.rules /etc/udev/rules.d/
+# Reload: sudo udevadm control --reload-rules && sudo udevadm trigger
+
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="222a", ATTR{idProduct}=="0001", ATTR{power/autosuspend}="-1"
