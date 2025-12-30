@@ -93,7 +93,7 @@
     - service: script.smart_tts_co2_alert
       data:
         message: >
-          Nithya, the Criuse Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
+          Nithya, the Cruise Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
         co2_threshold: 1200
     - service: notify.mobile_app_22111317pg
       data:
