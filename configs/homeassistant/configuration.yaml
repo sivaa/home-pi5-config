@@ -273,6 +273,10 @@ input_boolean:
   heaters_off_due_to_window:
     name: Heaters Off Due To Window
     icon: mdi:window-open-variant
+  # Guard flag for CO2-triggered heater shutoff
+  heaters_off_due_to_co2:
+    name: Heaters Off Due To CO2
+    icon: mdi:molecule-co2
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration

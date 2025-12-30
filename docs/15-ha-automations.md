@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
 > **Last Updated:** 2025-12-30
-> **Total Automations:** 23
+> **Total Automations:** 26
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -12,6 +12,7 @@
 |----------|-------|---------|
 | [Mailbox Alerts](#-mailbox-alerts) | 2 | Motion detection & sensor status |
 | [CO2 Monitoring](#-co2-monitoring) | 3 | Air quality alerts & ventilation reminders |
+| [CO2-Heater Control](#-co2-heater-control) | 3 | Auto-shutoff heaters when CO2 high |
 | [Window Alerts](#-window-open-alerts) | 2 | Bathroom & bedroom window open too long |
 | [Heater Notifications](#-heater-notifications) | 8 | Start/stop notifications for all 4 heaters |
 | [Thermostat Audit](#-thermostat-audit) | 1 | Track all setpoint changes |
@@ -123,6 +124,72 @@
 | **Cooldown** | 30 minutes |
 | **Action** | TTS thanking for ventilating + mobile notification |
 | **Message** | "Thanks Nithya! Air quality is good now. Ventilated in X minutes." |
+
+---
+
+### 🌡️ CO2-Heater Control
+
+These automations automatically turn off heaters when CO2 is high (to avoid heating air that will soon be vented) and restore them when CO2 drops.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      CO2-HEATER CONTROL PRIORITY                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  PRIORITY: WINDOW OPEN > CO2 HIGH > NORMAL THERMOSTAT                          │
+│                                                                                 │
+│  ┌────────────────────────────────────────────────────────────────────────┐    │
+│  │                        THRESHOLDS                                      │    │
+│  │                                                                        │    │
+│  │   1200 ppm ─┼─ HEATER OFF (aligned with verbal CO2 alert)             │    │
+│  │             │    ▲                                                     │    │
+│  │             │    │ 100 ppm hysteresis                                  │    │
+│  │             │    ▼                                                     │    │
+│  │   1100 ppm ─┼─ HEATER RESTORE (if windows closed)                     │    │
+│  │                                                                        │    │
+│  └────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                 │
+│  SCENARIOS:                                                                     │
+│  • CO2 high → heaters off, CO2 flag ON                                          │
+│  • Window opens while CO2 high → window takes over, CO2 flag cleared           │
+│  • Window closes, CO2 still high → CO2 flag ON, heaters stay off               │
+│  • CO2 drops below 1100 → heaters restored                                      │
+│                                                                                 │
+│  SAFETY FEATURES:                                                               │
+│  • HA startup trigger checks state on restart                                   │
+│  • 30-minute sensor timeout fallback restores heaters                           │
+│  • prevent_heating_if_co2_high blocks manual override                           │
+│  • Quiet hours (23:00-07:00): TTS suppressed, mobile notification only         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### CO2-4. CO2 High - Turn Off All Heaters
+| Property | Value |
+|----------|-------|
+| **ID** | `co2_high_turn_off_heaters` |
+| **Trigger** | CO2 > 1200 ppm OR HA startup with CO2 > 1200 |
+| **Condition** | CO2 flag OFF, at least one heater in heat mode |
+| **Action** | Save state, turn off heaters, TTS (07:00-23:00), mobile notification |
+| **Priority** | If window flag ON, don't save state (window already saved it) |
+
+#### CO2-5. CO2 Low - Resume Heaters
+| Property | Value |
+|----------|-------|
+| **ID** | `co2_low_resume_heaters` |
+| **Trigger** | CO2 < 1100 ppm OR HA startup OR sensor unavailable 30min |
+| **Condition** | CO2 flag ON, window flag OFF, all windows/doors closed |
+| **Action** | Restore HVAC mode, reset open_window flag, restore setpoints, TTS |
+| **Safety** | 30-minute sensor timeout fallback with warning notification |
+
+#### CO2-6. Prevent Heating If CO2 High
+| Property | Value |
+|----------|-------|
+| **ID** | `prevent_heating_if_co2_high` |
+| **Trigger** | Any thermostat enters "heating" state |
+| **Condition** | CO2 > 1200 ppm |
+| **Action** | Immediately turn off that specific heater + mobile notification |
+| **Purpose** | Catch manual overrides or race conditions |
 
 ---
 

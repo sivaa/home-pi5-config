@@ -651,6 +651,36 @@
       target:
         entity_id: input_boolean.heaters_off_due_to_window
 
+    # CO2 HANDOFF: If CO2 flag is ON, transfer ownership (skip state save)
+    - if:
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_co2
+          state: "on"
+      then:
+        # Clear CO2 flag (door/window takes priority)
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.heaters_off_due_to_co2
+        # Skip state saving - CO2 already saved it
+        # Skip turning off heaters - already off
+        # Just notify about priority transfer
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "🚪 {{ door_name }} (CO2 Handoff)"
+            message: "Door opened while CO2 was high. Door now controls heater resume."
+            data:
+              channel: "Info"
+              tag: "window_heater_safety"
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+              - media_player.master_bedroom_clock
+            message: "{{ door_name }} open. Door control takes over from CO2."
+            language: "en"
+        - stop: "Transferred ownership from CO2 to door"
+
     # SAVE current heater states (now protected by guard)
     - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
       target:
@@ -797,6 +827,36 @@
     - service: input_boolean.turn_on
       target:
         entity_id: input_boolean.heaters_off_due_to_window
+
+    # CO2 HANDOFF: If CO2 flag is ON, transfer ownership (skip state save)
+    - if:
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_co2
+          state: "on"
+      then:
+        # Clear CO2 flag (window takes priority)
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.heaters_off_due_to_co2
+        # Skip state saving - CO2 already saved it
+        # Skip turning off heaters - already off
+        # Just notify about priority transfer
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "🪟 {{ window_name }} (CO2 Handoff)"
+            message: "Window opened while CO2 was high. Window now controls heater resume."
+            data:
+              channel: "Info"
+              tag: "window_heater_safety"
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+              - media_player.master_bedroom_clock
+            message: "{{ window_name }} open. Window control takes over from CO2."
+            language: "en"
+        - stop: "Transferred ownership from CO2 to window"
 
     # SAVE current heater states (now protected by guard)
     - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
@@ -946,6 +1006,42 @@
       {{ restored | join(', ') if restored else 'None' }}
 
   action:
+    # CO2 HANDOFF: Check if CO2 is still high before restoring
+    - if:
+        - condition: numeric_state
+          entity_id: sensor.hallway_co2_co2
+          above: 1100
+      then:
+        # Transfer ownership to CO2 flag
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.heaters_off_due_to_co2
+        # Clear window flag
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.heaters_off_due_to_window
+        # Notify (respect quiet hours)
+        - if:
+            - condition: template
+              value_template: "{{ now().hour < 23 and now().hour >= 7 }}"
+          then:
+            - service: tts.google_translate_say
+              data:
+                entity_id:
+                  - media_player.kitchen_display
+                  - media_player.broken_display
+                  - media_player.master_bedroom_clock
+                message: "Windows closed, but CO2 is still {{ states('sensor.hallway_co2_co2') | int }}. Heaters staying off."
+                language: "en"
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "🪟 Windows Closed, CO2 Still High"
+            message: "CO2: {{ states('sensor.hallway_co2_co2') }} ppm. Heaters will resume when CO2 < 1100."
+            data:
+              channel: "Info"
+              tag: "window_heater_safety"
+        - stop: "CO2 still high - transferring to CO2 control"
+
     # Restore heaters to their saved states
     - service: climate.set_hvac_mode
       target:
@@ -1304,6 +1400,441 @@
           channel: "Critical"
           importance: high
           tag: "heater_blocked_windows"
+
+# =============================================================================
+# CO2-BASED HEATER CONTROL
+# Purpose: Turn off heaters when CO2 is high (>1200 ppm) to avoid heating
+#          air that will soon be vented. Window control takes priority.
+# Thresholds: OFF at 1200 ppm, ON at 1100 ppm (100 ppm hysteresis)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CO2 HIGH - TURN OFF ALL HEATERS
+# Trigger: CO2 rises above 1200 ppm OR HA startup with CO2 > 1200
+# Action: Save state (if not already saved), turn off heaters
+# Priority: Window takes priority - do NOT save if window flag is ON
+# -----------------------------------------------------------------------------
+- id: co2_high_turn_off_heaters
+  alias: "CO2 High - Turn Off All Heaters"
+  description: "When CO2 exceeds 1200 ppm, turn off all heaters"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    # Normal trigger: CO2 crosses threshold
+    - platform: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      above: 1200
+      id: threshold_crossed
+    # Startup trigger: Check state on HA restart
+    - platform: homeassistant
+      event: start
+      id: ha_startup
+
+  condition:
+    # For startup trigger, verify CO2 is actually high
+    - condition: or
+      conditions:
+        - condition: trigger
+          id: threshold_crossed
+        - condition: and
+          conditions:
+            - condition: trigger
+              id: ha_startup
+            - condition: numeric_state
+              entity_id: sensor.hallway_co2_co2
+              above: 1200
+    # CO2 flag must be OFF (not already handled)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+    # At least one heater in 'heat' mode OR window flag is on
+    - condition: or
+      conditions:
+        - condition: template
+          value_template: >
+            {{ states('climate.study_thermostat') == 'heat'
+               or states('climate.living_thermostat_inner') == 'heat'
+               or states('climate.living_thermostat_outer') == 'heat'
+               or states('climate.bed_thermostat') == 'heat' }}
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_window
+          state: "on"
+
+  variables:
+    window_owns_state: "{{ is_state('input_boolean.heaters_off_due_to_window', 'on') }}"
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
+    is_quiet_hours: "{{ now().hour >= 23 or now().hour < 7 }}"
+    heaters_running: >
+      {% set running = [] %}
+      {% if state_attr('climate.study_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Study'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_inner', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Inner'] %}
+      {% endif %}
+      {% if state_attr('climate.living_thermostat_outer', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Living Outer'] %}
+      {% endif %}
+      {% if state_attr('climate.bed_thermostat', 'hvac_action') == 'heating' %}
+        {% set running = running + ['Bedroom'] %}
+      {% endif %}
+      {{ running | join(', ') if running else 'None' }}
+
+  action:
+    # Set CO2 guard flag FIRST
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.heaters_off_due_to_co2
+
+    # ONLY save state if window automation hasn't already saved it
+    - if:
+        - condition: template
+          value_template: "{{ not window_owns_state }}"
+      then:
+        # SAVE current heater states
+        - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+          target:
+            entity_id: input_boolean.study_heater_was_on
+        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+          target:
+            entity_id: input_boolean.living_inner_heater_was_on
+        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+          target:
+            entity_id: input_boolean.living_outer_heater_was_on
+        - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+          target:
+            entity_id: input_boolean.bedroom_heater_was_on
+
+        # SAVE current setpoints
+        - service: input_number.set_value
+          target:
+            entity_id: input_number.study_heater_saved_temp
+          data:
+            value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+        - service: input_number.set_value
+          target:
+            entity_id: input_number.living_inner_heater_saved_temp
+          data:
+            value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+        - service: input_number.set_value
+          target:
+            entity_id: input_number.living_outer_heater_saved_temp
+          data:
+            value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+        - service: input_number.set_value
+          target:
+            entity_id: input_number.bedroom_heater_saved_temp
+          data:
+            value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+
+        # Turn off all heaters
+        - service: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.study_thermostat
+              - climate.living_thermostat_inner
+              - climate.living_thermostat_outer
+              - climate.bed_thermostat
+          data:
+            hvac_mode: "off"
+
+    # TTS Announcement (respect quiet hours)
+    - if:
+        - condition: template
+          value_template: "{{ not is_quiet_hours }}"
+      then:
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+              - media_player.master_bedroom_clock
+            message: >-
+              CO2 is {{ co2_level }}. Heaters paused.
+              {%- if heaters_running != 'None' %} Stopping {{ heaters_running }}.
+              {%- endif %}
+            language: "en"
+
+    # Mobile notification (always)
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🌫️ CO2 High - Heaters Off"
+        message: >-
+          CO2: {{ co2_level }} ppm.
+          {%- if heaters_running != 'None' %} Paused: {{ heaters_running }}
+          {%- else %} No heaters were active
+          {%- endif %}
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "co2_heater_safety"
+
+# -----------------------------------------------------------------------------
+# CO2 LOW - RESUME HEATERS
+# Trigger: CO2 drops below 1100 ppm OR sensor unavailable for 30 min
+# Condition: CO2 flag is ON AND window flag is OFF
+# Safety: Timeout fallback if sensor fails
+# -----------------------------------------------------------------------------
+- id: co2_low_resume_heaters
+  alias: "CO2 Low - Resume Heaters"
+  description: "When CO2 drops below 1100 ppm and windows closed, restore heaters"
+  mode: single
+
+  trigger:
+    # Normal trigger: CO2 drops below threshold
+    - platform: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      below: 1100
+      id: threshold_crossed
+    # Safety trigger: HA startup check
+    - platform: homeassistant
+      event: start
+      id: ha_startup
+    # Fallback: Sensor unavailable for 30 minutes
+    - platform: state
+      entity_id: sensor.hallway_co2_co2
+      to: "unavailable"
+      for:
+        minutes: 30
+      id: sensor_timeout
+
+  condition:
+    # CO2 flag must be ON
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "on"
+    # Window flag must be OFF
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    # ALL windows/doors must be closed
+    - condition: state
+      entity_id: binary_sensor.bath_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.bed_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_large_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_small_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_window_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+      state: "off"
+    # For startup/normal trigger, verify CO2 is actually low
+    # For timeout trigger, allow anyway (sensor failed)
+    - condition: or
+      conditions:
+        - condition: trigger
+          id: sensor_timeout
+        - condition: and
+          conditions:
+            - condition: or
+              conditions:
+                - condition: trigger
+                  id: threshold_crossed
+                - condition: trigger
+                  id: ha_startup
+            - condition: numeric_state
+              entity_id: sensor.hallway_co2_co2
+              below: 1100
+
+  variables:
+    is_timeout: "{{ trigger.id == 'sensor_timeout' }}"
+    is_quiet_hours: "{{ now().hour >= 23 or now().hour < 7 }}"
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) if not is_timeout else 'unavailable' }}"
+    heaters_restored: >
+      {% set restored = [] %}
+      {% if is_state('input_boolean.study_heater_was_on', 'on') %}
+        {% set restored = restored + ['Study'] %}
+      {% endif %}
+      {% if is_state('input_boolean.living_inner_heater_was_on', 'on') %}
+        {% set restored = restored + ['Living Inner'] %}
+      {% endif %}
+      {% if is_state('input_boolean.living_outer_heater_was_on', 'on') %}
+        {% set restored = restored + ['Living Outer'] %}
+      {% endif %}
+      {% if is_state('input_boolean.bedroom_heater_was_on', 'on') %}
+        {% set restored = restored + ['Bedroom'] %}
+      {% endif %}
+      {{ restored | join(', ') if restored else 'None' }}
+
+  action:
+    # Restore heaters
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.study_thermostat
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.study_heater_was_on', 'on') else 'off' }}"
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.living_thermostat_inner
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_inner_heater_was_on', 'on') else 'off' }}"
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.living_thermostat_outer
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_outer_heater_was_on', 'on') else 'off' }}"
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: climate.bed_thermostat
+      data:
+        hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
+
+    # Reset open_window flag on TRVs
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Study] Thermostat/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Thermostat/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
+        payload: '{"open_window": "OFF"}'
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
+        payload: '{"open_window": "OFF"}'
+
+    - delay:
+        seconds: 3
+
+    # Restore setpoints
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.study_thermostat
+      data:
+        temperature: "{{ states('input_number.study_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.living_thermostat_inner
+      data:
+        temperature: "{{ states('input_number.living_inner_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.living_thermostat_outer
+      data:
+        temperature: "{{ states('input_number.living_outer_heater_saved_temp') | float(18) }}"
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.bed_thermostat
+      data:
+        temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
+
+    # Clear CO2 flag
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.heaters_off_due_to_co2
+
+    - delay:
+        seconds: 2
+
+    # TTS (respect quiet hours)
+    - if:
+        - condition: template
+          value_template: "{{ not is_quiet_hours }}"
+      then:
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+              - media_player.master_bedroom_clock
+            message: >-
+              {% if is_timeout %}CO2 sensor timeout. Resuming heaters as safety fallback.
+              {% else %}CO2 now {{ co2_level }}. Air improved.
+              {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
+              {%- endif %}
+              {% endif %}
+            language: "en"
+
+    # Mobile notification
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "{% if is_timeout %}⚠️ CO2 Sensor Timeout{% else %}✅ CO2 Normal{% endif %}"
+        message: >-
+          {% if is_timeout %}Sensor unavailable 30min. Resuming heaters.
+          {% else %}CO2: {{ co2_level }} ppm.
+          {%- if heaters_restored != 'None' %} Resumed: {{ heaters_restored }}
+          {%- else %} No heaters to resume
+          {%- endif %}
+          {% endif %}
+        data:
+          channel: "{% if is_timeout %}Critical{% else %}Info{% endif %}"
+          importance: "{% if is_timeout %}max{% else %}default{% endif %}"
+          tag: "co2_heater_safety"
+
+# -----------------------------------------------------------------------------
+# PREVENT HEATING IF CO2 HIGH
+# Trigger: Any thermostat enters "heating" state
+# Condition: CO2 > 1200
+# Action: Turn off that specific heater immediately
+# Purpose: Catch manual overrides or race conditions
+# -----------------------------------------------------------------------------
+- id: prevent_heating_if_co2_high
+  alias: "Prevent Heating If CO2 High"
+  description: "If any heater starts heating while CO2 is high, turn it off immediately"
+  mode: parallel
+  max: 4
+
+  trigger:
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: hvac_action
+      to: "heating"
+
+  condition:
+    - condition: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      above: 1200
+
+  variables:
+    heater_name: >
+      {% set names = {
+        'climate.study_thermostat': 'Study',
+        'climate.living_thermostat_inner': 'Living Inner',
+        'climate.living_thermostat_outer': 'Living Outer',
+        'climate.bed_thermostat': 'Bedroom'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
+
+  action:
+    # Turn off the specific heater
+    - service: climate.set_hvac_mode
+      target:
+        entity_id: "{{ trigger.entity_id }}"
+      data:
+        hvac_mode: "off"
+
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚫 {{ heater_name }} Blocked (CO2)"
+        message: "Heater tried to start but CO2 is {{ co2_level }} ppm. Blocked."
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "co2_heater_block"
 
 # =============================================================================
 # TTS NOTIFICATION AUDIT LOGGING
