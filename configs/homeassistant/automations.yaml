@@ -705,18 +705,21 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: >
-          Warning! {{ door_name }} has been open for 2 minutes.
-          Turning off heaters: {{ heaters_running }}.
-          Close all doors and windows to resume heating.
+        message: >-
+          {{ door_name }} open 2 minutes.
+          {%- if heaters_running != 'None' %} Pausing {{ heaters_running }}.
+          {%- else %} No heaters active.
+          {%- endif %}
         language: "en"
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "Door Open 2min - Heaters Off"
-        message: >
-          {{ door_name }} has been open for 2 minutes.
-          Heaters turned off: {{ heaters_running }}.
+        title: "🚪 {{ door_name }}"
+        message: >-
+          Open 2 min.
+          {%- if heaters_running != 'None' %} Paused: {{ heaters_running }}
+          {%- else %} No heaters active
+          {%- endif %}
         data:
           channel: "Critical"
           importance: max
@@ -849,18 +852,21 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: >
-          Warning! {{ window_name }} has been open for 30 seconds.
-          Turning off heaters: {{ heaters_running }}.
-          Close all windows to resume heating.
+        message: >-
+          {{ window_name }} open 30 seconds.
+          {%- if heaters_running != 'None' %} Pausing {{ heaters_running }}.
+          {%- else %} No heaters active.
+          {%- endif %}
         language: "en"
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "Window Open 30s - Heaters Off"
-        message: >
-          {{ window_name }} has been open for 30 seconds.
-          Heaters turned off: {{ heaters_running }}.
+        title: "🪟 {{ window_name }}"
+        message: >-
+          Open 30s.
+          {%- if heaters_running != 'None' %} Paused: {{ heaters_running }}
+          {%- else %} No heaters active
+          {%- endif %}
         data:
           channel: "Critical"
           importance: max
@@ -1024,25 +1030,19 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: >
-          All windows are now closed.
-          {% if heaters_restored != 'None' %}
-            Heating resumed for: {{ heaters_restored }}.
-          {% else %}
-            No heaters were running before, so none have been restored.
-          {% endif %}
+        message: >-
+          Windows closed.
+          {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
+          {%- endif %}
         language: "en"
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "All Windows Closed"
-        message: >
-          All windows and doors are closed.
-          {% if heaters_restored != 'None' %}
-            Heaters restored: {{ heaters_restored }}.
-          {% else %}
-            No heaters were running before window opened.
-          {% endif %}
+        title: "✅ Windows Closed"
+        message: >-
+          {%- if heaters_restored != 'None' %}Resumed: {{ heaters_restored }}
+          {%- else %}No heaters to resume
+          {%- endif %}
         data:
           channel: "Info"
           importance: default
@@ -1293,16 +1293,13 @@
           - media_player.kitchen_display
           - media_player.broken_display
           - media_player.master_bedroom_clock
-        message: >
-          {{ heater_name }} heater cannot start. Windows are open: {{ open_windows }}.
-          Please close all windows first.
+        message: "{{ heater_name }} blocked. Close {{ open_windows }}."
         language: "en"
 
     - service: notify.mobile_app_22111317pg
       data:
-        title: "🚫 Heater Blocked - Windows Open"
-        message: >
-          {{ heater_name }} tried to start heating, but blocked because windows are open: {{ open_windows }}.
+        title: "🚫 {{ heater_name }} Blocked"
+        message: "Windows open: {{ open_windows }}"
         data:
           channel: "Critical"
           importance: high

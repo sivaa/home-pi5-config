@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2025-12-29
-> **Total Automations:** 21
+> **Last Updated:** 2025-12-30
+> **Total Automations:** 23
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -15,8 +15,9 @@
 | [Window Alerts](#-window-open-alerts) | 2 | Bathroom & bedroom window open too long |
 | [Heater Notifications](#-heater-notifications) | 8 | Start/stop notifications for all 4 heaters |
 | [Thermostat Audit](#-thermostat-audit) | 1 | Track all setpoint changes |
-| [Window-Heater Safety](#-window-heater-safety) | 4 | Auto-shutoff when windows open |
+| [Window-Heater Safety](#-window-heater-safety) | 5 | Auto-shutoff when windows open + prevention |
 | [Cold Weather Alert](#-cold-weather-alert) | 1 | Remind to close windows when cold |
+| [TTS Logging](#-tts-logging) | 1 | Publish TTS events to MQTT for dashboard |
 
 ---
 
@@ -291,6 +292,31 @@ The Sonoff TRVZB thermostats have firmware behavior that causes setpoint loss:
 | **Stops When** | Window closes OR temperature rises ≥18°C |
 | **Message** | "Attention! {window} has been open for a long time and it's {temp} degrees outside." |
 
+#### 22. Prevent Heating If Window Open
+| Property | Value |
+|----------|-------|
+| **ID** | `prevent_heating_if_window_open` |
+| **Trigger** | Any thermostat enters "heating" state (hvac_action → heating) |
+| **Condition** | At least one window/door sensor is open |
+| **Mode** | Parallel (max: 4) |
+| **Action** | Save heater state → Turn off that heater → TTS + mobile notification |
+| **Purpose** | Prevents heaters from starting while windows are open |
+| **Note** | Does NOT set guard flag - allows window_open timer to save ALL heaters |
+
+---
+
+### 📢 TTS Logging
+
+#### 23. TTS Event MQTT Publisher
+| Property | Value |
+|----------|-------|
+| **ID** | `tts_event_mqtt_publisher` |
+| **Trigger** | Any call to `tts.google_translate_say` service |
+| **Mode** | Parallel (max: 10) |
+| **Action** | Publish event to `dashboard/tts` MQTT topic |
+| **Fields** | timestamp, message, devices, availability status |
+| **Purpose** | Dashboard logging of all TTS announcements |
+
 ---
 
 ## Entity Reference
@@ -516,6 +542,7 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2025-12-30 | Updated count from 21→23 automations; added docs for `prevent_heating_if_window_open` (#22) and `tts_event_mqtt_publisher` (#23) |
 | 2025-12-29 | **Fixed 4 bugs in heating safety system:** (1) Removed `initial:` from input helpers so state persists across HA restarts, (2) Fixed `prevent_heating_if_window_open` to save heater state before turning off, (3) Updated heater-watchdog to use hybrid approach (safety first, best-effort state save), (4) Increased resume delay from 1s to 3s for TRVZB timing. Added complete scenarios matrix documentation. |
 | 2025-12-29 | **Fixed temperature restoration** - Added input_number entities to save/restore thermostat setpoints when windows trigger heater shutoff. TRVZB firmware drops setpoint to 7°C frost protection when mode=off; now setpoints are explicitly saved before shutoff and restored after. Also resets `open_window` flag via MQTT on restore. |
 | 2025-12-27 | Added cool-off delays: doors (2min), windows (30sec) |

@@ -30,14 +30,14 @@
 │    Zigbee:  Sonoff 3.0 USB Dongle Plus V2                   │
 │    Path:    /dev/serial/by-id/usb-Itead_Sonoff_...          │
 ├─────────────────────────────────────────────────────────────┤
-│  Services (Docker):                                         │
+│  Services (Docker - 8 containers):                          │
 │    Dashboard:     http://pi:8888                            │
 │    Home Assistant:http://pi:8123 (ext: ha.sivaa.in)         │
 │    Zigbee2MQTT:   http://pi:8080                            │
 │    InfluxDB:      http://pi:8086                            │
-│    Grafana:       http://pi:3000                            │
 │    MQTT Broker:   mqtt://pi:1883 (WS: 9001)                 │
 │    Cloudflared:   Tunnel to ha.sivaa.in                     │
+│    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog   │
 ├─────────────────────────────────────────────────────────────┤
 │  Zigbee Devices: 35 total                                   │
 │    Sensors: 23 (12x temp, 1x CO2, 1x PIR, 8x contact, 1x vib)│
@@ -195,7 +195,7 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 | 2025-12-28 | Added kiosk browser: auto-launch dashboard in fullscreen on boot |
 | 2025-12-27 | Added heater-watchdog: poll-based safety monitor runs every 5min as defense-in-depth layer |
 | 2025-12-27 | Enabled touch gestures (scroll, pinch-zoom) by disabling labwc mouse emulation |
-| 2025-12-19 | Added adaptive brightness control (DDC/CI): 80% on wake, dims 10%/min to 25% idle |
+| 2025-12-19 | Added adaptive brightness control (DDC/CI): 100% on wake, dims 10%/min to 10% idle |
 | 2025-12-19 | Replaced Chromium with Epiphany browser (440 MB → 60 MB, fixed infinite loading) |
 | 2025-12-18 | Added daily Pi reboot at 4:30 AM for unattended reliability |
 | 2025-12-18 | Enabled on-screen keyboard (squeekboard) for tablet-like touch input |

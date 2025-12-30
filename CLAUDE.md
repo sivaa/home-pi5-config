@@ -36,9 +36,22 @@ If the Pi dies, we should be able to rebuild it exactly as it was using this doc
 pi-setup/
 ├── README.md           # Main index and quick reference
 ├── CLAUDE.md           # This file - AI instructions
+├── AGENTS.md           # Agent guidelines
 ├── docs/               # Detailed documentation
 │   ├── 01-*.md         # Numbered for reading order
 │   └── ...
+├── configs/            # Source configs (source of truth)
+│   ├── zigbee2mqtt/    # Docker stack configs
+│   ├── homeassistant/  # HA configs & automations
+│   ├── display-scheduler/
+│   ├── kiosk-browser/
+│   └── cloudflared/
+├── services/           # Docker service code
+│   ├── dashboard/      # Custom web dashboard
+│   ├── heater-watchdog/
+│   ├── mqtt-influx-bridge/
+│   └── cast-ip-monitor/
+├── scripts/            # Maintenance scripts
 └── backups/
     └── configs/        # Backed up Pi config files
 ```
@@ -67,10 +80,10 @@ pi-setup/
   - 2x IKEA FLOALT lights + 2x remotes
   - 1x CO2 sensor (NOUS E10)
   - 1x Motion sensor (SNZB-03P) - Mailbox
-  - 1x Vibration sensor (unused)
-- **Docker Services:** 5 containers
-  - mosquitto (MQTT), zigbee2mqtt, homeassistant
-  - influxdb, dashboard (nginx)
+  - 1x Vibration sensor (Hot Water tracking)
+- **Docker Services:** 8 containers
+  - mosquitto (MQTT), zigbee2mqtt, homeassistant, influxdb
+  - dashboard (nginx), mqtt-influx-bridge, cast-ip-monitor, heater-watchdog
 
 ---
 

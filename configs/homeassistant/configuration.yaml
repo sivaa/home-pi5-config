@@ -195,22 +195,21 @@ google_assistant:
       room: "Bedroom"
 
     # === CO2 SENSOR ===
-    sensor.co2_co2:
+    sensor.hallway_co2_co2:
       name: "Air Quality"
       expose: true
-      room: "Living Room"
+      room: "Hallway"
+      aliases:
+        - "CO2 Sensor"
+        - "Air Quality Sensor"
 
-    # === MOTION SENSOR ===
-    binary_sensor.motion_detector_occupancy:
-      name: "Bathroom Motion Sensor"
-      expose: true
-      room: "Bathroom"
-
-    # === CONTACT SENSOR ===
-    binary_sensor.contact_sensor_1_contact:
-      name: "Door Sensor"
+    # === MOTION SENSOR (Mailbox) ===
+    binary_sensor.mailbox_motion_sensor_occupancy:
+      name: "Mailbox Sensor"
       expose: true
       room: "Entry"
+      aliases:
+        - "Mail Sensor"
 
     # === THERMOSTATS (Climate control) ===
     climate.study_thermostat:

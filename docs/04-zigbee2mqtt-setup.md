@@ -1,7 +1,7 @@
 # Zigbee2MQTT Setup via Docker
 
-> **Last Updated:** December 16, 2025
-> **Status:** Running and verified (5 Docker services)
+> **Last Updated:** December 30, 2025
+> **Status:** Running and verified (8 Docker services)
 
 ---
 
@@ -34,7 +34,7 @@ We're using **Docker** to run Zigbee2MQTT because:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          DOCKER STACK ON PI (5 SERVICES)                    │
+│                          DOCKER STACK ON PI (8 SERVICES)                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                   │
@@ -43,17 +43,23 @@ We're using **Docker** to run Zigbee2MQTT because:
 │  │  :1883/:9001 │    └──────┬───────┘    └──────▲───────┘                   │
 │  └──────┬───────┘           │                   │                           │
 │         │                   ▼                   │                           │
-│         │           ┌─────────────┐             │                           │
-│         │           │ /dev/ttyUSB0│             │                           │
-│         │           │ Zigbee Dongl│             │                           │
-│         │           └─────────────┘             │                           │
-│         │                                       │                           │
-│         ▼                                       │                           │
-│  ┌──────────────┐                       ┌──────┴───────┐                   │
-│  │Home Assistant│──────────────────────►│  Dashboard   │                   │
-│  │   :8123      │  writes sensor data   │  (Nginx)     │                   │
-│  │              │                       │   :8888      │                   │
-│  └──────────────┘                       └──────────────┘                   │
+│         │           ┌─────────────┐    ┌───────┴────────┐                   │
+│         │           │ /dev/ttyUSB0│    │mqtt-influx-    │                   │
+│         │           │ Zigbee Dongl│    │    bridge      │                   │
+│         │           └─────────────┘    └────────────────┘                   │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌──────────────┐    ┌────────────────┐    ┌──────────────┐                 │
+│  │Home Assistant│───►│   Dashboard    │    │heater-watchdog│                │
+│  │   :8123      │    │  (Nginx):8888  │    │ (safety)     │                 │
+│  └──────────────┘    └────────────────┘    └──────────────┘                 │
+│         │                                                                    │
+│         └──────────────────┐                                                │
+│                            ▼                                                │
+│                   ┌────────────────┐                                        │
+│                   │cast-ip-monitor │                                        │
+│                   │(Google Cast)   │                                        │
+│                   └────────────────┘                                        │
 │                                                                              │
 │  Data Flow:                                                                  │
 │    Zigbee Devices → Zigbee2MQTT → MQTT → Home Assistant → InfluxDB         │
@@ -153,7 +159,7 @@ ssh pi@pi "curl -s http://localhost:8080 | head -5"
 
 Location: `configs/zigbee2mqtt/docker-compose.yml`
 
-> **Note:** This is the full stack with all 5 services. Deploy to `/opt/docker-compose.yml` on Pi.
+> **Note:** This example shows 5 core services. The actual stack has 8 services - see `configs/zigbee2mqtt/docker-compose.yml` for the full configuration.
 
 ```yaml
 services:
@@ -182,7 +188,7 @@ services:
     devices:
       - /dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0:/dev/ttyUSB0
     environment:
-      - TZ=Australia/Sydney
+      - TZ=Europe/Berlin
 
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
@@ -195,7 +201,7 @@ services:
     volumes:
       - /opt/homeassistant:/config
     environment:
-      - TZ=Australia/Sydney
+      - TZ=Europe/Berlin
     privileged: true
 
   influxdb:
@@ -372,7 +378,7 @@ To rebuild this setup from scratch:
 
 **Important:** The Zigbee network key is auto-generated on first run. After devices are paired, backup the `configuration.yaml` from the Pi which contains the actual network key.
 
-> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 22 devices with pairing procedures.
+> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 35 devices with pairing procedures.
 
 ---
 
@@ -380,6 +386,8 @@ To rebuild this setup from scratch:
 
 | Date | Change |
 |------|--------|
+| 2025-12-30 | Updated to 8-service stack (added mqtt-influx-bridge, cast-ip-monitor, heater-watchdog) |
+| 2025-12-30 | Updated device count to 35, fixed timezone to Europe/Berlin |
 | 2025-12-16 | Updated docker-compose to show full 5-service stack |
 | 2025-12-16 | Updated architecture diagram, access points, device count (22) |
 | 2025-12-12 | Added reference to device inventory (docs/05-zigbee-devices.md) |
