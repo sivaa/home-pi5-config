@@ -239,6 +239,12 @@
                     title="Hard refresh (bypass cache)">
               🔄
             </button>
+            <!-- Close Browser Button (for kiosk mode) -->
+            <button class="close-btn"
+                    @click="window.close()"
+                    title="Close browser session">
+              ✕
+            </button>
             <!-- Theme Toggle -->
             <div class="theme-toggle" x-data>
               <button class="theme-toggle-btn"

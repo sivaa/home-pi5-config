@@ -1028,6 +1028,66 @@
     }
 
     /* ========================================
+       CLOSE BROWSER BUTTON (Kiosk Mode)
+       ======================================== */
+    .close-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      border: 1px solid var(--color-border);
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--color-text-secondary);
+      transition: background-color 100ms ease, color 100ms ease, border-color 100ms ease;
+      margin-right: var(--space-sm);
+    }
+
+    /* Hover effects - only on devices with hover capability */
+    @media (hover: hover) and (pointer: fine) {
+      .close-btn:hover {
+        background: #dc2626;
+        color: white;
+        border-color: #dc2626;
+      }
+    }
+
+    /* Active state - instant feedback for touch */
+    .close-btn:active {
+      background: #dc2626;
+      color: white;
+      border-color: #dc2626;
+      transform: scale(0.95);
+    }
+
+    /* Responsive: maintain touch targets on tablets */
+    @media (max-width: 900px) {
+      .close-btn {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+      }
+    }
+
+    /* Responsive: slightly smaller on mobile but still touchable */
+    @media (max-width: 600px) {
+      .close-btn {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 14px;
+        margin-right: var(--space-xs);
+      }
+    }
+
+    /* ========================================
        THEME TOGGLE
        ======================================== */
     .theme-toggle {
