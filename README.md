@@ -72,6 +72,7 @@
 | 16 | [Touch Monitor](docs/16-touch-monitor.md) | Touch gestures (scroll, pinch-zoom) setup |
 | 17 | [Heater Watchdog](docs/17-heater-watchdog.md) | Poll-based safety monitor for heater-window violations |
 | 18 | [Kiosk Browser](docs/18-kiosk-browser.md) | Auto-launch dashboard in fullscreen on boot |
+| 19 | [Zigbee Watchdog](docs/19-zigbee-watchdog.md) | Auto-restart zigbee2mqtt after USB disconnect |
 
 ---
 
@@ -255,7 +256,8 @@ pi-setup/
 │   ├── 15-ha-automations.md
 │   ├── 16-touch-monitor.md
 │   ├── 17-heater-watchdog.md
-│   └── 18-kiosk-browser.md
+│   ├── 18-kiosk-browser.md
+│   └── 19-zigbee-watchdog.md
 ├── scripts/                   <- Maintenance scripts
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
@@ -266,6 +268,8 @@ pi-setup/
 │   ├── heater-watchdog/       <- Poll-based heater safety monitor
 │   │   ├── heater-watchdog.py
 │   │   └── Dockerfile
+│   ├── zigbee-watchdog/       <- Auto-restart Z2M after USB disconnect
+│   │   └── zigbee-watchdog.sh
 │   ├── homeassistant/
 │   ├── mosquitto/
 │   └── zigbee2mqtt/
