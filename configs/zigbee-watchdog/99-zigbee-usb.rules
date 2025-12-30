@@ -1,0 +1,11 @@
+# Disable USB autosuspend for Sonoff Zigbee 3.0 USB Dongle Plus V2
+# This prevents the kernel from putting the dongle to sleep, which can cause
+# communication glitches and disconnection events.
+#
+# Vendor ID:  10c4 (Silicon Labs)
+# Product ID: ea60 (CP210x UART Bridge)
+#
+# Deploy: sudo cp 99-zigbee-usb.rules /etc/udev/rules.d/
+# Reload: sudo udevadm control --reload-rules && sudo udevadm trigger
+
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="10c4", ATTR{idProduct}=="ea60", ATTR{power/autosuspend}="-1"

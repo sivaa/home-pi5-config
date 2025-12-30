@@ -41,6 +41,7 @@ Every 60 seconds (via systemd timer):
 | `zigbee-watchdog.sh` | `/opt/zigbee-watchdog/` | Main script |
 | `zigbee-watchdog.service` | `/etc/systemd/system/` | Systemd service |
 | `zigbee-watchdog.timer` | `/etc/systemd/system/` | Systemd timer (every 60s) |
+| `99-zigbee-usb.rules` | `/etc/udev/rules.d/` | Disable USB autosuspend |
 | `.env` | `/opt/zigbee-watchdog/` | HA token (not in repo) |
 
 ## Configuration
@@ -59,12 +60,17 @@ If no token is provided, the watchdog still works but won't send mobile notifica
 # Copy files
 scp services/zigbee-watchdog/zigbee-watchdog.sh pi@pi:/opt/zigbee-watchdog/
 scp configs/zigbee-watchdog/*.service configs/zigbee-watchdog/*.timer pi@pi:/etc/systemd/system/
+scp configs/zigbee-watchdog/99-zigbee-usb.rules pi@pi:/tmp/
 
 # On Pi
 sudo chmod +x /opt/zigbee-watchdog/zigbee-watchdog.sh
 sudo systemctl daemon-reload
 sudo systemctl enable zigbee-watchdog.timer
 sudo systemctl start zigbee-watchdog.timer
+
+# Install udev rule for USB autosuspend
+sudo cp /tmp/99-zigbee-usb.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 ## Logs
@@ -108,3 +114,41 @@ sudo systemctl start zigbee-watchdog.service
 ### Timer not running
 - Check timer status: `systemctl status zigbee-watchdog.timer`
 - Enable if needed: `sudo systemctl enable --now zigbee-watchdog.timer`
+
+## USB Autosuspend
+
+Linux's USB autosuspend feature can cause stability issues with the Zigbee dongle.
+The `99-zigbee-usb.rules` udev rule disables autosuspend for the Sonoff dongle.
+
+### What It Does
+
+```
+Default:  autosuspend = 2   (sleep after 2 seconds of inactivity)
+With rule: autosuspend = -1  (never sleep)
+```
+
+### Why Disable It
+
+- Zigbee dongle needs to be always responsive (sensors report any time)
+- Power savings are negligible (~0.1W, ~$0.01/year)
+- Autosuspend can cause brief communication glitches and disconnection events
+
+### Installation
+
+```bash
+# Copy rule
+sudo cp configs/zigbee-watchdog/99-zigbee-usb.rules /etc/udev/rules.d/
+
+# Reload rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# For immediate effect (without replug/reboot):
+echo -1 | sudo tee /sys/bus/usb/devices/1-1/power/autosuspend
+```
+
+### Verify
+
+```bash
+# Should show -1 (never suspend)
+cat /sys/bus/usb/devices/1-1/power/autosuspend
+```
