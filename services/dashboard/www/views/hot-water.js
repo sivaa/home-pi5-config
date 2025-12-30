@@ -34,7 +34,7 @@ export function hotWaterView() {
       { id: '4d', label: '4d', minutes: 5760 },
       { id: '7d', label: '7d', minutes: 10080 }
     ],
-    selectedRange: '7d',
+    selectedRange: '3h',
 
     // Loading state
     loading: false,
