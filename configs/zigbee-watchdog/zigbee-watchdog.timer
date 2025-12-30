@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Zigbee2MQTT Watchdog every minute
+
+[Timer]
+# Start 60 seconds after boot
+OnBootSec=60
+# Run every 60 seconds
+OnUnitActiveSec=60
+# Allow up to 10 seconds scheduling variance
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target

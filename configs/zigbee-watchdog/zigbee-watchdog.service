@@ -1,0 +1,14 @@
+[Unit]
+Description=Zigbee2MQTT Watchdog
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/zigbee-watchdog/.env
+ExecStart=/opt/zigbee-watchdog/zigbee-watchdog.sh
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zigbee-watchdog
