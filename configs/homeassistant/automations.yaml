@@ -2050,3 +2050,63 @@
             } | tojson
           }}
         retain: true
+
+# -----------------------------------------------------------------------------
+# WATCHDOG RECOVERY - PERIODIC RESUME CHECK
+# Purpose: Safety net for heater-watchdog - catches cases where the event-driven
+#          resume automation misses the window/door close event.
+# Trigger: Every minute
+# Condition: Guard flag is ON AND all windows/doors are closed
+# Action: Trigger the existing resume automation
+# -----------------------------------------------------------------------------
+- id: watchdog_recovery_resume_check
+  alias: "Watchdog Recovery - Periodic Resume Check"
+  description: >
+    Safety net that runs every minute. If heater guard flag is ON but all
+    windows/doors are closed, triggers the resume automation. This catches
+    edge cases where the event-driven resume missed the close event.
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/1"
+
+  condition:
+    # Guard flag must be ON (heaters were intentionally turned off)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "on"
+    # AND all windows/doors must be closed
+    - condition: state
+      entity_id: binary_sensor.bath_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.bed_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_large_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.study_window_contact_sensor_small_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_window_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
+      state: "off"
+    - condition: state
+      entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+      state: "off"
+
+  action:
+    - service: system_log.write
+      data:
+        message: "Watchdog Recovery: Guard flag ON but all windows closed - triggering resume"
+        level: info
+    - service: automation.trigger
+      target:
+        entity_id: automation.all_windows_closed_resume_heaters

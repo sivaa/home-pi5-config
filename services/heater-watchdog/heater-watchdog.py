@@ -249,24 +249,39 @@ def save_heater_states():
     return success, fail
 
 
-def set_guard_flag(value):
+def set_guard_flag(value, max_retries=3):
     """
-    Set the guard flag (heaters_off_due_to_window).
-    This is BEST EFFORT - failures don't block safety action.
+    Set the guard flag (heaters_off_due_to_window) with retry logic.
+
+    This is critical for auto-resume to work - if the flag isn't set,
+    the HA resume automation won't know heaters were intentionally turned off.
+
+    Args:
+        value: True to turn on, False to turn off
+        max_retries: Number of attempts before giving up
+
     Returns: True if successful, False otherwise
     """
-    try:
-        service = "turn_on" if value else "turn_off"
-        call_service(
-            "input_boolean",
-            service,
-            {"entity_id": GUARD_FLAG_ENTITY},
-        )
-        log(f"  Guard flag set to {'ON' if value else 'OFF'}", "INFO")
-        return True
-    except Exception as e:
-        log(f"  Failed to set guard flag: {e}", "WARN")
-        return False
+    service = "turn_on" if value else "turn_off"
+    flag_state = "ON" if value else "OFF"
+
+    for attempt in range(max_retries):
+        try:
+            call_service(
+                "input_boolean",
+                service,
+                {"entity_id": GUARD_FLAG_ENTITY},
+            )
+            log(f"  Guard flag set to {flag_state} (attempt {attempt + 1})", "INFO")
+            return True
+        except Exception as e:
+            log(f"  Failed to set guard flag (attempt {attempt + 1}/{max_retries}): {e}", "WARN")
+            if attempt < max_retries - 1:
+                time.sleep(1)  # Brief delay before retry
+
+    log(f"  CRITICAL: Guard flag could not be set after {max_retries} attempts!", "ERROR")
+    log(f"  Auto-resume may not work - manual intervention may be required", "ERROR")
+    return False
 
 
 # =============================================================================

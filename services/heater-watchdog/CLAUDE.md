@@ -119,11 +119,23 @@ docker logs heater-watchdog --tail 100
 |  +- door_open_turn_off_heaters (2min delay for doors)      |
 |  +- prevent_heating_if_window_open (immediate block)       |
 |  +- all_windows_closed_resume_heaters                      |
+|  +- watchdog_recovery_resume_check (1min periodic safety)  |
 |                                                             |
 |  Layer 2: Heater Watchdog (Poll-Based, 5min intervals)      |
 |  +- This service - catches anything Layer 1 might miss     |
+|  +- Sets guard flag with retry (3 attempts) for resume     |
 +------------------------------------------------------------+
 ```
+
+## Auto-Resume Flow
+
+When watchdog turns off heaters:
+1. Saves heater states (best-effort)
+2. Sets guard flag with **3 retry attempts** (critical for resume)
+3. Turns off all heaters (core safety action)
+4. Resume happens via:
+   - Event-driven: HA automation triggers when windows close
+   - Periodic backup: Every 1 minute, checks if guard ON + all closed → resumes
 
 ## Troubleshooting
 
