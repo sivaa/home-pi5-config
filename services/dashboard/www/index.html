@@ -746,6 +746,43 @@
               </div>
             </div>
 
+            <!-- Heater Pause Banner (shown when heaters paused by automation) -->
+            <div class="heater-pause-banner"
+                 x-show="$store.thermostats?.heaterPause?.active"
+                 x-cloak
+                 x-transition:enter="banner-enter"
+                 x-transition:leave="banner-leave"
+                 :class="{
+                   'reason-window': $store.thermostats?.heaterPause?.reason === 'window',
+                   'reason-co2': $store.thermostats?.heaterPause?.reason === 'co2'
+                 }">
+
+              <div class="banner-icon" x-text="getPauseIcon()"></div>
+
+              <div class="banner-content">
+                <div class="banner-title" x-text="getPauseTitle()"></div>
+
+                <!-- Window reason: show open windows -->
+                <div class="banner-details" x-show="$store.thermostats?.heaterPause?.reason === 'window'">
+                  <span class="banner-detail-label">Open:</span>
+                  <span class="banner-windows" x-text="$store.thermostats?.heaterPause?.openWindows?.join(', ') || 'Unknown'"></span>
+                </div>
+
+                <!-- CO2 reason: show current level -->
+                <div class="banner-details" x-show="$store.thermostats?.heaterPause?.reason === 'co2'">
+                  <span class="banner-detail-label">CO2 Level:</span>
+                  <span class="banner-co2" x-text="($store.thermostats?.heaterPause?.co2Level || '--') + ' ppm'"></span>
+                  <span class="banner-threshold">(threshold: 1200 ppm)</span>
+                </div>
+              </div>
+
+              <div class="banner-timer">
+                <span class="timer-icon">⏱️</span>
+                <span class="timer-value" x-text="getPauseDuration()"></span>
+                <span class="timer-label">paused</span>
+              </div>
+            </div>
+
             <!-- ========================================
                  OVERVIEW TAB
                  ======================================== -->
@@ -1792,7 +1829,7 @@
                 <div class="hot-water-stat-icon">📊</div>
                 <div class="hot-water-stat-content">
                   <div class="hot-water-stat-value" x-text="weekFormatted"></div>
-                  <div class="hot-water-stat-label">This Week</div>
+                  <div class="hot-water-stat-label">7 Days</div>
                 </div>
               </div>
             </div>
@@ -2896,9 +2933,16 @@
 
   <!-- Hot Water View Module -->
   <script type="module">
-    import { hotWaterView } from './views/hot-water.js?v=5';
+    import { hotWaterView } from './views/hot-water.js?v=6';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
+  </script>
+
+  <!-- Floor Plan Config for Network View -->
+  <script type="module">
+    import { FLOOR_PLAN_CONFIG } from './js/config.js';
+    window.FLOOR_PLAN_CONFIG = FLOOR_PLAN_CONFIG;
+    console.log('[network] FLOOR_PLAN_CONFIG loaded');
   </script>
 
   <!-- CO2 View Module - loads methods and triggers stub enhancement -->
@@ -3122,10 +3166,89 @@
       Alpine.store('config', CONFIG);
 
       // MQTT connection store
+      // PERFORMANCE OPTIMIZATION (2024-12-31): Central dispatcher for all MQTT traffic
+      // Other stores/views should use registerTopicHandler() instead of client.on('message')
       Alpine.store('mqtt', {
         connected: false,
         connecting: true,
         client: null,
+        connectionCount: 0,
+
+        // Topic handlers registry: Map<pattern, Array<callback>>
+        _topicHandlers: new Map(),
+
+        // Performance metrics
+        _metrics: {
+          messagesReceived: 0,
+          messagesPerSecond: 0,
+          lastSecondMessages: 0,
+          lastSecondTimestamp: Date.now()
+        },
+
+        // PERFORMANCE: Update batching state
+        _pendingUpdates: [],
+        _batchScheduled: false,
+
+        // Register a handler for specific MQTT topics
+        registerTopicHandler(pattern, callback) {
+          if (!this._topicHandlers.has(pattern)) {
+            this._topicHandlers.set(pattern, []);
+          }
+          this._topicHandlers.get(pattern).push(callback);
+          return () => {
+            const handlers = this._topicHandlers.get(pattern);
+            if (handlers) {
+              const idx = handlers.indexOf(callback);
+              if (idx > -1) handlers.splice(idx, 1);
+            }
+          };
+        },
+
+        // PERFORMANCE: Queue update for batched dispatch via microtask
+        // Multiple MQTT messages arriving in same tick get batched together
+        _dispatchToHandlers(topic, data, deviceName) {
+          this._pendingUpdates.push({ topic, data, deviceName });
+
+          if (!this._batchScheduled) {
+            this._batchScheduled = true;
+            queueMicrotask(() => this._flushUpdates());
+          }
+        },
+
+        // Process all queued updates in a single batch
+        _flushUpdates() {
+          const updates = this._pendingUpdates;
+          this._pendingUpdates = [];
+          this._batchScheduled = false;
+
+          for (const { topic, data, deviceName } of updates) {
+            for (const [pattern, handlers] of this._topicHandlers) {
+              const matches = pattern.endsWith('*')
+                ? topic.startsWith(pattern.slice(0, -1))
+                : topic === pattern;
+              if (matches) {
+                for (const handler of handlers) {
+                  try { handler(topic, data, deviceName); }
+                  catch (e) { console.error(`[mqtt] Handler error for ${pattern}:`, e); }
+                }
+              }
+            }
+          }
+        },
+
+        // Update performance metrics
+        _updateMetrics() {
+          this._metrics.messagesReceived++;
+          this._metrics.lastSecondMessages++;
+          const now = Date.now();
+          if (now - this._metrics.lastSecondTimestamp >= 1000) {
+            this._metrics.messagesPerSecond = this._metrics.lastSecondMessages;
+            this._metrics.lastSecondMessages = 0;
+            this._metrics.lastSecondTimestamp = now;
+          }
+        },
+
+        getMetrics() { return { ...this._metrics }; },
 
         connect() {
           this.connecting = true;
@@ -3137,6 +3260,8 @@
           });
 
           this.client.on('connect', () => {
+            const isReconnect = this.connectionCount > 0;
+            this.connectionCount++;
             this.connected = true;
             this.connecting = false;
 
@@ -3148,75 +3273,62 @@
             this.client.subscribe('dashboard/#', { qos: 0 });
             console.log('[mqtt] Subscribed to dashboard/# (TTS notifications)');
 
-            // Subscribe to room sensors (primary) - now covered by wildcard but keeping for clarity
-            CONFIG.rooms.forEach(room => {
-              // Already covered by wildcard
-            });
-
-            // Subscribe to all additional sensors from ROOM_SENSORS
-            Object.values(ROOM_SENSORS).forEach(roomConfig => {
-              const allSensors = [
-                ...(roomConfig.climate || []),
-                ...(roomConfig.co2 || []),
-                ...(roomConfig.motion || []),
-                ...(roomConfig.contact || [])
-              ];
-              allSensors.forEach(sensor => {
-                this.client.subscribe(`${CONFIG.baseTopic}/${sensor.name}`, { qos: 0 });
-              });
-            });
-
             // Subscribe to light topics (state and availability)
             Alpine.store('lights').list.forEach(light => {
               this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}`, { qos: 0 });
               this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}/availability`, { qos: 0 });
             });
+
+            // On reconnect, reload open sensor timestamps
+            if (isReconnect) {
+              console.log('[mqtt] Reconnected - reloading open sensor timestamps');
+              setTimeout(() => {
+                Alpine.store('sensors')?.loadOpenSensorTimestamps?.(CONFIG);
+              }, 5000);
+            }
           });
 
+          // SINGLE message handler - parse ONCE, dispatch to all
           this.client.on('message', (topic, message) => {
+            this._updateMetrics();
             try {
               const msgStr = message.toString();
               const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
 
-              // Capture ALL messages for logs store (before any filtering)
+              // Parse ONCE
+              let data;
               try {
-                const logPayload = JSON.parse(msgStr);
-                Alpine.store('logs')?.captureMessage(topic, logPayload);
+                data = JSON.parse(msgStr);
               } catch (e) {
-                // Non-JSON message, capture as-is
-                Alpine.store('logs')?.captureMessage(topic, { raw: msgStr });
+                data = { raw: msgStr };
               }
 
-              // Check if it's an availability message
+              // 1. Capture for logs store (first)
+              Alpine.store('logs')?.captureMessage(topic, data);
+
+              // 2. Dispatch to registered handlers (stores/views use this)
+              this._dispatchToHandlers(topic, data, deviceName);
+
+              // 3. Built-in routing for backward compatibility
               if (topic.endsWith('/availability')) {
                 const lightTopic = deviceName.replace('/availability', '');
-                // Handle both JSON {"state":"online"} and plain string "online"
-                let isOnline;
-                try {
-                  const data = JSON.parse(msgStr);
-                  isOnline = data.state === 'online';
-                } catch {
-                  isOnline = msgStr === 'online';
-                }
+                const isOnline = data.state === 'online' || data === 'online' || msgStr === 'online';
                 Alpine.store('lights').setAvailability(lightTopic, isOnline);
                 return;
               }
 
-              const data = JSON.parse(msgStr);
+              if (data.raw) return; // Skip non-JSON messages for data routing
 
-              // Check if it's a room sensor (primary)
+              // Route to rooms store
               const roomConfig = CONFIG.rooms.find(r => r.sensor === deviceName);
               if (roomConfig) {
                 Alpine.store('rooms').updateRoom(deviceName, data);
-                // Note: updateRoom() calls updateSensor() internally
                 return;
               }
 
-              // Check if it's an additional sensor in any room
               const sensorFound = Alpine.store('rooms').updateSensor(deviceName, data);
               if (sensorFound) return;
 
-              // Check if it's a light
               Alpine.store('lights').updateLight(deviceName, data);
             } catch (e) {
               console.error('MQTT parse error:', e);
@@ -4233,12 +4345,12 @@
           const saved = localStorage.getItem('dashboard-view');
           if (saved) this.currentView = saved;
 
-          // Update time
+          // Update time - PERFORMANCE: reduced from 1s to 5s (clock precision isn't critical)
           this.updateDateTime();
           setInterval(() => {
             this.updateDateTime();
             this.now = Date.now();
-          }, 1000);
+          }, 5000);
 
           // Check stale
           setInterval(() => Alpine.store('rooms').checkStale(), 10000);
@@ -4645,6 +4757,12 @@
         },
 
         setDate(date) { this.selectedDate = date; this.loadEvents(); },
+
+        // Alias for HTML template compatibility
+        setDateRange(range) { this.setDate(range); },
+
+        // Getter for HTML template compatibility
+        get currentDateRange() { return this.selectedDate; },
 
         formatTime(timestamp) {
           return new Date(timestamp).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });

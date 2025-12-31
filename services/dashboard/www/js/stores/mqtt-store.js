@@ -1,6 +1,11 @@
 /**
  * MQTT Connection Store
  * Manages WebSocket connection to MQTT broker
+ *
+ * PERFORMANCE OPTIMIZATION (2024-12-31):
+ * This is the SINGLE message handler for all MQTT traffic.
+ * Other stores should NOT register their own client.on('message') handlers.
+ * Instead, they subscribe to specific topics via registerTopicHandler().
  */
 
 export function initMqttStore(Alpine, CONFIG) {
@@ -9,6 +14,92 @@ export function initMqttStore(Alpine, CONFIG) {
     connecting: true,
     client: null,
     connectionCount: 0,  // Track connection count for reconnect detection
+
+    // Topic handlers registry: Map<pattern, Array<callback>>
+    // Patterns support exact match or wildcard '*' suffix
+    _topicHandlers: new Map(),
+
+    // Performance metrics
+    _metrics: {
+      messagesReceived: 0,
+      messagesPerSecond: 0,
+      lastSecondMessages: 0,
+      lastSecondTimestamp: Date.now()
+    },
+
+    /**
+     * Register a handler for specific MQTT topics
+     * @param {string} pattern - Topic pattern (exact or ending with *)
+     * @param {function} callback - Handler function(topic, data, deviceName)
+     * @returns {function} Unsubscribe function
+     */
+    registerTopicHandler(pattern, callback) {
+      if (!this._topicHandlers.has(pattern)) {
+        this._topicHandlers.set(pattern, []);
+      }
+      this._topicHandlers.get(pattern).push(callback);
+
+      // Return unsubscribe function
+      return () => {
+        const handlers = this._topicHandlers.get(pattern);
+        if (handlers) {
+          const idx = handlers.indexOf(callback);
+          if (idx > -1) handlers.splice(idx, 1);
+        }
+      };
+    },
+
+    /**
+     * Dispatch message to all matching handlers
+     * @private
+     */
+    _dispatchToHandlers(topic, data, deviceName) {
+      for (const [pattern, handlers] of this._topicHandlers) {
+        let matches = false;
+
+        if (pattern.endsWith('*')) {
+          // Wildcard match
+          const prefix = pattern.slice(0, -1);
+          matches = topic.startsWith(prefix);
+        } else {
+          // Exact match
+          matches = topic === pattern;
+        }
+
+        if (matches) {
+          for (const handler of handlers) {
+            try {
+              handler(topic, data, deviceName);
+            } catch (e) {
+              console.error(`[mqtt] Handler error for ${pattern}:`, e);
+            }
+          }
+        }
+      }
+    },
+
+    /**
+     * Update performance metrics
+     * @private
+     */
+    _updateMetrics() {
+      this._metrics.messagesReceived++;
+      this._metrics.lastSecondMessages++;
+
+      const now = Date.now();
+      if (now - this._metrics.lastSecondTimestamp >= 1000) {
+        this._metrics.messagesPerSecond = this._metrics.lastSecondMessages;
+        this._metrics.lastSecondMessages = 0;
+        this._metrics.lastSecondTimestamp = now;
+      }
+    },
+
+    /**
+     * Get current performance metrics
+     */
+    getMetrics() {
+      return { ...this._metrics };
+    },
 
     connect() {
       this.connecting = true;
@@ -47,14 +138,23 @@ export function initMqttStore(Alpine, CONFIG) {
         }
       });
 
+      // SINGLE message handler for all MQTT traffic
+      // Other stores register via registerTopicHandler() - NO MORE client.on('message')!
       this.client.on('message', (topic, message) => {
-        try {
-          const data = JSON.parse(message.toString());
+        this._updateMetrics();
 
-          // Capture ALL messages for logs store (first, before any routing)
+        try {
+          // Parse ONCE for all handlers
+          const data = JSON.parse(message.toString());
+          const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+
+          // 1. Capture ALL messages for logs store (first, before any routing)
           Alpine.store('logs')?.captureMessage(topic, data);
 
-          const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+          // 2. Dispatch to registered topic handlers
+          this._dispatchToHandlers(topic, data, deviceName);
+
+          // 3. Built-in routing (kept for backward compatibility)
 
           // Check if it's an availability message
           if (deviceName.endsWith('/availability')) {

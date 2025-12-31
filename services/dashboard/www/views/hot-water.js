@@ -17,7 +17,7 @@ export function hotWaterView() {
     // Stats (seconds)
     todaySeconds: 0,
     yesterdaySeconds: 0,
-    weekMinutes: 0,
+    weekSeconds: 0,
 
     // Chart history data
     chartHistory: [],
@@ -76,6 +76,12 @@ export function hotWaterView() {
       if (this._refreshInterval) {
         clearInterval(this._refreshInterval);
       }
+      // Clean up MQTT handler to prevent memory leak
+      if (this._unsubscribeMqtt) {
+        this._unsubscribeMqtt();
+        this._unsubscribeMqtt = null;
+      }
+      this._mqttSetup = false;
     },
 
     // ========================================
@@ -98,19 +104,14 @@ export function hotWaterView() {
         console.log('[hot-water] Subscribing to:', topic);
         mqtt.client.subscribe(topic, { qos: 0 });
 
-        mqtt.client.on('message', (msgTopic, message) => {
-          if (msgTopic !== topic) return;
-
-          try {
-            const payload = JSON.parse(message.toString());
-
-            if (payload.vibration !== undefined) {
-              this.isRunning = payload.vibration === true;
-              this.lastUpdate = Date.now();
-              console.log(`[hot-water] State: ${this.isRunning ? 'RUNNING' : 'idle'}`);
-            }
-          } catch (e) {
-            // Parse error - ignore
+        // PERFORMANCE: Use central dispatcher instead of client.on('message')
+        // This prevents duplicate JSON parsing across multiple handlers
+        // Store unsubscribe function for cleanup in destroy()
+        this._unsubscribeMqtt = mqtt.registerTopicHandler(topic, (msgTopic, payload) => {
+          if (payload.vibration !== undefined) {
+            this.isRunning = payload.vibration === true;
+            this.lastUpdate = Date.now();
+            console.log(`[hot-water] State: ${this.isRunning ? 'RUNNING' : 'idle'}`);
           }
         });
       };
@@ -216,10 +217,9 @@ export function hotWaterView() {
         this.yesterdaySeconds = this.calculateDurationFromEvents(yesterdayEvents);
 
         const weekEvents = await this.queryEventsForRange(influxUrl, influxDb, weekStart);
-        const weekSeconds = this.calculateDurationFromEvents(weekEvents);
-        this.weekMinutes = Math.round(weekSeconds / 60);
+        this.weekSeconds = this.calculateDurationFromEvents(weekEvents);
 
-        console.log(`[hot-water] Stats: today=${this.todaySeconds}s, yesterday=${this.yesterdaySeconds}s, week=${this.weekMinutes}m`);
+        console.log(`[hot-water] Stats: today=${this.todaySeconds}s, yesterday=${this.yesterdaySeconds}s, week=${this.weekSeconds}s`);
       } catch (e) {
         console.error('[hot-water] Failed to load stats:', e);
       }
@@ -330,12 +330,7 @@ export function hotWaterView() {
     },
 
     get weekFormatted() {
-      if (this.weekMinutes < 60) {
-        return `${this.weekMinutes}m`;
-      }
-      const hours = Math.floor(this.weekMinutes / 60);
-      const mins = this.weekMinutes % 60;
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+      return this.formatDuration(this.weekSeconds);
     },
 
     get statusText() {

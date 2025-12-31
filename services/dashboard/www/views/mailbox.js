@@ -53,6 +53,12 @@ export function mailboxView() {
       if (this._refreshInterval) {
         clearInterval(this._refreshInterval);
       }
+      // Clean up MQTT handler to prevent memory leak
+      if (this._unsubscribeMqtt) {
+        this._unsubscribeMqtt();
+        this._unsubscribeMqtt = null;
+      }
+      this._mqttSetup = false;
     },
 
     // ========================================
@@ -75,41 +81,37 @@ export function mailboxView() {
         console.log('[mailbox-view] Subscribing to:', topic);
         mqtt.client.subscribe(topic, { qos: 0 });
 
-        mqtt.client.on('message', (msgTopic, message) => {
-          if (msgTopic !== topic) return;
+        // PERFORMANCE: Use central dispatcher instead of client.on('message')
+        // This prevents duplicate JSON parsing across multiple handlers
+        // Store unsubscribe function for cleanup in destroy()
+        this._unsubscribeMqtt = mqtt.registerTopicHandler(topic, (msgTopic, payload) => {
+          const now = Date.now();
 
-          try {
-            const payload = JSON.parse(message.toString());
-            const now = Date.now();
+          // Handle motion event
+          if (payload.occupancy === true) {
+            this.addLiveEvent({
+              time: now,
+              eventType: 'motion_detected',
+              deviceName: this.deviceName,
+              value: 1
+            });
+          } else if (payload.occupancy === false) {
+            this.addLiveEvent({
+              time: now,
+              eventType: 'motion_cleared',
+              deviceName: this.deviceName,
+              value: 0
+            });
+          }
 
-            // Handle motion event
-            if (payload.occupancy === true) {
-              this.addLiveEvent({
-                time: now,
-                eventType: 'motion_detected',
-                deviceName: this.deviceName,
-                value: 1
-              });
-            } else if (payload.occupancy === false) {
-              this.addLiveEvent({
-                time: now,
-                eventType: 'motion_cleared',
-                deviceName: this.deviceName,
-                value: 0
-              });
-            }
-
-            // Handle availability
-            if (payload.availability !== undefined) {
-              this.addLiveEvent({
-                time: now,
-                eventType: payload.availability === 'online' ? 'device_online' : 'device_offline',
-                deviceName: this.deviceName,
-                value: payload.availability === 'online' ? 1 : 0
-              });
-            }
-          } catch (e) {
-            // Parse error - ignore
+          // Handle availability
+          if (payload.availability !== undefined) {
+            this.addLiveEvent({
+              time: now,
+              eventType: payload.availability === 'online' ? 'device_online' : 'device_offline',
+              deviceName: this.deviceName,
+              value: payload.availability === 'online' ? 1 : 0
+            });
           }
         });
       };

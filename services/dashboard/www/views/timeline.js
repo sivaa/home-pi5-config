@@ -12,36 +12,55 @@ export function timelineView() {
     selectedDeviceType: '',
     selectedDevice: '',
 
+    // MQTT cleanup state
+    _mqttSetup: false,
+    _unsubscribeMqtt: null,
+    _retryTimeout: null,
+
     init() {
       // Events are loaded by app.js on init
       // Set up real-time MQTT listener for live events
       this.setupMqttListener();
     },
 
+    destroy() {
+      // Clean up MQTT handler to prevent memory leak
+      if (this._unsubscribeMqtt) {
+        this._unsubscribeMqtt();
+        this._unsubscribeMqtt = null;
+      }
+      // Clear any pending retry timeout
+      if (this._retryTimeout) {
+        clearTimeout(this._retryTimeout);
+        this._retryTimeout = null;
+      }
+      this._mqttSetup = false;
+    },
+
     // Set up MQTT listener for real-time events
     setupMqttListener() {
+      if (this._mqttSetup) return;
+
       const mqtt = this.$store.mqtt;
       if (!mqtt?.client) {
-        // Retry after MQTT connects
-        setTimeout(() => this.setupMqttListener(), 2000);
+        // Retry after MQTT connects - store timeout for cleanup
+        this._retryTimeout = setTimeout(() => this.setupMqttListener(), 2000);
         return;
       }
 
-      // Listen for zigbee device messages
-      mqtt.client.on('message', (topic, message) => {
-        if (!topic.startsWith('zigbee2mqtt/') || topic.includes('/bridge/')) return;
+      this._mqttSetup = true;
 
-        try {
-          const payload = JSON.parse(message.toString());
-          const deviceName = topic.replace('zigbee2mqtt/', '');
+      // PERFORMANCE: Use central dispatcher instead of client.on('message')
+      // This prevents duplicate JSON parsing across multiple handlers
+      // Store unsubscribe function for cleanup in destroy()
+      this._unsubscribeMqtt = mqtt.registerTopicHandler('zigbee2mqtt/*', (topic, payload, deviceName) => {
+        // Skip bridge messages
+        if (topic.includes('/bridge/')) return;
 
-          // Process relevant events
-          const event = this.processLiveEvent(deviceName, payload);
-          if (event) {
-            this.$store.events.addRealTimeEvent(event);
-          }
-        } catch (e) {
-          // Ignore parse errors
+        // Process relevant events
+        const event = this.processLiveEvent(deviceName, payload);
+        if (event) {
+          this.$store.events.addRealTimeEvent(event);
         }
       });
     },

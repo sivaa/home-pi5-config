@@ -89,50 +89,39 @@ export function initSensorsStore(Alpine, CONFIG) {
 
     /**
      * Subscribe to required MQTT topics
+     * PERFORMANCE: Uses central dispatcher instead of client.on('message')
      */
     subscribeToTopics(client, CONFIG) {
+      const mqtt = Alpine.store('mqtt');
+
       // Device discovery
       client.subscribe('zigbee2mqtt/bridge/devices', { qos: 1 });
 
       // Position persistence
       client.subscribe('dashboard/sensors/positions', { qos: 1 });
 
-      // Add message handler (alongside existing handlers)
-      client.on('message', (topic, message) => {
-        this.handleMessage(topic, message, CONFIG);
+      // PERFORMANCE: Use central dispatcher instead of client.on('message')
+      // This prevents duplicate JSON parsing across multiple stores
+
+      // Handle device list from bridge
+      mqtt.registerTopicHandler('zigbee2mqtt/bridge/devices', (topic, data) => {
+        this.handleDeviceList(data);
       });
 
-      console.log('[sensors-store] Subscribed to device discovery and positions');
-    },
+      // Handle position updates
+      mqtt.registerTopicHandler('dashboard/sensors/positions', (topic, data) => {
+        this.handlePositionUpdate(data);
+      });
 
-    /**
-     * Handle incoming MQTT messages
-     */
-    handleMessage(topic, message, CONFIG) {
-      try {
-        const data = JSON.parse(message.toString());
-
-        // Device list from bridge
-        if (topic === 'zigbee2mqtt/bridge/devices') {
-          this.handleDeviceList(data);
-          return;
-        }
-
-        // Position updates
-        if (topic === 'dashboard/sensors/positions') {
-          this.handlePositionUpdate(data);
-          return;
-        }
-
-        // Live sensor data
-        const deviceName = topic.replace(`${CONFIG.baseTopic}/`, '');
+      // Handle live sensor data
+      mqtt.registerTopicHandler(`${CONFIG.baseTopic}/*`, (topic, data, deviceName) => {
         const sensor = this.devices.find(d => d.friendly_name === deviceName);
         if (sensor) {
           this.updateLiveData(sensor.ieee_address, data);
         }
-      } catch (e) {
-        // Ignore parse errors for non-JSON messages
-      }
+      });
+
+      console.log('[sensors-store] Subscribed to device discovery and positions (using central dispatcher)');
     },
 
     /**
@@ -420,12 +409,12 @@ export function initSensorsStore(Alpine, CONFIG) {
 
     /**
      * Start the duration ticker (call once after init)
-     * Updates durationTick every second to trigger reactive updates
+     * PERFORMANCE: Reduced from 1s to 5s - exact seconds aren't critical for door open durations
      */
     startDurationTicker() {
       setInterval(() => {
         this.durationTick = Date.now();
-      }, 1000);
+      }, 5000);
     },
 
     /**

@@ -6,10 +6,13 @@
 export function initLogsStore(Alpine, CONFIG) {
   Alpine.store('logs', {
     // ============================================
-    // DATA
+    // DATA - O(1) Circular Buffer Implementation
     // ============================================
-    logs: [],
-    maxLogs: 5000,  // Conservative for Pi performance
+    // Internal circular buffer storage
+    _buffer: [],
+    _head: 0,       // Next write position
+    _count: 0,      // Items in buffer
+    maxLogs: 1000,  // Buffer capacity
 
     // Previous state for change detection
     previousState: {},  // device -> { values, timestamp }
@@ -62,6 +65,11 @@ export function initLogsStore(Alpine, CONFIG) {
     // INITIALIZATION
     // ============================================
     init() {
+      // Pre-allocate buffer for O(1) operations
+      this._buffer = new Array(this.maxLogs).fill(null);
+      this._head = 0;
+      this._count = 0;
+
       // Load saved thresholds from localStorage
       const saved = localStorage.getItem('logs-thresholds');
       if (saved) {
@@ -70,6 +78,44 @@ export function initLogsStore(Alpine, CONFIG) {
         } catch (e) {
           console.warn('Failed to parse saved thresholds:', e);
         }
+      }
+    },
+
+    // ============================================
+    // CIRCULAR BUFFER ACCESSORS
+    // ============================================
+
+    // O(1) insert at head of buffer
+    addLog(entry) {
+      this._buffer[this._head] = entry;
+      this._head = (this._head + 1) % this.maxLogs;
+      if (this._count < this.maxLogs) this._count++;
+    },
+
+    // Get logs in display order (newest first) - O(n) but only on read
+    get logs() {
+      if (this._count === 0) return [];
+
+      const result = [];
+      for (let i = 0; i < this._count; i++) {
+        // Read backwards from head (newest to oldest)
+        const idx = (this._head - 1 - i + this.maxLogs) % this.maxLogs;
+        if (this._buffer[idx]) result.push(this._buffer[idx]);
+      }
+      return result;
+    },
+
+    // Setter for bulk operations (loadHistorical, clearLogs)
+    set logs(newLogs) {
+      // Reset buffer
+      this._buffer = new Array(this.maxLogs).fill(null);
+      this._head = 0;
+      this._count = 0;
+
+      // Add logs in reverse order (oldest first) so newest ends up at head
+      const toAdd = newLogs.slice(0, this.maxLogs).reverse();
+      for (const log of toAdd) {
+        this.addLog(log);
       }
     },
 
@@ -89,11 +135,8 @@ export function initLogsStore(Alpine, CONFIG) {
       // Check for anomalies
       entry.isAnomaly = this.detectAnomaly(entry);
 
-      // Add to ring buffer
-      this.logs.unshift(entry);
-      if (this.logs.length > this.maxLogs) {
-        this.logs.pop();
-      }
+      // O(1) circular buffer insert (replaces O(n) unshift/pop)
+      this.addLog(entry);
 
       // Update previous state for change detection
       this.previousState[entry.device] = {
@@ -628,7 +671,10 @@ export function initLogsStore(Alpine, CONFIG) {
     // UTILITY
     // ============================================
     clearLogs() {
-      this.logs = [];
+      // Reset circular buffer
+      this._buffer = new Array(this.maxLogs).fill(null);
+      this._head = 0;
+      this._count = 0;
       this.previousState = {};
     },
 

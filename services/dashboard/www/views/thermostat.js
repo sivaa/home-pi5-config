@@ -83,13 +83,17 @@ export function thermostatView() {
     loading: false,
     chartUpdateInterval: null,
 
+    // Heater pause banner timer
+    pauseTimerTick: 0,           // Forces reactivity for live duration
+    pauseTimerInterval: null,
+
     // ============================================
     // LIFECYCLE
     // ============================================
 
     init() {
-      // Set up MQTT listeners for thermostats
-      this.setupMqttListener();
+      // PERFORMANCE: Thermostat MQTT handling is done by thermostat-store
+      // This view just reads from the store - no need for its own handler
 
       // Load historical data when trends tab is selected
       this.$watch('activeTab', (tab) => {
@@ -98,54 +102,29 @@ export function thermostatView() {
         }
       });
 
-      // Auto-refresh charts
+      // Auto-refresh charts (only when trends tab is active)
       this.chartUpdateInterval = setInterval(() => {
         if (this.activeTab === 'trends') {
           this.drawCharts();
         }
       }, 60000);
+
+      // PERFORMANCE: Reduce pause banner timer from 1s to 5s
+      // The exact second isn't critical for displaying "paused for X minutes"
+      this.pauseTimerInterval = setInterval(() => {
+        if (this.$store.thermostats?.heaterPause?.active) {
+          this.pauseTimerTick = Date.now();
+        }
+      }, 5000);  // Was 1000ms, now 5000ms
     },
 
     destroy() {
       if (this.chartUpdateInterval) {
         clearInterval(this.chartUpdateInterval);
       }
-    },
-
-    setupMqttListener() {
-      const mqtt = this.$store.mqtt;
-      if (!mqtt?.client) {
-        setTimeout(() => this.setupMqttListener(), 2000);
-        return;
+      if (this.pauseTimerInterval) {
+        clearInterval(this.pauseTimerInterval);
       }
-
-      // Subscribe to thermostat topics
-      CONFIG.thermostats.forEach(t => {
-        mqtt.client.subscribe(`zigbee2mqtt/${t.sensor}`, { qos: 0 });
-        mqtt.client.subscribe(`zigbee2mqtt/${t.sensor}/availability`, { qos: 0 });
-      });
-
-      // Handle messages
-      mqtt.client.on('message', (topic, message) => {
-        if (!topic.startsWith('zigbee2mqtt/')) return;
-
-        try {
-          const data = JSON.parse(message.toString());
-          const deviceName = topic.replace('zigbee2mqtt/', '').replace('/availability', '');
-
-          // Check if this is a thermostat
-          const thermostat = CONFIG.thermostats.find(t => t.sensor === deviceName);
-          if (!thermostat) return;
-
-          if (topic.endsWith('/availability')) {
-            this.$store.thermostats.updateAvailability(deviceName, data);
-          } else {
-            this.$store.thermostats.updateThermostat(deviceName, data);
-          }
-        } catch (e) {
-          // Ignore parse errors
-        }
-      });
     },
 
     // ============================================
@@ -426,6 +405,59 @@ export function thermostatView() {
       const fixed = temp.toFixed(1);
       const [whole, decimal] = fixed.split('.');
       return { whole, decimal: '.' + decimal };
+    },
+
+    // ============================================
+    // HEATER PAUSE BANNER HELPERS
+    // ============================================
+
+    /**
+     * Get pause duration string (reactive via pauseTimerTick)
+     * @returns {string} Duration like "5m 32s" or "1h 15m"
+     */
+    getPauseDuration() {
+      // Reference tick for reactivity
+      const _ = this.pauseTimerTick;
+
+      const pause = this.$store.thermostats?.heaterPause;
+      if (!pause?.active || !pause?.changedAt) return '';
+
+      const totalSeconds = Math.floor((Date.now() - pause.changedAt) / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      const secs = totalSeconds % 60;
+
+      if (hours > 0) {
+        return `${hours}h ${mins.toString().padStart(2, '0')}m`;
+      }
+      return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+    },
+
+    /**
+     * Get banner icon based on pause reason
+     */
+    getPauseIcon() {
+      const reason = this.$store.thermostats?.heaterPause?.reason;
+      if (reason === 'window') return '🪟';
+      if (reason === 'co2') return '💨';
+      return '⏸️';
+    },
+
+    /**
+     * Get banner title based on pause reason
+     */
+    getPauseTitle() {
+      const reason = this.$store.thermostats?.heaterPause?.reason;
+      if (reason === 'window') return 'Heaters Paused - Window Open';
+      if (reason === 'co2') return 'Heaters Paused - High CO2';
+      return 'Heaters Paused';
+    },
+
+    /**
+     * Get the heater pause state from store
+     */
+    get heaterPause() {
+      return this.$store.thermostats?.heaterPause ?? { active: false };
     },
 
     // ============================================
