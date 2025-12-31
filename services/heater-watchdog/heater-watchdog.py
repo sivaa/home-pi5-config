@@ -22,7 +22,7 @@ import os
 import time
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 
 # =============================================================================
 # CONFIGURATION
@@ -38,17 +38,29 @@ CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL", 300))  # 5 minutes
 # Notification service in Home Assistant
 NOTIFY_SERVICE = os.environ.get("NOTIFY_SERVICE", "notify.mobile_app_22111317pg")
 
-# Contact sensors (windows + doors) - "on" = open
-CONTACT_SENSORS = [
+# Window sensors - "on" = open (immediate response)
+WINDOW_SENSORS = [
     "binary_sensor.bath_window_contact_sensor_contact",
     "binary_sensor.bed_window_contact_sensor_contact",
     "binary_sensor.kitchen_window_contact_sensor_contact",
     "binary_sensor.study_window_contact_sensor_large_contact",
     "binary_sensor.study_window_contact_sensor_small_contact",
-    "binary_sensor.living_window_contact_sensor_balcony_door_contact",
     "binary_sensor.living_window_contact_sensor_window_contact",
+]
+
+# Door sensors - "on" = open (with delay to avoid false positives from brief openings)
+DOOR_SENSORS = [
+    "binary_sensor.living_window_contact_sensor_balcony_door_contact",
     "binary_sensor.hallway_window_contact_sensor_main_door_contact",
 ]
+
+# Combined list for backwards compatibility
+CONTACT_SENSORS = WINDOW_SENSORS + DOOR_SENSORS
+
+# Door delay in seconds (matches HA automation behavior)
+# Doors opened briefly for entry/exit won't trigger violation
+# NOTE: With 5-min poll interval, worst-case response time = CHECK_INTERVAL + DOOR_OPEN_DELAY
+DOOR_OPEN_DELAY = int(os.environ.get("DOOR_OPEN_DELAY", 120))  # Default: 2 minutes
 
 # Friendly names for logging
 CONTACT_NAMES = {
@@ -161,6 +173,28 @@ def get_entity_state(entity_id):
     return ha_request(f"states/{entity_id}")
 
 
+def get_seconds_in_current_state(state):
+    """Get how many seconds the entity has been in its current state.
+
+    Args:
+        state: Already-fetched state dict from get_entity_state()
+               (avoids duplicate API call)
+
+    Uses HA's last_changed attribute to calculate duration.
+    Returns float('inf') if unable to determine (safer - assumes long-open).
+    """
+    try:
+        last_changed = state.get("last_changed")
+        if last_changed:
+            # HA returns ISO format: 2025-12-31T12:50:29.123456+00:00
+            changed_time = datetime.fromisoformat(last_changed.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            return (now - changed_time).total_seconds()
+    except Exception as e:
+        log(f"Error calculating state duration: {e}", "WARN")
+    return float("inf")  # If unknown, treat as long-open (safer)
+
+
 def call_service(domain, service, data=None):
     """Call a Home Assistant service."""
     return ha_request(f"services/{domain}/{service}", method="POST", data=data or {})
@@ -241,17 +275,39 @@ def set_guard_flag(value):
 
 
 def get_open_windows():
-    """Return list of open windows/doors."""
-    open_windows = []
-    for sensor in CONTACT_SENSORS:
+    """Return list of open windows/doors that should trigger safety action.
+
+    Windows: Immediate response (no delay)
+    Doors: 2-minute delay to avoid false positives from brief entry/exit
+    """
+    open_contacts = []
+
+    # Check windows (no delay - immediate response)
+    for sensor in WINDOW_SENSORS:
         try:
             state = get_entity_state(sensor)
             if state.get("state") == "on":
                 name = CONTACT_NAMES.get(sensor, sensor)
-                open_windows.append(name)
+                open_contacts.append(name)
         except Exception as e:
             log(f"Error checking {sensor}: {e}", "WARN")
-    return open_windows
+
+    # Check doors (with delay to avoid false positives)
+    for sensor in DOOR_SENSORS:
+        try:
+            state = get_entity_state(sensor)
+            if state.get("state") == "on":
+                duration = get_seconds_in_current_state(state)  # Pass state object, not entity_id
+                name = CONTACT_NAMES.get(sensor, sensor)
+                if duration >= DOOR_OPEN_DELAY:
+                    open_contacts.append(name)
+                    log(f"  Door '{name}' open for {duration:.0f}s (>= {DOOR_OPEN_DELAY}s, triggering)", "INFO")
+                else:
+                    log(f"  Door '{name}' open for {duration:.0f}s (< {DOOR_OPEN_DELAY}s delay, ignoring)", "INFO")
+        except Exception as e:
+            log(f"Error checking {sensor}: {e}", "WARN")
+
+    return open_contacts
 
 
 def get_heating_thermostats():
@@ -436,9 +492,12 @@ def main():
     log("Configuration:")
     log(f"  HA_URL: {HA_URL}")
     log(f"  CHECK_INTERVAL: {CHECK_INTERVAL}s ({CHECK_INTERVAL // 60}min)")
+    log(f"  DOOR_OPEN_DELAY: {DOOR_OPEN_DELAY}s ({DOOR_OPEN_DELAY // 60}min)")
     log(f"  NOTIFY_SERVICE: {NOTIFY_SERVICE}")
-    log(f"  Monitoring {len(CONTACT_SENSORS)} contact sensors")
+    log(f"  Monitoring {len(WINDOW_SENSORS)} window sensors (immediate response)")
+    log(f"  Monitoring {len(DOOR_SENSORS)} door sensors ({DOOR_OPEN_DELAY}s delay)")
     log(f"  Monitoring {len(THERMOSTATS)} thermostats")
+    log(f"  Worst-case response time for doors: {CHECK_INTERVAL + DOOR_OPEN_DELAY}s ({(CHECK_INTERVAL + DOOR_OPEN_DELAY) // 60}min)")
     log("")
 
     # Validate configuration

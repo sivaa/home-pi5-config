@@ -17,17 +17,27 @@ Home Assistant already has event-driven automations for window-heater safety. Th
 
 ```
 Every 5 minutes:
-  IF any_contact_sensor == "on" (window/door open)
-     AND any_thermostat.hvac_action == "heating"
+  Check windows: IF any_window == "on" (open) → trigger immediately
+  Check doors:   IF any_door == "on" (open) for >= 2 minutes → trigger
+                 (brief door openings for entry/exit are ignored)
+
+  IF (open_windows OR doors_open_2min+) AND any_thermostat.hvac_action == "heating"
   THEN:
      1. Turn off ALL thermostats (hvac_mode: "off")
      2. Send mobile notification with details
      3. Log violation
 ```
 
+**Why the 2-minute door delay?**
+Doors (Main Door, Balcony Door) are frequently opened briefly for entry/exit. Without a delay, the watchdog would trigger false positives if its 5-minute poll happens during these brief openings. This matches the HA automation behavior.
+
+**Worst-case response time:**
+- Windows: up to 5 minutes (next poll)
+- Doors: up to 7 minutes (5-min poll + 2-min delay)
+
 ## Entities Monitored
 
-### Contact Sensors (8)
+### Window Sensors (6) - Immediate Response
 
 | Entity | Location |
 |--------|----------|
@@ -36,9 +46,14 @@ Every 5 minutes:
 | `kitchen_window_contact_sensor_contact` | Kitchen Window |
 | `study_window_contact_sensor_large_contact` | Study Large Window |
 | `study_window_contact_sensor_small_contact` | Study Small Window |
-| `living_window_contact_sensor_balcony_door_contact` | Balcony Door |
 | `living_window_contact_sensor_window_contact` | Living Window |
-| `hallway_window_contact_sensor_main_door_contact` | Main Door |
+
+### Door Sensors (2) - 2-Minute Delay
+
+| Entity | Location | Why Delay? |
+|--------|----------|------------|
+| `living_window_contact_sensor_balcony_door_contact` | Balcony Door | Brief entry/exit |
+| `hallway_window_contact_sensor_main_door_contact` | Main Door | Brief entry/exit |
 
 ### Thermostats (4)
 
@@ -58,6 +73,7 @@ Environment variables (set in docker-compose.yml):
 | `HA_URL` | No | `http://homeassistant:8123` | Home Assistant URL |
 | `HA_TOKEN` | **Yes** | None | Long-lived access token |
 | `CHECK_INTERVAL` | No | `300` | Seconds between checks (5 min) |
+| `DOOR_OPEN_DELAY` | No | `120` | Seconds door must be open before triggering (2 min) |
 | `NOTIFY_SERVICE` | No | `notify.mobile_app_22111317pg` | HA notification service |
 | `TZ` | No | `Europe/Berlin` | Timezone |
 
