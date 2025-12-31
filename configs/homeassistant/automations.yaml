@@ -107,7 +107,7 @@
 # CO2 CRITICAL ALERT
 # Trigger: Every 10 minutes, checks if CO2 > 1600 ppm
 # Action: Urgent TTS announcement + mobile notification
-# NOTE: NO quiet hours - safety critical, runs 24/7
+# Quiet Hours: 07:00-23:00 only (same as high alert)
 # -----------------------------------------------------------------------------
 - id: co2_critical_alert
   alias: "CO2 Critical Level Alert"
@@ -128,6 +128,10 @@
     - condition: numeric_state
       entity_id: sensor.hallway_co2_co2
       above: 1600
+    # Quiet hours: only announce during waking hours (7 AM to 11 PM)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
 
   action:
     # Smart TTS with retry logic - waits up to 5 min if Kitchen Display unavailable
@@ -206,7 +210,7 @@
 # -----------------------------------------------------------------------------
 # BATHROOM WINDOW OPEN TOO LONG
 # Trigger: Window open for more than 10 minutes
-# Action: TTS announcement every minute until closed
+# Action: TTS announcement every minute until closed (with retry & fallback)
 # -----------------------------------------------------------------------------
 - id: bath_window_open_too_long
   alias: "Bathroom Window Open Too Long"
@@ -227,13 +231,14 @@
             entity_id: binary_sensor.bath_window_contact_sensor_contact
             state: "on"
         sequence:
-          - service: tts.google_translate_say
+          # Use smart TTS script with retry, fallback speakers, and obsolescence check
+          - service: script.smart_tts_window_alert
             data:
-              entity_id: media_player.kitchen_display
               message: >
                 {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
                 Bathroom window has been open for {{ minutes }} minutes.
-              language: "en"
+              window_entity: binary_sensor.bath_window_contact_sensor_contact
+          # Mobile notification as backup
           - service: notify.mobile_app_22111317pg
             data:
               title: "🪟 Bathroom Window"
@@ -250,7 +255,7 @@
 # -----------------------------------------------------------------------------
 # BEDROOM WINDOW OPEN TOO LONG
 # Trigger: Window open for more than 10 minutes
-# Action: TTS announcement every minute until closed
+# Action: TTS announcement every minute until closed (with retry & fallback)
 # -----------------------------------------------------------------------------
 - id: bed_window_open_too_long
   alias: "Bedroom Window Open Too Long"
@@ -271,13 +276,14 @@
             entity_id: binary_sensor.bed_window_contact_sensor_contact
             state: "on"
         sequence:
-          - service: tts.google_translate_say
+          # Use smart TTS script with retry, fallback speakers, and obsolescence check
+          - service: script.smart_tts_window_alert
             data:
-              entity_id: media_player.kitchen_display
               message: >
                 {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
                 Bedroom window has been open for {{ minutes }} minutes.
-              language: "en"
+              window_entity: binary_sensor.bed_window_contact_sensor_contact
+          # Mobile notification as backup
           - service: notify.mobile_app_22111317pg
             data:
               title: "🪟 Bedroom Window"
@@ -1903,3 +1909,144 @@
             } | tojson
           }}
         retain: false
+
+# =============================================================================
+# HEATER GUARD STATE MQTT PUBLISHER
+# Purpose: Publish heater pause state to MQTT for dashboard banner display
+# Topic: dashboard/heater-guard/combined (retained)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# HEATER GUARD COMBINED STATE PUBLISHER
+# Trigger: Guard flags change OR window sensors change while guard active
+# Action: Publish combined state with open windows list and CO2 level
+# Note: Retained message so dashboard shows state on page load
+# -----------------------------------------------------------------------------
+- id: heater_guard_combined_publisher
+  alias: "Heater Guard Combined State Publisher"
+  description: "Publishes combined heater pause state with window/CO2 context to MQTT"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    # Guard flag changes
+    - platform: state
+      entity_id:
+        - input_boolean.heaters_off_due_to_window
+        - input_boolean.heaters_off_due_to_co2
+      id: guard_change
+    # Window state changes (to update open window list in real-time)
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      id: window_change
+    # CO2 sensor changes (to update CO2 level in real-time when CO2 guard active)
+    - platform: state
+      entity_id: sensor.hallway_co2_co2
+      id: co2_change
+
+  condition:
+    # Only publish if at least one guard is active
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_window
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_co2
+          state: "on"
+
+  variables:
+    window_guard: "{{ is_state('input_boolean.heaters_off_due_to_window', 'on') }}"
+    co2_guard: "{{ is_state('input_boolean.heaters_off_due_to_co2', 'on') }}"
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
+    open_windows: >
+      {% set open = [] %}
+      {% set windows = {
+        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom',
+        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom',
+        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen',
+        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large',
+        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small',
+        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window',
+        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Balcony Door',
+        'binary_sensor.hallway_window_contact_sensor_main_door_contact': 'Main Door'
+      } %}
+      {% for entity, name in windows.items() %}
+        {% if is_state(entity, 'on') %}
+          {% set open = open + [name] %}
+        {% endif %}
+      {% endfor %}
+      {{ open }}
+
+  action:
+    - service: mqtt.publish
+      data:
+        topic: dashboard/heater-guard/combined
+        payload: >
+          {{
+            {
+              "active": true,
+              "reason": 'window' if window_guard else 'co2',
+              "window_guard": window_guard,
+              "co2_guard": co2_guard,
+              "co2_level": co2_level,
+              "open_windows": open_windows,
+              "timestamp": now().isoformat(),
+              "changed_at": now().timestamp() | int
+            } | tojson
+          }}
+        retain: true
+
+# -----------------------------------------------------------------------------
+# HEATER GUARD CLEAR ON RESUME
+# Trigger: Either guard flag turns OFF
+# Condition: BOTH flags must be OFF
+# Action: Publish inactive state to clear the retained message
+# -----------------------------------------------------------------------------
+- id: heater_guard_clear_on_resume
+  alias: "Heater Guard Clear on Resume"
+  description: "Publishes inactive heater guard state when all guards are cleared"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id:
+        - input_boolean.heaters_off_due_to_window
+        - input_boolean.heaters_off_due_to_co2
+      to: "off"
+
+  condition:
+    # Both guards must be off
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+
+  action:
+    - service: mqtt.publish
+      data:
+        topic: dashboard/heater-guard/combined
+        payload: >
+          {{
+            {
+              "active": false,
+              "reason": "none",
+              "window_guard": false,
+              "co2_guard": false,
+              "co2_level": states('sensor.hallway_co2_co2') | int(0),
+              "open_windows": [],
+              "timestamp": now().isoformat(),
+              "changed_at": now().timestamp() | int
+            } | tojson
+          }}
+        retain: true
