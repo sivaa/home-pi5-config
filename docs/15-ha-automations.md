@@ -1,6 +1,6 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2025-12-30
+> **Last Updated:** 2025-12-31
 > **Total Automations:** 26
 > **File:** `configs/homeassistant/automations.yaml`
 
@@ -195,11 +195,14 @@ These automations automatically turn off heaters when CO2 is high (to avoid heat
 
 ### 🪟 Window Open Alerts
 
+These automations use the `smart_tts_window_alert` script for robust TTS with retry, fallback speakers, and obsolescence checking.
+
 #### 6. Bathroom Window Open Too Long
 | Property | Value |
 |----------|-------|
 | **ID** | `bath_window_open_too_long` |
 | **Trigger** | Bathroom window open for 10+ minutes |
+| **TTS Script** | `script.smart_tts_window_alert` with retry & fallback |
 | **Action** | TTS every 1 minute + mobile notification (until closed) |
 
 #### 7. Bedroom Window Open Too Long
@@ -207,7 +210,41 @@ These automations automatically turn off heaters when CO2 is high (to avoid heat
 |----------|-------|
 | **ID** | `bed_window_open_too_long` |
 | **Trigger** | Bedroom window open for 10+ minutes |
+| **TTS Script** | `script.smart_tts_window_alert` with retry & fallback |
 | **Action** | TTS every 1 minute + mobile notification (until closed) |
+
+#### Smart TTS Window Alert Script
+
+The `smart_tts_window_alert` script (defined in `scripts.yaml`) provides:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  SMART TTS WINDOW ALERT - FLOW                                     │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  1. Check Kitchen Display available?                               │
+│     ├─ YES + window open → Play TTS immediately                   │
+│     └─ NO → Wait up to 5 minutes                                  │
+│                                                                    │
+│  2. During wait, check:                                            │
+│     ├─ Window closed? → Stop (obsolete)                           │
+│     ├─ Kitchen Display available? → Play TTS                      │
+│     └─ Timeout (5 min)? → Use fallback speakers                   │
+│                                                                    │
+│  3. Fallback speakers:                                             │
+│     ├─ media_player.broken_display (Living Room)                  │
+│     └─ media_player.master_bedroom_clock (Bedroom)                │
+│                                                                    │
+│  4. If ALL speakers unavailable:                                   │
+│     └─ Send mobile notification with full message                 │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+| Field | Description |
+|-------|-------------|
+| `message` | The TTS message to announce |
+| `window_entity` | Window sensor entity to check if still open |
 
 ---
 
@@ -370,11 +407,53 @@ The Sonoff TRVZB thermostats have firmware behavior that causes setpoint loss:
 | **Purpose** | Prevents heaters from starting while windows are open |
 | **Note** | Does NOT set guard flag - allows window_open timer to save ALL heaters |
 
+#### 23. Watchdog Recovery - Periodic Resume Check
+| Property | Value |
+|----------|-------|
+| **ID** | `watchdog_recovery_resume_check` |
+| **Trigger** | Every 1 minute (time_pattern) |
+| **Condition** | (Window OR CO2 guard ON) AND all 8 sensors closed |
+| **Action** | Routes to appropriate resume automation based on active guard |
+| **Purpose** | Safety net for missed event-driven resume triggers |
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    WATCHDOG RECOVERY LOGIC (Every 1 Minute)                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  CHECK: Is ANY guard flag ON?                                                    │
+│  ├─ heaters_off_due_to_window = ON?                                             │
+│  └─ heaters_off_due_to_co2 = ON?                                                │
+│                                                                                 │
+│  IF NO → Exit (nothing to recover)                                              │
+│                                                                                 │
+│  IF YES → CHECK: Are ALL 8 sensors closed?                                      │
+│           │                                                                      │
+│           IF NO → Exit (can't resume yet)                                       │
+│           │                                                                      │
+│           IF YES → Which guard is active?                                       │
+│                    │                                                            │
+│                    ├─ Window guard ON → Trigger all_windows_closed_resume       │
+│                    │                                                            │
+│                    └─ CO2 guard ON (and window OFF)?                            │
+│                       └─ Is CO2 < 1100 ppm?                                     │
+│                          ├─ YES → Trigger co2_low_resume_heaters               │
+│                          └─ NO → Log and wait (CO2 still high)                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why This Exists:**
+
+Event-driven automations (`co2_low_resume_heaters`, `all_windows_closed_resume_heaters`) use `numeric_state` triggers that require the value to **cross** the threshold. If HA is busy or the value jumps over the threshold in a single update, the trigger can miss. This periodic check catches those edge cases.
+
+**Bug Fixed (2025-12-31):** Originally only checked `heaters_off_due_to_window`. Now also checks `heaters_off_due_to_co2` to catch CO2-triggered shutoffs where the resume was missed.
+
 ---
 
 ### 📢 TTS Logging
 
-#### 23. TTS Event MQTT Publisher
+#### 24. TTS Event MQTT Publisher
 | Property | Value |
 |----------|-------|
 | **ID** | `tts_event_mqtt_publisher` |
@@ -428,7 +507,7 @@ The Sonoff TRVZB thermostats have firmware behavior that causes setpoint loss:
 
 ### State Memory (input_boolean)
 
-Used to remember heater states before window-triggered shutoff:
+Used to remember heater states before window/CO2-triggered shutoff:
 
 | Entity ID | Purpose |
 |-----------|---------|
@@ -436,7 +515,8 @@ Used to remember heater states before window-triggered shutoff:
 | `input_boolean.living_inner_heater_was_on` | Was Living Inner heater on? |
 | `input_boolean.living_outer_heater_was_on` | Was Living Outer heater on? |
 | `input_boolean.bedroom_heater_was_on` | Was Bedroom heater on? |
-| `input_boolean.heaters_off_due_to_window` | Guard flag to prevent state overwrite |
+| `input_boolean.heaters_off_due_to_window` | Guard flag: window triggered shutoff |
+| `input_boolean.heaters_off_due_to_co2` | Guard flag: CO2 high triggered shutoff |
 
 ### Saved Setpoints (input_number)
 
@@ -609,6 +689,8 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2025-12-31 | **Fixed CO2 guard not triggering heater resume:** The `watchdog_recovery_periodic_resume_check` automation only checked `heaters_off_due_to_window` flag, missing cases where heaters were paused due to high CO2. When `co2_low_resume_heaters` missed the threshold crossing (e.g., HA busy, value jumped), heaters stayed off indefinitely. Fix: Watchdog now checks BOTH window AND CO2 guard flags and routes to the appropriate resume automation. |
+| 2025-12-30 | **Added robust TTS for window alerts:** Created `smart_tts_window_alert` script with retry logic, fallback speakers, and obsolescence checking. Updated bathroom and bedroom window automations to use this script. Fixes silent TTS failures when Kitchen Display appears available but doesn't play audio. |
 | 2025-12-30 | Updated count from 21→23 automations; added docs for `prevent_heating_if_window_open` (#22) and `tts_event_mqtt_publisher` (#23) |
 | 2025-12-29 | **Fixed 4 bugs in heating safety system:** (1) Removed `initial:` from input helpers so state persists across HA restarts, (2) Fixed `prevent_heating_if_window_open` to save heater state before turning off, (3) Updated heater-watchdog to use hybrid approach (safety first, best-effort state save), (4) Increased resume delay from 1s to 3s for TRVZB timing. Added complete scenarios matrix documentation. |
 | 2025-12-29 | **Fixed temperature restoration** - Added input_number entities to save/restore thermostat setpoints when windows trigger heater shutoff. TRVZB firmware drops setpoint to 7°C frost protection when mode=off; now setpoints are explicitly saved before shutoff and restored after. Also resets `open_window` flag via MQTT on restore. |

@@ -12,8 +12,11 @@ The Heater Safety Watchdog is a Python Docker service that runs every 5 minutes 
 |  Layer 1: HA Automations (Event-Driven)                     |
 |  - window_open_turn_off_heaters (30s delay)                |
 |  - door_open_turn_off_heaters (2min delay)                 |
+|  - co2_high_turn_off_heaters (immediate)                   |
 |  - prevent_heating_if_window_open                          |
 |  - all_windows_closed_resume_heaters                       |
+|  - co2_low_resume_heaters                                  |
+|  - watchdog_recovery_resume_check (every 1min)             |
 |                                                             |
 |  Layer 2: Heater Watchdog (Poll-Based) <-- THIS SERVICE    |
 |  - Runs every 5 minutes                                    |
@@ -234,3 +237,34 @@ export HA_TOKEN="your_token"
 export CHECK_INTERVAL=30  # Faster for testing
 python3 heater-watchdog.py
 ```
+
+## Related: HA Watchdog Recovery Automation
+
+In addition to this Python watchdog service, there's an HA automation (`watchdog_recovery_resume_check`) that runs **every 1 minute** to catch missed resume triggers.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              WATCHDOG RECOVERY (HA Automation)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  TRIGGER: Every 1 minute                                        │
+│                                                                 │
+│  CHECKS:                                                        │
+│  1. Is guard flag ON? (window OR CO2)                           │
+│  2. Are ALL 8 sensors closed?                                   │
+│  3. If CO2 guard: Is CO2 < 1100 ppm?                            │
+│                                                                 │
+│  ACTION:                                                        │
+│  - Window guard ON → Trigger all_windows_closed_resume          │
+│  - CO2 guard ON + CO2 low → Trigger co2_low_resume_heaters      │
+│                                                                 │
+│  PURPOSE:                                                       │
+│  Catch cases where event-driven resume missed threshold         │
+│  crossing (e.g., HA busy, value jumped over threshold)          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Bug Fixed (2025-12-31):** Originally only checked window guard flag. Now also checks CO2 guard to catch CO2-triggered shutoffs where resume was missed.
+
+See `docs/15-ha-automations.md` for full details.
