@@ -2062,9 +2062,9 @@
 - id: watchdog_recovery_resume_check
   alias: "Watchdog Recovery - Periodic Resume Check"
   description: >
-    Safety net that runs every minute. If heater guard flag is ON but all
-    windows/doors are closed, triggers the resume automation. This catches
-    edge cases where the event-driven resume missed the close event.
+    Safety net that runs every minute. If heater guard flag (window OR CO2) is ON
+    but all windows/doors are closed and CO2 is acceptable, triggers the appropriate
+    resume automation. This catches edge cases where the event-driven resume missed.
   mode: single
 
   trigger:
@@ -2072,10 +2072,15 @@
       minutes: "/1"
 
   condition:
-    # Guard flag must be ON (heaters were intentionally turned off)
-    - condition: state
-      entity_id: input_boolean.heaters_off_due_to_window
-      state: "on"
+    # EITHER guard flag must be ON (heaters were intentionally turned off)
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_window
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.heaters_off_due_to_co2
+          state: "on"
     # AND all windows/doors must be closed
     - condition: state
       entity_id: binary_sensor.bath_window_contact_sensor_contact
@@ -2103,10 +2108,49 @@
       state: "off"
 
   action:
-    - service: system_log.write
-      data:
-        message: "Watchdog Recovery: Guard flag ON but all windows closed - triggering resume"
-        level: info
-    - service: automation.trigger
-      target:
-        entity_id: automation.all_windows_closed_resume_heaters
+    # Check which guard is active and call the appropriate resume automation
+    - choose:
+        # Case 1: Window guard is active → use window resume automation
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.heaters_off_due_to_window
+              state: "on"
+          sequence:
+            - service: system_log.write
+              data:
+                message: "Watchdog Recovery: Window guard ON but all windows closed - triggering window resume"
+                level: info
+            - service: automation.trigger
+              target:
+                entity_id: automation.all_windows_closed_resume_heaters
+
+        # Case 2: CO2 guard is active (and window guard is off) AND CO2 is acceptable
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.heaters_off_due_to_co2
+              state: "on"
+            - condition: state
+              entity_id: input_boolean.heaters_off_due_to_window
+              state: "off"
+            - condition: numeric_state
+              entity_id: sensor.hallway_co2_co2
+              below: 1100
+          sequence:
+            - service: system_log.write
+              data:
+                message: "Watchdog Recovery: CO2 guard ON but CO2 now {{ states('sensor.hallway_co2_co2') }} ppm (< 1100) - triggering CO2 resume"
+                level: info
+            - service: automation.trigger
+              target:
+                entity_id: automation.co2_low_resume_heaters
+
+      # Default: Log that conditions weren't met for resume
+      default:
+        - service: system_log.write
+          data:
+            message: >
+              Watchdog Recovery: Guard active but resume conditions not met.
+              Window guard: {{ states('input_boolean.heaters_off_due_to_window') }},
+              CO2 guard: {{ states('input_boolean.heaters_off_due_to_co2') }},
+              CO2 level: {{ states('sensor.hallway_co2_co2') }} ppm
+            level: debug
