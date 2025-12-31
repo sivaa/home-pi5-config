@@ -2192,3 +2192,427 @@
               CO2 guard: {{ states('input_boolean.heaters_off_due_to_co2') }},
               CO2 level: {{ states('sensor.hallway_co2_co2') }} ppm
             level: debug
+
+# =============================================================================
+# HEATER TEMPERATURE SAFETY LIMITS
+# Purpose: Prevent excessive heating with hard caps
+# Safety Rules:
+#   1. ALL heaters: Max 22°C at all times
+#   2. BEDROOM only: Max 17°C during night hours (23:00 - 06:00)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# HEATER SAFETY - 22°C MAXIMUM CAP
+# Trigger: Any thermostat setpoint set above 22°C
+# Action: Immediately cap to 22°C, send audit notification
+# Why: Prevent excessive heating and energy waste
+# Note: Runs in parallel to handle multiple heaters simultaneously
+# -----------------------------------------------------------------------------
+- id: heater_safety_max_22c_cap
+  alias: "Heater Safety - 22°C Maximum Cap"
+  description: "If any thermostat is set above 22°C, immediately cap it to 22°C"
+  mode: parallel
+  max: 4
+
+  trigger:
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: temperature
+
+  condition:
+    # Only trigger if temperature is above 22°C
+    - condition: template
+      value_template: >
+        {{ trigger.to_state.attributes.temperature is defined
+           and trigger.to_state.attributes.temperature | float(0) > 22 }}
+
+  variables:
+    heater_name: >
+      {% set names = {
+        'climate.study_thermostat': 'Study',
+        'climate.living_thermostat_inner': 'Living Inner',
+        'climate.living_thermostat_outer': 'Living Outer',
+        'climate.bed_thermostat': 'Bedroom'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+    attempted_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+
+  action:
+    # Cap to 22°C
+    - service: climate.set_temperature
+      target:
+        entity_id: "{{ trigger.entity_id }}"
+      data:
+        temperature: 22
+
+    # Audit notification
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚫 {{ heater_name }} Capped to 22°C"
+        message: >
+          Attempted: {{ attempted_temp }}°C → Capped to 22°C
+          at {{ now().strftime('%H:%M:%S') }}
+        data:
+          channel: "Safety"
+          importance: high
+          tag: "heater_safety_cap"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE - START (23:00)
+# Trigger: Time reaches 23:00
+# Action: Save current setpoint, cap to 17°C if above
+# Edge cases:
+#   - Bedroom off at 23:00 → Save 17°C (safe default), no cap needed
+#   - Bedroom already <= 17°C → Save current, no cap needed
+#   - Window/CO2 guard active → Still save and cap (heater will restore when guard clears)
+# -----------------------------------------------------------------------------
+- id: bedroom_night_mode_start
+  alias: "Bedroom Night Mode - Start (23:00)"
+  description: "At 23:00, save bedroom setpoint and cap to 17°C"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: "23:00:00"
+
+  condition:
+    # Night mode must not already be active (shouldn't happen, but safety check)
+    - condition: state
+      entity_id: input_boolean.bedroom_night_mode_active
+      state: "off"
+
+  variables:
+    current_setpoint: >
+      {{ state_attr('climate.bed_thermostat', 'temperature') | float(17) }}
+    heater_mode: "{{ states('climate.bed_thermostat') }}"
+    needs_capping: "{{ current_setpoint > 17 and heater_mode == 'heat' }}"
+
+  action:
+    # Set night mode flag FIRST
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bedroom_night_mode_active
+
+    # Save current setpoint (even if off - saves what it was set to)
+    # If heater is off, save 17 as safe default for morning restore
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.bedroom_pre_night_setpoint
+      data:
+        value: >
+          {% if heater_mode == 'off' %}
+            17
+          {% else %}
+            {{ current_setpoint }}
+          {% endif %}
+
+    # Cap to 17°C if currently above and heater is on
+    - if:
+        - condition: template
+          value_template: "{{ needs_capping }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: 17
+
+        # Notification only when actually capped
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "🌙 Bedroom Night Mode"
+            message: >
+              Capped {{ current_setpoint }}°C → 17°C for sleep.
+              Will restore at 06:00.
+            data:
+              channel: "Info"
+              importance: default
+              tag: "bedroom_night_mode"
+      else:
+        # Silent start if no capping needed
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "🌙 Bedroom Night Mode"
+            message: >
+              {% if heater_mode == 'off' %}
+                Bedroom heater is off. Night mode monitoring active.
+              {% else %}
+                Already at {{ current_setpoint }}°C (≤17°C). No change needed.
+              {% endif %}
+            data:
+              channel: "Info"
+              importance: low
+              tag: "bedroom_night_mode"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE - ENFORCEMENT
+# Trigger: Bedroom setpoint changes during night hours (23:00-06:00)
+# Condition: Night mode flag is ON AND setpoint > 17°C
+# Action: Cap back to 17°C
+# Why: Prevents manual override from bypassing night mode
+# -----------------------------------------------------------------------------
+- id: bedroom_night_mode_enforcement
+  alias: "Bedroom Night Mode - Enforcement"
+  description: "During night mode, cap bedroom to 17°C if changed to above"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: climate.bed_thermostat
+      attribute: temperature
+
+  condition:
+    # Night mode must be active
+    - condition: state
+      entity_id: input_boolean.bedroom_night_mode_active
+      state: "on"
+    # Heater must be in heat mode
+    - condition: state
+      entity_id: climate.bed_thermostat
+      state: "heat"
+    # Setpoint must be above 17°C
+    - condition: template
+      value_template: >
+        {{ trigger.to_state.attributes.temperature is defined
+           and trigger.to_state.attributes.temperature | float(0) > 17 }}
+
+  variables:
+    attempted_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+
+  action:
+    # Cap back to 17°C
+    - service: climate.set_temperature
+      target:
+        entity_id: climate.bed_thermostat
+      data:
+        temperature: 17
+
+    # Notification
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🌙 Bedroom Night Cap"
+        message: >
+          Attempted {{ attempted_temp }}°C during night mode.
+          Capped to 17°C (until 06:00).
+        data:
+          channel: "Safety"
+          importance: high
+          tag: "bedroom_night_enforcement"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE - END (06:00)
+# Trigger: Time reaches 06:00
+# Action: Restore saved setpoint from before night mode
+# Edge cases:
+#   - Heater was off at 23:00 → Restores to 17°C (safe default)
+#   - Heater is currently off → Restore setpoint anyway (for when turned on)
+#   - Window guard active → Still restore (will be overwritten by guard restore if needed)
+# -----------------------------------------------------------------------------
+- id: bedroom_night_mode_end
+  alias: "Bedroom Night Mode - End (06:00)"
+  description: "At 06:00, restore bedroom setpoint from before night mode"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: "06:00:00"
+
+  condition:
+    # Night mode must be active
+    - condition: state
+      entity_id: input_boolean.bedroom_night_mode_active
+      state: "on"
+
+  variables:
+    saved_setpoint: "{{ states('input_number.bedroom_pre_night_setpoint') | float(17) }}"
+    heater_mode: "{{ states('climate.bed_thermostat') }}"
+
+  action:
+    # Clear night mode flag FIRST
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.bedroom_night_mode_active
+
+    # Restore setpoint (only if heater is in heat mode)
+    - if:
+        - condition: template
+          value_template: "{{ heater_mode == 'heat' }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: "{{ saved_setpoint }}"
+
+    # Notification
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "☀️ Bedroom Night Mode Ended"
+        message: >
+          {% if heater_mode == 'heat' %}
+            Restored to {{ saved_setpoint }}°C
+          {% else %}
+            Heater is off. Saved setpoint {{ saved_setpoint }}°C ready when turned on.
+          {% endif %}
+        data:
+          channel: "Info"
+          importance: default
+          tag: "bedroom_night_mode"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE - HA STARTUP HANDLER
+# Trigger: Home Assistant starts during night hours (23:00-06:00)
+# Condition: Night mode flag is OFF (wasn't properly set before restart)
+# Action: Activate night mode, cap if needed
+# Why: Handles HA restart during night hours
+# -----------------------------------------------------------------------------
+- id: bedroom_night_mode_startup_check
+  alias: "Bedroom Night Mode - HA Startup Check"
+  description: "If HA restarts during night hours, ensure night mode is active"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  condition:
+    # Must be during night hours (23:00-05:59)
+    - condition: time
+      after: "23:00:00"
+      before: "06:00:00"
+    # Night mode must not already be active
+    - condition: state
+      entity_id: input_boolean.bedroom_night_mode_active
+      state: "off"
+
+  variables:
+    current_setpoint: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(17) }}"
+    heater_mode: "{{ states('climate.bed_thermostat') }}"
+
+  action:
+    # Set night mode flag
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bedroom_night_mode_active
+
+    # Save current setpoint (best effort - may not be pre-night value)
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.bedroom_pre_night_setpoint
+      data:
+        value: "{{ current_setpoint if heater_mode == 'heat' else 17 }}"
+
+    # Cap if needed
+    - if:
+        - condition: template
+          value_template: "{{ current_setpoint > 17 and heater_mode == 'heat' }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: 17
+
+    # Notification
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🌙 Night Mode Activated (Restart)"
+        message: >
+          HA restarted during night hours. Bedroom night mode activated.
+          {% if current_setpoint > 17 and heater_mode == 'heat' %}
+            Capped {{ current_setpoint }}°C → 17°C.
+          {% endif %}
+        data:
+          channel: "Info"
+          importance: default
+          tag: "bedroom_night_mode"
+
+# -----------------------------------------------------------------------------
+# HEATER SAFETY - 22°C CAP ON HA STARTUP
+# Trigger: Home Assistant starts
+# Action: Check all thermostats, cap any above 22°C
+# Why: Catches thermostats that were set above 22°C before automation existed
+# -----------------------------------------------------------------------------
+- id: heater_safety_22c_startup_check
+  alias: "Heater Safety - 22°C Cap on HA Startup"
+  description: "On HA startup, check all thermostats and cap any above 22°C"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  variables:
+    study_temp: "{{ state_attr('climate.study_thermostat', 'temperature') | float(0) }}"
+    living_inner_temp: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(0) }}"
+    living_outer_temp: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(0) }}"
+    bed_temp: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(0) }}"
+    any_above_22: "{{ study_temp > 22 or living_inner_temp > 22 or living_outer_temp > 22 or bed_temp > 22 }}"
+
+  condition:
+    # Only run if at least one thermostat is above 22°C
+    - condition: template
+      value_template: "{{ any_above_22 }}"
+
+  action:
+    # Cap each thermostat if above 22°C
+    - if:
+        - condition: template
+          value_template: "{{ study_temp > 22 }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: 22
+
+    - if:
+        - condition: template
+          value_template: "{{ living_inner_temp > 22 }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: 22
+
+    - if:
+        - condition: template
+          value_template: "{{ living_outer_temp > 22 }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: 22
+
+    - if:
+        - condition: template
+          value_template: "{{ bed_temp > 22 }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: 22
+
+    # Single notification with all capped heaters
+    - service: notify.mobile_app_22111317pg
+      data:
+        title: "🚫 22°C Cap Enforced (Startup)"
+        message: >
+          HA startup check capped:
+          {%- set capped = [] %}
+          {%- if study_temp > 22 %}{% set capped = capped + ['Study ' ~ study_temp|int ~ '°C'] %}{% endif %}
+          {%- if living_inner_temp > 22 %}{% set capped = capped + ['Living Inner ' ~ living_inner_temp|int ~ '°C'] %}{% endif %}
+          {%- if living_outer_temp > 22 %}{% set capped = capped + ['Living Outer ' ~ living_outer_temp|int ~ '°C'] %}{% endif %}
+          {%- if bed_temp > 22 %}{% set capped = capped + ['Bedroom ' ~ bed_temp|int ~ '°C'] %}{% endif %}
+          {{ capped | join(', ') }} → 22°C
+        data:
+          channel: "Safety"
+          importance: high
+          tag: "heater_safety_startup"
