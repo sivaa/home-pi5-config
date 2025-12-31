@@ -1610,35 +1610,11 @@
     - condition: state
       entity_id: input_boolean.heaters_off_due_to_co2
       state: "on"
-    # Window flag must be OFF
+    # Window flag must be OFF (window guard takes precedence)
     - condition: state
       entity_id: input_boolean.heaters_off_due_to_window
       state: "off"
-    # ALL windows/doors must be closed
-    - condition: state
-      entity_id: binary_sensor.bath_window_contact_sensor_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.bed_window_contact_sensor_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.kitchen_window_contact_sensor_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.study_window_contact_sensor_large_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.study_window_contact_sensor_small_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.living_window_contact_sensor_window_contact
-      state: "off"
-    - condition: state
-      entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
-      state: "off"
+    # Note: Window closed checks moved to action block to allow handoff to window guard
     # For startup/normal trigger, verify CO2 is actually low
     # For timeout trigger, allow anyway (sensor failed)
     - condition: or
@@ -1678,113 +1654,175 @@
       {{ restored | join(', ') if restored else 'None' }}
 
   action:
-    # Restore heaters
-    - service: climate.set_hvac_mode
-      target:
-        entity_id: climate.study_thermostat
-      data:
-        hvac_mode: "{{ 'heat' if is_state('input_boolean.study_heater_was_on', 'on') else 'off' }}"
-    - service: climate.set_hvac_mode
-      target:
-        entity_id: climate.living_thermostat_inner
-      data:
-        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_inner_heater_was_on', 'on') else 'off' }}"
-    - service: climate.set_hvac_mode
-      target:
-        entity_id: climate.living_thermostat_outer
-      data:
-        hvac_mode: "{{ 'heat' if is_state('input_boolean.living_outer_heater_was_on', 'on') else 'off' }}"
-    - service: climate.set_hvac_mode
-      target:
-        entity_id: climate.bed_thermostat
-      data:
-        hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
+    - choose:
+        # Case 1: A window is open - transfer ownership to window guard
+        # This fixes the bug where CO2 normalizes but dashboard still shows "High CO2"
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: state
+                  entity_id: binary_sensor.bath_window_contact_sensor_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.bed_window_contact_sensor_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.study_window_contact_sensor_large_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.study_window_contact_sensor_small_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.living_window_contact_sensor_balcony_door_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.living_window_contact_sensor_window_contact
+                  state: "on"
+                - condition: state
+                  entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
+                  state: "on"
+          sequence:
+            # Transfer ownership to window guard
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.heaters_off_due_to_window
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.heaters_off_due_to_co2
+            # TTS notification (respect quiet hours)
+            - if:
+                - condition: template
+                  value_template: "{{ not is_quiet_hours }}"
+              then:
+                - service: tts.google_translate_say
+                  data:
+                    entity_id:
+                      - media_player.kitchen_display
+                      - media_player.broken_display
+                      - media_player.master_bedroom_clock
+                    message: "CO2 is now {{ co2_level }}. Air improved, but window still open. Heaters staying off."
+                    language: "en"
+            # Mobile notification
+            - service: notify.mobile_app_22111317pg
+              data:
+                title: "✅ CO2 Normal (Window Open)"
+                message: "CO2: {{ co2_level }} ppm. Window still open - heaters stay off until closed."
+                data:
+                  channel: "Info"
+                  tag: "co2_heater_safety"
 
-    # Reset open_window flag on TRVs
-    - service: mqtt.publish
-      data:
-        topic: "zigbee2mqtt/[Study] Thermostat/set"
-        payload: '{"open_window": "OFF"}'
-    - service: mqtt.publish
-      data:
-        topic: "zigbee2mqtt/[Bed] Thermostat/set"
-        payload: '{"open_window": "OFF"}'
-    - service: mqtt.publish
-      data:
-        topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
-        payload: '{"open_window": "OFF"}'
-    - service: mqtt.publish
-      data:
-        topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
-        payload: '{"open_window": "OFF"}'
-
-    - delay:
-        seconds: 3
-
-    # Restore setpoints
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.study_thermostat
-      data:
-        temperature: "{{ states('input_number.study_heater_saved_temp') | float(18) }}"
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.living_thermostat_inner
-      data:
-        temperature: "{{ states('input_number.living_inner_heater_saved_temp') | float(18) }}"
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.living_thermostat_outer
-      data:
-        temperature: "{{ states('input_number.living_outer_heater_saved_temp') | float(18) }}"
-    - service: climate.set_temperature
-      target:
-        entity_id: climate.bed_thermostat
-      data:
-        temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
-
-    # Clear CO2 flag
-    - service: input_boolean.turn_off
-      target:
-        entity_id: input_boolean.heaters_off_due_to_co2
-
-    - delay:
-        seconds: 2
-
-    # TTS (respect quiet hours)
-    - if:
-        - condition: template
-          value_template: "{{ not is_quiet_hours }}"
-      then:
-        - service: tts.google_translate_say
+      # Default: All windows closed - resume heaters normally
+      default:
+        # Restore heaters
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.study_thermostat
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
-              - media_player.master_bedroom_clock
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.study_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.living_inner_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.living_outer_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
+
+        # Reset open_window flag on TRVs
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Study] Thermostat/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Bed] Thermostat/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
+            payload: '{"open_window": "OFF"}'
+
+        - delay:
+            seconds: 3
+
+        # Restore setpoints
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: "{{ states('input_number.study_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: "{{ states('input_number.living_inner_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: "{{ states('input_number.living_outer_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
+
+        # Clear CO2 flag
+        - service: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.heaters_off_due_to_co2
+
+        - delay:
+            seconds: 2
+
+        # TTS (respect quiet hours)
+        - if:
+            - condition: template
+              value_template: "{{ not is_quiet_hours }}"
+          then:
+            - service: tts.google_translate_say
+              data:
+                entity_id:
+                  - media_player.kitchen_display
+                  - media_player.broken_display
+                  - media_player.master_bedroom_clock
+                message: >-
+                  {% if is_timeout %}CO2 sensor timeout. Resuming heaters as safety fallback.
+                  {% else %}CO2 now {{ co2_level }}. Air improved.
+                  {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
+                  {%- endif %}
+                  {% endif %}
+                language: "en"
+
+        # Mobile notification
+        - service: notify.mobile_app_22111317pg
+          data:
+            title: "{% if is_timeout %}⚠️ CO2 Sensor Timeout{% else %}✅ CO2 Normal{% endif %}"
             message: >-
-              {% if is_timeout %}CO2 sensor timeout. Resuming heaters as safety fallback.
-              {% else %}CO2 now {{ co2_level }}. Air improved.
-              {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
+              {% if is_timeout %}Sensor unavailable 30min. Resuming heaters.
+              {% else %}CO2: {{ co2_level }} ppm.
+              {%- if heaters_restored != 'None' %} Resumed: {{ heaters_restored }}
+              {%- else %} No heaters to resume
               {%- endif %}
               {% endif %}
-            language: "en"
-
-    # Mobile notification
-    - service: notify.mobile_app_22111317pg
-      data:
-        title: "{% if is_timeout %}⚠️ CO2 Sensor Timeout{% else %}✅ CO2 Normal{% endif %}"
-        message: >-
-          {% if is_timeout %}Sensor unavailable 30min. Resuming heaters.
-          {% else %}CO2: {{ co2_level }} ppm.
-          {%- if heaters_restored != 'None' %} Resumed: {{ heaters_restored }}
-          {%- else %} No heaters to resume
-          {%- endif %}
-          {% endif %}
-        data:
-          channel: "{% if is_timeout %}Critical{% else %}Info{% endif %}"
-          importance: "{% if is_timeout %}max{% else %}default{% endif %}"
-          tag: "co2_heater_safety"
+            data:
+              channel: "{% if is_timeout %}Critical{% else %}Info{% endif %}"
+              importance: "{% if is_timeout %}max{% else %}default{% endif %}"
+              tag: "co2_heater_safety"
 
 # -----------------------------------------------------------------------------
 # PREVENT HEATING IF CO2 HIGH
