@@ -896,6 +896,20 @@
     .floor-temp-hot { fill: #FF9800; }          /* Orange: 19-21°C */
     .floor-temp-very-hot { fill: #F44336; }     /* Red: >21°C */
 
+    /* Helicopter stamp room names (subtle centered labels) */
+    .floor-room-name {
+      font-family: var(--font-family);
+      font-size: 5px;
+      font-weight: 600;
+      fill: var(--color-text-tertiary);
+      opacity: 0.5;
+      text-anchor: middle;
+      dominant-baseline: hanging;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      pointer-events: none;
+    }
+
     /* Dark mode adjustments */
     [data-theme="dark"] .floor-room {
       fill: var(--color-surface);
