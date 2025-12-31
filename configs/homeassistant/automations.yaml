@@ -1968,7 +1968,7 @@
     co2_guard: "{{ is_state('input_boolean.heaters_off_due_to_co2', 'on') }}"
     co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
     open_windows: >
-      {% set open = [] %}
+      {% set ns = namespace(open=[]) %}
       {% set windows = {
         'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom',
         'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom',
@@ -1981,10 +1981,10 @@
       } %}
       {% for entity, name in windows.items() %}
         {% if is_state(entity, 'on') %}
-          {% set open = open + [name] %}
+          {% set ns.open = ns.open + [name] %}
         {% endif %}
       {% endfor %}
-      {{ open }}
+      {{ ns.open }}
 
   action:
     - service: mqtt.publish

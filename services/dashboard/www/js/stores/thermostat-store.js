@@ -87,6 +87,18 @@ export function initThermostatStore(Alpine, CONFIG) {
     initializing: true,
     firstMessageReceived: {},    // Track which devices have recorded initial state
 
+    // Heater pause state (from HA guard flags via MQTT)
+    heaterPause: {
+      active: false,           // true when heaters are paused by automation
+      reason: 'none',          // 'window' | 'co2' | 'none'
+      windowGuard: false,
+      co2Guard: false,
+      co2Level: null,
+      openWindows: [],         // Array of window names
+      changedAt: null,         // Timestamp when pause started (for timer)
+      lastUpdate: null         // Last MQTT message received
+    },
+
     // ============================================
     // INITIALIZATION
     // ============================================
@@ -115,47 +127,46 @@ export function initThermostatStore(Alpine, CONFIG) {
       mqtt.client.subscribe('zigbee2mqtt/bridge/event', { qos: 0 });
       console.log('[thermostat-store] Subscribed to zigbee2mqtt/bridge/event');
 
-      // Handle incoming messages
-      mqtt.client.on('message', (topic, message) => {
-        // Handle bridge events (device_leave, etc.)
-        if (topic === 'zigbee2mqtt/bridge/event') {
-          try {
-            const event = JSON.parse(message.toString());
-            if (event.type === 'device_leave') {
-              const thermostat = this.list.find(t => t.sensor === event.data?.friendly_name);
-              if (thermostat) {
-                console.warn(`[thermostat-store] 🚨 Device LEFT network: ${thermostat.name}`);
-                this.handleDeviceLeave(thermostat, event.data);
-              }
-            }
-          } catch (e) {
-            // Ignore parse errors
+      // Subscribe to heater guard state (for pause banner)
+      mqtt.client.subscribe('dashboard/heater-guard/combined', { qos: 1 });
+      console.log('[thermostat-store] Subscribed to dashboard/heater-guard/combined');
+
+      // PERFORMANCE: Use central dispatcher instead of client.on('message')
+      // This prevents duplicate JSON parsing across multiple stores
+
+      // Handle heater guard state (for pause banner)
+      mqtt.registerTopicHandler('dashboard/heater-guard/combined', (topic, data) => {
+        this.handleHeaterGuardUpdate(data);
+      });
+
+      // Handle bridge events (device_leave, etc.)
+      mqtt.registerTopicHandler('zigbee2mqtt/bridge/event', (topic, data) => {
+        if (data.type === 'device_leave') {
+          const thermostat = this.list.find(t => t.sensor === data.data?.friendly_name);
+          if (thermostat) {
+            console.warn(`[thermostat-store] 🚨 Device LEFT network: ${thermostat.name}`);
+            this.handleDeviceLeave(thermostat, data.data);
           }
-          return;
         }
+      });
 
-        if (!topic.startsWith(CONFIG.baseTopic + '/')) return;
-
-        const deviceName = topic.replace(CONFIG.baseTopic + '/', '').replace('/availability', '');
-        const thermostat = CONFIG.thermostats.find(t => t.sensor === deviceName);
+      // Handle thermostat data updates
+      mqtt.registerTopicHandler(`${CONFIG.baseTopic}/*`, (topic, data, deviceName) => {
+        // Skip non-thermostat devices
+        const cleanName = deviceName.replace('/availability', '');
+        const thermostat = CONFIG.thermostats.find(t => t.sensor === cleanName);
         if (!thermostat) return;
 
-        try {
-          if (topic.endsWith('/availability')) {
-            const isOnline = message.toString() === 'online' ||
-              (JSON.parse(message.toString()).state === 'online');
-            this.updateAvailability(deviceName, isOnline);
-          } else {
-            const data = JSON.parse(message.toString());
-            this.updateThermostat(deviceName, data);
-          }
-        } catch (e) {
-          // Ignore parse errors
+        if (topic.endsWith('/availability')) {
+          const isOnline = data.state === 'online' || data === 'online';
+          this.updateAvailability(cleanName, isOnline);
+        } else {
+          this.updateThermostat(cleanName, data);
         }
       });
 
       this.initializing = false;
-      console.log('[thermostat-store] Initialization complete');
+      console.log('[thermostat-store] Initialization complete (using central dispatcher)');
     },
 
     // ============================================
@@ -428,6 +439,44 @@ export function initThermostatStore(Alpine, CONFIG) {
         } catch (e) {
           console.warn('[thermostat-store] TTS announcement failed:', e);
         }
+      }
+    },
+
+    // ============================================
+    // HEATER PAUSE STATE (from HA automations)
+    // ============================================
+
+    /**
+     * Handle heater guard state update from Home Assistant
+     * Updates the heaterPause state for dashboard banner display
+     */
+    handleHeaterGuardUpdate(data) {
+      const wasActive = this.heaterPause.active;
+      const existingChangedAt = this.heaterPause.changedAt;
+
+      this.heaterPause = {
+        active: data.active ?? false,
+        reason: data.reason ?? 'none',
+        windowGuard: data.window_guard ?? false,
+        co2Guard: data.co2_guard ?? false,
+        co2Level: data.co2_level ?? null,
+        openWindows: data.open_windows ?? [],
+        changedAt: wasActive && existingChangedAt
+          ? existingChangedAt  // Preserve original pause start time
+          : (data.changed_at ? data.changed_at * 1000 : Date.now()),
+        lastUpdate: Date.now()
+      };
+
+      // Log state changes
+      if (data.active && !wasActive) {
+        console.log(`[thermostat-store] Heaters PAUSED due to ${data.reason}`);
+        if (data.reason === 'window') {
+          console.log(`[thermostat-store] Open windows: ${data.open_windows?.join(', ') || 'Unknown'}`);
+        } else if (data.reason === 'co2') {
+          console.log(`[thermostat-store] CO2 level: ${data.co2_level} ppm`);
+        }
+      } else if (!data.active && wasActive) {
+        console.log('[thermostat-store] Heaters RESUMED');
       }
     },
 
