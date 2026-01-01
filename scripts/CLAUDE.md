@@ -54,6 +54,87 @@ chmod 600 .env
 cd ~/arris-tg3442-reboot && python3 arris_tg3442_reboot.py -t http://192.168.0.1 -p "PASSWORD"
 ```
 
+---
+
+### lint-css-performance.sh
+Scans dashboard CSS files for expensive properties that cause high CPU on Raspberry Pi.
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  CSS PERFORMANCE LINTER                                            │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  BANNED (errors):                                                  │
+│    backdrop-filter: blur()    → Extremely CPU intensive            │
+│    filter: blur()             → Causes Skia CPU spikes             │
+│                                                                    │
+│  WARNINGS (review needed):                                         │
+│    filter: grayscale()        → Use opacity instead                │
+│    animation: * infinite      → Constant rendering work            │
+│    Multi-layer box-shadow     → Skia repaints 108%+ CPU            │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Usage:**
+```bash
+./scripts/lint-css-performance.sh              # Scan all dashboard CSS
+./scripts/lint-css-performance.sh path/to.css  # Scan specific file
+```
+
+**Exit codes:**
+- `0` = All checks passed
+- `1` = Errors found (must fix before deploy)
+- `2` = Warnings found (review needed)
+
+---
+
+### check-pi-health.sh
+Verifies Pi kiosk is running efficiently after CSS/dashboard changes.
+
+```
+┌────────────────────────────────────────────────┐
+│  METRIC              │  WARNING   │  CRITICAL  │
+├──────────────────────┼────────────┼────────────┤
+│  CPU Temperature     │  > 55°C    │  > 60°C    │
+│  Fan State           │  > 1       │  = 2       │
+│  System Load (1m)    │  > 3.0     │  > 4.0     │
+│  Browser CPU %       │  > 100%    │  > 150%    │
+│  Display Refresh Hz  │  != 60     │  > 60      │
+└────────────────────────────────────────────────┘
+```
+
+**Usage:**
+```bash
+./scripts/check-pi-health.sh          # Quick check
+./scripts/check-pi-health.sh --wait   # Wait 60s for metrics to stabilize
+```
+
+**When to run:**
+- After deploying CSS changes to Pi
+- When fan noise is audible
+- Before/after adding new animations
+
+---
+
+## Git Hooks
+
+### hooks/pre-commit
+Runs CSS linter when dashboard CSS files are staged.
+
+**Installation:**
+```bash
+cp scripts/hooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Behavior:**
+- Only runs when `services/dashboard/**/*.css` files are staged
+- Blocks commit if banned CSS properties are found
+- Bypass with: `git commit --no-verify` (use sparingly)
+
+---
+
 ## Configuration Files
 
 | File | Purpose | Git |

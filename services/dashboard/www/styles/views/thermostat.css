@@ -204,114 +204,12 @@
 
 .thermostat-card.heating {
   border-color: var(--color-danger);
-  animation: warmGlow 2s ease-in-out infinite;
+  /* Simple border only - no shadow for CPU efficiency */
   overflow: hidden;
 }
 
-/* Heating card warm glow pulsing animation */
-@keyframes warmGlow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2),
-                0 0 40px rgba(249, 115, 22, 0.1),
-                inset 0 0 30px rgba(239, 68, 68, 0.03);
-  }
-  50% {
-    box-shadow: 0 0 35px rgba(239, 68, 68, 0.4),
-                0 0 60px rgba(249, 115, 22, 0.25),
-                inset 0 0 50px rgba(239, 68, 68, 0.06);
-  }
-}
-
-/* Rising ember particles - Layer 1: Large, slow, high */
-.thermostat-card.heating::before {
-  content: '';
-  position: absolute;
-  bottom: 5px;
-  left: 5%;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #ff6b00;
-  box-shadow:
-    25px 0 0 3px #ff8c00,
-    70px 2px 0 2px #ffa500,
-    120px -1px 0 4px #ff6b00,
-    175px 1px 0 3px #ff8c00,
-    230px 0 0 2px #ffa500;
-  animation: riseSlow 4s ease-out infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Layer 2: Medium, medium speed, medium height */
-.thermostat-card.heating::after {
-  content: '';
-  position: absolute;
-  bottom: 5px;
-  left: 10%;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #ffa500;
-  box-shadow:
-    15px 1px 0 2px #ff6b00,
-    45px -1px 0 3px #ff8c00,
-    85px 2px 0 2px #ffa500,
-    130px 0 0 2px #ff6b00,
-    180px -2px 0 3px #ff8c00,
-    225px 1px 0 2px #ffa500;
-  animation: riseMedium 2.8s ease-out infinite 0.5s;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Layer 3: Small, fast, low - using box-shadow on the card */
-.thermostat-card.heating {
-  --ember-shadow:
-    inset 20px -10px 0 1px rgba(255, 107, 0, 0.8),
-    inset 55px -8px 0 2px rgba(255, 140, 0, 0.7),
-    inset 95px -12px 0 1px rgba(255, 165, 0, 0.8),
-    inset 140px -6px 0 2px rgba(255, 107, 0, 0.7),
-    inset 185px -10px 0 1px rgba(255, 140, 0, 0.8),
-    inset 235px -8px 0 2px rgba(255, 165, 0, 0.7),
-    inset 280px -11px 0 1px rgba(255, 107, 0, 0.8);
-}
-
-/* Slow rise - large particles, high */
-@keyframes riseSlow {
-  0% {
-    transform: translateY(0);
-    opacity: 0.9;
-  }
-  100% {
-    transform: translateY(-100px);
-    opacity: 0;
-  }
-}
-
-/* Medium rise */
-@keyframes riseMedium {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-70px);
-    opacity: 0;
-  }
-}
-
-/* Fast rise - small particles, low */
-@keyframes riseFast {
-  0% {
-    transform: translateY(0);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(-45px);
-    opacity: 0;
-  }
-}
+/* Rising ember particles removed for CPU efficiency
+   The warm glow effect is now static on .thermostat-card.heating */
 
 .thermostat-card.off {
   opacity: 0.7;
@@ -319,21 +217,12 @@
 
 .thermostat-card.unavailable {
   opacity: 0.5;
-  filter: grayscale(40%);
+  /* Removed grayscale filter for CPU efficiency */
 }
 
 .thermostat-card.left-network {
   border-color: #dc2626 !important;
-  animation: criticalPulse 1.5s ease-in-out infinite;
-}
-
-@keyframes criticalPulse {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(220, 38, 38, 0.6);
-  }
+  /* Simple border only - no shadow for CPU efficiency */
 }
 
 .thermostat-card.syncing {
@@ -348,13 +237,13 @@
 .offline-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(220, 38, 38, 0.95);
+  background: rgba(220, 38, 38, 0.98);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 20;
   border-radius: inherit;
-  backdrop-filter: blur(4px);
+  /* backdrop-filter removed for CPU efficiency */
 }
 
 .offline-content {
@@ -367,18 +256,7 @@
   font-size: 3rem;
   display: block;
   margin-bottom: var(--space-md);
-  animation: alertPulse 2s infinite;
-}
-
-@keyframes alertPulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
+  /* Static display instead of animation */
 }
 
 .offline-text {
@@ -463,14 +341,9 @@
   font-size: var(--font-size-md);
 }
 
-/* Heating Animation */
+/* Heating Animation - removed infinite animation for CPU efficiency */
 .heating-glow {
-  animation: heatingPulse 1.5s ease-in-out infinite;
-}
-
-@keyframes heatingPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  /* Static heating indicator */
 }
 
 /* Temperature Display */
@@ -678,7 +551,8 @@
 }
 
 .target-container.syncing {
-  animation: syncPulse 1s ease-in-out infinite;
+  /* Syncing indicated by opacity, no animation for CPU efficiency */
+  opacity: 0.75;
 }
 
 .target-label {
@@ -831,12 +705,8 @@
 
 .temp-target-display.syncing {
   border-color: var(--color-warning);
-  animation: syncPulse 1s ease-in-out infinite;
-}
-
-@keyframes syncPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  /* Syncing indicated by opacity, no animation for CPU efficiency */
+  opacity: 0.75;
 }
 
 .temp-target-display .target-value {
@@ -1888,5 +1758,184 @@
 
   .alert-time {
     text-align: left;
+  }
+}
+
+/* ========================================
+   HEATER PAUSE BANNER
+   Full-width alert when heaters are paused by automation
+   ======================================== */
+
+.heater-pause-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  color: #92400e;
+  box-shadow: var(--shadow-md);
+}
+
+/* Dark mode */
+[data-theme="dark"] .heater-pause-banner {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+/* Window reason - blue tint */
+.heater-pause-banner.reason-window {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+[data-theme="dark"] .heater-pause-banner.reason-window {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+  border-color: #60a5fa;
+  color: #dbeafe;
+}
+
+/* CO2 reason - purple tint */
+.heater-pause-banner.reason-co2 {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+  border-color: #a855f7;
+  color: #6b21a8;
+}
+
+[data-theme="dark"] .heater-pause-banner.reason-co2 {
+  background: linear-gradient(135deg, #4c1d95 0%, #6b21a8 100%);
+  border-color: #a855f7;
+  color: #f3e8ff;
+}
+
+.banner-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-xs);
+}
+
+.banner-details {
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.banner-detail-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.banner-windows {
+  font-weight: var(--font-weight-medium);
+}
+
+.banner-co2 {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.banner-threshold {
+  opacity: 0.7;
+  font-size: var(--font-size-xs);
+}
+
+.banner-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .banner-timer {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.timer-icon {
+  font-size: var(--font-size-md);
+}
+
+.timer-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.timer-label {
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Banner transitions */
+.banner-enter {
+  animation: bannerSlideDown 0.3s ease-out;
+}
+
+.banner-leave {
+  animation: bannerSlideUp 0.3s ease-out;
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bannerSlideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .heater-pause-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .banner-icon {
+    font-size: 24px;
+  }
+
+  .banner-title {
+    font-size: var(--font-size-md);
+  }
+
+  .banner-timer {
+    width: 100%;
+    justify-content: center;
+    margin-top: var(--space-sm);
   }
 }

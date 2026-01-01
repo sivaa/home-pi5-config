@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# Git Pre-commit Hook
+# ===================
+# Runs CSS performance linter when dashboard CSS files are staged
+#
+# Installation:
+#   cp scripts/hooks/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+
+# Get list of staged CSS files
+STAGED_CSS=$(git diff --cached --name-only --diff-filter=ACM | grep -E "services/dashboard/.*\.css$" || true)
+
+if [ -n "$STAGED_CSS" ]; then
+    echo ""
+    echo "CSS files staged for commit - running performance linter..."
+    echo ""
+
+    # Run the linter
+    SCRIPT_DIR="$(git rev-parse --show-toplevel)/scripts"
+    if [ -x "$SCRIPT_DIR/lint-css-performance.sh" ]; then
+        if ! "$SCRIPT_DIR/lint-css-performance.sh"; then
+            echo ""
+            echo "Pre-commit hook blocked due to CSS performance issues."
+            echo "Fix the errors above or bypass with: git commit --no-verify"
+            echo ""
+            exit 1
+        fi
+    else
+        echo "Warning: CSS linter not found at $SCRIPT_DIR/lint-css-performance.sh"
+    fi
+fi
+
+exit 0

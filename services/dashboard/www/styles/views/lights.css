@@ -55,7 +55,8 @@
 
     .master-control.master-on {
       background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
-      box-shadow: var(--shadow-md), 0 0 20px rgba(255, 193, 7, 0.2);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      /* Multi-layer glow removed for CPU efficiency */
     }
 
     .master-control.master-syncing {
@@ -100,9 +101,9 @@
 
     /* Disabled state for all lights controls */
     .lights-disabled {
-      opacity: 0.4;
+      opacity: 0.35;
       pointer-events: none;
-      filter: grayscale(50%);
+      /* grayscale removed for CPU efficiency */
     }
 
     /* Light Cards Grid */
@@ -136,8 +137,8 @@
     }
 
     .light-card.light-unavailable {
-      opacity: 0.6;
-      filter: grayscale(40%);
+      opacity: 0.5;
+      /* grayscale removed for CPU efficiency */
       border-color: var(--color-border);
       position: relative;
     }
@@ -569,7 +570,8 @@
 /* Master control "on" state */
 [data-theme="dark"] .master-control.master-on {
   background: linear-gradient(135deg, #3D3520 0%, #4A4025 100%);
-  box-shadow: var(--shadow-md), 0 0 20px rgba(255, 193, 7, 0.15);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  /* Multi-layer glow removed for CPU efficiency */
 }
 
 /* Unavailable text overlay */

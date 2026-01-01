@@ -65,12 +65,8 @@
 }
 
 .co2-gauge-arc.pulse {
-  animation: gauge-pulse 2s ease-in-out infinite;
-}
-
-@keyframes gauge-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.75; }
+  /* Static pulse indicator - animation removed for CPU efficiency */
+  opacity: 0.9;
 }
 
 .co2-gauge-content {

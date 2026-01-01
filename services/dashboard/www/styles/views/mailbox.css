@@ -44,12 +44,7 @@
   width: 200%;
   height: 200%;
   background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
-  animation: hero-shimmer 8s ease-in-out infinite;
-}
-
-@keyframes hero-shimmer {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(10%, 10%); }
+  /* animation removed for CPU efficiency */
 }
 
 .mailbox-hero-icon {
@@ -59,13 +54,9 @@
   display: inline-block;
 }
 
+/* Static indicator for mail - animation removed for CPU efficiency */
 .mailbox-hero.has-mail .mailbox-hero-icon {
-  animation: mailbox-bounce 2s ease-in-out infinite;
-}
-
-@keyframes mailbox-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  transform: scale(1.05);
 }
 
 .mailbox-hero-status {

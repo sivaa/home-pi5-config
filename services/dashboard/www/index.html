@@ -726,8 +726,9 @@
           </div>
         </div>
 
-        <!-- Vision 10: Heater Control -->
-        <div x-show="currentView === 'heater'" x-cloak x-data="thermostatView()">
+        <!-- Vision 10: Heater Control - CPU OPTIMIZATION: x-if removes heavy DOM when hidden -->
+        <template x-if="currentView === 'heater'">
+        <div x-data="thermostatView()" x-init="init()">
           <div class="thermostat-view">
             <!-- Compact Header: Title + Stats + Tabs in one line -->
             <div class="thermostat-compact-header">
@@ -1171,9 +1172,11 @@
             </div>
           </div>
         </div>
+        </template>
 
-        <!-- Activity Logs View -->
-        <div x-show="currentView === 'logs'" x-cloak x-data="logsView()" x-init="init()">
+        <!-- Activity Logs View - CPU OPTIMIZATION: x-if removes logs DOM when hidden -->
+        <template x-if="currentView === 'logs'">
+        <div x-data="logsView()" x-init="init()">
           <div class="logs-view">
             <!-- Filter Sidebar -->
             <div class="logs-sidebar" x-show="showFilters">
@@ -1408,6 +1411,7 @@
             </div>
           </div>
         </div>
+        </template>
 
         <!-- Vision 10: CO2 Monitor -->
         <div x-show="currentView === 'co2'" x-cloak x-data="co2View()" x-init="init()">
@@ -1574,8 +1578,9 @@
           </div>
         </div>
 
-        <!-- Zigbee Network View -->
-        <div x-show="currentView === 'network'" x-cloak x-data="networkView()" x-init="init()">
+        <!-- Zigbee Network View - CPU OPTIMIZATION: x-if removes WebGL from DOM when hidden -->
+        <template x-if="currentView === 'network'">
+        <div x-data="networkView()" x-init="init()">
           <div class="network-view">
             <!-- Controls -->
             <div class="network-controls">
@@ -1641,6 +1646,7 @@
             </div>
           </div>
         </div>
+        </template>
 
         <!-- Mailbox Monitor View -->
         <div x-show="currentView === 'mailbox'" x-cloak x-data="mailboxView()">
@@ -5027,6 +5033,10 @@
             }
             this.createLabels(container);
             this.onResize();
+            // Restart animation loop if it was stopped (CPU efficiency feature)
+            if (!networkState.animationId) {
+              this.animate();
+            }
             return;
           }
 
@@ -6001,6 +6011,16 @@
           const height = 10;
 
           function loop() {
+            // Check if container is visible (CPU efficiency - don't render when hidden)
+            const container = self.$refs.networkContainer;
+            const isVisible = container && container.offsetParent !== null && container.clientWidth > 0;
+
+            if (!isVisible) {
+              // View is hidden - stop the loop, will restart when visible
+              networkState.animationId = null;
+              return;
+            }
+
             networkState.animationId = requestAnimationFrame(loop);
 
             if (self.autoRotate && networkState.camera) {
@@ -6050,6 +6070,9 @@
 
         init() {
           this.$store.logs?.init?.();
+          // Load recent logs from InfluxDB since we don't capture in background
+          // This provides context when switching to logs view
+          this.$store.logs?.loadHistorical?.(1);  // Load last 1 hour
         },
 
         get logs() {

@@ -23,12 +23,19 @@ export function classicView() {
       // Initial sparkline render
       this.$nextTick(() => this.updateSparklines());
 
-      // Update sparklines every 5 seconds
-      this.sparklineUpdateInterval = setInterval(() => this.updateSparklines(), 5000);
+      // Update sparklines every 5 seconds (only when view is active)
+      // CPU OPTIMIZATION: Skip updates when view is hidden
+      this.sparklineUpdateInterval = setInterval(() => {
+        if (Alpine.store('app')?.currentView === 'classic') {
+          this.updateSparklines();
+        }
+      }, 5000);
 
-      // Watch for room changes
+      // Watch for room changes (only update if view is active)
       this.$watch('$store.rooms.list', () => {
-        this.$nextTick(() => this.updateSparklines());
+        if (Alpine.store('app')?.currentView === 'classic') {
+          this.$nextTick(() => this.updateSparklines());
+        }
       });
     },
 

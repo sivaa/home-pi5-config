@@ -125,6 +125,11 @@ export function initLogsStore(Alpine, CONFIG) {
     captureMessage(topic, payload) {
       if (this.paused) return;
 
+      // CPU OPTIMIZATION: Skip capture when logs view is not active
+      // Users can load historical data when they open logs view
+      const currentView = Alpine.store('app')?.currentView;
+      if (currentView !== 'logs') return;
+
       // Filter out bridge noise
       if (topic.includes('/bridge/')) return;
 

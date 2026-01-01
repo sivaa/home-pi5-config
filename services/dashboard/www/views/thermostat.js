@@ -102,17 +102,19 @@ export function thermostatView() {
         }
       });
 
-      // Auto-refresh charts (only when trends tab is active)
+      // Auto-refresh charts (only when heater view is active AND trends tab selected)
+      // CPU OPTIMIZATION: Skip when view is hidden
       this.chartUpdateInterval = setInterval(() => {
-        if (this.activeTab === 'trends') {
+        if (Alpine.store('app')?.currentView === 'heater' && this.activeTab === 'trends') {
           this.drawCharts();
         }
       }, 60000);
 
       // PERFORMANCE: Reduce pause banner timer from 1s to 5s
       // The exact second isn't critical for displaying "paused for X minutes"
+      // CPU OPTIMIZATION: Only tick when heater view is active
       this.pauseTimerInterval = setInterval(() => {
-        if (this.$store.thermostats?.heaterPause?.active) {
+        if (Alpine.store('app')?.currentView === 'heater' && this.$store.thermostats?.heaterPause?.active) {
           this.pauseTimerTick = Date.now();
         }
       }, 5000);  // Was 1000ms, now 5000ms

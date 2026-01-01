@@ -43,9 +43,12 @@ export function mailboxView() {
       // Set up MQTT listener for real-time updates
       this.setupMqttListener();
 
-      // Refresh data every 5 minutes
+      // Refresh data every 5 minutes (only when mailbox view is active)
+      // CPU OPTIMIZATION: Skip refresh when view is hidden
       this._refreshInterval = setInterval(() => {
-        this.loadMailboxEvents();
+        if (Alpine.store('app')?.currentView === 'mailbox') {
+          this.loadMailboxEvents();
+        }
       }, 5 * 60 * 1000);
     },
 

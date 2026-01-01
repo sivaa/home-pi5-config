@@ -65,10 +65,13 @@ export function hotWaterView() {
       this.loadStats();
       this.loadChartHistory();
 
-      // Refresh stats every 5 minutes
+      // Refresh stats every 5 minutes (only when hot water view is active)
+      // CPU OPTIMIZATION: Skip refresh when view is hidden
       this._refreshInterval = setInterval(() => {
-        this.loadStats();
-        this.loadChartHistory();
+        if (Alpine.store('app')?.currentView === 'hotwater') {
+          this.loadStats();
+          this.loadChartHistory();
+        }
       }, 5 * 60 * 1000);
     },
 
