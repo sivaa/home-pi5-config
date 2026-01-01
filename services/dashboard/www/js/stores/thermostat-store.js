@@ -99,6 +99,20 @@ export function initThermostatStore(Alpine, CONFIG) {
       lastUpdate: null         // Last MQTT message received
     },
 
+    // Manual overrides per thermostat { [thermostatId]: { targetTemp, expiresAt, originalTemp } }
+    manualOverrides: {},
+
+    // Night mode override state (for bedroom 17°C enforcement bypass)
+    nightModeOverride: {
+      active: false,        // True when user has disabled night mode enforcement
+      expiresAt: null,      // When the override expires (re-enables night mode)
+      timeoutId: null       // For scheduling re-enable
+    },
+
+    // HA API config
+    haApiUrl: '/api/ha',
+    haToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no',
+
     // ============================================
     // INITIALIZATION
     // ============================================
@@ -708,6 +722,234 @@ export function initThermostatStore(Alpine, CONFIG) {
       if (payload.system_mode !== undefined) return 'mode_change';
       if (payload.child_lock !== undefined) return 'child_lock_change';
       return 'unknown';
+    },
+
+    // ============================================
+    // MANUAL OVERRIDE METHODS
+    // ============================================
+
+    /**
+     * Set a manual temperature override for a thermostat
+     * @param {string} thermostatId - The thermostat ID (e.g., 'bedroom')
+     * @param {number} targetTemp - Target temperature in °C
+     * @param {Date|number} expiresAt - When the override expires (Date or timestamp)
+     */
+    setManualOverride(thermostatId, targetTemp, expiresAt) {
+      const thermostat = this.list.find(t => t.id === thermostatId);
+      if (!thermostat) {
+        console.error('[thermostat-store] Cannot set override: thermostat not found:', thermostatId);
+        return;
+      }
+
+      // Store original temp before override
+      const originalTemp = thermostat.targetTemp;
+      const expiresTimestamp = expiresAt instanceof Date ? expiresAt.getTime() : expiresAt;
+
+      this.manualOverrides[thermostatId] = {
+        targetTemp,
+        expiresAt: expiresTimestamp,
+        originalTemp,
+        setAt: Date.now()
+      };
+
+      // Apply the override temperature
+      this.setTargetTemp(thermostatId, targetTemp);
+
+      console.log(`[thermostat-store] Manual override set for ${thermostat.name}: ${targetTemp}°C until ${new Date(expiresTimestamp).toLocaleTimeString()}`);
+
+      // Schedule automatic removal when override expires
+      const timeUntilExpiry = expiresTimestamp - Date.now();
+      if (timeUntilExpiry > 0) {
+        setTimeout(() => {
+          this.removeManualOverride(thermostatId, true);
+        }, timeUntilExpiry);
+      }
+    },
+
+    /**
+     * Remove a manual override (restore original temp or keep current)
+     * @param {string} thermostatId - The thermostat ID
+     * @param {boolean} expired - Whether this is an automatic removal due to expiry
+     */
+    removeManualOverride(thermostatId, expired = false) {
+      const override = this.manualOverrides[thermostatId];
+      if (!override) return;
+
+      const thermostat = this.list.find(t => t.id === thermostatId);
+
+      // Restore original temperature if it was stored
+      if (override.originalTemp !== null && override.originalTemp !== undefined) {
+        this.setTargetTemp(thermostatId, override.originalTemp);
+        console.log(`[thermostat-store] Override ${expired ? 'expired' : 'removed'} for ${thermostat?.name || thermostatId}, restoring to ${override.originalTemp}°C`);
+      }
+
+      delete this.manualOverrides[thermostatId];
+    },
+
+    /**
+     * Check if a thermostat has an active manual override
+     * @param {string} thermostatId - The thermostat ID
+     * @returns {object|null} Override data or null
+     */
+    getManualOverride(thermostatId) {
+      const override = this.manualOverrides[thermostatId];
+      if (!override) return null;
+
+      // Check if expired
+      if (Date.now() > override.expiresAt) {
+        this.removeManualOverride(thermostatId, true);
+        return null;
+      }
+
+      return override;
+    },
+
+    /**
+     * Get time remaining for an override
+     * @param {string} thermostatId - The thermostat ID
+     * @returns {string} Formatted time remaining (e.g., "1h 30m")
+     */
+    getOverrideTimeRemaining(thermostatId) {
+      const override = this.getManualOverride(thermostatId);
+      if (!override) return '';
+
+      const remaining = override.expiresAt - Date.now();
+      if (remaining <= 0) return 'Expired';
+
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    },
+
+    // ============================================
+    // HOME ASSISTANT SERVICE CALLS
+    // ============================================
+
+    /**
+     * Call a Home Assistant service via the API proxy
+     * @param {string} domain - Service domain (e.g., 'input_boolean')
+     * @param {string} service - Service name (e.g., 'turn_off')
+     * @param {object} data - Service data
+     */
+    async callHAService(domain, service, data = {}) {
+      try {
+        const response = await fetch(`${this.haApiUrl}/services/${domain}/${service}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.haToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        console.log(`[thermostat-store] HA service called: ${domain}.${service}`, data);
+        return await response.json();
+      } catch (err) {
+        console.error(`[thermostat-store] HA service call failed: ${domain}.${service}`, err);
+        throw err;
+      }
+    },
+
+    /**
+     * Disable bedroom night mode enforcement for a duration
+     * This allows setting the bedroom temperature above 17°C during night hours
+     * @param {number} durationMinutes - How long to disable enforcement (default: 90 min = 1.5 hours)
+     */
+    async disableNightModeEnforcement(durationMinutes = 90) {
+      try {
+        // Turn off the night mode flag in Home Assistant
+        await this.callHAService('input_boolean', 'turn_off', {
+          entity_id: 'input_boolean.bedroom_night_mode_active'
+        });
+
+        // Calculate expiry time
+        const expiresAt = Date.now() + (durationMinutes * 60 * 1000);
+
+        // Clear any existing timeout
+        if (this.nightModeOverride.timeoutId) {
+          clearTimeout(this.nightModeOverride.timeoutId);
+        }
+
+        // Update state
+        this.nightModeOverride = {
+          active: true,
+          expiresAt: expiresAt,
+          timeoutId: setTimeout(() => {
+            this.enableNightModeEnforcement();
+          }, durationMinutes * 60 * 1000)
+        };
+
+        console.log(`[thermostat-store] Night mode enforcement disabled for ${durationMinutes} minutes (until ${new Date(expiresAt).toLocaleTimeString()})`);
+
+      } catch (err) {
+        console.error('[thermostat-store] Failed to disable night mode enforcement:', err);
+      }
+    },
+
+    /**
+     * Re-enable bedroom night mode enforcement
+     * Called automatically after override expires or manually by user
+     */
+    async enableNightModeEnforcement() {
+      try {
+        // Check if we're still in night hours (23:00-06:00)
+        const now = new Date();
+        const hour = now.getHours();
+        const isNightTime = hour >= 23 || hour < 6;
+
+        if (isNightTime) {
+          // Turn the night mode flag back on
+          await this.callHAService('input_boolean', 'turn_on', {
+            entity_id: 'input_boolean.bedroom_night_mode_active'
+          });
+          console.log('[thermostat-store] Night mode enforcement re-enabled');
+        } else {
+          console.log('[thermostat-store] Not in night hours, skipping night mode re-enable');
+        }
+
+        // Clear the override state
+        if (this.nightModeOverride.timeoutId) {
+          clearTimeout(this.nightModeOverride.timeoutId);
+        }
+
+        this.nightModeOverride = {
+          active: false,
+          expiresAt: null,
+          timeoutId: null
+        };
+
+      } catch (err) {
+        console.error('[thermostat-store] Failed to enable night mode enforcement:', err);
+      }
+    },
+
+    /**
+     * Get time remaining for night mode override
+     * @returns {string} Formatted time remaining (e.g., "1h 30m")
+     */
+    getNightModeOverrideRemaining() {
+      if (!this.nightModeOverride.active || !this.nightModeOverride.expiresAt) {
+        return '';
+      }
+
+      const remaining = this.nightModeOverride.expiresAt - Date.now();
+      if (remaining <= 0) return 'Expired';
+
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
     },
 
     // ============================================

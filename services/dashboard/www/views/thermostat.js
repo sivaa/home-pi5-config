@@ -522,6 +522,110 @@ export function thermostatView() {
     },
 
     // ============================================
+    // MANUAL OVERRIDE HELPERS
+    // ============================================
+
+    /**
+     * Check if a thermostat has an active manual override
+     */
+    hasOverride(thermostatId) {
+      return !!this.$store.thermostats?.getManualOverride?.(thermostatId);
+    },
+
+    /**
+     * Get the override for a thermostat (if any)
+     */
+    getOverride(thermostatId) {
+      return this.$store.thermostats?.getManualOverride?.(thermostatId);
+    },
+
+    /**
+     * Get formatted expiry time for override
+     */
+    getOverrideExpiryTime(thermostatId) {
+      const override = this.getOverride(thermostatId);
+      if (!override) return '';
+
+      return new Date(override.expiresAt).toLocaleTimeString('en-AU', {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    },
+
+    /**
+     * Get time remaining for override
+     */
+    getOverrideRemaining(thermostatId) {
+      return this.$store.thermostats?.getOverrideTimeRemaining?.(thermostatId) || '';
+    },
+
+    /**
+     * Remove a manual override
+     */
+    removeOverride(thermostatId) {
+      this.$store.thermostats?.removeManualOverride?.(thermostatId);
+    },
+
+    /**
+     * Set a manual override for bedroom until 11 PM at 17°C
+     * (Quick action for current use case)
+     */
+    setBedroomOverride() {
+      // Calculate 11 PM today (or tomorrow if past 11 PM)
+      const now = new Date();
+      const elevenPM = new Date();
+      elevenPM.setHours(23, 0, 0, 0);
+
+      // If it's already past 11 PM, set for tomorrow
+      if (now >= elevenPM) {
+        elevenPM.setDate(elevenPM.getDate() + 1);
+      }
+
+      this.$store.thermostats?.setManualOverride?.('bedroom', 17, elevenPM);
+    },
+
+    // ============================================
+    // NIGHT MODE OVERRIDE HELPERS (Bedroom 17°C cap)
+    // ============================================
+
+    /**
+     * Check if we're currently in night hours (23:00-06:00)
+     */
+    isNightTime() {
+      const hour = new Date().getHours();
+      return hour >= 23 || hour < 6;
+    },
+
+    /**
+     * Check if night mode override is active
+     */
+    isNightModeOverrideActive() {
+      return this.$store.thermostats?.nightModeOverride?.active ?? false;
+    },
+
+    /**
+     * Get time remaining for night mode override
+     */
+    getNightModeOverrideRemaining() {
+      return this.$store.thermostats?.getNightModeOverrideRemaining?.() || '';
+    },
+
+    /**
+     * Disable night mode enforcement for 1-2 hours
+     * Allows setting bedroom above 17°C during night hours
+     */
+    async disableNightModeFor(minutes = 90) {
+      await this.$store.thermostats?.disableNightModeEnforcement?.(minutes);
+    },
+
+    /**
+     * Re-enable night mode enforcement (restore 17°C cap)
+     */
+    async enableNightMode() {
+      await this.$store.thermostats?.enableNightModeEnforcement?.();
+    },
+
+    // ============================================
     // TAB METHODS
     // ============================================
 

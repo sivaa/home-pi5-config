@@ -1939,3 +1939,183 @@
     margin-top: var(--space-sm);
   }
 }
+
+/* ========================================
+   MANUAL OVERRIDE BANNER
+   Shows when thermostat has a manual temperature override
+   ======================================== */
+
+.override-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 2px solid #f59e0b;
+  color: #92400e;
+}
+
+/* Dark mode */
+[data-theme="dark"] .override-banner {
+  background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
+  border-color: #f59e0b;
+  color: #fef3c7;
+}
+
+.override-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.override-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.override-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.override-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.override-meta {
+  font-size: var(--font-size-sm);
+  opacity: 0.9;
+}
+
+.override-remove-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(146, 64, 14, 0.3);
+  border-radius: var(--radius-md);
+  color: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px; /* Touch-friendly */
+}
+
+.override-remove-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border-color: rgba(146, 64, 14, 0.5);
+}
+
+.override-remove-btn:active {
+  transform: scale(0.98);
+}
+
+[data-theme="dark"] .override-remove-btn {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(254, 243, 199, 0.3);
+}
+
+[data-theme="dark"] .override-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(254, 243, 199, 0.5);
+}
+
+/* ========================================
+   NIGHT MODE OVERRIDE BANNER
+   Shows on bedroom card during night hours (23:00-06:00)
+   ======================================== */
+
+.night-mode-banner {
+  margin-bottom: var(--space-md);
+}
+
+.night-mode-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #312e81 0%, #4c1d95 100%);
+  border: 2px solid #6366f1;
+  color: #e0e7ff;
+}
+
+.night-mode-content.bypassed {
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+  border-color: #10b981;
+  color: #d1fae5;
+}
+
+.night-mode-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.night-mode-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.night-mode-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.night-mode-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.night-mode-meta {
+  font-size: var(--font-size-sm);
+  opacity: 0.9;
+}
+
+.night-mode-override-btn,
+.night-mode-restore-btn {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px; /* Touch-friendly */
+}
+
+.night-mode-override-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(224, 231, 255, 0.3);
+  color: #e0e7ff;
+}
+
+.night-mode-override-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(224, 231, 255, 0.5);
+}
+
+.night-mode-restore-btn {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(209, 250, 229, 0.3);
+  color: #d1fae5;
+}
+
+.night-mode-restore-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(209, 250, 229, 0.5);
+}
+
+.night-mode-override-btn:active,
+.night-mode-restore-btn:active {
+  transform: scale(0.98);
+}
