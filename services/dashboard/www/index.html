@@ -904,13 +904,13 @@
                                 <span class="night-mode-meta">Bedroom capped at 17°C until 06:00</span>
                               </div>
                             </div>
-                            <button class="night-mode-override-btn" @click="disableNightModeFor(90)">
+                            <button class="night-mode-override-btn" @click="requestNightModeOverride()">
                               Remove this override for 1-2 hours
                             </button>
                           </div>
                         </template>
 
-                        <!-- Night mode BYPASSED - Show remaining time and option to re-enable -->
+                        <!-- Night mode BYPASSED - Show remaining time (auto-restores via HA) -->
                         <template x-if="isNightModeOverrideActive()">
                           <div class="night-mode-content bypassed">
                             <div class="night-mode-info">
@@ -923,9 +923,7 @@
                                 </span>
                               </div>
                             </div>
-                            <button class="night-mode-restore-btn" @click="enableNightMode()">
-                              Restore 17°C cap now
-                            </button>
+                            <!-- HA automatically restores 17°C cap when timer expires -->
                           </div>
                         </template>
                       </div>
@@ -5067,10 +5065,26 @@
         endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
 
         init() {
+          console.log('[network-view] Initializing...');
+
+          // Defensive: disconnect any existing observer before creating new
+          // (prevents duplicate observers if destroy() wasn't called properly)
+          if (networkState.themeObserver) {
+            networkState.themeObserver.disconnect();
+            networkState.themeObserver = null;
+          }
+
           this.waitForContainer();
         },
 
         waitForContainer() {
+          // Guard: component may have been destroyed while waiting
+          // (prevents orphaned setTimeout callbacks from continuing)
+          if (!this.$el || !document.contains(this.$el)) {
+            console.log('[network-view] Component destroyed, aborting init');
+            return;
+          }
+
           const container = this.$refs.networkContainer;
           if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
             setTimeout(() => this.waitForContainer(), 100);
@@ -6100,6 +6114,54 @@
           networkState.camera.bottom = frustumSize / -2;
           networkState.camera.updateProjectionMatrix();
           networkState.renderer.setSize(container.clientWidth, container.clientHeight);
+        },
+
+        destroy() {
+          console.log('[network-view] Destroying...');
+
+          // Stop animation loop
+          if (networkState.animationId) {
+            cancelAnimationFrame(networkState.animationId);
+            networkState.animationId = null;
+          }
+
+          // Disconnect theme observer
+          if (networkState.themeObserver) {
+            networkState.themeObserver.disconnect();
+            networkState.themeObserver = null;
+          }
+
+          // Remove resize handler
+          if (networkState.resizeHandler) {
+            window.removeEventListener('resize', networkState.resizeHandler);
+            networkState.resizeHandler = null;
+          }
+
+          // Clean up labels
+          Object.values(networkState.labelElements).forEach(el => el?.remove?.());
+          networkState.labelElements = {};
+
+          // Clean up signal elements
+          Object.values(networkState.signalElements).forEach(el => el?.remove?.());
+          networkState.signalElements = {};
+
+          // Remove pan handlers from container
+          if (networkState.containerRef && networkState.panHandlers) {
+            networkState.containerRef.removeEventListener('mousedown', networkState.panHandlers.mousedown);
+            networkState.containerRef.removeEventListener('mousemove', networkState.panHandlers.mousemove);
+            networkState.containerRef.removeEventListener('mouseup', networkState.panHandlers.mouseup);
+            networkState.containerRef.removeEventListener('mouseleave', networkState.panHandlers.mouseleave);
+            networkState.containerRef.removeEventListener('touchstart', networkState.panHandlers.touchstart);
+            networkState.containerRef.removeEventListener('touchmove', networkState.panHandlers.touchmove);
+            networkState.containerRef.removeEventListener('touchend', networkState.panHandlers.touchend);
+            networkState.panHandlers = null;
+            networkState.containerRef = null;
+          }
+
+          // Mark as not initialized so next init recreates everything
+          networkState.isInitialized = false;
+
+          console.log('[network-view] Destroyed successfully');
         },
 
         getZoomPercent() { return Math.round(this.zoomLevel * 100); }
