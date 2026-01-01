@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
 > **Last Updated:** 2025-12-31
-> **Total Automations:** 26
+> **Total Automations:** 35
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -19,6 +19,10 @@
 | [Window-Heater Safety](#-window-heater-safety) | 5 | Auto-shutoff when windows open + prevention |
 | [Cold Weather Alert](#-cold-weather-alert) | 1 | Remind to close windows when cold |
 | [TTS Logging](#-tts-logging) | 1 | Publish TTS events to MQTT for dashboard |
+| [Heater Guard MQTT](#-heater-guard-mqtt) | 2 | Publish guard state to dashboard |
+| [Watchdog Recovery](#-watchdog-recovery) | 1 | Periodic safety net for missed events |
+| [Bedroom Night Mode](#-bedroom-night-mode) | 4 | Limit bedroom temp 23:00-06:00 |
+| [Heater Safety Limits](#-heater-safety-limits) | 2 | Cap all thermostats at 22°C max |
 
 ---
 
@@ -465,6 +469,143 @@ Event-driven automations (`co2_low_resume_heaters`, `all_windows_closed_resume_h
 
 ---
 
+### 🛡️ Heater Guard MQTT
+
+These automations publish heater guard state to MQTT for dashboard display.
+
+#### 25. Heater Guard Combined State Publisher
+| Property | Value |
+|----------|-------|
+| **ID** | `heater_guard_combined_publisher` |
+| **Trigger** | Guard flag changes, window state changes, CO2 level changes |
+| **Condition** | At least one guard flag ON |
+| **Action** | Publish combined state to `dashboard/heater-guard/combined` |
+| **Payload** | `{ active, reason, window_guard, co2_guard, windows, co2_level }` |
+| **Retained** | Yes (dashboard shows state on page load) |
+
+#### 26. Heater Guard Clear on Resume
+| Property | Value |
+|----------|-------|
+| **ID** | `heater_guard_clear_on_resume` |
+| **Trigger** | Either guard flag turns OFF |
+| **Condition** | BOTH guards must be OFF |
+| **Action** | Publish `{ active: false }` to clear retained message |
+| **Purpose** | Clears dashboard indicator when heaters resume |
+
+---
+
+### 🔄 Watchdog Recovery
+
+#### 27. Watchdog Recovery - Periodic Resume Check
+| Property | Value |
+|----------|-------|
+| **ID** | `watchdog_recovery_resume_check` |
+| **Trigger** | Every 1 minute (time_pattern) |
+| **Condition** | (Window OR CO2 guard ON) AND all 8 sensors closed |
+| **Action** | Routes to appropriate resume automation based on active guard |
+| **Purpose** | Safety net for missed event-driven resume triggers |
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    WATCHDOG RECOVERY LOGIC (Every 1 Minute)                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  CHECK: Is ANY guard flag ON?                                                    │
+│  ├─ heaters_off_due_to_window = ON?                                             │
+│  └─ heaters_off_due_to_co2 = ON?                                                │
+│                                                                                 │
+│  IF YES + ALL sensors closed → Route to appropriate resume automation          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🌙 Bedroom Night Mode
+
+These automations limit bedroom temperature to 17°C during sleeping hours (23:00-06:00).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         BEDROOM NIGHT MODE FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  23:00 ──► Save current setpoint ──► Cap to 17°C ──► Set night mode flag       │
+│                                                                                 │
+│  During night: Any setpoint > 17°C ──► Force back to 17°C + notify             │
+│                                                                                 │
+│  06:00 ──► Restore saved setpoint ──► Clear night mode flag                    │
+│                                                                                 │
+│  HA Restart during night ──► Re-activate night mode + cap if needed            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 28. Bedroom Night Mode - Start (23:00)
+| Property | Value |
+|----------|-------|
+| **ID** | `bedroom_night_mode_start` |
+| **Trigger** | Time = 23:00:00 |
+| **Condition** | Night mode flag OFF |
+| **Action** | Set flag, save setpoint to `input_number.bedroom_pre_night_setpoint`, cap to 17°C |
+| **Notify** | "Night mode activated. Capped X°C → 17°C" |
+
+#### 29. Bedroom Night Mode - Enforcement
+| Property | Value |
+|----------|-------|
+| **ID** | `bedroom_night_mode_enforcement` |
+| **Trigger** | Bedroom thermostat setpoint changes |
+| **Condition** | Night mode ON AND heater in heat mode AND setpoint > 17°C |
+| **Action** | Cap back to 17°C |
+| **Notify** | "Attempted X°C during night mode. Capped to 17°C" |
+
+#### 30. Bedroom Night Mode - End (06:00)
+| Property | Value |
+|----------|-------|
+| **ID** | `bedroom_night_mode_end` |
+| **Trigger** | Time = 06:00:00 |
+| **Condition** | Night mode flag ON |
+| **Action** | Clear flag, restore setpoint from `input_number.bedroom_pre_night_setpoint` |
+| **Notify** | "Restored to X°C" |
+
+#### 31. Bedroom Night Mode - HA Startup Check
+| Property | Value |
+|----------|-------|
+| **ID** | `bedroom_night_mode_startup_check` |
+| **Trigger** | HA starts |
+| **Condition** | Time 23:00-06:00 AND night mode flag OFF |
+| **Action** | Set flag, save setpoint, cap if needed |
+| **Purpose** | Handles HA restart during night hours |
+
+---
+
+### 🔥 Heater Safety Limits
+
+These automations enforce a 22°C maximum temperature on all thermostats.
+
+#### 32. Heater Safety - 22°C Maximum Cap
+| Property | Value |
+|----------|-------|
+| **ID** | `heater_safety_max_22c_cap` |
+| **Trigger** | Any thermostat setpoint changes |
+| **Condition** | New setpoint > 22°C |
+| **Mode** | Parallel (max: 4) |
+| **Action** | Cap to 22°C |
+| **Notify** | "X Heater capped from Y°C to 22°C" |
+| **Purpose** | Prevent excessive heating and energy waste |
+
+#### 33. Heater Safety - 22°C Cap on HA Startup
+| Property | Value |
+|----------|-------|
+| **ID** | `heater_safety_22c_startup_check` |
+| **Trigger** | HA starts |
+| **Condition** | Any thermostat > 22°C |
+| **Action** | Cap all thermostats above 22°C |
+| **Notify** | Lists all capped heaters |
+| **Purpose** | Catches thermostats set above 22°C before automation existed |
+
+---
+
 ## Entity Reference
 
 ### Contact Sensors (8 total)
@@ -517,6 +658,7 @@ Used to remember heater states before window/CO2-triggered shutoff:
 | `input_boolean.bedroom_heater_was_on` | Was Bedroom heater on? |
 | `input_boolean.heaters_off_due_to_window` | Guard flag: window triggered shutoff |
 | `input_boolean.heaters_off_due_to_co2` | Guard flag: CO2 high triggered shutoff |
+| `input_boolean.bedroom_night_mode_active` | Night mode active flag (23:00-06:00) |
 
 ### Saved Setpoints (input_number)
 
@@ -528,6 +670,7 @@ Used to save thermostat setpoints before window-triggered shutoff (TRVZB firmwar
 | `input_number.living_inner_heater_saved_temp` | Living Inner setpoint backup | 5-22°C |
 | `input_number.living_outer_heater_saved_temp` | Living Outer setpoint backup | 5-22°C |
 | `input_number.bedroom_heater_saved_temp` | Bedroom setpoint backup | 5-22°C |
+| `input_number.bedroom_pre_night_setpoint` | Bedroom pre-night mode setpoint | 5-22°C |
 
 ---
 

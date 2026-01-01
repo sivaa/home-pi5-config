@@ -17,12 +17,14 @@
 
 # Tunnel ID from: cloudflared tunnel create homeassistant
 tunnel: 6600ccff-747f-4b92-b6d8-26178c8a5112
-credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
+credentials-file: /home/pi/.cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
 
 ingress:
   # Home Assistant - main endpoint for Google Home
   - hostname: ha.sivaa.in
     service: http://localhost:8123
+    originRequest:
+      noTLSVerify: true
 
   # Catch-all rule (required by cloudflared)
   - service: http_status:404

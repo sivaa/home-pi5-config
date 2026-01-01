@@ -12,8 +12,9 @@ configs/siva-home-assistant-*.json
 **/*-service-account*.json
 backups/configs/zigbee2mqtt/network_key.txt
 
-# Router reboot script credentials
+# Environment files with secrets
 scripts/.env
+configs/**/.env
 node_modules/
 .playwright-mcp/
 

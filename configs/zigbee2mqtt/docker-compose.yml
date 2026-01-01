@@ -66,6 +66,8 @@ services:
       - influxdb
     environment:
       - MQTT_URL=mqtt://mosquitto:1883
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
       - INFLUX_URL=http://influxdb:8086
       - INFLUX_DB=homeassistant
       - TZ=Europe/Berlin
@@ -106,7 +108,7 @@ services:
       - homeassistant
     environment:
       - HA_URL=http://homeassistant:8123
-      - HA_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no
+      - HA_TOKEN=${HA_TOKEN}
       - CHECK_INTERVAL=300
       - NOTIFY_SERVICE=notify.mobile_app_22111317pg
       - TZ=Europe/Berlin
