@@ -728,7 +728,7 @@
 
         <!-- Vision 10: Heater Control - CPU OPTIMIZATION: x-if removes heavy DOM when hidden -->
         <template x-if="currentView === 'heater'">
-        <div x-data="thermostatView()" x-init="init()" @destroy.window="destroy()">
+        <div x-data="thermostatView()" x-init="init()">
           <div class="thermostat-view">
             <!-- Compact Header: Title + Stats + Tabs in one line -->
             <div class="thermostat-compact-header">
@@ -890,6 +890,46 @@
                         ⏻ Off
                       </button>
                     </div>
+
+                    <!-- Night Mode Override Banner (Bedroom only, during night hours 23:00-06:00) -->
+                    <template x-if="t.id === 'bedroom' && isNightTime()">
+                      <div class="night-mode-banner" x-cloak>
+                        <!-- Night mode ACTIVE (17°C cap enforced) - Show button to disable -->
+                        <template x-if="!isNightModeOverrideActive()">
+                          <div class="night-mode-content">
+                            <div class="night-mode-info">
+                              <span class="night-mode-icon">🌙</span>
+                              <div class="night-mode-details">
+                                <span class="night-mode-label">Night Mode Active</span>
+                                <span class="night-mode-meta">Bedroom capped at 17°C until 06:00</span>
+                              </div>
+                            </div>
+                            <button class="night-mode-override-btn" @click="disableNightModeFor(90)">
+                              Remove this override for 1-2 hours
+                            </button>
+                          </div>
+                        </template>
+
+                        <!-- Night mode BYPASSED - Show remaining time and option to re-enable -->
+                        <template x-if="isNightModeOverrideActive()">
+                          <div class="night-mode-content bypassed">
+                            <div class="night-mode-info">
+                              <span class="night-mode-icon">🔓</span>
+                              <div class="night-mode-details">
+                                <span class="night-mode-label">Night Cap Disabled</span>
+                                <span class="night-mode-meta">
+                                  You can set above 17°C for
+                                  <span x-text="getNightModeOverrideRemaining()"></span>
+                                </span>
+                              </div>
+                            </div>
+                            <button class="night-mode-restore-btn" @click="enableNightMode()">
+                              Restore 17°C cap now
+                            </button>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
 
                     <!-- Heater Stats (Professional) -->
                     <div class="heater-stats">
@@ -1176,7 +1216,7 @@
 
         <!-- Activity Logs View - CPU OPTIMIZATION: x-if removes logs DOM when hidden -->
         <template x-if="currentView === 'logs'">
-        <div x-data="logsView()" x-init="init()" @destroy.window="destroy()">
+        <div x-data="logsView()" x-init="init()">
           <div class="logs-view">
             <!-- Filter Sidebar -->
             <div class="logs-sidebar" x-show="showFilters">
@@ -1580,7 +1620,7 @@
 
         <!-- Zigbee Network View - CPU OPTIMIZATION: x-if removes WebGL from DOM when hidden -->
         <template x-if="currentView === 'network'">
-        <div x-data="networkView()" x-init="init()" @destroy.window="destroy()">
+        <div x-data="networkView()" x-init="init()">
           <div class="network-view">
             <!-- Controls -->
             <div class="network-controls">
@@ -1805,7 +1845,7 @@
         </div>
 
         <!-- Hot Water View -->
-        <div x-show="currentView === 'hotwater'" x-cloak x-data="hotWaterView()" x-init="init()" @destroy.window="destroy()">
+        <div x-show="currentView === 'hotwater'" x-cloak x-data="hotWaterView()" x-init="init()">
           <div class="hot-water-view">
 
             <!-- Hero Section - Live Indicator -->

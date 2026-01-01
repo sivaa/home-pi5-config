@@ -217,6 +217,21 @@ export function logsView() {
       const buckets = this.stats.hourlyBuckets || [];
       const max = Math.max(...buckets, 1);
       return buckets.map(v => Math.round((v / max) * 100));
+    },
+
+    // ============================================
+    // CLEANUP (called by Alpine when x-if removes element)
+    // ============================================
+    destroy() {
+      console.log('[logs-view] Destroying...');
+      // Clear search debounce timeout
+      if (this.searchDebounce) {
+        clearTimeout(this.searchDebounce);
+        this.searchDebounce = null;
+      }
+      // Reset pagination
+      this.visibleCount = 100;
+      console.log('[logs-view] Destroyed successfully');
     }
   };
 }

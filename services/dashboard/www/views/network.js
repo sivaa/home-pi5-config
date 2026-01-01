@@ -21,7 +21,12 @@ const networkState = {
   isInitialized: false,
   panOffset: { x: 0, z: 0 },
   isPanning: false,
-  lastPanPos: { x: 0, y: 0 }
+  lastPanPos: { x: 0, y: 0 },
+  // Cleanup tracking
+  themeObserver: null,
+  resizeHandler: null,
+  containerRef: null,
+  panHandlers: null
 };
 
 export function networkView() {
@@ -41,12 +46,14 @@ export function networkView() {
     endDeviceCount: ZIGBEE_DEVICES.filter(d => d.type === 'end-device').length,
 
     init() {
+      console.log('[network-view] Initializing...');
+
       // Sync with global theme store
       const globalTheme = document.documentElement.getAttribute('data-theme');
       this.darkTheme = globalTheme === 'dark';
 
-      // Watch for global theme changes
-      const observer = new MutationObserver((mutations) => {
+      // Watch for global theme changes (store reference for cleanup)
+      networkState.themeObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.attributeName === 'data-theme') {
             const newTheme = document.documentElement.getAttribute('data-theme');
@@ -58,7 +65,7 @@ export function networkView() {
           }
         });
       });
-      observer.observe(document.documentElement, { attributes: true });
+      networkState.themeObserver.observe(document.documentElement, { attributes: true });
 
       this.waitForContainer();
     },
@@ -96,7 +103,10 @@ export function networkView() {
       this.animate();
       networkState.isInitialized = true;
 
-      window.addEventListener('resize', () => this.onResize());
+      // Store container reference and resize handler for cleanup
+      networkState.containerRef = container;
+      networkState.resizeHandler = () => this.onResize();
+      window.addEventListener('resize', networkState.resizeHandler);
     },
 
     initScene() {
@@ -887,33 +897,40 @@ export function networkView() {
     },
 
     setupPanControls(container) {
-      container.addEventListener('pointerdown', (e) => {
-        if (this.autoRotate) return;
-        networkState.isPanning = true;
-        networkState.lastPanPos = { x: e.clientX, y: e.clientY };
-        container.style.cursor = 'grabbing';
-      });
+      const self = this;
 
-      container.addEventListener('pointermove', (e) => {
-        if (!networkState.isPanning) return;
-        const dx = e.clientX - networkState.lastPanPos.x;
-        const dy = e.clientY - networkState.lastPanPos.y;
-        networkState.panOffset.x -= dx * 0.02;
-        networkState.panOffset.z -= dy * 0.02;
-        networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
-        networkState.lastPanPos = { x: e.clientX, y: e.clientY };
-      });
+      // Store handlers for cleanup
+      networkState.panHandlers = {
+        pointerdown: (e) => {
+          if (self.autoRotate) return;
+          networkState.isPanning = true;
+          networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+          container.style.cursor = 'grabbing';
+        },
+        pointermove: (e) => {
+          if (!networkState.isPanning) return;
+          const dx = e.clientX - networkState.lastPanPos.x;
+          const dy = e.clientY - networkState.lastPanPos.y;
+          networkState.panOffset.x -= dx * 0.02;
+          networkState.panOffset.z -= dy * 0.02;
+          networkState.camera.lookAt(networkState.panOffset.x, 0, networkState.panOffset.z);
+          networkState.lastPanPos = { x: e.clientX, y: e.clientY };
+        },
+        pointerup: () => {
+          networkState.isPanning = false;
+          container.style.cursor = 'grab';
+        },
+        wheel: (e) => {
+          e.preventDefault();
+          const delta = e.deltaY > 0 ? 0.9 : 1.1;
+          self.setZoom(self.zoomLevel * delta);
+        }
+      };
 
-      container.addEventListener('pointerup', () => {
-        networkState.isPanning = false;
-        container.style.cursor = 'grab';
-      });
-
-      container.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        this.setZoom(this.zoomLevel * delta);
-      }, { passive: false });
+      container.addEventListener('pointerdown', networkState.panHandlers.pointerdown);
+      container.addEventListener('pointermove', networkState.panHandlers.pointermove);
+      container.addEventListener('pointerup', networkState.panHandlers.pointerup);
+      container.addEventListener('wheel', networkState.panHandlers.wheel, { passive: false });
     },
 
     setZoom(level) {
@@ -1004,6 +1021,28 @@ export function networkView() {
       if (networkState.animationId) {
         cancelAnimationFrame(networkState.animationId);
         networkState.animationId = null;
+      }
+
+      // Disconnect theme observer
+      if (networkState.themeObserver) {
+        networkState.themeObserver.disconnect();
+        networkState.themeObserver = null;
+      }
+
+      // Remove window resize listener
+      if (networkState.resizeHandler) {
+        window.removeEventListener('resize', networkState.resizeHandler);
+        networkState.resizeHandler = null;
+      }
+
+      // Remove container event listeners
+      if (networkState.containerRef && networkState.panHandlers) {
+        networkState.containerRef.removeEventListener('pointerdown', networkState.panHandlers.pointerdown);
+        networkState.containerRef.removeEventListener('pointermove', networkState.panHandlers.pointermove);
+        networkState.containerRef.removeEventListener('pointerup', networkState.panHandlers.pointerup);
+        networkState.containerRef.removeEventListener('wheel', networkState.panHandlers.wheel);
+        networkState.panHandlers = null;
+        networkState.containerRef = null;
       }
 
       // Remove DOM label elements
