@@ -586,6 +586,7 @@ export function thermostatView() {
 
     // ============================================
     // NIGHT MODE OVERRIDE HELPERS (Bedroom 17°C cap)
+    // Server-side: State comes from MQTT, actions call HA scripts
     // ============================================
 
     /**
@@ -597,10 +598,11 @@ export function thermostatView() {
     },
 
     /**
-     * Check if night mode override is active
+     * Check if night mode override is active (17°C cap bypassed)
+     * State comes from MQTT (dashboard/bedroom-night-mode)
      */
     isNightModeOverrideActive() {
-      return this.$store.thermostats?.nightModeOverride?.active ?? false;
+      return this.$store.thermostats?.nightModeOverride?.overrideActive ?? false;
     },
 
     /**
@@ -611,18 +613,11 @@ export function thermostatView() {
     },
 
     /**
-     * Disable night mode enforcement for 1-2 hours
-     * Allows setting bedroom above 17°C during night hours
+     * Request night mode override (calls HA script)
+     * HA handles all state management and publishes to MQTT
      */
-    async disableNightModeFor(minutes = 90) {
-      await this.$store.thermostats?.disableNightModeEnforcement?.(minutes);
-    },
-
-    /**
-     * Re-enable night mode enforcement (restore 17°C cap)
-     */
-    async enableNightMode() {
-      await this.$store.thermostats?.enableNightModeEnforcement?.();
+    async requestNightModeOverride() {
+      await this.$store.thermostats?.requestNightModeOverride?.();
     },
 
     // ============================================

@@ -99,7 +99,7 @@ smart_tts_co2_alert:
                            or states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}
                   then:
                     # Notify that we're using fallback (Kitchen Display was unavailable)
-                    - service: notify.mobile_app_22111317pg
+                    - service: notify.all_phones
                       data:
                         title: "🔇 TTS Fallback"
                         message: "Kitchen Display unavailable for 5 min. Using fallback speakers."
@@ -117,7 +117,7 @@ smart_tts_co2_alert:
                         language: "en"
                   else:
                     # ALL speakers unavailable - critical notification!
-                    - service: notify.mobile_app_22111317pg
+                    - service: notify.all_phones
                       data:
                         title: "🔇 TTS FAILED - No Speakers!"
                         message: >
@@ -127,3 +127,179 @@ smart_tts_co2_alert:
                           channel: "Critical"
                           importance: max
                           tag: "tts_failed"
+
+# -----------------------------------------------------------------------------
+# SMART TTS - WINDOW ALERT WITH RETRY
+# Purpose: TTS announcement for window alerts with speaker availability check,
+#          retry logic, fallback speakers, and obsolescence check
+#
+# Flow:
+#   1. Check if primary speaker (kitchen_display) is available
+#   2. If available AND window still open: play immediately
+#   3. If unavailable: wait up to 5 minutes (event-driven with wait_template)
+#   4. If primary becomes available AND window still open: play on primary
+#   5. If timeout (5 min) AND window still open: play on fallback speakers
+#   6. If window closes during wait: skip (announcement obsolete)
+#   7. If ALL speakers unavailable: send mobile notification warning
+#
+# Usage:
+#   service: script.smart_tts_window_alert
+#   data:
+#     message: "Your message here"
+#     window_entity: binary_sensor.bath_window_contact_sensor_contact
+# -----------------------------------------------------------------------------
+smart_tts_window_alert:
+  alias: "Smart TTS - Window Alert with Retry"
+  description: "TTS with primary speaker preference, retry logic, and obsolescence check for window alerts"
+  mode: parallel
+  max: 4
+
+  fields:
+    message:
+      description: "The message to announce"
+      example: "Bathroom window has been open for 10 minutes."
+    window_entity:
+      description: "Window sensor entity to check if still open"
+      example: "binary_sensor.bath_window_contact_sensor_contact"
+
+  sequence:
+    # Check if primary speaker is immediately available
+    - if:
+        # Kitchen Display is available (not unavailable/unknown) AND window still open
+        - condition: template
+          value_template: >
+            {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+               and is_state(window_entity, 'on') }}
+      then:
+        # Play immediately on primary speaker
+        - service: tts.google_translate_say
+          data:
+            entity_id: media_player.kitchen_display
+            message: "{{ message }}"
+            language: "en"
+      else:
+        # Primary speaker unavailable - wait for it (up to 5 min) or for window to close
+        - wait_template: >
+            {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+               or is_state(window_entity, 'off') }}
+          timeout: "00:05:00"
+          continue_on_timeout: true
+
+        # Check what caused the wait to end
+        - choose:
+            # Case 1: Window closed - announcement is obsolete
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state(window_entity, 'off') }}"
+              sequence:
+                - stop: "Window closed - announcement obsolete"
+
+            # Case 2: Primary speaker became available AND window still open
+            - conditions:
+                - condition: template
+                  value_template: >
+                    {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
+                       and is_state(window_entity, 'on') }}
+              sequence:
+                # Play on primary speaker (Kitchen Display)
+                - service: tts.google_translate_say
+                  data:
+                    entity_id: media_player.kitchen_display
+                    message: "{{ message }}"
+                    language: "en"
+
+          # Default: Timeout reached (5 min) - use fallback speakers if window still open
+          default:
+            - if:
+                - condition: template
+                  value_template: "{{ is_state(window_entity, 'on') }}"
+              then:
+                # Check if ANY fallback speaker is available
+                - if:
+                    - condition: template
+                      value_template: >
+                        {{ states('media_player.broken_display') not in ['unavailable', 'unknown']
+                           or states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}
+                  then:
+                    # Notify that we're using fallback (Kitchen Display was unavailable)
+                    - service: notify.all_phones
+                      data:
+                        title: "🔇 TTS Fallback"
+                        message: "Kitchen Display unavailable for 5 min. Using fallback speakers for window alert."
+                        data:
+                          channel: "Alerts"
+                          importance: default
+                          tag: "tts_fallback"
+                    # Play on fallback speakers
+                    - service: tts.google_translate_say
+                      data:
+                        entity_id:
+                          - media_player.broken_display
+                          - media_player.master_bedroom_clock
+                        message: "{{ message }}"
+                        language: "en"
+                  else:
+                    # ALL speakers unavailable - critical notification!
+                    - service: notify.all_phones
+                      data:
+                        title: "🔇 TTS FAILED - No Speakers!"
+                        message: >
+                          {{ message }}
+                          (ALL Google Home speakers are unavailable!)
+                        data:
+                          channel: "Critical"
+                          importance: max
+                          tag: "tts_failed"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE OVERRIDE - START
+# Purpose: Disable 17°C cap for 90 minutes (called from dashboard)
+#
+# Flow:
+#   1. Set expiry datetime (now + 90 minutes)
+#   2. Turn off night mode enforcement (input_boolean)
+#   3. Publish state to MQTT for dashboard
+#   4. Send notification
+#
+# Usage:
+#   service: script.bedroom_night_override_start
+# -----------------------------------------------------------------------------
+bedroom_night_override_start:
+  alias: "Bedroom Night Override - Start"
+  description: "Disable 17°C cap for 90 minutes (called from dashboard)"
+  mode: single
+
+  sequence:
+    # Calculate expiry time
+    - variables:
+        expiry_time: "{{ (now() + timedelta(minutes=90)).strftime('%Y-%m-%d %H:%M:%S') }}"
+
+    # Set expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.bedroom_night_override_end
+      data:
+        datetime: "{{ expiry_time }}"
+
+    # Turn off night mode enforcement
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.bedroom_night_mode_active
+
+    # Publish state to MQTT for dashboard (retained so new connections get state)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/bedroom-night-mode"
+        retain: true
+        payload: >
+          {"active": false, "override_active": true, "override_expires": "{{ expiry_time }}"}
+
+    # Notification
+    - service: notify.all_phones
+      data:
+        title: "🌙 Night Mode Override"
+        message: "17°C cap disabled for 90 minutes (until {{ expiry_time[11:16] }})"
+        data:
+          channel: "Info"
+          importance: default
+          tag: "bedroom_night_override"

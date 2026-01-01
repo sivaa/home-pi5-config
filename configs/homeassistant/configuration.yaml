@@ -12,6 +12,20 @@ frontend:
 config:
 mobile_app:
 
+# =============================================================================
+# NOTIFICATION GROUPS
+# Purpose: Send notifications to multiple phones simultaneously
+# Phones:
+#   - mobile_app_22111317pg (Siva)
+#   - mobile_app_nithya_mobile (Nithya)
+# =============================================================================
+notify:
+  - platform: group
+    name: all_phones
+    services:
+      - action: mobile_app_22111317pg
+      - action: mobile_app_nithya_mobile
+
 http:
   server_port: 8123
   use_x_forwarded_for: true
@@ -256,6 +270,18 @@ weather:
     longitude: 13.2599
 
 # =============================================================================
+# LIGHT GROUPS
+# Purpose: Group lights for easier control and scalability
+# =============================================================================
+light:
+  - platform: group
+    name: "IKEA Lights"
+    unique_id: ikea_lights_group
+    entities:
+      - light.study_ikea_light
+      - light.living_ikea_light
+
+# =============================================================================
 # INPUT BOOLEANS - State Memory for Automations
 # Purpose: Remember heater states before window-triggered shutoff
 # =============================================================================
@@ -281,6 +307,47 @@ input_boolean:
   bedroom_night_mode_active:
     name: Bedroom Night Mode Active
     icon: mdi:weather-night
+  # =========================================================================
+  # CIRCADIAN LIGHTING FLAGS
+  # Purpose: Track circadian state and manual overrides for IKEA lights
+  # =========================================================================
+  circadian_enabled:
+    name: Circadian Lighting Enabled
+    icon: mdi:brightness-auto
+  # Debounce flag - set when automation is actively changing lights
+  # Used to distinguish automation changes from manual remote presses
+  circadian_automation_active:
+    name: Circadian Automation Active
+    icon: mdi:sync
+  # Per-light override flags
+  circadian_study_override:
+    name: Study Light Override
+    icon: mdi:hand-back-right
+  circadian_living_override:
+    name: Living Light Override
+    icon: mdi:hand-back-right
+
+# =============================================================================
+# INPUT DATETIMES - Override Expiration Timestamps
+# Purpose: Track when manual overrides should expire (30 min from trigger)
+# =============================================================================
+input_datetime:
+  circadian_study_override_expires:
+    name: Study Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  circadian_living_override_expires:
+    name: Living Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  # Bedroom night mode override expiry (for dashboard 90-min override)
+  bedroom_night_override_end:
+    name: Bedroom Night Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
@@ -400,6 +467,74 @@ template:
         state_class: measurement
         icon: mdi:chart-bar
         state: "{{ (states('sensor.hot_water_7_days') | float(0) * 60) | round(1) }}"
+
+      # =========================================================================
+      # CIRCADIAN LIGHTING SENSORS
+      # Purpose: Calculate scheduled brightness and color temp based on time
+      # Schedule:
+      #   Night (22:00-06:00): 20% brightness, 454 mired (warmest)
+      #   Sunrise (06:00-07:30): Gradual 20%→100%, 454→320 mired
+      #   Day (07:30-18:00): 100% brightness, 320 mired (neutral)
+      #   Sunset (18:00-22:00): Gradual 100%→20%, 320→454 mired
+      # =========================================================================
+      - name: "Circadian Brightness"
+        unique_id: circadian_brightness
+        unit_of_measurement: "%"
+        icon: mdi:brightness-6
+        state: >
+          {% set hour = now().hour %}
+          {% set minute = now().minute %}
+          {% set t = hour + minute / 60 %}
+          {% if t < 6 %}
+            20
+          {% elif t < 7.5 %}
+            {{ (20 + (t - 6) / 1.5 * 80) | round(0) }}
+          {% elif t < 18 %}
+            100
+          {% elif t < 22 %}
+            {{ (100 - (t - 18) / 4 * 80) | round(0) }}
+          {% else %}
+            20
+          {% endif %}
+
+      - name: "Circadian Color Temp"
+        unique_id: circadian_color_temp
+        unit_of_measurement: "K"
+        icon: mdi:thermometer-lines
+        state: >
+          {% set hour = now().hour %}
+          {% set minute = now().minute %}
+          {% set t = hour + minute / 60 %}
+          {% if t < 6 %}
+            2200
+          {% elif t < 7.5 %}
+            {{ (2200 + (t - 6) / 1.5 * 925) | round(0) }}
+          {% elif t < 18 %}
+            3125
+          {% elif t < 22 %}
+            {{ (3125 - (t - 18) / 4 * 925) | round(0) }}
+          {% else %}
+            2200
+          {% endif %}
+
+      - name: "Circadian Phase"
+        unique_id: circadian_phase
+        icon: mdi:theme-light-dark
+        state: >
+          {% set hour = now().hour %}
+          {% set minute = now().minute %}
+          {% set t = hour + minute / 60 %}
+          {% if t < 6 %}
+            Night
+          {% elif t < 7.5 %}
+            Sunrise
+          {% elif t < 18 %}
+            Day
+          {% elif t < 22 %}
+            Sunset
+          {% else %}
+            Night
+          {% endif %}
 
 # =============================================================================
 # AUTOMATIONS

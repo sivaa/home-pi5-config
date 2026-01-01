@@ -41,7 +41,7 @@
           - media_player.master_bedroom_clock
         message: "Mailbox opened"
         language: "en"
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "📬 Mailbox"
         message: "Motion detected at mailbox"
@@ -95,7 +95,7 @@
         message: >
           Nithya, the Cruise Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
         co2_threshold: 1200
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "⚠️ CO2 High"
         message: "CO2 above {{ states('sensor.hallway_co2_co2') }} ppm - please ventilate"
@@ -140,7 +140,7 @@
         message: >
           Warning! CO2 level is critical at {{ states('sensor.hallway_co2_co2') | int }}. Please open windows immediately!
         co2_threshold: 1600
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚨 CO2 CRITICAL"
         message: "CO2 at {{ states('sensor.hallway_co2_co2') }} ppm - OPEN WINDOWS NOW!"
@@ -199,7 +199,7 @@
           {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
           Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
         language: "en"
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "✅ Air Quality Good"
         message: "CO2 now {{ states('sensor.hallway_co2_co2') }} ppm - windows can be closed"
@@ -239,7 +239,7 @@
                 Bathroom window has been open for {{ minutes }} minutes.
               window_entity: binary_sensor.bath_window_contact_sensor_contact
           # Mobile notification as backup
-          - service: notify.mobile_app_22111317pg
+          - service: notify.all_phones
             data:
               title: "🪟 Bathroom Window"
               message: >
@@ -284,7 +284,7 @@
                 Bedroom window has been open for {{ minutes }} minutes.
               window_entity: binary_sensor.bed_window_contact_sensor_contact
           # Mobile notification as backup
-          - service: notify.mobile_app_22111317pg
+          - service: notify.all_phones
             data:
               title: "🪟 Bedroom Window"
               message: >
@@ -332,7 +332,7 @@
           - media_player.master_bedroom_clock
         message: "Mailbox sensor is now online."
         language: "en"
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "📡 Sensor Online"
         message: "Mailbox motion sensor is back online"
@@ -360,7 +360,7 @@
       to: "heating"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🔥 Study Heater ON"
         message: "Target: {{ state_attr('climate.study_thermostat', 'temperature') }}°C"
@@ -385,7 +385,7 @@
       to: "idle"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "❄️ Study Heater OFF"
         message: "Current: {{ state_attr('climate.study_thermostat', 'current_temperature') }}°C"
@@ -409,7 +409,7 @@
       to: "heating"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🔥 Living Inner Heater ON"
         message: "Target: {{ state_attr('climate.living_thermostat_inner', 'temperature') }}°C"
@@ -434,7 +434,7 @@
       to: "idle"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "❄️ Living Inner Heater OFF"
         message: "Current: {{ state_attr('climate.living_thermostat_inner', 'current_temperature') }}°C"
@@ -458,7 +458,7 @@
       to: "heating"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🔥 Living Outer Heater ON"
         message: "Target: {{ state_attr('climate.living_thermostat_outer', 'temperature') }}°C"
@@ -483,7 +483,7 @@
       to: "idle"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "❄️ Living Outer Heater OFF"
         message: "Current: {{ state_attr('climate.living_thermostat_outer', 'current_temperature') }}°C"
@@ -507,7 +507,7 @@
       to: "heating"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🔥 Bedroom Heater ON"
         message: "Target: {{ state_attr('climate.bed_thermostat', 'temperature') }}°C"
@@ -532,7 +532,7 @@
       to: "idle"
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "❄️ Bedroom Heater OFF"
         message: "Current: {{ state_attr('climate.bed_thermostat', 'current_temperature') }}°C"
@@ -575,7 +575,7 @@
            and trigger.from_state.attributes.temperature != trigger.to_state.attributes.temperature }}
 
   action:
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🌡️ Setpoint Changed"
         message: >
@@ -670,7 +670,7 @@
         # Skip state saving - CO2 already saved it
         # Skip turning off heaters - already off
         # Just notify about priority transfer
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "🚪 {{ door_name }} (CO2 Handoff)"
             message: "Door opened while CO2 was high. Door now controls heater resume."
@@ -748,7 +748,7 @@
           {%- endif %}
         language: "en"
 
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚪 {{ door_name }}"
         message: >-
@@ -847,7 +847,7 @@
         # Skip state saving - CO2 already saved it
         # Skip turning off heaters - already off
         # Just notify about priority transfer
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "🪟 {{ window_name }} (CO2 Handoff)"
             message: "Window opened while CO2 was high. Window now controls heater resume."
@@ -925,7 +925,7 @@
           {%- endif %}
         language: "en"
 
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🪟 {{ window_name }}"
         message: >-
@@ -1039,7 +1039,7 @@
                   - media_player.master_bedroom_clock
                 message: "Windows closed, but CO2 is still {{ states('sensor.hallway_co2_co2') | int }}. Heaters staying off."
                 language: "en"
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "🪟 Windows Closed, CO2 Still High"
             message: "CO2: {{ states('sensor.hallway_co2_co2') }} ppm. Heaters will resume when CO2 < 1100."
@@ -1138,7 +1138,7 @@
           {%- endif %}
         language: "en"
 
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "✅ Windows Closed"
         message: >-
@@ -1185,7 +1185,7 @@
                 Please close the main door.
               language: "en"
 
-          - service: notify.mobile_app_22111317pg
+          - service: notify.all_phones
             data:
               title: "🚪 Main Door Still Open!"
               message: "The main door has been open for more than 3 minutes. Please close it."
@@ -1398,7 +1398,7 @@
         message: "{{ heater_name }} blocked. Close {{ open_windows }}."
         language: "en"
 
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚫 {{ heater_name }} Blocked"
         message: "Windows open: {{ open_windows }}"
@@ -1563,7 +1563,7 @@
             language: "en"
 
     # Mobile notification (always)
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🌫️ CO2 High - Heaters Off"
         message: >-
@@ -1706,7 +1706,7 @@
                     message: "CO2 is now {{ co2_level }}. Air improved, but window still open. Heaters staying off."
                     language: "en"
             # Mobile notification
-            - service: notify.mobile_app_22111317pg
+            - service: notify.all_phones
               data:
                 title: "✅ CO2 Normal (Window Open)"
                 message: "CO2: {{ co2_level }} ppm. Window still open - heaters stay off until closed."
@@ -1809,7 +1809,7 @@
                 language: "en"
 
         # Mobile notification
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "{% if is_timeout %}⚠️ CO2 Sensor Timeout{% else %}✅ CO2 Normal{% endif %}"
             message: >-
@@ -1871,7 +1871,7 @@
       data:
         hvac_mode: "off"
 
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚫 {{ heater_name }} Blocked (CO2)"
         message: "Heater tried to start but CO2 is {{ co2_level }} ppm. Blocked."
@@ -2250,7 +2250,7 @@
         temperature: 22
 
     # Audit notification
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚫 {{ heater_name }} Capped to 22°C"
         message: >
@@ -2322,7 +2322,7 @@
             temperature: 17
 
         # Notification only when actually capped
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "🌙 Bedroom Night Mode"
             message: >
@@ -2334,7 +2334,7 @@
               tag: "bedroom_night_mode"
       else:
         # Silent start if no capping needed
-        - service: notify.mobile_app_22111317pg
+        - service: notify.all_phones
           data:
             title: "🌙 Bedroom Night Mode"
             message: >
@@ -2347,6 +2347,13 @@
               channel: "Info"
               importance: low
               tag: "bedroom_night_mode"
+
+    # Publish state to MQTT for dashboard (after either branch)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/bedroom-night-mode"
+        retain: true
+        payload: '{"active": true, "override_active": false, "override_expires": null}'
 
 # -----------------------------------------------------------------------------
 # BEDROOM NIGHT MODE - ENFORCEMENT
@@ -2392,7 +2399,7 @@
         temperature: 17
 
     # Notification
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🌙 Bedroom Night Cap"
         message: >
@@ -2449,7 +2456,7 @@
             temperature: "{{ saved_setpoint }}"
 
     # Notification
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "☀️ Bedroom Night Mode Ended"
         message: >
@@ -2462,6 +2469,13 @@
           channel: "Info"
           importance: default
           tag: "bedroom_night_mode"
+
+    # Publish state to MQTT for dashboard (night mode ended)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/bedroom-night-mode"
+        retain: true
+        payload: '{"active": false, "override_active": false, "override_expires": null}'
 
 # -----------------------------------------------------------------------------
 # BEDROOM NIGHT MODE - HA STARTUP HANDLER
@@ -2518,7 +2532,7 @@
             temperature: 17
 
     # Notification
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🌙 Night Mode Activated (Restart)"
         message: >
@@ -2530,6 +2544,74 @@
           channel: "Info"
           importance: default
           tag: "bedroom_night_mode"
+
+# -----------------------------------------------------------------------------
+# BEDROOM NIGHT MODE - OVERRIDE EXPIRES
+# Trigger: Time matches input_datetime.bedroom_night_override_end
+# Condition: Override is active (night mode flag is OFF) AND still in night hours
+# Action: Re-enable 17°C cap, publish to MQTT
+# Why: Auto-restore night mode after 90-minute dashboard override
+# -----------------------------------------------------------------------------
+- id: bedroom_night_override_expires
+  alias: "Bedroom Night Override - Expires"
+  description: "Re-enable 17°C cap when dashboard override timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.bedroom_night_override_end
+
+  condition:
+    # Only if override is actually active (night mode is off)
+    - condition: state
+      entity_id: input_boolean.bedroom_night_mode_active
+      state: "off"
+    # Only during night hours
+    - condition: time
+      after: "23:00:00"
+      before: "06:00:00"
+
+  action:
+    # Re-enable night mode
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bedroom_night_mode_active
+
+    # Cap bedroom back to 17°C if above
+    - if:
+        - condition: template
+          value_template: >
+            {{ state_attr('climate.bed_thermostat', 'temperature') | float(0) > 17 }}
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: 17
+
+    # Clear expiry datetime (reset to epoch)
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.bedroom_night_override_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+    # Publish state to MQTT for dashboard
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/bedroom-night-mode"
+        retain: true
+        payload: '{"active": true, "override_active": false, "override_expires": null}'
+
+    # Notification
+    - service: notify.all_phones
+      data:
+        title: "🌙 Night Mode Restored"
+        message: "Override expired. 17°C cap re-enabled."
+        data:
+          channel: "Info"
+          importance: default
+          tag: "bedroom_night_override"
 
 # -----------------------------------------------------------------------------
 # HEATER SAFETY - 22°C CAP ON HA STARTUP
@@ -2601,7 +2683,7 @@
             temperature: 22
 
     # Single notification with all capped heaters
-    - service: notify.mobile_app_22111317pg
+    - service: notify.all_phones
       data:
         title: "🚫 22°C Cap Enforced (Startup)"
         message: >
@@ -2616,3 +2698,433 @@
           channel: "Safety"
           importance: high
           tag: "heater_safety_startup"
+
+# =============================================================================
+# CIRCADIAN LIGHTING AUTOMATIONS
+# Purpose: Automatic brightness and color temperature scheduling for IKEA lights
+# Lights: light.study_ikea_light, light.living_ikea_light
+# Color Temp Range: 320 mired (neutral) to 454 mired (warmest)
+# Brightness Range: 20% (night) to 100% (day)
+#
+# Schedule:
+#   Night (22:00-06:00): 20% brightness, 454 mired (2200K warmest)
+#   Sunrise (06:00-07:30): Gradual 20%→100%, 454→320 mired
+#   Day (07:30-18:00): 100% brightness, 320 mired (3125K neutral)
+#   Sunset (18:00-22:00): Gradual 100%→20%, 320→454 mired
+#
+# Override Detection: Uses debounce flag to detect manual changes (IKEA remotes
+# use direct Zigbee binding, bypassing HA context). Any brightness/color change
+# when automation_active=off triggers 30-minute override.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN SCHEDULE UPDATE
+# Trigger: Every 10 minutes
+# Action: Apply scheduled brightness and color temp to ON lights (not overridden)
+# Note: Sets debounce flag to prevent false override detection
+# -----------------------------------------------------------------------------
+- id: circadian_schedule_update
+  alias: "Circadian - Schedule Update"
+  description: "Updates light brightness and color temp every 10 minutes"
+  mode: single
+  max_exceeded: silent
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/10"
+
+  condition:
+    - condition: state
+      entity_id: input_boolean.circadian_enabled
+      state: "on"
+
+  action:
+    # Set debounce flag BEFORE changing lights
+    - service: input_boolean.turn_on
+      entity_id: input_boolean.circadian_automation_active
+
+    # Read scheduled values from template sensors
+    - variables:
+        brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
+        color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
+        brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+
+    # Study light (if on and not overridden)
+    - if:
+        - condition: state
+          entity_id: light.study_ikea_light
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_study_override
+          state: "off"
+      then:
+        - service: light.turn_on
+          entity_id: light.study_ikea_light
+          data:
+            brightness: "{{ brightness_value }}"
+            color_temp_kelvin: "{{ color_temp_kelvin }}"
+            transition: 30
+
+    # Living light (if on and not overridden)
+    - if:
+        - condition: state
+          entity_id: light.living_ikea_light
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_living_override
+          state: "off"
+      then:
+        - service: light.turn_on
+          entity_id: light.living_ikea_light
+          data:
+            brightness: "{{ brightness_value }}"
+            color_temp_kelvin: "{{ color_temp_kelvin }}"
+            transition: 30
+
+    # Clear debounce flag after 5 seconds (allows time for light state to update)
+    - delay:
+        seconds: 5
+    - service: input_boolean.turn_off
+      entity_id: input_boolean.circadian_automation_active
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN POWER-ON HANDLER
+# Trigger: Light turns on
+# Action: Set to warmest color temp (2200K) with scheduled brightness
+# Note: Power-on always uses warmest color for gentle start
+# -----------------------------------------------------------------------------
+- id: circadian_power_on
+  alias: "Circadian - Light Power On"
+  description: "When light turns on, set to warm color temp with scheduled brightness"
+  mode: parallel
+  max: 2
+
+  trigger:
+    - platform: state
+      entity_id:
+        - light.study_ikea_light
+        - light.living_ikea_light
+      from: "off"
+      to: "on"
+
+  condition:
+    - condition: state
+      entity_id: input_boolean.circadian_enabled
+      state: "on"
+
+  variables:
+    room: "{{ 'study' if trigger.entity_id == 'light.study_ikea_light' else 'living' }}"
+    override_flag: "input_boolean.circadian_{{ room }}_override"
+    light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
+    brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
+    brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+    phase: "{{ states('sensor.circadian_phase') }}"
+
+  action:
+    # Skip if overridden
+    - condition: template
+      value_template: "{{ is_state(override_flag, 'off') }}"
+
+    # Set debounce flag
+    - service: input_boolean.turn_on
+      entity_id: input_boolean.circadian_automation_active
+
+    # Small delay for light to initialize
+    - delay:
+        milliseconds: 300
+
+    # Apply: warmest color temp (2200K) + scheduled brightness
+    - service: light.turn_on
+      target:
+        entity_id: "{{ trigger.entity_id }}"
+      data:
+        brightness: "{{ brightness_value }}"
+        color_temp_kelvin: 2200
+        transition: 2
+
+    # Clear debounce after 5 seconds
+    - delay:
+        seconds: 5
+    - service: input_boolean.turn_off
+      entity_id: input_boolean.circadian_automation_active
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN OVERRIDE DETECTION
+# Trigger: Light brightness or color_temp changes
+# Condition: Automation is NOT actively changing lights (debounce check)
+# Action: Set 30-minute override timer
+# Note: Detects remote presses via timing, not context (remotes bypass HA context)
+# -----------------------------------------------------------------------------
+- id: circadian_override_detect
+  alias: "Circadian - Override Detection"
+  description: "Detects manual light changes and sets 30-minute override"
+  mode: parallel
+  max: 2
+
+  trigger:
+    - platform: state
+      entity_id: light.study_ikea_light
+      attribute: brightness
+    - platform: state
+      entity_id: light.study_ikea_light
+      attribute: color_temp
+    - platform: state
+      entity_id: light.living_ikea_light
+      attribute: brightness
+    - platform: state
+      entity_id: light.living_ikea_light
+      attribute: color_temp
+
+  condition:
+    # Light must be on
+    - condition: template
+      value_template: "{{ trigger.to_state.state == 'on' }}"
+    # Circadian must be enabled
+    - condition: state
+      entity_id: input_boolean.circadian_enabled
+      state: "on"
+    # Automation must NOT be actively changing lights (debounce check)
+    - condition: state
+      entity_id: input_boolean.circadian_automation_active
+      state: "off"
+
+  variables:
+    room: "{{ 'study' if 'study' in trigger.entity_id else 'living' }}"
+    override_flag: "input_boolean.circadian_{{ room }}_override"
+    expiry_entity: "input_datetime.circadian_{{ room }}_override_expires"
+    light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
+    # Format expiration time as strings (avoid strftime on variable)
+    expiry_datetime: "{{ (now() + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S') }}"
+    expiry_time: "{{ (now() + timedelta(minutes=30)).strftime('%H:%M') }}"
+
+  action:
+    # Set override flag
+    - service: input_boolean.turn_on
+      target:
+        entity_id: "{{ override_flag }}"
+
+    # Set expiration time
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: "{{ expiry_entity }}"
+      data:
+        datetime: "{{ expiry_datetime }}"
+
+    # Notification
+    - service: notify.all_phones
+      data:
+        title: "💡 {{ light_name }} Override"
+        message: "Manual adjustment detected. Schedule resumes {{ expiry_time }}."
+        data:
+          channel: "Lights"
+          importance: low
+          tag: "circadian_override_{{ room }}"
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN OVERRIDE EXPIRY CHECK
+# Trigger: Every minute
+# Condition: At least one override is active
+# Action: Clear expired overrides and restore scheduled settings
+# -----------------------------------------------------------------------------
+- id: circadian_override_expiry
+  alias: "Circadian - Override Expiry Check"
+  description: "Checks for expired overrides every minute and restores schedule"
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/1"
+
+  condition:
+    # At least one override must be active
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: input_boolean.circadian_study_override
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_living_override
+          state: "on"
+
+  variables:
+    brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
+    color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
+    brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+
+  action:
+    # Check Study override expiry
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_study_override
+          state: "on"
+        - condition: template
+          value_template: >
+            {{ as_timestamp(states('input_datetime.circadian_study_override_expires'))
+               < as_timestamp(now()) }}
+      then:
+        # Clear override flag
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.circadian_study_override
+
+        # Restore settings if light is on
+        - if:
+            - condition: state
+              entity_id: light.study_ikea_light
+              state: "on"
+          then:
+            - service: input_boolean.turn_on
+              entity_id: input_boolean.circadian_automation_active
+            - service: light.turn_on
+              entity_id: light.study_ikea_light
+              data:
+                brightness: "{{ brightness_value }}"
+                color_temp_kelvin: "{{ color_temp_kelvin }}"
+                transition: 60
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              entity_id: input_boolean.circadian_automation_active
+
+        # Notification
+        - service: notify.all_phones
+          data:
+            title: "💡 Study Light"
+            message: "Override ended. Circadian schedule restored ({{ brightness_pct }}%)."
+            data:
+              channel: "Lights"
+              importance: low
+              tag: "circadian_override_study"
+
+    # Check Living override expiry
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_living_override
+          state: "on"
+        - condition: template
+          value_template: >
+            {{ as_timestamp(states('input_datetime.circadian_living_override_expires'))
+               < as_timestamp(now()) }}
+      then:
+        # Clear override flag
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.circadian_living_override
+
+        # Restore settings if light is on
+        - if:
+            - condition: state
+              entity_id: light.living_ikea_light
+              state: "on"
+          then:
+            - service: input_boolean.turn_on
+              entity_id: input_boolean.circadian_automation_active
+            - service: light.turn_on
+              entity_id: light.living_ikea_light
+              data:
+                brightness: "{{ brightness_value }}"
+                color_temp_kelvin: "{{ color_temp_kelvin }}"
+                transition: 60
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              entity_id: input_boolean.circadian_automation_active
+
+        # Notification
+        - service: notify.all_phones
+          data:
+            title: "💡 Living Light"
+            message: "Override ended. Circadian schedule restored ({{ brightness_pct }}%)."
+            data:
+              channel: "Lights"
+              importance: low
+              tag: "circadian_override_living"
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN PHASE NOTIFICATION
+# Trigger: Phase changes (Night→Sunrise→Day→Sunset→Night)
+# Condition: Circadian enabled and at least one light is on
+# Action: Send notification about the phase transition
+# -----------------------------------------------------------------------------
+- id: circadian_phase_notification
+  alias: "Circadian - Phase Change Notification"
+  description: "Notifies when circadian phase changes"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: sensor.circadian_phase
+
+  condition:
+    - condition: state
+      entity_id: input_boolean.circadian_enabled
+      state: "on"
+    # At least one light must be on
+    - condition: or
+      conditions:
+        - condition: state
+          entity_id: light.study_ikea_light
+          state: "on"
+        - condition: state
+          entity_id: light.living_ikea_light
+          state: "on"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "🌅 Circadian Lighting"
+        message: >
+          {% set phase = states('sensor.circadian_phase') %}
+          {% if phase == 'Sunrise' %}
+            Sunrise mode: Gradually brightening to 100%
+          {% elif phase == 'Day' %}
+            Day mode: Full brightness (100%)
+          {% elif phase == 'Sunset' %}
+            Sunset mode: Gradually dimming for sleep
+          {% elif phase == 'Night' %}
+            Night mode: Minimal light (20%)
+          {% endif %}
+        data:
+          channel: "Lights"
+          importance: low
+          tag: "circadian_phase"
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN HA STARTUP INIT
+# Trigger: Home Assistant starts
+# Action: Enable circadian if unknown, clear stale automation_active flag
+# -----------------------------------------------------------------------------
+- id: circadian_ha_startup
+  alias: "Circadian - HA Startup Init"
+  description: "Initializes circadian lighting state on Home Assistant startup"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  action:
+    # Always enable circadian on startup (user can disable manually if needed)
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.circadian_enabled
+
+    # Clear automation_active flag (might be stale from crash)
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_automation_active
+
+    # Clear any stale overrides from before restart
+    - service: input_boolean.turn_off
+      target:
+        entity_id:
+          - input_boolean.circadian_study_override
+          - input_boolean.circadian_living_override
+
+    # Notification
+    - service: notify.all_phones
+      data:
+        title: "💡 Circadian Initialized"
+        message: "Lighting schedule active. Phase: {{ states('sensor.circadian_phase') }}."
+        data:
+          channel: "Info"
+          importance: low
+          tag: "circadian_startup"

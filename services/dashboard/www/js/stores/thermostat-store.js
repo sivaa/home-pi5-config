@@ -103,10 +103,11 @@ export function initThermostatStore(Alpine, CONFIG) {
     manualOverrides: {},
 
     // Night mode override state (for bedroom 17°C enforcement bypass)
+    // State comes from MQTT (dashboard/bedroom-night-mode), not localStorage
     nightModeOverride: {
-      active: false,        // True when user has disabled night mode enforcement
-      expiresAt: null,      // When the override expires (re-enables night mode)
-      timeoutId: null       // For scheduling re-enable
+      nightModeActive: true,   // Is 17°C cap enforced? (true = enforced, false = not enforced)
+      overrideActive: false,   // Is temporary override in effect?
+      expiresAt: null          // When override ends (ms timestamp), null if not active
     },
 
     // HA API config
@@ -120,6 +121,8 @@ export function initThermostatStore(Alpine, CONFIG) {
     async init() {
       // Load historical events from InfluxDB first
       await this.loadHistoricalEvents(24);
+
+      // Night mode state comes from MQTT (server-side, no localStorage)
 
       const mqtt = Alpine.store('mqtt');
       if (!mqtt?.client) {
@@ -145,12 +148,21 @@ export function initThermostatStore(Alpine, CONFIG) {
       mqtt.client.subscribe('dashboard/heater-guard/combined', { qos: 1 });
       console.log('[thermostat-store] Subscribed to dashboard/heater-guard/combined');
 
+      // Subscribe to bedroom night mode state (for override banner)
+      mqtt.client.subscribe('dashboard/bedroom-night-mode', { qos: 1 });
+      console.log('[thermostat-store] Subscribed to dashboard/bedroom-night-mode');
+
       // PERFORMANCE: Use central dispatcher instead of client.on('message')
       // This prevents duplicate JSON parsing across multiple stores
 
       // Handle heater guard state (for pause banner)
       mqtt.registerTopicHandler('dashboard/heater-guard/combined', (topic, data) => {
         this.handleHeaterGuardUpdate(data);
+      });
+
+      // Handle bedroom night mode state (from HA automations)
+      mqtt.registerTopicHandler('dashboard/bedroom-night-mode', (topic, data) => {
+        this.handleNightModeUpdate(data);
       });
 
       // Handle bridge events (device_leave, etc.)
@@ -491,6 +503,33 @@ export function initThermostatStore(Alpine, CONFIG) {
         }
       } else if (!data.active && wasActive) {
         console.log('[thermostat-store] Heaters RESUMED');
+      }
+    },
+
+    /**
+     * Handle bedroom night mode state update from MQTT
+     * Updates nightModeOverride state for dashboard UI
+     * Payload: { active: bool, override_active: bool, override_expires: string|null }
+     */
+    handleNightModeUpdate(data) {
+      const wasOverrideActive = this.nightModeOverride.overrideActive;
+
+      this.nightModeOverride = {
+        nightModeActive: data.active ?? true,
+        overrideActive: data.override_active ?? false,
+        expiresAt: data.override_expires ? new Date(data.override_expires).getTime() : null
+      };
+
+      // Log state changes
+      if (data.override_active && !wasOverrideActive) {
+        const expiresStr = data.override_expires ? data.override_expires.substring(11, 16) : '?';
+        console.log(`[thermostat-store] Night mode OVERRIDE started (expires ${expiresStr})`);
+      } else if (!data.override_active && wasOverrideActive) {
+        console.log('[thermostat-store] Night mode override ENDED');
+      } else if (data.active) {
+        console.log('[thermostat-store] Night mode ACTIVE (17°C cap enforced)');
+      } else {
+        console.log('[thermostat-store] Night mode INACTIVE');
       }
     },
 
@@ -859,75 +898,23 @@ export function initThermostatStore(Alpine, CONFIG) {
     },
 
     /**
-     * Disable bedroom night mode enforcement for a duration
-     * This allows setting the bedroom temperature above 17°C during night hours
-     * @param {number} durationMinutes - How long to disable enforcement (default: 90 min = 1.5 hours)
+     * Request night mode override (calls HA script)
+     * Dashboard button calls this; HA handles all state management
+     * The script will:
+     *   1. Set input_datetime.bedroom_night_override_end to now + 90 min
+     *   2. Turn off input_boolean.bedroom_night_mode_active
+     *   3. Publish state to MQTT (which updates this store)
      */
-    async disableNightModeEnforcement(durationMinutes = 90) {
+    async requestNightModeOverride() {
       try {
-        // Turn off the night mode flag in Home Assistant
-        await this.callHAService('input_boolean', 'turn_off', {
-          entity_id: 'input_boolean.bedroom_night_mode_active'
+        console.log('[thermostat-store] Requesting night mode override from HA...');
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.bedroom_night_override_start'
         });
-
-        // Calculate expiry time
-        const expiresAt = Date.now() + (durationMinutes * 60 * 1000);
-
-        // Clear any existing timeout
-        if (this.nightModeOverride.timeoutId) {
-          clearTimeout(this.nightModeOverride.timeoutId);
-        }
-
-        // Update state
-        this.nightModeOverride = {
-          active: true,
-          expiresAt: expiresAt,
-          timeoutId: setTimeout(() => {
-            this.enableNightModeEnforcement();
-          }, durationMinutes * 60 * 1000)
-        };
-
-        console.log(`[thermostat-store] Night mode enforcement disabled for ${durationMinutes} minutes (until ${new Date(expiresAt).toLocaleTimeString()})`);
-
+        // UI updates automatically via MQTT when HA publishes state
+        console.log('[thermostat-store] Night mode override request sent');
       } catch (err) {
-        console.error('[thermostat-store] Failed to disable night mode enforcement:', err);
-      }
-    },
-
-    /**
-     * Re-enable bedroom night mode enforcement
-     * Called automatically after override expires or manually by user
-     */
-    async enableNightModeEnforcement() {
-      try {
-        // Check if we're still in night hours (23:00-06:00)
-        const now = new Date();
-        const hour = now.getHours();
-        const isNightTime = hour >= 23 || hour < 6;
-
-        if (isNightTime) {
-          // Turn the night mode flag back on
-          await this.callHAService('input_boolean', 'turn_on', {
-            entity_id: 'input_boolean.bedroom_night_mode_active'
-          });
-          console.log('[thermostat-store] Night mode enforcement re-enabled');
-        } else {
-          console.log('[thermostat-store] Not in night hours, skipping night mode re-enable');
-        }
-
-        // Clear the override state
-        if (this.nightModeOverride.timeoutId) {
-          clearTimeout(this.nightModeOverride.timeoutId);
-        }
-
-        this.nightModeOverride = {
-          active: false,
-          expiresAt: null,
-          timeoutId: null
-        };
-
-      } catch (err) {
-        console.error('[thermostat-store] Failed to enable night mode enforcement:', err);
+        console.error('[thermostat-store] Failed to request night mode override:', err);
       }
     },
 
@@ -936,7 +923,7 @@ export function initThermostatStore(Alpine, CONFIG) {
      * @returns {string} Formatted time remaining (e.g., "1h 30m")
      */
     getNightModeOverrideRemaining() {
-      if (!this.nightModeOverride.active || !this.nightModeOverride.expiresAt) {
+      if (!this.nightModeOverride.overrideActive || !this.nightModeOverride.expiresAt) {
         return '';
       }
 
