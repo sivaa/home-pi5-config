@@ -728,7 +728,7 @@
 
         <!-- Vision 10: Heater Control - CPU OPTIMIZATION: x-if removes heavy DOM when hidden -->
         <template x-if="currentView === 'heater'">
-        <div x-data="thermostatView()" x-init="init()">
+        <div x-data="thermostatView()" x-init="init()" @destroy.window="destroy()">
           <div class="thermostat-view">
             <!-- Compact Header: Title + Stats + Tabs in one line -->
             <div class="thermostat-compact-header">
@@ -1176,7 +1176,7 @@
 
         <!-- Activity Logs View - CPU OPTIMIZATION: x-if removes logs DOM when hidden -->
         <template x-if="currentView === 'logs'">
-        <div x-data="logsView()" x-init="init()">
+        <div x-data="logsView()" x-init="init()" @destroy.window="destroy()">
           <div class="logs-view">
             <!-- Filter Sidebar -->
             <div class="logs-sidebar" x-show="showFilters">
@@ -1580,7 +1580,7 @@
 
         <!-- Zigbee Network View - CPU OPTIMIZATION: x-if removes WebGL from DOM when hidden -->
         <template x-if="currentView === 'network'">
-        <div x-data="networkView()" x-init="init()">
+        <div x-data="networkView()" x-init="init()" @destroy.window="destroy()">
           <div class="network-view">
             <!-- Controls -->
             <div class="network-controls">
@@ -4845,12 +4845,19 @@
           // Initial sparkline render
           this.$nextTick(() => this.updateSparklines());
 
-          // Update sparklines every 5 seconds
-          this.sparklineUpdateInterval = setInterval(() => this.updateSparklines(), 5000);
+          // Update sparklines every 5 seconds (only when view is active)
+          // CPU OPTIMIZATION: Skip updates when view is hidden
+          this.sparklineUpdateInterval = setInterval(() => {
+            if (Alpine.store('app')?.currentView === 'classic') {
+              this.updateSparklines();
+            }
+          }, 5000);
 
-          // Watch for room changes
+          // Watch for room changes (only update if view is active)
           this.$watch('$store.rooms.list', () => {
-            this.$nextTick(() => this.updateSparklines());
+            if (Alpine.store('app')?.currentView === 'classic') {
+              this.$nextTick(() => this.updateSparklines());
+            }
           });
         },
 

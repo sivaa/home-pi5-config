@@ -991,6 +991,58 @@ export function networkView() {
       networkState.renderer.setSize(container.clientWidth, container.clientHeight);
     },
 
-    getZoomPercent() { return Math.round(this.zoomLevel * 100); }
+    getZoomPercent() { return Math.round(this.zoomLevel * 100); },
+
+    // ========================================
+    // CLEANUP
+    // ========================================
+
+    destroy() {
+      console.log('[network-view] Destroying...');
+
+      // Cancel animation loop
+      if (networkState.animationId) {
+        cancelAnimationFrame(networkState.animationId);
+        networkState.animationId = null;
+      }
+
+      // Remove DOM label elements
+      Object.values(networkState.labelElements).forEach(el => el?.remove());
+      Object.values(networkState.signalElements).forEach(el => el?.remove());
+      networkState.labelElements = {};
+      networkState.signalElements = {};
+
+      // Dispose Three.js resources
+      if (networkState.renderer) {
+        networkState.renderer.dispose();
+        networkState.renderer.forceContextLoss();
+        networkState.renderer = null;
+      }
+
+      // Clear scene (disposes geometries and materials)
+      if (networkState.scene) {
+        networkState.scene.traverse(obj => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach(m => m.dispose());
+            } else {
+              obj.material.dispose();
+            }
+          }
+        });
+        networkState.scene.clear();
+        networkState.scene = null;
+      }
+
+      networkState.camera = null;
+      networkState.roomMeshes = {};
+      networkState.wallMeshes = [];
+      networkState.wallNumberSprites = [];
+      networkState.deviceMeshes = {};
+      networkState.isInitialized = false;
+
+      console.log('[network-view] Destroyed successfully');
+    }
   };
 }

@@ -410,9 +410,12 @@ export function initSensorsStore(Alpine, CONFIG) {
     /**
      * Start the duration ticker (call once after init)
      * PERFORMANCE: Reduced from 1s to 5s - exact seconds aren't critical for door open durations
+     * CPU OPTIMIZATION: Skip updates when sidebar is hidden (ambient view)
      */
     startDurationTicker() {
       setInterval(() => {
+        // Skip update when sidebar not visible (ambient view hides sidebar)
+        if (Alpine.store('app')?.currentView === 'ambient') return;
         this.durationTick = Date.now();
       }, 5000);
     },
