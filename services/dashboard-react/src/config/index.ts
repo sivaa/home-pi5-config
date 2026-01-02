@@ -221,3 +221,75 @@ export const ALL_VIEWS = VIEW_CATEGORIES.flatMap((cat) => cat.views);
 export const KEYBOARD_SHORTCUTS = Object.fromEntries(
   ALL_VIEWS.map((v) => [v.key.toLowerCase(), v.id])
 );
+
+// Zigbee device configuration for Network view
+export interface ZigbeeDevice {
+  id: string;
+  name: string;
+  type: 'coordinator' | 'router' | 'end-device';
+  icon: string;
+  room: string;
+  x: number; // 0-1 position within room
+  z: number; // 0-1 position within room
+}
+
+export const ZIGBEE_DEVICES: ZigbeeDevice[] = [
+  // Coordinator
+  { id: 'coordinator', name: 'Sonoff Dongle V2', type: 'coordinator', icon: '📡', room: 'living', x: 0.5, z: 0.4 },
+
+  // Routers (mains-powered)
+  { id: 'plug1', name: 'Smart Plug [1]', type: 'router', icon: '🔌', room: 'living', x: 0.3, z: 0.3 },
+  { id: 'plug2', name: 'Smart Plug [2]', type: 'router', icon: '🔌', room: 'study', x: 0.8, z: 0.2 },
+  { id: 'plug3', name: 'Smart Plug [3]', type: 'router', icon: '🔌', room: 'kitchen', x: 0.6, z: 0.1 },
+  { id: 'study-light', name: '[Study] IKEA Light', type: 'router', icon: '💡', room: 'study', x: 0.85, z: 0.25 },
+  { id: 'living-light', name: '[Living] IKEA Light', type: 'router', icon: '💡', room: 'living', x: 0.4, z: 0.35 },
+  { id: 'co2', name: '[Hallway] CO2', type: 'router', icon: '🌬️', room: 'hallway', x: 0.5, z: 0.5 },
+
+  // End devices (battery-powered)
+  { id: 'temp-balcony', name: '[Balcony] Temperature', type: 'end-device', icon: '🌡️', room: 'balcony', x: 0.1, z: 0.4 },
+  { id: 'temp-study', name: '[Study] Temperature', type: 'end-device', icon: '🌡️', room: 'study', x: 0.9, z: 0.2 },
+  { id: 'temp-living', name: '[Living] Temperature', type: 'end-device', icon: '🌡️', room: 'living', x: 0.35, z: 0.4 },
+  { id: 'temp-kitchen', name: '[Kitchen] Temperature', type: 'end-device', icon: '🌡️', room: 'kitchen', x: 0.65, z: 0.15 },
+  { id: 'temp-bath', name: '[Bath] Temperature', type: 'end-device', icon: '🌡️', room: 'bathroom', x: 0.85, z: 0.1 },
+  { id: 'temp-bed', name: '[Bed] Temperature', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.2, z: 0.15 },
+
+  // Contact sensors
+  { id: 'contact-bath', name: '[Bath] Window', type: 'end-device', icon: '🪟', room: 'bathroom', x: 0.95, z: 0.08 },
+  { id: 'contact-bed', name: '[Bed] Window', type: 'end-device', icon: '🪟', room: 'bedroom', x: 0.1, z: 0.1 },
+  { id: 'contact-kitchen', name: '[Kitchen] Window', type: 'end-device', icon: '🪟', room: 'kitchen', x: 0.7, z: 0.05 },
+  { id: 'contact-study-lg', name: '[Study] Window Large', type: 'end-device', icon: '🪟', room: 'study', x: 0.95, z: 0.18 },
+  { id: 'contact-living-door', name: '[Living] Balcony Door', type: 'end-device', icon: '🚪', room: 'living', x: 0.2, z: 0.5 },
+  { id: 'contact-main-door', name: '[Hallway] Main Door', type: 'end-device', icon: '🚪', room: 'hallway', x: 0.5, z: 0.55 },
+
+  // Thermostats
+  { id: 'thermo-study', name: '[Study] Thermostat', type: 'end-device', icon: '🔥', room: 'study', x: 0.7, z: 0.25 },
+  { id: 'thermo-bed', name: '[Bed] Thermostat', type: 'end-device', icon: '🔥', room: 'bedroom', x: 0.05, z: 0.18 },
+  { id: 'thermo-living-inner', name: '[Living] Thermostat', type: 'end-device', icon: '🔥', room: 'living', x: 0.3, z: 0.25 },
+  { id: 'thermo-living-outer', name: '[Living] Thermostat', type: 'end-device', icon: '🔥', room: 'living', x: 0.4, z: 0.5 },
+
+  // Mailbox motion sensor
+  { id: 'motion-mailbox', name: '[Mailbox] Motion Sensor', type: 'end-device', icon: '📬', room: 'mailbox', x: 0.5, z: 0.5 },
+
+  // Vibration sensor
+  { id: 'vibration', name: 'Vibration Sensor', type: 'end-device', icon: '💧', room: 'bathroom', x: 0.88, z: 0.12 },
+];
+
+// Floor plan room positions (for 2D SVG layout)
+export interface FloorPlanRoom {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export const FLOOR_PLAN_ROOMS: FloorPlanRoom[] = [
+  { id: 'bathroom', name: 'Bath', x: 0, y: 0, width: 80, height: 50 },
+  { id: 'kitchen', name: 'Kitchen', x: 0, y: 50, width: 80, height: 60 },
+  { id: 'hallway', name: 'Hall', x: 80, y: 0, width: 60, height: 110 },
+  { id: 'bedroom', name: 'Bedroom', x: 0, y: 110, width: 100, height: 90 },
+  { id: 'study', name: 'Study', x: 140, y: 0, width: 100, height: 100 },
+  { id: 'living', name: 'Living', x: 100, y: 100, width: 140, height: 100 },
+  { id: 'balcony', name: 'Balcony', x: 0, y: 200, width: 60, height: 40 },
+];

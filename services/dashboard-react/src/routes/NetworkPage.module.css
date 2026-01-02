@@ -1,0 +1,232 @@
+/**
+ * NetworkPage styles
+ *
+ * 2D floor plan visualization with Zigbee devices.
+ * Performance: No animations, simple shapes.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  gap: var(--space-md);
+  max-width: 900px;
+  margin: 0 auto;
+  height: 100%;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.toggleBtn {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.toggleBtn:hover {
+  border-color: var(--color-primary);
+}
+
+.toggleBtn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+/* Stats */
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.statDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Floor Plan Container */
+.floorPlanContainer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  min-height: 300px;
+}
+
+.floorPlan {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+}
+
+/* Rooms */
+.room {
+  fill: #e8dfd4;
+  stroke: #b5a080;
+  stroke-width: 1.5;
+}
+
+[data-theme="dark"] .room {
+  fill: #2c2c2e;
+  stroke: #48484a;
+}
+
+.roomLabel {
+  font-size: 8px;
+  fill: #8b7355;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .roomLabel {
+  fill: #8e8e93;
+}
+
+/* Device Markers */
+.deviceMarker {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.deviceMarker:hover {
+  transform: scale(1.2);
+}
+
+.deviceIcon {
+  pointer-events: none;
+}
+
+.deviceLabel {
+  font-size: 5px;
+  fill: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+/* Device Info Panel */
+.deviceInfo {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.deviceInfoHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.deviceInfoIcon {
+  font-size: var(--font-size-xl);
+}
+
+.deviceInfoName {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.deviceInfoDetails {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.legendDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-md);
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .stats {
+    justify-content: center;
+  }
+
+  .legend {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .deviceInfoDetails {
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+}

@@ -10,31 +10,9 @@ import { CO2Page } from './CO2Page';
 import { HotWaterPage } from './HotWaterPage';
 import { LogsPage } from './LogsPage';
 import { HeaterPage } from './HeaterPage';
-import { PlaceholderPage } from './PlaceholderPage';
-
-const TimelinePage = () => (
-  <PlaceholderPage
-    title="Event Timeline"
-    icon="📖"
-    description="Chronological view of thermostat and sensor events. (Phase 5)"
-  />
-);
-
-const NetworkPage = () => (
-  <PlaceholderPage
-    title="Zigbee Network"
-    icon="📡"
-    description="3D floor plan with sensor positions and signal quality. (Phase 5)"
-  />
-);
-
-const MailboxPage = () => (
-  <PlaceholderPage
-    title="Mailbox Monitor"
-    icon="📬"
-    description="Motion detection events from mailbox sensor. (Phase 5)"
-  />
-);
+import { TimelinePage } from './TimelinePage';
+import { NetworkPage } from './NetworkPage';
+import { MailboxPage } from './MailboxPage';
 
 // Route definitions
 const routes: RouteObject[] = [
