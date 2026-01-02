@@ -6,6 +6,8 @@ import { createHashRouter, RouteObject } from 'react-router-dom';
 import { Layout } from '@/components/layout';
 import { LightsPage } from './LightsPage';
 import { ClassicPage } from './ClassicPage';
+import { CO2Page } from './CO2Page';
+import { HotWaterPage } from './HotWaterPage';
 import { PlaceholderPage } from './PlaceholderPage';
 
 const TimelinePage = () => (
@@ -21,22 +23,6 @@ const LogsPage = () => (
     title="Activity Logs"
     icon="📋"
     description="Real-time MQTT message logs with filtering."
-  />
-);
-
-const CO2Page = () => (
-  <PlaceholderPage
-    title="CO2 Monitor"
-    icon="💨"
-    description="CO2 levels, air quality, and historical charts."
-  />
-);
-
-const HotWaterPage = () => (
-  <PlaceholderPage
-    title="Hot Water Monitor"
-    icon="🚿"
-    description="Hot water usage tracking via vibration sensor."
   />
 );
 

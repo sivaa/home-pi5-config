@@ -2,7 +2,7 @@
 
 Last Updated: 2026-01-02
 
-## Current Phase: 2 - Simple Views (COMPLETE)
+## Current Phase: 3 - Monitor Views (COMPLETE)
 
 ### Phase 0 - Validation (COMPLETE)
 
@@ -77,12 +77,41 @@ Status:     WORKING
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Next Steps (Phase 3)
+### Phase 3 - Monitor Views (COMPLETE)
 
-1. Implement CO2 Monitor page
-2. Add Timeline page for thermostat events
-3. Hot Water monitor page
-4. Historical charts with InfluxDB integration
+- [x] co2Store with Zustand for CO2/temp/humidity
+- [x] useCO2MQTT hook for NOUS E10 sensor
+- [x] CO2Page with circular gauge and info cards
+- [x] Air quality thresholds (Excellent/Good/Moderate/Poor/Bad)
+- [x] hotWaterStore for vibration sensor state
+- [x] useHotWaterMQTT hook for pipe vibration sensor
+- [x] HotWaterPage with running/idle indicator
+- [x] Deployed and tested
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 3 TEST RESULTS                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  CO2 Page:              PASS - Circular gauge with live CO2 data (868 ppm) │
+│  Air Quality Colors:    PASS - Green for "Good" (600-1000 ppm)             │
+│  Temperature/Humidity:  PASS - Shows 17.0°C and 57% from sensor            │
+│  Hot Water Page:        PASS - Shows Idle status with last update          │
+│  Vibration Sensor:      PASS - Receives MQTT data                          │
+│  Classic Page:          PASS - Still works (7 rooms with live data)        │
+│  Lights Page:           PASS - Still works (both lights controllable)      │
+│                                                                             │
+│  Bundle Size: 190KB gzip (+3KB for monitors)                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Next Steps (Phase 4)
+
+1. Timeline page for thermostat events (requires events store)
+2. Historical charts with InfluxDB integration
+3. Logs page with real-time MQTT message display
+4. Heater/Thermostat control page
 
 ---
 
@@ -93,8 +122,8 @@ Status:     WORKING
 | 0 | Validation (lights only) | **COMPLETE** |
 | 1 | Foundation (routing, layout) | **COMPLETE** |
 | 2 | Simple Views (Lights, Classic) | **COMPLETE** |
-| 3 | Monitor Views (CO2, Timeline, etc.) | Pending |
-| 4 | Complex Views (Logs, Thermostat, Network) | Pending |
+| 3 | Monitor Views (CO2, Hot Water) | **COMPLETE** |
+| 4 | Complex Views (Logs, Timeline, Heater) | Pending |
 | 5 | Integration + Polish | Pending |
 | 6 | Cutover | Pending |
 
@@ -124,3 +153,11 @@ Phase 2:
 - Implemented ClassicPage with summary card
 - Home averages exclude outdoor sensors
 - Deployed and tested on Pi
+
+Phase 3:
+- Created co2Store with air quality thresholds
+- CO2Page with SVG circular gauge
+- hotWaterStore for vibration sensor
+- HotWaterPage with running/idle indicator
+- Both pages showing live MQTT data
+- Bundle size: 190KB gzip

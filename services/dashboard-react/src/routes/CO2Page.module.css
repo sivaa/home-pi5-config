@@ -1,0 +1,248 @@
+/**
+ * CO2Page styles
+ *
+ * Clean, focused design for air quality monitoring.
+ * Performance: No animations, simple shadows.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-lg);
+  gap: var(--space-xl);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Gauge Section */
+.gaugeSection {
+  text-align: center;
+  width: 100%;
+}
+
+.gaugeHeader {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: var(--space-md);
+}
+
+.gauge {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  margin: 0 auto;
+}
+
+.gaugeRing {
+  width: 100%;
+  height: 100%;
+}
+
+.gaugeArc {
+  transition: stroke-dasharray 0.6s ease, stroke 0.4s ease;
+}
+
+.gaugeContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.value {
+  font-size: 64px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.unit {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: var(--space-xs);
+}
+
+.status {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  margin-top: var(--space-sm);
+  text-transform: capitalize;
+  transition: color 0.3s ease;
+}
+
+/* Cards Grid */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.card.highlight {
+  border: 2px solid #ff6b6b;
+}
+
+.cardIcon {
+  font-size: 28px;
+  margin-bottom: var(--space-sm);
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cardLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cardValue {
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+}
+
+.cardBar {
+  height: 6px;
+  background: var(--color-bg);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: var(--space-xs);
+}
+
+.cardFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease, background 0.3s ease;
+}
+
+.cardStatus {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+  margin-top: var(--space-xs);
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.footerItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-md);
+    gap: var(--space-lg);
+  }
+
+  .gauge {
+    width: 220px;
+    height: 220px;
+  }
+
+  .value {
+    font-size: 48px;
+  }
+
+  .status {
+    font-size: var(--font-size-lg);
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    text-align: left;
+    padding: var(--space-md);
+  }
+
+  .cardIcon {
+    font-size: 24px;
+    margin-bottom: 0;
+  }
+
+  .cardContent {
+    flex: 1;
+  }
+
+  .cardValue {
+    font-size: 24px;
+  }
+
+  .legend {
+    gap: var(--space-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .gauge {
+    width: 180px;
+    height: 180px;
+  }
+
+  .value {
+    font-size: 40px;
+  }
+}
