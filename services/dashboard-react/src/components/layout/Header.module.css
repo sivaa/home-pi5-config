@@ -1,0 +1,107 @@
+/**
+ * Header styles
+ */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.logoIcon {
+  font-size: 1.5rem;
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  justify-content: center;
+  flex: 1;
+  margin: 0 var(--space-md);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  min-height: var(--touch-target);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.navLink:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.navLinkActive {
+  background: var(--color-primary);
+  color: white;
+}
+
+.navLinkActive:hover {
+  background: var(--color-primary-hover);
+  color: white;
+}
+
+.navIcon {
+  font-size: 1rem;
+}
+
+.navLabel {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .navLabel {
+    display: inline;
+  }
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+}
+
+.statusDotConnected {
+  background: var(--color-success);
+}
+
+.statusDotConnecting {
+  background: var(--color-warning);
+}
+
+.statusDotError {
+  background: var(--color-danger);
+}

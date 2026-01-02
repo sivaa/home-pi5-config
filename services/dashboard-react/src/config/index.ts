@@ -56,3 +56,69 @@ export const LIGHT_SCENES = {
 
 export type LightPreset = keyof typeof LIGHT_PRESETS;
 export type LightScene = keyof typeof LIGHT_SCENES;
+
+// View configuration
+export interface ViewConfig {
+  id: string;
+  name: string;
+  icon: string;
+  title: string;
+  path: string;
+  key: string;
+}
+
+export interface ViewCategory {
+  id: string;
+  name: string;
+  icon: string;
+  views: ViewConfig[];
+}
+
+// All dashboard views organized by category
+export const VIEW_CATEGORIES: ViewCategory[] = [
+  {
+    id: 'display',
+    name: 'Display',
+    icon: '📺',
+    views: [
+      { id: 'classic', name: 'Classic', icon: '🃏', title: 'Classic Cards', path: '/', key: '8' },
+    ],
+  },
+  {
+    id: 'monitor',
+    name: 'Monitor',
+    icon: '📈',
+    views: [
+      { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', path: '/timeline', key: '5' },
+      { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', path: '/logs', key: 'l' },
+      { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', path: '/co2', key: '0' },
+      { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', path: '/hotwater', key: 'w' },
+    ],
+  },
+  {
+    id: 'visualize',
+    name: 'Visualize',
+    icon: '👁️',
+    views: [
+      { id: 'network', name: 'Network', icon: '📡', title: 'Zigbee Network', path: '/network', key: 'n' },
+    ],
+  },
+  {
+    id: 'control',
+    name: 'Control',
+    icon: '🎛️',
+    views: [
+      { id: 'lights', name: 'Lights', icon: '💡', title: 'Light Control', path: '/lights', key: '7' },
+      { id: 'heater', name: 'Heater', icon: '🔥', title: 'Heater Control', path: '/heater', key: 'h' },
+      { id: 'mailbox', name: 'Mailbox', icon: '📬', title: 'Mailbox Monitor', path: '/mailbox', key: 'm' },
+    ],
+  },
+];
+
+// Flat list of all views
+export const ALL_VIEWS = VIEW_CATEGORIES.flatMap((cat) => cat.views);
+
+// Keyboard shortcut map (key -> view id)
+export const KEYBOARD_SHORTCUTS = Object.fromEntries(
+  ALL_VIEWS.map((v) => [v.key.toLowerCase(), v.id])
+);
