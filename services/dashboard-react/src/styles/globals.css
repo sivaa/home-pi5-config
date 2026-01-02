@@ -19,13 +19,16 @@
   --color-bg: #f8fafc;
   --color-surface: #ffffff;
   --color-text: #1e293b;
+  --color-text-primary: #1e293b;
   --color-text-secondary: #64748b;
+  --color-text-tertiary: #94a3b8;
   --color-border: #e2e8f0;
   --color-primary: #3b82f6;
   --color-primary-hover: #2563eb;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-info: #0ea5e9;
 
   /* Spacing */
   --space-xs: 4px;
@@ -34,10 +37,30 @@
   --space-lg: 24px;
   --space-xl: 32px;
 
-  /* Sizing */
+  /* Font sizes */
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+
+  /* Font weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Border radius */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Shadows (single layer only for Pi performance) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
 
   /* Touch targets (44px minimum for accessibility) */
   --touch-target: 44px;
@@ -52,8 +75,13 @@
   --color-bg: #0f172a;
   --color-surface: #1e293b;
   --color-text: #f1f5f9;
+  --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
   --color-border: #334155;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
 }
 
 html, body {

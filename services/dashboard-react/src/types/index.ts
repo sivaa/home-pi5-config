@@ -39,3 +39,44 @@ export interface LightCommand {
 
 // Topic handler for MQTT dispatcher
 export type TopicHandler = (topic: string, message: unknown) => void;
+
+// MQTT message from climate sensor
+export interface ClimateMQTTMessage {
+  temperature?: number;
+  humidity?: number;
+  battery?: number;
+  linkquality?: number;
+  co2?: number;
+}
+
+// Individual sensor reading
+export interface SensorReading {
+  sensorName: string;
+  label: string;
+  isPrimary: boolean;
+  temperature: number | null;
+  humidity: number | null;
+  battery: number | null;
+  co2: number | null;
+  lastSeen: number | null;
+  isStale: boolean;
+}
+
+// Room state with multiple sensors
+export interface RoomState {
+  id: string;
+  name: string;
+  icon: string;
+  isOutdoor: boolean;
+  // Sensor readings
+  sensors: SensorReading[];
+  // Computed averages
+  temperature: number | null;
+  humidity: number | null;
+  co2: number | null;
+  // Status
+  comfortLevel: 'cold' | 'cool' | 'comfortable' | 'warm' | 'hot' | null;
+  hasData: boolean;
+  sensorCount: number;
+  activeSensorCount: number;
+}

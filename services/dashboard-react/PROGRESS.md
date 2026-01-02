@@ -2,7 +2,7 @@
 
 Last Updated: 2026-01-02
 
-## Current Phase: 1 - Foundation (COMPLETE)
+## Current Phase: 2 - Simple Views (COMPLETE)
 
 ### Phase 0 - Validation (COMPLETE)
 
@@ -47,12 +47,42 @@ Location:   /opt/dashboard/www/v2/
 Status:     WORKING
 ```
 
-### Next Steps (Phase 2)
+### Phase 2 - Simple Views (COMPLETE)
 
-1. Implement Classic page (room cards with temp/humidity)
-2. Add roomsStore with sensor data
-3. Create RoomCard component
-4. Add InfluxDB integration for historical data
+- [x] roomsStore with Zustand for multi-sensor rooms
+- [x] useRoomsMQTT hook for sensor subscriptions
+- [x] RoomCard component with comfort level strips
+- [x] ClassicPage with summary + room grid
+- [x] Home average calculations (indoor rooms only)
+- [x] Multi-sensor display (e.g., "2/2", "3/4")
+- [x] Outdoor badge for balcony
+- [x] CSS variables expanded (fonts, shadows, colors)
+- [x] Deployed and tested
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2 TEST RESULTS                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Classic Page:           PASS - 7 room cards displayed                      │
+│  Summary Card:           PASS - Shows home temp/humidity averages           │
+│  Multi-Sensor Rooms:     PASS - Shows active/total sensor counts            │
+│  Comfort Strips:         PASS - Color-coded by temperature                  │
+│  Outdoor Badge:          PASS - Balcony marked as outdoor                   │
+│  MQTT Live Data:         PASS - Real-time sensor updates                    │
+│  Navigation:             PASS - Both Classic and Lights work                │
+│                                                                             │
+│  Bundle Size: 187KB gzip (+2KB for rooms)                                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Next Steps (Phase 3)
+
+1. Implement CO2 Monitor page
+2. Add Timeline page for thermostat events
+3. Hot Water monitor page
+4. Historical charts with InfluxDB integration
 
 ---
 
@@ -62,7 +92,7 @@ Status:     WORKING
 |-------|-------------|--------|
 | 0 | Validation (lights only) | **COMPLETE** |
 | 1 | Foundation (routing, layout) | **COMPLETE** |
-| 2 | Simple Views (Lights, Classic) | Pending |
+| 2 | Simple Views (Lights, Classic) | **COMPLETE** |
 | 3 | Monitor Views (CO2, Timeline, etc.) | Pending |
 | 4 | Complex Views (Logs, Thermostat, Network) | Pending |
 | 5 | Integration + Polish | Pending |
@@ -87,3 +117,10 @@ Phase 1:
 - 9 view routes with placeholders
 - Keyboard shortcuts
 - Deployed and tested
+
+Phase 2:
+- Added roomsStore for multi-sensor room data
+- Created RoomCard component with comfort strips
+- Implemented ClassicPage with summary card
+- Home averages exclude outdoor sensors
+- Deployed and tested on Pi

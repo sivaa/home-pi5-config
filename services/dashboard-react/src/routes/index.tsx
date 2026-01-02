@@ -5,16 +5,8 @@
 import { createHashRouter, RouteObject } from 'react-router-dom';
 import { Layout } from '@/components/layout';
 import { LightsPage } from './LightsPage';
+import { ClassicPage } from './ClassicPage';
 import { PlaceholderPage } from './PlaceholderPage';
-
-// View pages - placeholders for now, will be implemented in later phases
-const ClassicPage = () => (
-  <PlaceholderPage
-    title="Classic Cards"
-    icon="🃏"
-    description="Room temperature and humidity cards with sensor data."
-  />
-);
 
 const TimelinePage = () => (
   <PlaceholderPage

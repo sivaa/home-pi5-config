@@ -1,0 +1,155 @@
+/**
+ * RoomCard styles
+ *
+ * Performance notes:
+ * - No backdrop-filter (causes high CPU on Pi)
+ * - Single box-shadow only
+ * - Transform animations only
+ */
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card.noData {
+  opacity: 0.6;
+}
+
+.card.outdoor {
+  border: 1px solid var(--color-border);
+}
+
+/* Comfort Strip */
+.comfortStrip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.comfortStrip.cold { background: var(--color-info); }
+.comfortStrip.cool { background: #60a5fa; }
+.comfortStrip.comfortable { background: var(--color-success); }
+.comfortStrip.warm { background: var(--color-warning); }
+.comfortStrip.hot { background: var(--color-danger); }
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.roomTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.icon {
+  font-size: var(--font-size-lg);
+}
+
+.name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.sensorCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+/* Values */
+.values {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex: 1;
+}
+
+.temperature {
+  font-size: 36px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.unit {
+  font-size: 18px;
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-tertiary);
+  margin-left: 2px;
+}
+
+.noDataText {
+  color: var(--color-text-tertiary);
+  font-size: 28px;
+}
+
+.humidity {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.humidityIcon {
+  font-size: var(--font-size-sm);
+}
+
+/* Outdoor badge */
+.outdoorBadge {
+  position: absolute;
+  bottom: var(--space-sm);
+  right: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card {
+    padding: var(--space-sm);
+    min-height: 120px;
+  }
+
+  .temperature {
+    font-size: 28px;
+  }
+
+  .unit {
+    font-size: 14px;
+  }
+
+  .humidity {
+    font-size: var(--font-size-md);
+  }
+}
