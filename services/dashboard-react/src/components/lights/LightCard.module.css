@@ -1,0 +1,154 @@
+/**
+ * LightCard styles
+ *
+ * Performance notes:
+ * - Simple shadows only (max 10px blur)
+ * - No infinite animations
+ * - Transform/opacity for state changes
+ */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+.cardSyncing {
+  opacity: 0.7;
+}
+
+.cardUnavailable {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.icon {
+  font-size: 1.5rem;
+}
+
+.name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.status {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.statusOnline {
+  color: var(--color-success);
+}
+
+.statusOffline {
+  color: var(--color-danger);
+}
+
+/* Toggle button */
+.toggleButton {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-sm) var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toggleButton:hover {
+  border-color: var(--color-primary);
+}
+
+.toggleButtonOn {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  color: #1e293b;
+}
+
+/* Sliders */
+.controls {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sliderGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sliderLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.sliderValue {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Presets */
+.presets {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.presetButton {
+  flex: 1;
+  min-width: 70px;
+  min-height: var(--touch-target);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.presetButton:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Link quality indicator */
+.meta {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
