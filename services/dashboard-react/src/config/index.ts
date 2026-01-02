@@ -140,6 +140,22 @@ export const COMFORT_THRESHOLDS = {
 
 export type ComfortLevel = 'cold' | 'cool' | 'comfortable' | 'warm' | 'hot';
 
+// Thermostat configuration (SONOFF TRVZB devices)
+export interface ThermostatConfig {
+  id: string;
+  name: string;
+  icon: string;
+  sensor: string;
+  roomId: string;
+}
+
+export const THERMOSTATS_CONFIG: ThermostatConfig[] = [
+  { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Thermostat', roomId: 'study' },
+  { id: 'living_inner', name: 'Living Inner', icon: '🛋️', sensor: '[Living] Thermostat Inner', roomId: 'living' },
+  { id: 'living_outer', name: 'Living Outer', icon: '🛋️', sensor: '[Living] Thermostat Outer', roomId: 'living' },
+  { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Thermostat', roomId: 'bedroom' },
+];
+
 // View configuration
 export interface ViewConfig {
   id: string;

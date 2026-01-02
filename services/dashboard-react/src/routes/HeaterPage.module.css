@@ -1,0 +1,315 @@
+/**
+ * HeaterPage styles
+ *
+ * Thermostat cards with temperature controls.
+ * Performance: No animations for Pi compatibility.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  gap: var(--space-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.stat {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.stat.offline {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+/* Card */
+.card {
+  position: relative;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--color-border);
+}
+
+.card.heating {
+  border-left-color: var(--color-danger);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, var(--color-surface) 100%);
+}
+
+.card.idle {
+  border-left-color: var(--color-primary);
+}
+
+.card.off {
+  border-left-color: var(--color-text-tertiary);
+  opacity: 0.7;
+}
+
+.card.offline {
+  border-left-color: var(--color-warning);
+}
+
+/* Card Header */
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cardIcon {
+  font-size: var(--font-size-xl);
+}
+
+.cardStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Temperature Display */
+.tempDisplay {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-lg) 0;
+}
+
+.currentTemp,
+.targetTemp {
+  text-align: center;
+}
+
+.tempValue {
+  font-size: 36px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.tempUnit {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-tertiary);
+  vertical-align: super;
+}
+
+.tempLabel {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-xs);
+}
+
+.tempArrow {
+  font-size: var(--font-size-xl);
+  color: var(--color-text-tertiary);
+}
+
+.card.heating .targetTemp .tempValue {
+  color: var(--color-danger);
+}
+
+/* Progress Bar */
+.progressBar {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: var(--space-lg);
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-danger), var(--color-warning), var(--color-success));
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.tempButton {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.tempButton:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+.tempButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.powerButton {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.powerButton.powerOn {
+  background: var(--color-danger);
+  color: white;
+}
+
+.powerButton.powerOn:hover {
+  background: #dc2626;
+}
+
+.powerButton.powerOff {
+  background: var(--color-success);
+  color: white;
+}
+
+.powerButton.powerOff:hover {
+  background: #16a34a;
+}
+
+.powerButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Card Footer */
+.cardFooter {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.battery {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.batteryLow {
+  color: var(--color-danger);
+}
+
+.batteryMedium {
+  color: var(--color-warning);
+}
+
+.batteryGood {
+  color: var(--color-success);
+}
+
+.signal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.syncing {
+  color: var(--color-primary);
+}
+
+/* Offline Overlay */
+.offlineOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-lg);
+  color: white;
+  font-size: var(--font-size-lg);
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tempValue {
+    font-size: 28px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: var(--space-sm);
+    text-align: center;
+  }
+}

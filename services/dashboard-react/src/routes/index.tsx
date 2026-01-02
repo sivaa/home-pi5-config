@@ -8,21 +8,15 @@ import { LightsPage } from './LightsPage';
 import { ClassicPage } from './ClassicPage';
 import { CO2Page } from './CO2Page';
 import { HotWaterPage } from './HotWaterPage';
+import { LogsPage } from './LogsPage';
+import { HeaterPage } from './HeaterPage';
 import { PlaceholderPage } from './PlaceholderPage';
 
 const TimelinePage = () => (
   <PlaceholderPage
     title="Event Timeline"
     icon="📖"
-    description="Chronological view of thermostat and sensor events."
-  />
-);
-
-const LogsPage = () => (
-  <PlaceholderPage
-    title="Activity Logs"
-    icon="📋"
-    description="Real-time MQTT message logs with filtering."
+    description="Chronological view of thermostat and sensor events. (Phase 5)"
   />
 );
 
@@ -30,15 +24,7 @@ const NetworkPage = () => (
   <PlaceholderPage
     title="Zigbee Network"
     icon="📡"
-    description="3D floor plan with sensor positions and signal quality."
-  />
-);
-
-const HeaterPage = () => (
-  <PlaceholderPage
-    title="Heater Control"
-    icon="🔥"
-    description="Thermostat controls and heating cycle statistics."
+    description="3D floor plan with sensor positions and signal quality. (Phase 5)"
   />
 );
 
@@ -46,7 +32,7 @@ const MailboxPage = () => (
   <PlaceholderPage
     title="Mailbox Monitor"
     icon="📬"
-    description="Motion detection events from mailbox sensor."
+    description="Motion detection events from mailbox sensor. (Phase 5)"
   />
 );
 
