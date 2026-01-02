@@ -31,7 +31,8 @@
 │    Path:    /dev/serial/by-id/usb-Itead_Sonoff_...          │
 ├─────────────────────────────────────────────────────────────┤
 │  Services (Docker - 8 containers):                          │
-│    Dashboard:     http://pi:8888                            │
+│    Dashboard:     http://pi:8888 (Classic)                  │
+│    Dashboard v2:  http://pi:8888/v2/ (React - Beta)         │
 │    Home Assistant:http://pi:8123 (ext: ha.sivaa.in)         │
 │    Zigbee2MQTT:   http://pi:8080                            │
 │    InfluxDB:      http://pi:8086                            │
@@ -189,10 +190,69 @@ nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 
 ---
 
+## Dashboard Versions (Dual-Dashboard Setup)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DASHBOARD ARCHITECTURE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Classic Dashboard (Alpine.js)      React Dashboard (Beta)      │
+│  ───────────────────────────────    ─────────────────────────   │
+│  URL:    http://pi:8888/            URL: http://pi:8888/v2/     │
+│  Path:   /opt/dashboard/www/        Path: /opt/dashboard/www/v2/ │
+│  Stack:  Alpine.js + vanilla JS     Stack: React 18 + Zustand   │
+│  Status: STABLE (production)        Status: BETA (testing)      │
+│                                                                 │
+│  Both dashboards share:                                          │
+│    • MQTT connection (pi:1883)                                  │
+│    • Same Zigbee devices                                        │
+│    • Same nginx server (:8888)                                  │
+│                                                                 │
+│  Navigation:                                                     │
+│    • Classic → React: Click "➡️ React" button in header          │
+│    • React → Classic: Click "⬅️ Classic" button in header        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Cutover Process (Future)
+
+**Both versions will run in parallel until manual cutover.**
+
+When ready to switch to React as default:
+
+1. **Verify stability** - React dashboard must run 48+ hours without issues
+2. **Feature parity** - All 9 views functioning identically
+3. **Update kiosk config**:
+   ```bash
+   # Edit: configs/kiosk-browser/kiosk-browser.service
+   # Change: http://localhost:8888/ → http://localhost:8888/v2/
+   ssh pi@pi 'systemctl --user restart kiosk-browser'
+   ```
+4. **Archive Classic** (optional) - Move to `/opt/dashboard/www/classic/`
+
+### Current React Dashboard Views
+
+| View | Route | Status |
+|------|-------|--------|
+| Classic (Home) | `/v2/#/` | ✅ Complete |
+| Timeline | `/v2/#/timeline` | ✅ Complete |
+| Logs | `/v2/#/logs` | ✅ Complete |
+| CO2 | `/v2/#/co2` | ✅ Complete |
+| Hot Water | `/v2/#/hotwater` | ✅ Complete |
+| Network | `/v2/#/network` | ✅ Complete (2D SVG) |
+| Lights | `/v2/#/lights` | ✅ Complete |
+| Heater | `/v2/#/heater` | ✅ Complete |
+| Mailbox | `/v2/#/mailbox` | ✅ Complete |
+
+---
+
 ## Changelog
 
 | Date | Change |
 |------|--------|
+| 2026-01-02 | Added React dashboard v2 at /v2/ with bidirectional navigation (dual-dashboard setup) |
 | 2025-12-28 | Added kiosk browser: auto-launch dashboard in fullscreen on boot |
 | 2025-12-27 | Added heater-watchdog: poll-based safety monitor runs every 5min as defense-in-depth layer |
 | 2025-12-27 | Enabled touch gestures (scroll, pinch-zoom) by disabling labwc mouse emulation |
@@ -262,9 +322,12 @@ pi-setup/
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   └── .env                   <- Router credentials (gitignored)
 ├── services/                  <- Docker service configs (source of truth)
-│   ├── dashboard/             <- Custom smart home dashboard
+│   ├── dashboard/             <- Classic dashboard (Alpine.js)
 │   │   ├── www/index.html
 │   │   └── nginx/dashboard.conf
+│   ├── dashboard-react/       <- React dashboard v2 (Beta)
+│   │   ├── src/               <- React source code
+│   │   └── dist/              <- Built static files → /v2/
 │   ├── heater-watchdog/       <- Poll-based heater safety monitor
 │   │   ├── heater-watchdog.py
 │   │   └── Dockerfile

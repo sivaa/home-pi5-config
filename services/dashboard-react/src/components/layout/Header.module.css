@@ -105,3 +105,36 @@
 .statusDotError {
   background: var(--color-danger);
 }
+
+/* Old dashboard link */
+.oldDashboardLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  margin-left: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 0.75rem;
+  min-height: var(--touch-target);
+  border: 1px solid var(--color-border);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.oldDashboardLink:hover {
+  background: var(--color-bg);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.oldDashboardLabel {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .oldDashboardLabel {
+    display: inline;
+  }
+}

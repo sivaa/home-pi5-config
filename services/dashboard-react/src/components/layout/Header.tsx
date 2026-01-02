@@ -51,6 +51,12 @@ export function Header() {
         <span className={`${styles.statusDot} ${getStatusClass()}`} />
         <span>{getStatusText()}</span>
       </div>
+
+      {/* Link to old Alpine.js dashboard */}
+      <a href="/" className={styles.oldDashboardLink} title="Switch to Classic Dashboard (Alpine.js)">
+        <span>⬅️</span>
+        <span className={styles.oldDashboardLabel}>Classic</span>
+      </a>
     </header>
   );
 }
