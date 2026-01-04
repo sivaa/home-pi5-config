@@ -23,7 +23,7 @@ availability:
   active:
     timeout: 2
   passive:
-    timeout: 1500
+    timeout: 2400  # Increased from 1500 (25 min) to 2400 (40 min) for better recovery
 device_options:
   retain: true
 devices:

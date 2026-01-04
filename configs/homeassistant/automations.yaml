@@ -3128,3 +3128,304 @@
           channel: "Info"
           importance: low
           tag: "circadian_startup"
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN MQTT CONTROL (Dashboard Integration)
+# Trigger: MQTT command from web dashboard
+# Action: Toggle circadian enabled or clear override flags
+# Purpose: Allows dashboard to control circadian without HA REST API token
+# Commands:
+#   {"action": "toggle"} - Toggle circadian_enabled
+#   {"action": "enable"} - Enable circadian
+#   {"action": "disable"} - Disable circadian
+#   {"action": "clear_override", "room": "study"} - Clear study override
+#   {"action": "clear_override", "room": "living"} - Clear living override
+#   {"action": "apply_circadian", "room": "study"} - Apply schedule to study light
+#   {"action": "apply_circadian", "room": "living"} - Apply schedule to living light
+# -----------------------------------------------------------------------------
+- id: circadian_mqtt_control
+  alias: "Circadian - MQTT Dashboard Control"
+  description: "Handles circadian control commands from web dashboard via MQTT"
+  mode: parallel
+  max: 4
+
+  trigger:
+    - platform: mqtt
+      topic: "homeassistant/circadian/command"
+
+  action:
+    - choose:
+        # Toggle circadian enabled
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload_json.action == 'toggle' }}"
+          sequence:
+            - service: input_boolean.toggle
+              target:
+                entity_id: input_boolean.circadian_enabled
+
+        # Enable circadian
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload_json.action == 'enable' }}"
+          sequence:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.circadian_enabled
+
+        # Disable circadian
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload_json.action == 'disable' }}"
+          sequence:
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.circadian_enabled
+
+        # Clear override for a specific room
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload_json.action == 'clear_override' }}"
+          sequence:
+            - service: input_boolean.turn_off
+              target:
+                entity_id: "input_boolean.circadian_{{ trigger.payload_json.room }}_override"
+
+        # Apply circadian schedule to a specific light
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.payload_json.action == 'apply_circadian' }}"
+          sequence:
+            - variables:
+                room: "{{ trigger.payload_json.room }}"
+                light_entity: "{{ 'light.study_ikea_light' if room == 'study' else 'light.living_ikea_light' }}"
+                brightness_value: "{{ (states('sensor.circadian_brightness') | int / 100 * 254) | round(0) }}"
+                color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.circadian_automation_active
+            - service: light.turn_on
+              target:
+                entity_id: "{{ light_entity }}"
+              data:
+                brightness: "{{ brightness_value }}"
+                color_temp_kelvin: "{{ color_temp_kelvin }}"
+                transition: 2
+            # Clear override flag since user explicitly requested schedule
+            - service: input_boolean.turn_off
+              target:
+                entity_id: "input_boolean.circadian_{{ room }}_override"
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.circadian_automation_active
+
+# -----------------------------------------------------------------------------
+# CIRCADIAN - MQTT STATE PUBLISHER
+# Purpose: Publishes circadian state to MQTT for dashboard consumption
+# Triggers on ANY circadian entity state change
+# Topic: homeassistant/circadian/state (JSON payload)
+# -----------------------------------------------------------------------------
+- id: circadian_mqtt_state_publisher
+  alias: "Circadian - MQTT State Publisher"
+  description: "Publishes circadian state to MQTT whenever any entity changes"
+  mode: queued
+  max: 5
+
+  trigger:
+    # Trigger on any circadian-related entity change
+    - platform: state
+      entity_id:
+        - sensor.circadian_phase
+        - sensor.circadian_brightness
+        - sensor.circadian_color_temp
+        - input_boolean.circadian_enabled
+        - input_boolean.circadian_study_override
+        - input_boolean.circadian_living_override
+        - input_datetime.circadian_study_override_expires
+        - input_datetime.circadian_living_override_expires
+
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "homeassistant/circadian/state"
+        retain: true
+        payload: >
+          {
+            "phase": "{{ states('sensor.circadian_phase') }}",
+            "brightness": {{ states('sensor.circadian_brightness') | int(100) }},
+            "colorTemp": {{ states('sensor.circadian_color_temp') | int(3125) }},
+            "enabled": {{ is_state('input_boolean.circadian_enabled', 'on') | lower }},
+            "overrides": {
+              "study": {
+                "active": {{ is_state('input_boolean.circadian_study_override', 'on') | lower }},
+                "expires": "{{ states('input_datetime.circadian_study_override_expires') }}"
+              },
+              "living": {
+                "active": {{ is_state('input_boolean.circadian_living_override', 'on') | lower }},
+                "expires": "{{ states('input_datetime.circadian_living_override_expires') }}"
+              }
+            },
+            "timestamp": "{{ now().isoformat() }}"
+          }
+
+# =============================================================================
+# SENSOR OFFLINE MONITORING
+# Purpose: Alert when contact sensors go offline (affects heater safety system)
+# Problem: When sensors are "unavailable", heater resume automation can't work
+#          because it requires all sensors to be state="off" (not "unavailable")
+# Solution: Alert the user so they can manually trigger sensors to rejoin
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONTACT SENSOR OFFLINE - IMMEDIATE ALERT
+# Trigger: Any contact sensor goes unavailable for 5+ minutes
+# Action: Send mobile notification with sensor name and recovery instructions
+# -----------------------------------------------------------------------------
+- id: contact_sensor_offline_alert
+  alias: "Contact Sensor Offline Alert"
+  description: "Alert when any contact sensor becomes unavailable"
+  mode: parallel
+  max: 8
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      to: "unavailable"
+      for: "00:05:00"  # Wait 5 min to confirm not temporary
+
+  variables:
+    sensor_names:
+      binary_sensor.bath_window_contact_sensor_contact: "Bathroom Window"
+      binary_sensor.bed_window_contact_sensor_contact: "Bedroom Window"
+      binary_sensor.kitchen_window_contact_sensor_contact: "Kitchen Window"
+      binary_sensor.study_window_contact_sensor_large_contact: "Study Large Window"
+      binary_sensor.study_window_contact_sensor_small_contact: "Study Small Window"
+      binary_sensor.living_window_contact_sensor_window_contact: "Living Window"
+      binary_sensor.living_window_contact_sensor_balcony_door_contact: "Balcony Door"
+      binary_sensor.hallway_window_contact_sensor_main_door_contact: "Main Door"
+    sensor_name: "{{ sensor_names.get(trigger.entity_id, trigger.entity_id) }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "📵 SENSOR OFFLINE"
+        message: >
+          {{ sensor_name }} sensor is offline.
+          Heaters may not resume automatically.
+          Try opening/closing the window to wake it.
+        data:
+          channel: "Alerts"
+          importance: high
+          tag: "sensor_offline_{{ trigger.entity_id }}"
+    - service: system_log.write
+      data:
+        message: "ALERT: {{ sensor_name }} contact sensor went offline"
+        level: warning
+
+# -----------------------------------------------------------------------------
+# CONTACT SENSOR OFFLINE - REPEAT ALERT EVERY 4 HOURS
+# Trigger: Every 4 hours (time pattern)
+# Condition: At least one contact sensor is unavailable
+# Action: Send reminder notification listing all offline sensors
+# -----------------------------------------------------------------------------
+- id: contact_sensor_offline_repeat
+  alias: "Contact Sensor Offline - Repeat Alert"
+  description: "Repeat offline alert every 4 hours"
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      hours: "/4"
+
+  action:
+    - variables:
+        sensor_names:
+          binary_sensor.bath_window_contact_sensor_contact: "Bathroom"
+          binary_sensor.bed_window_contact_sensor_contact: "Bedroom"
+          binary_sensor.kitchen_window_contact_sensor_contact: "Kitchen"
+          binary_sensor.study_window_contact_sensor_large_contact: "Study Large"
+          binary_sensor.study_window_contact_sensor_small_contact: "Study Small"
+          binary_sensor.living_window_contact_sensor_window_contact: "Living"
+          binary_sensor.living_window_contact_sensor_balcony_door_contact: "Balcony Door"
+          binary_sensor.hallway_window_contact_sensor_main_door_contact: "Main Door"
+        offline_list: >
+          {% set ns = namespace(sensors=[]) %}
+          {% for entity, name in sensor_names.items() %}
+            {% if states(entity) == 'unavailable' %}
+              {% set ns.sensors = ns.sensors + [name] %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.sensors }}
+        offline_count: "{{ offline_list | length }}"
+    - condition: template
+      value_template: "{{ offline_count | int > 0 }}"
+    - service: notify.all_phones
+      data:
+        title: "📵 {{ offline_count }} SENSOR(S) STILL OFFLINE"
+        message: >
+          {{ offline_list | join(', ') }} sensor(s) offline.
+          Heaters won't auto-resume until fixed.
+          Open/close window or check battery.
+        data:
+          channel: "Alerts"
+          importance: high
+          tag: "sensor_offline_repeat"
+
+# -----------------------------------------------------------------------------
+# CONTACT SENSOR BACK ONLINE - CLEAR ALERT
+# Trigger: Any contact sensor transitions FROM unavailable to any other state
+# Action: Send recovery notification and clear the offline alert
+# -----------------------------------------------------------------------------
+- id: contact_sensor_back_online
+  alias: "Contact Sensor Back Online"
+  description: "Clear alert when sensor comes back online"
+  mode: parallel
+  max: 8
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+        - binary_sensor.hallway_window_contact_sensor_main_door_contact
+      from: "unavailable"
+
+  variables:
+    sensor_names:
+      binary_sensor.bath_window_contact_sensor_contact: "Bathroom Window"
+      binary_sensor.bed_window_contact_sensor_contact: "Bedroom Window"
+      binary_sensor.kitchen_window_contact_sensor_contact: "Kitchen Window"
+      binary_sensor.study_window_contact_sensor_large_contact: "Study Large Window"
+      binary_sensor.study_window_contact_sensor_small_contact: "Study Small Window"
+      binary_sensor.living_window_contact_sensor_window_contact: "Living Window"
+      binary_sensor.living_window_contact_sensor_balcony_door_contact: "Balcony Door"
+      binary_sensor.hallway_window_contact_sensor_main_door_contact: "Main Door"
+    sensor_name: "{{ sensor_names.get(trigger.entity_id, trigger.entity_id) }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "✅ SENSOR ONLINE"
+        message: "{{ sensor_name }} sensor is back online"
+        data:
+          channel: "Alerts"
+          tag: "sensor_offline_{{ trigger.entity_id }}"
+    - service: system_log.write
+      data:
+        message: "RECOVERED: {{ sensor_name }} contact sensor is back online"
+        level: info
