@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2025-12-31
-> **Total Automations:** 35
+> **Last Updated:** 2026-01-04
+> **Total Automations:** 47
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -23,6 +23,8 @@
 | [Watchdog Recovery](#-watchdog-recovery) | 1 | Periodic safety net for missed events |
 | [Bedroom Night Mode](#-bedroom-night-mode) | 4 | Limit bedroom temp 23:00-06:00 |
 | [Heater Safety Limits](#-heater-safety-limits) | 2 | Cap all thermostats at 22°C max |
+| [Circadian Lighting](#-circadian-lighting) | 8 | Schedule-based brightness/color temp with override detection |
+| [Sensor Offline Alerts](#-sensor-offline-alerts) | 3 | Alert when contact sensors go unavailable |
 
 ---
 
@@ -606,6 +608,201 @@ These automations enforce a 22°C maximum temperature on all thermostats.
 
 ---
 
+### 💡 Circadian Lighting
+
+These automations manage automatic brightness and color temperature adjustments throughout the day for IKEA lights, with manual override detection.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         CIRCADIAN LIGHTING FLOW                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  SCHEDULE (every 10 min)                                                        │
+│  ├─ Read sensor.circadian_brightness & sensor.circadian_color_temp             │
+│  ├─ Apply to ON lights that aren't overridden                                  │
+│  └─ Uses 30-second transition for smooth changes                               │
+│                                                                                 │
+│  POWER ON                                                                       │
+│  ├─ Light turns on → Set to warmest color (2200K) + scheduled brightness       │
+│  └─ Gentle start regardless of time of day                                     │
+│                                                                                 │
+│  OVERRIDE DETECTION                                                             │
+│  ├─ Manual adjustment detected (remote/app)                                    │
+│  ├─ 30-minute override timer starts                                            │
+│  ├─ Schedule paused for that light                                             │
+│  └─ After 30 min → restore scheduled settings                                  │
+│                                                                                 │
+│  MQTT CONTROL                                                                   │
+│  └─ Dashboard can enable/disable circadian globally                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 34. Circadian - Schedule Update
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_schedule_update` |
+| **Trigger** | Every 10 minutes (time pattern) |
+| **Condition** | `input_boolean.circadian_enabled` is ON |
+| **Action** | Apply scheduled brightness/color temp to ON lights (not overridden) |
+| **Lights** | Study IKEA Light, Living IKEA Light |
+| **Transition** | 30 seconds |
+
+#### 35. Circadian - Light Power On
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_power_on` |
+| **Trigger** | Study or Living light turns on |
+| **Condition** | Circadian enabled, light not overridden |
+| **Action** | Set to 2200K (warmest) + scheduled brightness |
+| **Purpose** | Gentle warm start when light is turned on |
+
+#### 36. Circadian - Override Detection
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_override_detect` |
+| **Trigger** | Light brightness or color_temp attribute changes |
+| **Condition** | Circadian enabled AND automation NOT actively changing lights |
+| **Action** | Set 30-minute override timer, notify user |
+| **Purpose** | Detects manual changes (remote presses, app control) |
+
+#### 37. Circadian - Override Expiry Check
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_override_expiry` |
+| **Trigger** | Every 1 minute (time pattern) |
+| **Condition** | At least one override is active |
+| **Action** | Clear expired overrides, restore scheduled settings |
+| **Transition** | 60 seconds (slow restore) |
+
+#### 38. Circadian - Phase Notification
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_phase_notification` |
+| **Trigger** | Circadian phase changes (Morning → Day → Evening → Night) |
+| **Action** | Send mobile notification with phase name and color temp |
+| **Purpose** | User awareness of schedule progression |
+
+#### 39. Circadian - HA Startup Check
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_ha_startup` |
+| **Trigger** | Home Assistant starts |
+| **Action** | Apply current scheduled settings to all ON lights |
+| **Purpose** | Restore circadian state after HA restart |
+
+#### 40. Circadian - MQTT Control
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_mqtt_control` |
+| **Trigger** | MQTT message to `dashboard/circadian/command` |
+| **Action** | Enable/disable circadian based on `{ "enabled": true/false }` |
+| **Purpose** | Dashboard control of circadian system |
+
+#### 41. Circadian - MQTT State Publisher
+| Property | Value |
+|----------|-------|
+| **ID** | `circadian_mqtt_state_publisher` |
+| **Trigger** | Circadian enabled changes, phase changes, 10-min schedule |
+| **Action** | Publish state to `dashboard/circadian/state` (retained) |
+| **Payload** | `{ enabled, phase, brightness, color_temp, study_override, living_override }` |
+| **Purpose** | Dashboard displays current circadian state |
+
+---
+
+### 📵 Sensor Offline Alerts
+
+These automations alert when contact sensors go offline, which is critical because the heater resume system requires ALL 8 sensors to be in `state: "off"` - sensors showing `unavailable` block heater restoration indefinitely.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      SENSOR OFFLINE ALERT FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  SENSOR UNAVAILABLE (5+ min)                                                    │
+│       │                                                                         │
+│       ▼                                                                         │
+│  ┌────────────────────────────────────────────────────────────────────┐         │
+│  │ 📵 SENSOR OFFLINE notification                                     │         │
+│  │ - Sensor name (e.g., "Kitchen Window")                            │         │
+│  │ - Warning: Heaters may not resume automatically                   │         │
+│  │ - Instructions: Open/close window to wake sensor                  │         │
+│  └────────────────────────────────────────────────────────────────────┘         │
+│                                                                                 │
+│  STILL OFFLINE (every 4 hours)                                                  │
+│       │                                                                         │
+│       ▼                                                                         │
+│  ┌────────────────────────────────────────────────────────────────────┐         │
+│  │ 📵 X SENSOR(S) STILL OFFLINE reminder                             │         │
+│  │ - Lists all offline sensors                                       │         │
+│  │ - "Heaters won't auto-resume until fixed"                        │         │
+│  └────────────────────────────────────────────────────────────────────┘         │
+│                                                                                 │
+│  SENSOR RECOVERS                                                                │
+│       │                                                                         │
+│       ▼                                                                         │
+│  ┌────────────────────────────────────────────────────────────────────┐         │
+│  │ ✅ SENSOR ONLINE notification                                      │         │
+│  │ - Replaces previous offline notification (same tag)              │         │
+│  └────────────────────────────────────────────────────────────────────┘         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why This Matters:**
+
+After a 34-hour power outage, 2 contact sensors (Bath, Kitchen) stayed offline while 6 others recovered. The heater resume automation requires `all 8 sensors state == "off"`, but `unavailable ≠ "off"`, so heaters stayed off indefinitely. The system was SAFE (heaters off when uncertain), but failed to ALERT that attention was needed.
+
+#### 42. Contact Sensor Offline Alert
+| Property | Value |
+|----------|-------|
+| **ID** | `contact_sensor_offline_alert` |
+| **Trigger** | Any of 8 contact sensors → `unavailable` for 5+ minutes |
+| **Mode** | Parallel (max: 8) |
+| **Action** | Mobile notification to `notify.all_phones` |
+| **Title** | 📵 SENSOR OFFLINE |
+| **Message** | "{Sensor} sensor is offline. Heaters may not resume automatically. Try opening/closing the window to wake it." |
+| **Tag** | `sensor_offline_{entity_id}` (for replacement on recovery) |
+| **Channel** | Alerts (high importance) |
+
+#### 43. Contact Sensor Offline - Repeat Alert
+| Property | Value |
+|----------|-------|
+| **ID** | `contact_sensor_offline_repeat` |
+| **Trigger** | Every 4 hours (time pattern) |
+| **Condition** | At least one contact sensor is `unavailable` |
+| **Mode** | Single |
+| **Action** | Mobile notification listing ALL offline sensors |
+| **Title** | 📵 {count} SENSOR(S) STILL OFFLINE |
+| **Message** | "{list} sensor(s) offline. Heaters won't auto-resume until fixed. Open/close window or check battery." |
+| **Purpose** | Persistent reminder every 4 hours while sensors remain offline |
+
+#### 44. Contact Sensor Back Online
+| Property | Value |
+|----------|-------|
+| **ID** | `contact_sensor_back_online` |
+| **Trigger** | Any contact sensor transitions FROM `unavailable` |
+| **Mode** | Parallel (max: 8) |
+| **Action** | Mobile notification + system log |
+| **Title** | ✅ SENSOR ONLINE |
+| **Message** | "{Sensor} sensor is back online" |
+| **Tag** | `sensor_offline_{entity_id}` (replaces offline notification) |
+| **Purpose** | Confirms recovery and clears previous offline alert |
+
+**Monitored Sensors:**
+| Sensor | Entity ID |
+|--------|-----------|
+| Bathroom Window | `binary_sensor.bath_window_contact_sensor_contact` |
+| Bedroom Window | `binary_sensor.bed_window_contact_sensor_contact` |
+| Kitchen Window | `binary_sensor.kitchen_window_contact_sensor_contact` |
+| Study Large Window | `binary_sensor.study_window_contact_sensor_large_contact` |
+| Study Small Window | `binary_sensor.study_window_contact_sensor_small_contact` |
+| Living Window | `binary_sensor.living_window_contact_sensor_window_contact` |
+| Balcony Door | `binary_sensor.living_window_contact_sensor_balcony_door_contact` |
+| Main Door | `binary_sensor.hallway_window_contact_sensor_main_door_contact` |
+
+---
+
 ## Entity Reference
 
 ### Contact Sensors (8 total)
@@ -801,6 +998,12 @@ This section documents all possible heating scenarios and their expected behavio
 
 If ANY of 8 sensors is unavailable, the resume condition fails because `unavailable` != `off`. Heaters stay off indefinitely until sensor returns.
 
+**Mitigation (2026-01-04):** Sensor Offline Alert system now notifies users when any sensor goes unavailable:
+- 📵 Immediate notification after 5 minutes of unavailability
+- 📵 Repeat reminder every 4 hours while offline
+- ✅ Recovery notification when sensor comes back online
+- Instructions included to open/close window to wake sleeping sensor
+
 **Workaround:** Manually enable heaters via dashboard or check sensor battery/connectivity.
 
 #### EDGE-2: Manual Override Not Possible
@@ -832,6 +1035,7 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2026-01-04 | **Added Sensor Offline Alert system:** After a 34-hour power outage, 2 contact sensors stayed offline blocking heater resume (unavailable ≠ off). Added 3 automations: (1) `contact_sensor_offline_alert` - immediate notification after 5 min offline, (2) `contact_sensor_offline_repeat` - repeat every 4 hours, (3) `contact_sensor_back_online` - recovery notification. Also increased Z2M passive timeout 1500→2400 for better short-outage recovery. Documented 8 Circadian Lighting automations. Total count: 33→47 automations. |
 | 2025-12-31 | **Fixed CO2 guard not triggering heater resume:** The `watchdog_recovery_periodic_resume_check` automation only checked `heaters_off_due_to_window` flag, missing cases where heaters were paused due to high CO2. When `co2_low_resume_heaters` missed the threshold crossing (e.g., HA busy, value jumped), heaters stayed off indefinitely. Fix: Watchdog now checks BOTH window AND CO2 guard flags and routes to the appropriate resume automation. |
 | 2025-12-30 | **Added robust TTS for window alerts:** Created `smart_tts_window_alert` script with retry logic, fallback speakers, and obsolescence checking. Updated bathroom and bedroom window automations to use this script. Fixes silent TTS failures when Kitchen Display appears available but doesn't play audio. |
 | 2025-12-30 | Updated count from 21→23 automations; added docs for `prevent_heating_if_window_open` (#22) and `tts_event_mqtt_publisher` (#23) |
