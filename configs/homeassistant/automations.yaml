@@ -3429,3 +3429,194 @@
       data:
         message: "RECOVERED: {{ sensor_name }} contact sensor is back online"
         level: info
+
+# =============================================================================
+# ZIGBEE NETWORK MONITORING ALERTS
+# Purpose: Monitor Zigbee network health during device recovery
+# Created: 2026-01-05 (after network reformation incident)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# ZIGBEE DEVICE JOINED ALERT
+# Trigger: Any device successfully completes interview (joins network)
+# Action: Mobile notification to both phones
+# Purpose: Monitor device recovery after network reformation
+# -----------------------------------------------------------------------------
+- id: zigbee_device_joined_alert
+  alias: "Zigbee Device Joined Alert"
+  description: "Notifies when any Zigbee device successfully joins the network"
+  mode: parallel
+  max: 10
+
+  trigger:
+    - platform: mqtt
+      topic: "zigbee2mqtt/bridge/event"
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ trigger.payload_json.type == 'device_interview' and
+           trigger.payload_json.data.status == 'successful' }}
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "🎉 Zigbee Device Joined!"
+        message: >
+          {{ trigger.payload_json.data.friendly_name }} has joined the network
+          ({{ trigger.payload_json.data.ieee_address }})
+        data:
+          channel: "Zigbee"
+          importance: high
+          tag: "zigbee_join_{{ trigger.payload_json.data.ieee_address }}"
+    - service: system_log.write
+      data:
+        message: >
+          ZIGBEE JOIN: {{ trigger.payload_json.data.friendly_name }}
+          ({{ trigger.payload_json.data.ieee_address }}) joined successfully
+        level: info
+
+# -----------------------------------------------------------------------------
+# ZIGBEE ROUTER OFFLINE ALERT
+# Trigger: Any router device goes offline (unavailable)
+# Devices: Smart Plugs, IKEA Lights, CO2 Sensor, Light Switch
+# Action: Mobile notification with device name
+# Cooldown: 5 minutes per device (prevents spam during network issues)
+# -----------------------------------------------------------------------------
+- id: zigbee_router_offline_alert
+  alias: "Zigbee Router Offline Alert"
+  description: "Notifies when any Zigbee router device goes offline"
+  mode: parallel
+  max: 10
+
+  trigger:
+    # Smart Plugs
+    - platform: state
+      entity_id: switch.smart_plug_1
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: switch.smart_plug_2
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: switch.smart_plug_3
+      to: "unavailable"
+      for:
+        minutes: 2
+    # IKEA Lights
+    - platform: state
+      entity_id: light.study_ikea_light
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: light.living_ikea_light
+      to: "unavailable"
+      for:
+        minutes: 2
+    # CO2 Sensor (router device)
+    - platform: state
+      entity_id: sensor.hallway_co2_co2
+      to: "unavailable"
+      for:
+        minutes: 2
+    # Light Switch
+    - platform: state
+      entity_id: switch.study_light_switch
+      to: "unavailable"
+      for:
+        minutes: 2
+
+  variables:
+    device_names:
+      switch.smart_plug_1: "Smart Plug [1]"
+      switch.smart_plug_2: "Smart Plug [2]"
+      switch.smart_plug_3: "Smart Plug [3]"
+      light.study_ikea_light: "[Study] IKEA Light"
+      light.living_ikea_light: "[Living] IKEA Light"
+      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
+      switch.study_light_switch: "[Study] Light Switch"
+    device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "⚠️ Zigbee Router OFFLINE"
+        message: >
+          {{ device_name }} is offline! This may affect mesh network.
+          Check if device is powered on.
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "router_offline_{{ trigger.entity_id }}"
+          vibrationPattern: "100, 500, 100, 500"
+    - service: system_log.write
+      data:
+        message: "ROUTER OFFLINE: {{ device_name }} ({{ trigger.entity_id }}) went unavailable"
+        level: warning
+
+# -----------------------------------------------------------------------------
+# ZIGBEE ROUTER BACK ONLINE ALERT
+# Trigger: Any router device comes back online
+# Action: Mobile notification (clears offline alert)
+# -----------------------------------------------------------------------------
+- id: zigbee_router_online_alert
+  alias: "Zigbee Router Back Online Alert"
+  description: "Notifies when a Zigbee router device comes back online"
+  mode: parallel
+  max: 10
+
+  trigger:
+    # Smart Plugs
+    - platform: state
+      entity_id: switch.smart_plug_1
+      from: "unavailable"
+    - platform: state
+      entity_id: switch.smart_plug_2
+      from: "unavailable"
+    - platform: state
+      entity_id: switch.smart_plug_3
+      from: "unavailable"
+    # IKEA Lights
+    - platform: state
+      entity_id: light.study_ikea_light
+      from: "unavailable"
+    - platform: state
+      entity_id: light.living_ikea_light
+      from: "unavailable"
+    # CO2 Sensor
+    - platform: state
+      entity_id: sensor.hallway_co2_co2
+      from: "unavailable"
+    # Light Switch
+    - platform: state
+      entity_id: switch.study_light_switch
+      from: "unavailable"
+
+  variables:
+    device_names:
+      switch.smart_plug_1: "Smart Plug [1]"
+      switch.smart_plug_2: "Smart Plug [2]"
+      switch.smart_plug_3: "Smart Plug [3]"
+      light.study_ikea_light: "[Study] IKEA Light"
+      light.living_ikea_light: "[Living] IKEA Light"
+      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
+      switch.study_light_switch: "[Study] Light Switch"
+    device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "✅ Zigbee Router ONLINE"
+        message: "{{ device_name }} is back online!"
+        data:
+          channel: "Zigbee"
+          importance: high
+          tag: "router_offline_{{ trigger.entity_id }}"
+    - service: system_log.write
+      data:
+        message: "ROUTER ONLINE: {{ device_name }} ({{ trigger.entity_id }}) is back"
+        level: info
