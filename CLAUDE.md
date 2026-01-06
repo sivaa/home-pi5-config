@@ -155,6 +155,61 @@ All documentation should enable complete system restoration from scratch.
 - Example: `ssh pi@pi "command"` or `scp file pi@pi:/path/`
 - The hostname `pi` alone may resolve to wrong user
 
+### 7. Zigbee2MQTT Operations (CRITICAL - 35 DEVICES AT RISK)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ⚠️  INCIDENT HISTORY                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  On Jan 4, 2026, rapid restart commands caused complete         │
+│  Zigbee network loss. Root cause: AI issued 4 docker commands   │
+│  in 21 seconds, causing USB timeout and database corruption.    │
+│                                                                 │
+│  ALL 35 DEVICES WERE ORPHANED!                                  │
+│                                                                 │
+│  Z2M is now managed by SYSTEMD with pre-start validation.       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**COMMANDS (MUST use systemctl, NOT docker):**
+```bash
+# Restart Z2M (validation runs automatically)
+ssh pi@pi "sudo systemctl restart zigbee2mqtt"
+
+# Check status
+ssh pi@pi "sudo systemctl status zigbee2mqtt"
+
+# View logs
+ssh pi@pi "docker logs zigbee2mqtt --tail 100"
+
+# If validation blocks startup, check why:
+ssh pi@pi "sudo journalctl -u zigbee2mqtt -n 50"
+```
+
+**RULES:**
+1. **NEVER** use `docker restart zigbee2mqtt` (bypasses validation!)
+2. **NEVER** use `docker stop` + `docker start` (bypasses validation!)
+3. **ALWAYS** use `systemctl` commands for Z2M
+4. **WAIT 60 seconds** between Z2M operations
+5. If restart fails, check validation output in journalctl
+
+**Recovery if validation blocks:**
+```bash
+# 1. Check available backups
+ssh pi@pi "ls -la /mnt/storage/backups/zigbee2mqtt/"
+
+# 2. Restore from backup (replace TIMESTAMP)
+ssh pi@pi "sudo cp /mnt/storage/backups/zigbee2mqtt/database.db.TIMESTAMP /opt/zigbee2mqtt/data/database.db"
+ssh pi@pi "sudo cp /mnt/storage/backups/zigbee2mqtt/coordinator_backup.json.TIMESTAMP /opt/zigbee2mqtt/data/coordinator_backup.json"
+
+# 3. Retry
+ssh pi@pi "sudo systemctl start zigbee2mqtt"
+```
+
+**See also:** `configs/zigbee2mqtt/NETWORK_KEYS.md` for disaster recovery keys.
+
 ---
 
 ## Lessons Learned (AI Memory)
