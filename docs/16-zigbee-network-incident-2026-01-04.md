@@ -276,5 +276,95 @@ ssh pi@pi 'docker logs zigbee2mqtt --tail 50 2>&1 | grep "contact"'
 
 ---
 
+---
+
+## Resolution - 2026-01-06
+
+### Decision: Fresh Network Key Migration
+
+After 2 days of recovery attempts, the decision was made to perform a **fresh network key migration** rather than continue with partial recovery. The reasons:
+
+1. **Persistent Network Congestion**: Smart plugs flooding the network with reports every 10 seconds caused "cannot get node descriptor" errors for temperature sensors attempting to rejoin
+2. **Incomplete Recovery**: Only 18/35 devices had rejoined after 36+ hours
+3. **Frame Counter Issues**: Devices rejecting messages due to frame counter mismatches
+4. **Clean Slate Benefits**: A fresh network ensures all devices have consistent credentials
+
+### Migration Steps Performed
+
+```
++--------------------------------------------------------------------------+
+|  FRESH NETWORK MIGRATION - 2026-01-06                                    |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  1. Generated new network key:                                           |
+|     9a0aa1d156264e9ca4b4779a086cf75e                                    |
+|                                                                          |
+|  2. Stopped Z2M, deleted database.db and coordinator_backup.json         |
+|                                                                          |
+|  3. Configured new key in configuration.yaml                             |
+|                                                                          |
+|  4. Started Z2M - new network formed on channel 25                       |
+|                                                                          |
+|  5. Enabled permit_join                                                  |
+|                                                                          |
+|  6. Factory reset all 35 devices one by one                             |
+|                                                                          |
+|  7. All devices successfully paired within 4 hours                       |
+|                                                                          |
+|  8. Renamed all devices using MQTT commands                              |
+|                                                                          |
+|  9. Added debounce: 60000 to smart plugs to reduce network traffic      |
+|                                                                          |
+|  10. Set up hourly backup cron job                                       |
+|                                                                          |
+|  11. Disabled permit_join                                                |
+|                                                                          |
+|  12. Updated documentation with new key                                  |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+### Final Device Count
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Coordinator | 1 | Online |
+| Router Devices | 7 | All online |
+| End Devices | 27 | All online |
+| **Total** | **35** | **100% operational** |
+
+### Lessons Learned (Updated)
+
+1. **Fresh migration > Partial recovery**: When >50% of devices fail to rejoin after 24h, start fresh
+2. **Debounce is critical**: Smart plugs without debounce flood the network (3 plugs = 18 messages/min)
+3. **Backup before any changes**: Hourly cron job now active
+4. **Document ALL keys**: See `configs/zigbee2mqtt/NETWORK_KEYS.md` for complete list
+5. **Use systemctl, NOT docker**: Z2M is now protected by systemd with pre-start validation
+
+### Files Updated
+
+| File | Change |
+|------|--------|
+| `configs/zigbee2mqtt/NETWORK_KEYS.md` | New key + all parameters documented |
+| `configs/zigbee2mqtt/configuration.yaml` | New key + all 34 devices |
+| `scripts/z2m-backup.sh` | Hourly backup script |
+| `/etc/cron.d/z2m-backup` | Hourly cron job |
+| This file | Resolution section added |
+
+### Current Network Parameters
+
+```
+Network Key:     9a0aa1d156264e9ca4b4779a086cf75e
+PAN ID:          6754 (0x1A62)
+Extended PAN ID: dddddddddddddddd
+Channel:         25
+Coordinator:     0x08b95ffffed8f574 (Sonoff V2)
+```
+
+**STATUS: RESOLVED**
+
+---
+
 *Report generated: 2026-01-05 20:25 CET*
+*Resolution added: 2026-01-06*
 *Author: Claude Code (automated investigation)*

@@ -12,10 +12,36 @@ serial:
   adapter: ember
 advanced:
   channel: 25
+  pan_id: 6754
+  ext_pan_id:
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
   # Network key - KEEP SECRET! Stored on Pi, not in git
   # If rebuilding: use existing key from Pi backup or generate new one
-  # To regenerate: delete network_key, restart z2m, re-pair all devices
-  network_key: GENERATE
+  # Current key (2026-01-06): 9a0aa1d156264e9ca4b4779a086cf75e
+  network_key:
+    - 154
+    - 10
+    - 161
+    - 209
+    - 86
+    - 38
+    - 78
+    - 156
+    - 164
+    - 180
+    - 119
+    - 154
+    - 8
+    - 108
+    - 247
+    - 94
   log_level: info
   last_seen: epoch
 availability:
@@ -23,21 +49,37 @@ availability:
   active:
     timeout: 2
   passive:
-    timeout: 2400  # Increased from 1500 (25 min) to 2400 (40 min) for better recovery
+    timeout: 2400  # 40 min for battery devices
 device_options:
   retain: true
 devices:
-  # IKEA Lights
+  # === IKEA LIGHTS (Routers) ===
   '0xd0cf5efffe25ab28':
     friendly_name: '[Study] IKEA Light'
   '0xd0cf5efffe24d093':
     friendly_name: '[Living] IKEA Light'
-  # IKEA Remotes
+  # === IKEA REMOTES ===
   '0x90fd9ffffef4cebf':
-    friendly_name: '[Study] Light Remote'
+    friendly_name: '[Study] IKEA Remote'
   '0x90fd9ffffee43106':
-    friendly_name: '[Living] Light Remote'
-  # Temperature Sensors (original)
+    friendly_name: '[Living] IKEA Remote'
+  # === LIGHT SWITCH (Router) ===
+  '0x4c97a1fffecd9a31':
+    friendly_name: '[Study] Light Switch'
+  # === SMART PLUGS (Routers) ===
+  '0xa4c13802b54effff':
+    friendly_name: Smart Plug [1]
+    debounce: 60000
+  '0xa4c13802c8b9ffff':
+    friendly_name: Smart Plug [2]
+    debounce: 60000
+  '0xa4c13803091fffff':
+    friendly_name: Smart Plug [3]
+    debounce: 60000
+  # === CO2 SENSOR (Router) ===
+  '0xa4c138d2b1446edf':
+    friendly_name: '[Hallway] CO2'
+  # === TEMPERATURE SENSORS (6 original SNZB-02P) ===
   '0xc09b9efffed502b9':
     friendly_name: '[Living] Temperature & Humidity'
   '0xc09b9efffef541b2':
@@ -49,34 +91,22 @@ devices:
   '0xa4c1380286dbffff':
     friendly_name: '[Balcony] Temperature & Humidity'
   '0xc09b9efffef541a8':
-    friendly_name: '[Bed] Temperature & Humidity Sensor'
-  # Temperature Sensors (additional)
+    friendly_name: '[Bed] Temperature & Humidity'
+  # === TEMPERATURE SENSORS (6 additional SNZB-02WD) ===
   '0x8c73dafffe2a0459':
     friendly_name: '[Living] Temperature & Humidity 6'
-  '0x8c73dafffe2a0638':
-    friendly_name: '[Living] Temperature & Humidity 7'
   '0xf044d3fffe0806bc':
     friendly_name: '[Study] Temperature & Humidity 8'
   '0xf044d3fffe0806da':
-    friendly_name: '[Bed] Temperature & Humidity Sensor 9'
+    friendly_name: '[Bed] Temperature & Humidity 9'
   '0xf044d3fffe07f88a':
     friendly_name: '[Kitchen] Temperature & Humidity 10'
   '0x8c73dafffeb33c57':
     friendly_name: '[Bath] Temperature & Humidity 11'
-  # CO2 Sensor
-  '0xa4c138d2b1446edf':
-    friendly_name: '[Hallway] CO2'
-  # Motion Sensor
+  # === MOTION SENSOR ===
   '0x3425b4fffe1432aa':
     friendly_name: '[Mailbox] Motion Sensor'
-  # Smart Plugs
-  '0xa4c13802b54effff':
-    friendly_name: 'Smart Plug [1]'
-  '0xa4c13802c8b9ffff':
-    friendly_name: 'Smart Plug [2]'
-  '0xa4c13803091fffff':
-    friendly_name: 'Smart Plug [3]'
-  # Contact Sensors
+  # === WINDOW CONTACT SENSORS ===
   '0xc09b9efffe4af947':
     friendly_name: '[Bath] Window Contact Sensor'
   '0xc4d8c8fffe0f7eab':
@@ -93,7 +123,7 @@ devices:
     friendly_name: '[Living] Window Contact Sensor - Window'
   '0x983268fffe653343':
     friendly_name: '[Hallway] Window Contact Sensor - Main Door'
-  # Thermostats (TRVZB)
+  # === THERMOSTATS (TRVZB Radiator Valves) ===
   '0xc4d8c8fffe02cef8':
     friendly_name: '[Study] Thermostat'
   '0xc4d8c8fffe0d9fcc':
@@ -102,7 +132,7 @@ devices:
     friendly_name: '[Living] Thermostat Inner'
   '0x286847fffe38ed6c':
     friendly_name: '[Living] Thermostat Outer'
-  # Vibration Sensor
+  # === VIBRATION SENSOR ===
   '0xa4c13863257ea097':
-    friendly_name: 'Vibration Sensor'
+    friendly_name: Vibration Sensor
 version: 4

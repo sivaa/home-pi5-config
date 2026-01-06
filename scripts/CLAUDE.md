@@ -56,6 +56,111 @@ cd ~/arris-tg3442-reboot && python3 arris_tg3442_reboot.py -t http://192.168.0.1
 
 ---
 
+## Zigbee2MQTT Scripts
+
+### safe-z2m-restart.sh
+**ALWAYS use this script to restart Z2M** (never use docker restart directly).
+
+```
++--------------------------------------------------------------------------+
+|  SAFE Z2M RESTART                                                        |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  Step 1: Backup              → Creates backup before restart             |
+|  Step 2: Graceful Stop       → 30s timeout for clean shutdown            |
+|  Step 3: USB Settle          → 5s wait for USB to stabilize              |
+|  Step 4: Validation          → Checks database integrity                 |
+|  Step 5: Start + Verify      → Confirms Z2M is operational               |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**Why this exists:**
+On Jan 4, 2026, rapid docker restart commands caused complete network loss
+(35 devices orphaned). This script prevents similar incidents.
+
+**Usage:**
+```bash
+ssh pi@pi "sudo /opt/scripts/safe-z2m-restart.sh"
+```
+
+**DO NOT USE:**
+```bash
+# These bypass safety checks!
+docker restart zigbee2mqtt    # DANGEROUS
+docker stop/start zigbee2mqtt # DANGEROUS
+```
+
+---
+
+### z2m-backup.sh
+Creates hourly backups of Z2M database and coordinator state.
+
+```
++--------------------------------------------------------------------------+
+|  HOURLY BACKUP SYSTEM                                                    |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  Cron:      Every hour at minute 0                                      |
+|  Location:  /mnt/storage/backups/zigbee2mqtt/                           |
+|  Retention: 7 days (~168 hourly backups)                                |
+|                                                                          |
+|  Files:                                                                  |
+|    - database.db.<YYYYMMDD_HHMM>                                        |
+|    - coordinator_backup.json.<YYYYMMDD_HHMM>                            |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**Manual backup:**
+```bash
+ssh pi@pi "sudo /opt/scripts/z2m-backup.sh"
+```
+
+**List backups:**
+```bash
+ssh pi@pi "ls -la /mnt/storage/backups/zigbee2mqtt/"
+```
+
+---
+
+### z2m-validate.sh
+Pre-start validation that prevents Z2M from starting with corrupted database.
+
+```
++--------------------------------------------------------------------------+
+|  VALIDATION CHECKS                                                       |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  1. Fresh install detection (allows first-time start)                   |
+|  2. coordinator_backup.json presence                                    |
+|  3. database.db.backup presence                                         |
+|  4. database.db size >= 30% of backup (corruption detection)            |
+|                                                                          |
+|  EXIT CODES:                                                             |
+|    0 = OK to start                                                      |
+|    1 = BLOCKED (corruption detected, DO NOT START)                      |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**If blocked:**
+```bash
+# Check why
+ssh pi@pi "sudo journalctl -u zigbee2mqtt -n 50"
+
+# Restore from backup (replace TIMESTAMP)
+ssh pi@pi "sudo cp /mnt/storage/backups/zigbee2mqtt/database.db.TIMESTAMP \
+    /opt/zigbee2mqtt/data/database.db"
+ssh pi@pi "sudo cp /mnt/storage/backups/zigbee2mqtt/coordinator_backup.json.TIMESTAMP \
+    /opt/zigbee2mqtt/data/coordinator_backup.json"
+
+# Retry
+ssh pi@pi "sudo systemctl start zigbee2mqtt"
+```
+
+---
+
 ### lint-css-performance.sh
 Scans dashboard CSS files for expensive properties that cause high CPU on Raspberry Pi.
 
