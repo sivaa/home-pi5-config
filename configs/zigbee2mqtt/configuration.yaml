@@ -92,9 +92,11 @@ devices:
     friendly_name: '[Balcony] Temperature & Humidity'
   '0xc09b9efffef541a8':
     friendly_name: '[Bed] Temperature & Humidity'
-  # === TEMPERATURE SENSORS (6 additional SNZB-02WD) ===
+  # === TEMPERATURE SENSORS (7 additional SNZB-02WD) ===
   '0x8c73dafffe2a0459':
     friendly_name: '[Living] Temperature & Humidity 6'
+  '0x8c73dafffe2a0638':
+    friendly_name: '[Living] Temperature & Humidity 7'
   '0xf044d3fffe0806bc':
     friendly_name: '[Study] Temperature & Humidity 8'
   '0xf044d3fffe0806da':
