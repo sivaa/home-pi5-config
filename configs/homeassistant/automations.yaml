@@ -208,92 +208,104 @@
           importance: default
 
 # -----------------------------------------------------------------------------
-# BATHROOM WINDOW OPEN TOO LONG
-# Trigger: Window open for more than 10 minutes
-# Action: TTS announcement every minute until closed (with retry & fallback)
+# WINDOW OPEN TOO LONG (TEMPERATURE-AWARE)
+# Trigger: Any window/balcony door open for 5min (freezing) or 10min (normal)
+# Condition: Temperature-based (<=0C = freezing = 5min, >0C = 10min)
+# Action: TTS + mobile notification, repeat every 1 minute until closed
+# Sensors: All 7 windows + balcony door (main door has separate 3-min alert)
+# Backup: Cold weather alert (15min, <18C) catches edge cases
 # -----------------------------------------------------------------------------
-- id: bath_window_open_too_long
-  alias: "Bathroom Window Open Too Long"
-  description: "Alerts when bathroom window is open for more than 10 minutes"
-  mode: single
+- id: window_open_too_long
+  alias: "Window Open Too Long (Temperature-Aware)"
+  description: "5min alert if <=0C (freezing), 10min if >0C. Covers all windows + balcony door."
+  mode: parallel
+  max: 7
 
   trigger:
-    - platform: state
-      entity_id: binary_sensor.bath_window_contact_sensor_contact
+    # FREEZING trigger: 5 minutes when temp <= 0C
+    - id: "freezing"
+      platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
+      to: "on"
+      for:
+        minutes: 5
+
+    # STANDARD trigger: 10 minutes when temp > 0C
+    - id: "standard"
+      platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+        - binary_sensor.living_window_contact_sensor_balcony_door_contact
       to: "on"
       for:
         minutes: 10
 
+  condition:
+    # Temperature check: freezing trigger needs temp <= 0, standard needs temp > 0
+    # Use -999 default so unavailable sensor = assume freezing (safer)
+    - condition: template
+      value_template: >
+        {% set temp = states('sensor.balcony_temperature_humidity_temperature') | float(-999) %}
+        {% if trigger.id == 'freezing' %}
+          {{ temp <= 0 }}
+        {% else %}
+          {{ temp > 0 }}
+        {% endif %}
+
+  variables:
+    window_name: >
+      {% set names = {
+        'binary_sensor.bath_window_contact_sensor_contact': 'Bathroom Window',
+        'binary_sensor.bed_window_contact_sensor_contact': 'Bedroom Window',
+        'binary_sensor.kitchen_window_contact_sensor_contact': 'Kitchen Window',
+        'binary_sensor.study_window_contact_sensor_large_contact': 'Study Large Window',
+        'binary_sensor.study_window_contact_sensor_small_contact': 'Study Small Window',
+        'binary_sensor.living_window_contact_sensor_window_contact': 'Living Window',
+        'binary_sensor.living_window_contact_sensor_balcony_door_contact': 'Balcony Door'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+    is_freezing: "{{ trigger.id == 'freezing' }}"
+
   action:
     - repeat:
         while:
-          - condition: state
-            entity_id: binary_sensor.bath_window_contact_sensor_contact
-            state: "on"
+          - condition: template
+            value_template: "{{ is_state(trigger.entity_id, 'on') }}"
         sequence:
           # Use smart TTS script with retry, fallback speakers, and obsolescence check
           - service: script.smart_tts_window_alert
             data:
               message: >
-                {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
-                Bathroom window has been open for {{ minutes }} minutes.
-              window_entity: binary_sensor.bath_window_contact_sensor_contact
-          # Mobile notification as backup
+                {% set minutes = ((now() - states[trigger.entity_id].last_changed).total_seconds() / 60) | round(0) | int %}
+                {% set temp = states('sensor.balcony_temperature_humidity_temperature') | round(0) | int %}
+                {{ window_name }} has been open for {{ minutes }} minutes.
+                {% if is_freezing %}It's {{ temp }} degrees outside - freezing!{% endif %}
+              window_entity: "{{ trigger.entity_id }}"
+          # Mobile notification
           - service: notify.all_phones
             data:
-              title: "🪟 Bathroom Window"
+              title: >
+                {% if is_freezing %}🥶{% else %}🪟{% endif %} {{ window_name }}
               message: >
-                {% set minutes = ((now() - states.binary_sensor.bath_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
-                Open for {{ minutes }} minutes
+                {% set minutes = ((now() - states[trigger.entity_id].last_changed).total_seconds() / 60) | round(0) | int %}
+                {% set temp = states('sensor.balcony_temperature_humidity_temperature') | round(0) | int %}
+                Open for {{ minutes }} min{% if is_freezing %} - {{ temp }}° freezing!{% endif %}
               data:
-                channel: "Alerts"
-                importance: high
-                tag: "bath_window"
-          - delay:
-              minutes: 1
-
-# -----------------------------------------------------------------------------
-# BEDROOM WINDOW OPEN TOO LONG
-# Trigger: Window open for more than 10 minutes
-# Action: TTS announcement every minute until closed (with retry & fallback)
-# -----------------------------------------------------------------------------
-- id: bed_window_open_too_long
-  alias: "Bedroom Window Open Too Long"
-  description: "Alerts when bedroom window is open for more than 10 minutes"
-  mode: single
-
-  trigger:
-    - platform: state
-      entity_id: binary_sensor.bed_window_contact_sensor_contact
-      to: "on"
-      for:
-        minutes: 10
-
-  action:
-    - repeat:
-        while:
-          - condition: state
-            entity_id: binary_sensor.bed_window_contact_sensor_contact
-            state: "on"
-        sequence:
-          # Use smart TTS script with retry, fallback speakers, and obsolescence check
-          - service: script.smart_tts_window_alert
-            data:
-              message: >
-                {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
-                Bedroom window has been open for {{ minutes }} minutes.
-              window_entity: binary_sensor.bed_window_contact_sensor_contact
-          # Mobile notification as backup
-          - service: notify.all_phones
-            data:
-              title: "🪟 Bedroom Window"
-              message: >
-                {% set minutes = ((now() - states.binary_sensor.bed_window_contact_sensor_contact.last_changed).total_seconds() / 60) | round(0) | int %}
-                Open for {{ minutes }} minutes
-              data:
-                channel: "Alerts"
-                importance: high
-                tag: "bed_window"
+                channel: "{% if is_freezing %}Critical{% else %}Alerts{% endif %}"
+                importance: "{% if is_freezing %}max{% else %}high{% endif %}"
+                tag: "window_{{ trigger.entity_id | replace('.', '_') }}"
           - delay:
               minutes: 1
 

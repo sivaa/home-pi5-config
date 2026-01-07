@@ -203,21 +203,55 @@ These automations automatically turn off heaters when CO2 is high (to avoid heat
 
 These automations use the `smart_tts_window_alert` script for robust TTS with retry, fallback speakers, and obsolescence checking.
 
-#### 6. Bathroom Window Open Too Long
-| Property | Value |
-|----------|-------|
-| **ID** | `bath_window_open_too_long` |
-| **Trigger** | Bathroom window open for 10+ minutes |
-| **TTS Script** | `script.smart_tts_window_alert` with retry & fallback |
-| **Action** | TTS every 1 minute + mobile notification (until closed) |
+#### 6. Window Open Too Long (Temperature-Aware)
 
-#### 7. Bedroom Window Open Too Long
 | Property | Value |
 |----------|-------|
-| **ID** | `bed_window_open_too_long` |
-| **Trigger** | Bedroom window open for 10+ minutes |
+| **ID** | `window_open_too_long` |
+| **Mode** | `parallel` (max: 7) |
+| **Sensors** | All 7 windows + balcony door |
+| **Trigger** | 5 min if temp ≤0°C (freezing), 10 min if temp >0°C |
+| **Condition** | Temperature-based via balcony sensor |
 | **TTS Script** | `script.smart_tts_window_alert` with retry & fallback |
-| **Action** | TTS every 1 minute + mobile notification (until closed) |
+| **Action** | TTS + mobile notification every 1 min until closed |
+| **Backup** | Cold weather alert (15min, <18°C) catches edge cases |
+
+**Sensors Covered:**
+| Sensor | Entity ID |
+|--------|-----------|
+| Bathroom Window | `binary_sensor.bath_window_contact_sensor_contact` |
+| Bedroom Window | `binary_sensor.bed_window_contact_sensor_contact` |
+| Kitchen Window | `binary_sensor.kitchen_window_contact_sensor_contact` |
+| Study Large Window | `binary_sensor.study_window_contact_sensor_large_contact` |
+| Study Small Window | `binary_sensor.study_window_contact_sensor_small_contact` |
+| Living Window | `binary_sensor.living_window_contact_sensor_window_contact` |
+| Balcony Door | `binary_sensor.living_window_contact_sensor_balcony_door_contact` |
+
+**Temperature Logic:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  TEMPERATURE-AWARE WINDOW ALERTS                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Balcony Temp ≤ 0°C (Freezing):                            │
+│  └─ Alert after 5 minutes                                   │
+│     └─ Title: 🥶 [Window Name]                             │
+│     └─ Channel: Critical (max importance)                   │
+│     └─ Message: "It's X degrees outside - freezing!"       │
+│                                                             │
+│  Balcony Temp > 0°C (Normal):                              │
+│  └─ Alert after 10 minutes                                  │
+│     └─ Title: 🪟 [Window Name]                             │
+│     └─ Channel: Alerts (high importance)                    │
+│                                                             │
+│  Sensor Unavailable:                                        │
+│  └─ Defaults to freezing behavior (safer)                   │
+│                                                             │
+│  Note: Main door has separate 3-min alert (security)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Known Limitation:** If temperature drops from warm to freezing mid-window (e.g., opens at 5°C, drops to -3°C at minute 7), the alert may be delayed to 15 minutes via the cold weather backup. This is rare as temperature rarely drops 5°C in 5 minutes.
 
 #### Smart TTS Window Alert Script
 
@@ -1035,6 +1069,7 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2026-01-07 | **Unified temperature-aware window alerts:** Replaced `bath_window_open_too_long` and `bed_window_open_too_long` with single `window_open_too_long` automation. Now covers ALL 7 windows + balcony door. **Key change:** 5-minute alert when temp ≤0°C (freezing), 10-minute when >0°C. Uses balcony sensor for outdoor temp. If sensor unavailable, defaults to freezing behavior (safer). Main door unchanged at 3-min (security). Cold weather alert (15min, <18°C) provides backup for edge cases. |
 | 2026-01-04 | **Added Sensor Offline Alert system:** After a 34-hour power outage, 2 contact sensors stayed offline blocking heater resume (unavailable ≠ off). Added 3 automations: (1) `contact_sensor_offline_alert` - immediate notification after 5 min offline, (2) `contact_sensor_offline_repeat` - repeat every 4 hours, (3) `contact_sensor_back_online` - recovery notification. Also increased Z2M passive timeout 1500→2400 for better short-outage recovery. Documented 8 Circadian Lighting automations. Total count: 33→47 automations. |
 | 2025-12-31 | **Fixed CO2 guard not triggering heater resume:** The `watchdog_recovery_periodic_resume_check` automation only checked `heaters_off_due_to_window` flag, missing cases where heaters were paused due to high CO2. When `co2_low_resume_heaters` missed the threshold crossing (e.g., HA busy, value jumped), heaters stayed off indefinitely. Fix: Watchdog now checks BOTH window AND CO2 guard flags and routes to the appropriate resume automation. |
 | 2025-12-30 | **Added robust TTS for window alerts:** Created `smart_tts_window_alert` script with retry logic, fallback speakers, and obsolescence checking. Updated bathroom and bedroom window automations to use this script. Fixes silent TTS failures when Kitchen Display appears available but doesn't play audio. |
