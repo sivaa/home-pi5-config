@@ -169,3 +169,72 @@ transition: transform 0.2s ease, opacity 0.2s ease;
 /* Border colors are cheap */
 border-color: var(--color-danger);
 ```
+
+---
+
+## Device Health View (2026-01-08)
+
+Real-time monitoring of all 36 Zigbee devices with health status, battery levels, and signal strength.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DEVICE HEALTH DATA FLOW                                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Zigbee Device → Z2M → MQTT Broker                              │
+│                          │                                      │
+│                          ▼                                      │
+│                     mqtt-store.js                               │
+│                    (WebSocket via MQTT.js)                      │
+│                          │                                      │
+│                          ▼ _dispatchToHandlers()                │
+│                          │                                      │
+│                     device-health-store.js                      │
+│                    updateDeviceHealth()                         │
+│                          │                                      │
+│                          ▼                                      │
+│             ┌────────────┴────────────┐                         │
+│             │                         │                         │
+│        healthData[ieee]          viewActive?                    │
+│        (always updated)               │                         │
+│                              ┌────────┴────────┐                │
+│                              │                 │                │
+│                           YES: Queue        NO: Skip            │
+│                           for 5s batch      UI work             │
+│                              │                                  │
+│                              ▼                                  │
+│                     _flushUpdates()                             │
+│                    (triggers Alpine reactivity)                 │
+│                              │                                  │
+│                              ▼                                  │
+│                     device-health.js (View)                     │
+│                    UI re-renders                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `js/stores/device-health-store.js` | Alpine store with MQTT handlers, health calculations |
+| `views/device-health.js` | View controller with lifecycle management |
+| `styles/views/device-health.css` | Responsive grid layout for device list |
+
+### Performance Optimizations
+
+1. **5-second batched updates** - Collects MQTT updates, flushes in single reactivity trigger
+2. **View lifecycle gating** - UI work only when tab is active
+3. **Data always fresh** - MQTT data stored even when view inactive
+4. **Cleanup on tab switch** - Timers cleared, no memory leaks
+
+### Health Status Thresholds
+
+| Status | Last Seen | Color |
+|--------|-----------|-------|
+| OK | < 30 min | Green |
+| Warning | 30 min - 2 hr | Yellow |
+| Critical | 2 hr - 24 hr | Red |
+| Dead | > 24 hr | Gray |

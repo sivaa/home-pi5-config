@@ -1,0 +1,554 @@
+/**
+ * Device Health View Styles
+ * Monitors health status of all Zigbee devices
+ */
+
+/* ============================================
+   LAYOUT
+   ============================================ */
+.device-health-view {
+  display: flex;
+  gap: var(--space-md);
+  height: 100%;
+  max-height: calc(100vh - 80px);
+  padding: var(--space-md);
+}
+
+/* ============================================
+   FILTER SIDEBAR
+   ============================================ */
+.health-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  overflow-y: auto;
+  padding-right: var(--space-sm);
+}
+
+.health-sidebar-section {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.health-sidebar-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+/* Status Filter Pills */
+.health-status-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+}
+
+.health-status-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-sm);
+  font-size: 0.7rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.health-status-pill:hover {
+  background: var(--color-surface);
+}
+
+.health-status-pill.inactive {
+  opacity: 0.4;
+}
+
+.health-status-pill.active {
+  border-width: 2px;
+}
+
+.health-status-pill.ok { border-color: var(--color-success); }
+.health-status-pill.ok.active { background: rgba(34, 197, 94, 0.1); }
+
+.health-status-pill.warning { border-color: var(--color-warning); }
+.health-status-pill.warning.active { background: rgba(245, 158, 11, 0.1); }
+
+.health-status-pill.critical { border-color: var(--color-danger); }
+.health-status-pill.critical.active { background: rgba(239, 68, 68, 0.1); }
+
+.health-status-pill.dead { border-color: #6b7280; }
+.health-status-pill.dead.active { background: rgba(107, 114, 128, 0.1); }
+
+.health-status-count {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.health-status-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* Device Type List */
+.health-type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.health-type-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  min-height: 36px;
+  touch-action: manipulation;
+}
+
+.health-type-item:hover {
+  background: var(--color-bg);
+}
+
+.health-type-item.inactive {
+  opacity: 0.4;
+}
+
+.health-type-icon {
+  font-size: 0.9rem;
+  width: 20px;
+  text-align: center;
+}
+
+.health-type-label {
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+.health-type-count {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Search */
+.health-search-input {
+  width: 100%;
+  padding: var(--space-sm);
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.health-search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* Clear Filters */
+.health-clear-btn {
+  width: 100%;
+  padding: var(--space-sm);
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.health-clear-btn:hover {
+  background: var(--color-bg);
+}
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+.health-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-md);
+}
+
+/* Header */
+.health-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--color-surface);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+}
+
+.health-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.health-stats-bar {
+  display: flex;
+  gap: var(--space-lg);
+  margin-left: auto;
+}
+
+.health-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.85rem;
+}
+
+.health-stat-value {
+  font-weight: 600;
+}
+
+.health-stat.ok .health-stat-value { color: var(--color-success); }
+.health-stat.attention .health-stat-value { color: var(--color-danger); }
+
+.health-toggle-btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.health-toggle-btn:hover {
+  background: var(--color-bg);
+}
+
+/* ============================================
+   DEVICE LIST
+   ============================================ */
+.health-list {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+/* Column Headers */
+.health-list-header {
+  display: grid;
+  grid-template-columns: 24px 24px 1fr 70px 60px 55px 30px 90px;
+  /* Status | TypeIcon | Name | RelTime | AbsTime | Battery | Signal | Value */
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  z-index: 1;
+}
+
+.health-col-header {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  padding: var(--space-xs) 0;
+}
+
+.health-col-header:hover {
+  color: var(--color-text);
+}
+
+.health-col-header.active {
+  color: var(--color-primary);
+}
+
+.health-sort-icon {
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+/* Device Row - Single line layout */
+.health-device-row {
+  display: grid;
+  grid-template-columns: 24px 24px 1fr 70px 60px 55px 30px 90px;
+  /* Status | TypeIcon | Name | RelTime | AbsTime | Battery | Signal | Value */
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s;
+  min-height: 40px;  /* Reduced from 56px */
+}
+
+.health-device-row:hover {
+  background: var(--color-bg);
+}
+
+.health-device-row:last-child {
+  border-bottom: none;
+}
+
+/* Status Indicator */
+.health-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 auto;
+}
+
+.health-status-dot.ok { background: var(--color-success); }
+.health-status-dot.warning { background: var(--color-warning); }
+.health-status-dot.critical { background: var(--color-danger); }
+.health-status-dot.dead { background: #6b7280; }
+.health-status-dot.unknown { background: var(--color-text-tertiary); }
+
+/* Type Icon (inline before name) */
+.health-device-type-icon {
+  text-align: center;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Device Name - Single line */
+.health-device-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Absolute Time */
+.health-abs-time {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+/* Last Seen */
+.health-last-seen {
+  font-size: 0.85rem;
+}
+
+.health-last-seen.ok { color: var(--color-text); }
+.health-last-seen.warning { color: var(--color-warning); }
+.health-last-seen.critical { color: var(--color-danger); font-weight: 500; }
+.health-last-seen.dead { color: #6b7280; font-weight: 600; }
+.health-last-seen.unknown { color: var(--color-text-tertiary); }
+
+/* Battery */
+.health-battery {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.85rem;
+}
+
+.health-battery.low {
+  color: var(--color-danger);
+}
+
+.health-battery-na {
+  color: var(--color-text-tertiary);
+  font-size: 0.8rem;
+}
+
+/* Signal Indicator Dot */
+.health-signal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 auto;
+  cursor: help;  /* Indicates hover info available */
+}
+
+.health-signal-dot.strong { background: var(--color-success); }
+.health-signal-dot.medium { background: var(--color-warning); }
+.health-signal-dot.weak { background: var(--color-danger); }
+
+.health-signal-na {
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+/* Last Value */
+.health-last-value {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================
+   EMPTY & LOADING STATES
+   ============================================ */
+.health-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  color: var(--color-text-secondary);
+}
+
+.health-empty-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-md);
+}
+
+.health-empty-text {
+  font-size: 0.9rem;
+}
+
+.health-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  color: var(--color-text-secondary);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 900px) {
+  .health-list-header,
+  .health-device-row {
+    /* Hide AbsTime, Signal, Value columns on tablet */
+    grid-template-columns: 24px 24px 1fr 70px 55px;
+  }
+
+  /* Hide AbsTime, Signal, Value columns using class selectors
+     (nth-child doesn't work with Alpine.js template elements) */
+  .health-col-abstime,
+  .health-abs-time,
+  .health-col-signal,
+  .health-signal-dot,
+  .health-signal-na,
+  .health-col-value,
+  .health-last-value {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .device-health-view {
+    flex-direction: column;
+  }
+
+  .health-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    padding-right: 0;
+    gap: var(--space-sm);
+  }
+
+  .health-sidebar-section {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  .health-header {
+    flex-wrap: wrap;
+  }
+
+  .health-stats-bar {
+    width: 100%;
+    justify-content: space-around;
+    margin-top: var(--space-sm);
+    margin-left: 0;
+  }
+
+  .health-list-header {
+    display: none;
+  }
+
+  /* Mobile: Show Status, Type, Name, RelTime, Battery only */
+  .health-device-row {
+    grid-template-columns: 24px 24px 1fr 60px 50px;
+    min-height: 44px;
+  }
+
+  /* Hide AbsTime, Signal, Value on mobile using class selectors */
+  .health-abs-time,
+  .health-signal-dot,
+  .health-signal-na,
+  .health-last-value {
+    display: none;
+  }
+
+  .health-device-name {
+    font-size: 0.8rem;
+  }
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+[data-theme="dark"] .health-status-pill {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .health-status-pill.ok.active {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] .health-status-pill.warning.active {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+[data-theme="dark"] .health-status-pill.critical.active {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .health-status-pill.dead.active {
+  background: rgba(107, 114, 128, 0.2);
+}
+
+[data-theme="dark"] .health-device-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .health-last-seen.warning {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .health-last-seen.critical {
+  color: #f87171;
+}
+
+[data-theme="dark"] .health-battery.low {
+  color: #f87171;
+}
