@@ -87,6 +87,10 @@ export function thermostatView() {
     pauseTimerTick: 0,           // Forces reactivity for live duration
     pauseTimerInterval: null,
 
+    // Boost override timer
+    overrideTimerTick: 0,        // Forces reactivity for boost countdown
+    overrideTimerInterval: null,
+
     // ============================================
     // LIFECYCLE
     // ============================================
@@ -118,6 +122,14 @@ export function thermostatView() {
           this.pauseTimerTick = Date.now();
         }
       }, 5000);  // Was 1000ms, now 5000ms
+
+      // Boost override countdown timer
+      // CPU OPTIMIZATION: Only tick when heater view is active AND there's an active override
+      this.overrideTimerInterval = setInterval(() => {
+        if (Alpine.store('app')?.currentView === 'heater' && this.hasAnyActiveOverride()) {
+          this.overrideTimerTick = Date.now();
+        }
+      }, 5000);  // Update every 5 seconds
     },
 
     destroy() {
@@ -126,6 +138,9 @@ export function thermostatView() {
       }
       if (this.pauseTimerInterval) {
         clearInterval(this.pauseTimerInterval);
+      }
+      if (this.overrideTimerInterval) {
+        clearInterval(this.overrideTimerInterval);
       }
     },
 
@@ -553,10 +568,11 @@ export function thermostatView() {
     },
 
     /**
-     * Get time remaining for override
+     * Get time remaining for boost (with reactivity via overrideTimerTick)
      */
     getOverrideRemaining(thermostatId) {
-      return this.$store.thermostats?.getOverrideTimeRemaining?.(thermostatId) || '';
+      const _ = this.overrideTimerTick;  // Force reactivity on timer tick
+      return this.$store.thermostats?.getBoostTimeRemaining?.(thermostatId) || '';
     },
 
     /**
@@ -582,6 +598,53 @@ export function thermostatView() {
       }
 
       this.$store.thermostats?.setManualOverride?.('bedroom', 17, elevenPM);
+    },
+
+    // ============================================
+    // QUICK BOOST (22°C for 60 minutes)
+    // ============================================
+
+    /**
+     * Check if ANY thermostat has an active boost (for timer interval optimization)
+     */
+    hasAnyActiveOverride() {
+      const store = this.$store.thermostats;
+      if (!store?.boostOverrides) return false;
+      return Object.keys(store.boostOverrides).some(id =>
+        store.hasBoostActive(id)
+      );
+    },
+
+    /**
+     * Check if specific thermostat has active boost (from MQTT/HA state)
+     */
+    hasActiveOverride(thermostatId) {
+      return this.$store.thermostats?.hasBoostActive?.(thermostatId) ?? false;
+    },
+
+    /**
+     * Request 22°C boost for 60 minutes (calls HA script)
+     */
+    setQuickBoost(thermostatId) {
+      this.$store.thermostats?.requestBoost?.(thermostatId);
+    },
+
+    /**
+     * Cancel active boost (calls HA script)
+     */
+    cancelBoost(thermostatId) {
+      this.$store.thermostats?.cancelBoost?.(thermostatId);
+    },
+
+    /**
+     * Check if boost button should be enabled
+     * Disabled when: offline, syncing, already at max boost temp (25°C), or heaters paused
+     */
+    canBoost(thermostat) {
+      if (!thermostat.available || thermostat.syncing) return false;
+      if (this.$store.thermostats?.heaterPause?.active) return false;
+      if ((thermostat.targetTemp || 17) >= 25) return false;  // Max boost temp is 25°C
+      return true;
     },
 
     // ============================================

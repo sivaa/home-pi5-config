@@ -100,7 +100,20 @@ export function initThermostatStore(Alpine, CONFIG) {
     },
 
     // Manual overrides per thermostat { [thermostatId]: { targetTemp, expiresAt, originalTemp } }
+    // NOTE: This is for local UI state only - primary state comes from MQTT (boostOverrides)
     manualOverrides: {},
+
+    // Boost overrides from Home Assistant (via MQTT)
+    // { [thermostatId]: { active, target_temp, original_temp, expires_at } }
+    boostOverrides: {},
+
+    // Global boost MODE (enables 25°C limit for all thermostats)
+    // State comes from MQTT (dashboard/global-boost-mode)
+    globalBoostMode: {
+      active: false,
+      expiresAt: null,     // When boost mode ends (ms timestamp)
+      _tick: 0             // Incremented every 30s to force timer re-render
+    },
 
     // Night mode override state (for bedroom 17°C enforcement bypass)
     // State comes from MQTT (dashboard/bedroom-night-mode), not localStorage
@@ -123,6 +136,7 @@ export function initThermostatStore(Alpine, CONFIG) {
       await this.loadHistoricalEvents(24);
 
       // Night mode state comes from MQTT (server-side, no localStorage)
+      // Boost override state also comes from MQTT (HA manages timers)
 
       const mqtt = Alpine.store('mqtt');
       if (!mqtt?.client) {
@@ -152,6 +166,16 @@ export function initThermostatStore(Alpine, CONFIG) {
       mqtt.client.subscribe('dashboard/bedroom-night-mode', { qos: 1 });
       console.log('[thermostat-store] Subscribed to dashboard/bedroom-night-mode');
 
+      // Subscribe to thermostat boost state (for all thermostats)
+      ['study', 'living_inner', 'living_outer', 'bedroom'].forEach(id => {
+        mqtt.client.subscribe(`dashboard/thermostat-boost/${id}`, { qos: 1 });
+      });
+      console.log('[thermostat-store] Subscribed to dashboard/thermostat-boost/*');
+
+      // Subscribe to global boost mode state
+      mqtt.client.subscribe('dashboard/global-boost-mode', { qos: 1 });
+      console.log('[thermostat-store] Subscribed to dashboard/global-boost-mode');
+
       // PERFORMANCE: Use central dispatcher instead of client.on('message')
       // This prevents duplicate JSON parsing across multiple stores
 
@@ -163,6 +187,17 @@ export function initThermostatStore(Alpine, CONFIG) {
       // Handle bedroom night mode state (from HA automations)
       mqtt.registerTopicHandler('dashboard/bedroom-night-mode', (topic, data) => {
         this.handleNightModeUpdate(data);
+      });
+
+      // Handle thermostat boost state (from HA scripts)
+      mqtt.registerTopicHandler('dashboard/thermostat-boost/*', (topic, data) => {
+        const thermostatId = topic.split('/').pop();
+        this.handleBoostUpdate(thermostatId, data);
+      });
+
+      // Handle global boost mode state (from HA scripts)
+      mqtt.registerTopicHandler('dashboard/global-boost-mode', (topic, data) => {
+        this.handleGlobalBoostModeUpdate(data);
       });
 
       // Handle bridge events (device_leave, etc.)
@@ -190,6 +225,13 @@ export function initThermostatStore(Alpine, CONFIG) {
           this.updateThermostat(cleanName, data);
         }
       });
+
+      // Start timer tick for boost mode countdown (every 30 seconds)
+      setInterval(() => {
+        if (this.globalBoostMode.active) {
+          this.globalBoostMode._tick++;
+        }
+      }, 30000);
 
       this.initializing = false;
       console.log('[thermostat-store] Initialization complete (using central dispatcher)');
@@ -319,7 +361,13 @@ export function initThermostatStore(Alpine, CONFIG) {
       }
       if (data.occupied_heating_setpoint !== undefined) {
         thermostat.targetTemp = data.occupied_heating_setpoint;
-        thermostat.pendingTarget = null;  // Clear optimistic update
+        // Only clear pendingTarget if heater confirmed our requested value
+        // (or if we weren't waiting for anything)
+        if (thermostat.pendingTarget === null ||
+            thermostat.pendingTarget === data.occupied_heating_setpoint) {
+          thermostat.pendingTarget = null;
+        }
+        // else: keep pendingTarget, user tapped again and we're still waiting
       }
       if (data.running_state !== undefined) {
         thermostat.runningState = data.running_state === 'heat' ? 'heat' : 'idle';
@@ -345,7 +393,10 @@ export function initThermostatStore(Alpine, CONFIG) {
       }
 
       thermostat.lastSeen = Date.now();
-      thermostat.syncing = false;
+      // Only clear syncing if we're not waiting for a different setpoint
+      if (thermostat.pendingTarget === null) {
+        thermostat.syncing = false;
+      }
       this.initializing = false;
 
       // Record initial state on first message from this device
@@ -533,6 +584,192 @@ export function initThermostatStore(Alpine, CONFIG) {
       }
     },
 
+    /**
+     * Handle thermostat boost state update from MQTT
+     * Updates boostOverrides state for dashboard UI
+     * Payload: { active: bool, target_temp?: number, original_temp?: number, expires_at?: string }
+     */
+    handleBoostUpdate(thermostatId, data) {
+      const wasActive = this.boostOverrides[thermostatId]?.active ?? false;
+
+      if (data.active) {
+        this.boostOverrides[thermostatId] = {
+          active: true,
+          targetTemp: data.target_temp ?? 22,
+          originalTemp: data.original_temp ?? 17,
+          expiresAt: data.expires_at ? new Date(data.expires_at).getTime() : null
+        };
+
+        if (!wasActive) {
+          const expiresStr = data.expires_at ? data.expires_at.substring(11, 16) : '?';
+          console.log(`[thermostat-store] Boost STARTED for ${thermostatId}: 22°C until ${expiresStr}`);
+        }
+      } else {
+        this.boostOverrides[thermostatId] = { active: false };
+
+        if (wasActive) {
+          console.log(`[thermostat-store] Boost ENDED for ${thermostatId}`);
+        }
+      }
+    },
+
+    // ============================================
+    // GLOBAL BOOST MODE (25°C limit for all thermostats)
+    // ============================================
+
+    /**
+     * Handle global boost mode state update from MQTT
+     */
+    handleGlobalBoostModeUpdate(data) {
+      const wasActive = this.globalBoostMode.active;
+
+      if (data.active) {
+        this.globalBoostMode = {
+          active: true,
+          expiresAt: data.expires_at ? new Date(data.expires_at).getTime() : null
+        };
+
+        if (!wasActive) {
+          const expiresStr = data.expires_at ? data.expires_at.substring(11, 16) : '?';
+          console.log(`[thermostat-store] GLOBAL Boost Mode ENABLED until ${expiresStr}`);
+        }
+      } else {
+        this.globalBoostMode = { active: false, expiresAt: null };
+
+        if (wasActive) {
+          console.log('[thermostat-store] GLOBAL Boost Mode DISABLED');
+        }
+      }
+    },
+
+    /**
+     * Check if global boost mode is active
+     */
+    isGlobalBoostModeActive() {
+      return this.globalBoostMode.active ?? false;
+    },
+
+    /**
+     * Get global boost mode time remaining
+     * @returns {string} Formatted time remaining (e.g., "45m")
+     */
+    getGlobalBoostModeTimeRemaining() {
+      // Reference _tick to trigger Alpine reactivity when it updates
+      const _ = this.globalBoostMode._tick;
+
+      if (!this.globalBoostMode.active || !this.globalBoostMode.expiresAt) return '';
+
+      const remaining = this.globalBoostMode.expiresAt - Date.now();
+      if (remaining <= 0) return 'Expired';
+
+      const minutes = Math.floor(remaining / (60 * 1000));
+      return `${minutes}m`;
+    },
+
+    /**
+     * Enable global boost mode (calls HA script)
+     */
+    async enableGlobalBoostMode() {
+      // Optimistically update state immediately for responsive UI
+      const expiresAt = Date.now() + 60 * 60 * 1000; // 60 minutes from now
+      this.globalBoostMode = {
+        active: true,
+        expiresAt: expiresAt
+      };
+      console.log('[thermostat-store] Global boost mode ENABLED (optimistic) until', new Date(expiresAt).toLocaleTimeString());
+
+      try {
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.global_boost_mode_start'
+        });
+        console.log('[thermostat-store] Global boost mode confirmed by HA');
+      } catch (err) {
+        console.error('[thermostat-store] HA call failed (state remains optimistic):', err);
+        // Keep optimistic state - MQTT will sync if HA eventually processes it
+      }
+    },
+
+    /**
+     * Disable global boost mode (calls HA script)
+     */
+    async disableGlobalBoostMode() {
+      // Optimistically update state immediately for responsive UI
+      this.globalBoostMode = {
+        active: false,
+        expiresAt: null
+      };
+      console.log('[thermostat-store] Global boost mode DISABLED (optimistic)');
+
+      try {
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.global_boost_mode_cancel'
+        });
+        console.log('[thermostat-store] Global boost mode disable confirmed by HA');
+      } catch (err) {
+        console.error('[thermostat-store] HA call failed (state remains optimistic):', err);
+        // Keep optimistic state - MQTT will sync if HA eventually processes it
+      }
+    },
+
+    /**
+     * Check if a thermostat has an active boost (from MQTT state)
+     */
+    hasBoostActive(thermostatId) {
+      return this.boostOverrides[thermostatId]?.active ?? false;
+    },
+
+    /**
+     * Get boost time remaining for a thermostat
+     * @returns {string} Formatted time remaining (e.g., "45m")
+     */
+    getBoostTimeRemaining(thermostatId) {
+      const boost = this.boostOverrides[thermostatId];
+      if (!boost?.active || !boost.expiresAt) return '';
+
+      const remaining = boost.expiresAt - Date.now();
+      if (remaining <= 0) return 'Expired';
+
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    },
+
+    /**
+     * Request boost for a thermostat (calls HA script)
+     */
+    async requestBoost(thermostatId) {
+      try {
+        console.log(`[thermostat-store] Requesting boost for ${thermostatId}...`);
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.thermostat_boost_start',
+          variables: { thermostat_id: thermostatId }
+        });
+        console.log(`[thermostat-store] Boost request sent for ${thermostatId}`);
+      } catch (err) {
+        console.error(`[thermostat-store] Failed to request boost for ${thermostatId}:`, err);
+      }
+    },
+
+    /**
+     * Cancel boost for a thermostat (calls HA script)
+     */
+    async cancelBoost(thermostatId) {
+      try {
+        console.log(`[thermostat-store] Canceling boost for ${thermostatId}...`);
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.thermostat_boost_cancel',
+          variables: { thermostat_id: thermostatId }
+        });
+        console.log(`[thermostat-store] Boost cancel sent for ${thermostatId}`);
+      } catch (err) {
+        console.error(`[thermostat-store] Failed to cancel boost for ${thermostatId}:`, err);
+      }
+    },
+
     // ============================================
     // EVENT DETECTION
     // ============================================
@@ -672,14 +909,32 @@ export function initThermostatStore(Alpine, CONFIG) {
       const thermostat = this.list.find(t => t.id === thermostatId);
       if (!thermostat || !thermostat.available) return;
 
-      // Clamp to valid range (5-22°C) - max 22° for energy efficiency
-      const clampedTemp = Math.max(5, Math.min(22, temp));
+      // Check if ANY boost is active:
+      // - Per-thermostat boost (from boostOverrides)
+      // - OR Global boost MODE (from globalBoostMode)
+      const hasPerThermostatBoost = this.boostOverrides[thermostatId]?.active ?? false;
+      const hasGlobalBoostMode = this.globalBoostMode.active ?? false;
+      const hasBoost = hasPerThermostatBoost || hasGlobalBoostMode;
+      const maxTemp = hasBoost ? 25 : 22;  // 25°C during boost, 22°C otherwise
+
+      // Clamp to valid range (5-maxTemp)
+      const clampedTemp = Math.max(5, Math.min(maxTemp, temp));
+
+      // Debug logging to verify boost state detection
+      console.log(`[thermostat-store] setTargetTemp: id=${thermostatId}, perBoost=${hasPerThermostatBoost}, globalBoost=${hasGlobalBoostMode}, maxTemp=${maxTemp}, requested=${temp}, clamped=${clampedTemp}`);
 
       // Optimistic update
       thermostat.pendingTarget = clampedTemp;
       thermostat.syncing = true;
 
-      this.publishCommand(thermostat, { occupied_heating_setpoint: clampedTemp });
+      // SONOFF TRVZB has internal 'boost' mode that enforces 22°C and fights temp changes.
+      // Sending temporary_mode_select: 'timer' clears the internal boost mode.
+      // Note: SONOFF TRVZB only accepts 'boost' or 'timer' for temporary_mode_select.
+      this.publishCommand(thermostat, {
+        occupied_heating_setpoint: clampedTemp,
+        temporary_mode_select: 'timer',
+        temporary_mode_duration: 0  // No timer, just clear boost mode
+      });
     },
 
     adjustTemp(thermostatId, delta) {
@@ -790,6 +1045,15 @@ export function initThermostatStore(Alpine, CONFIG) {
         originalTemp,
         setAt: Date.now()
       };
+
+      // If bedroom during night hours and boosting above 17°C, trigger night mode bypass
+      if (thermostatId === 'bedroom' && targetTemp > 17) {
+        const hour = new Date().getHours();
+        if (hour >= 23 || hour < 6) {
+          console.log('[thermostat-store] Bedroom boost during night mode - triggering bypass');
+          this.requestNightModeOverride();
+        }
+      }
 
       // Apply the override temperature
       this.setTargetTemp(thermostatId, targetTemp);

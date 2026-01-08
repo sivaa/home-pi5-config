@@ -348,6 +348,33 @@ input_datetime:
     has_date: true
     has_time: true
     icon: mdi:timer-sand
+  # Thermostat boost expiry times (dashboard 60-min boost feature)
+  study_boost_end:
+    name: Study Boost Expires
+    has_date: true
+    has_time: true
+    icon: mdi:fire
+  living_inner_boost_end:
+    name: Living Inner Boost Expires
+    has_date: true
+    has_time: true
+    icon: mdi:fire
+  living_outer_boost_end:
+    name: Living Outer Boost Expires
+    has_date: true
+    has_time: true
+    icon: mdi:fire
+  bedroom_boost_end:
+    name: Bedroom Boost Expires
+    has_date: true
+    has_time: true
+    icon: mdi:fire
+  # Global boost mode expiry (enables 25°C limit for 60 min)
+  global_boost_end:
+    name: Global Boost Mode Expires
+    has_date: true
+    has_time: true
+    icon: mdi:fire-alert
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
@@ -393,6 +420,68 @@ input_number:
     step: 0.5
     unit_of_measurement: "°C"
     icon: mdi:bed-clock
+  # Thermostat boost - Save setpoints before 22°C boost (dashboard feature)
+  study_pre_boost_setpoint:
+    name: Study Pre-Boost Setpoint
+    min: 5
+    max: 22
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:fire
+  living_inner_pre_boost_setpoint:
+    name: Living Inner Pre-Boost Setpoint
+    min: 5
+    max: 22
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:fire
+  living_outer_pre_boost_setpoint:
+    name: Living Outer Pre-Boost Setpoint
+    min: 5
+    max: 22
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:fire
+  bedroom_pre_boost_setpoint:
+    name: Bedroom Pre-Boost Setpoint
+    min: 5
+    max: 22
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:fire
+  # Global boost mode - Save temps before enabling 25°C limit (for restoration)
+  global_boost_saved_study:
+    name: Global Boost Saved - Study
+    min: 5
+    max: 30
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:fire-alert
+  global_boost_saved_living_inner:
+    name: Global Boost Saved - Living Inner
+    min: 5
+    max: 30
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:fire-alert
+  global_boost_saved_living_outer:
+    name: Global Boost Saved - Living Outer
+    min: 5
+    max: 30
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:fire-alert
+  global_boost_saved_bedroom:
+    name: Global Boost Saved - Bedroom
+    min: 5
+    max: 30
+    step: 0.5
+    unit_of_measurement: "°C"
+    mode: box
+    icon: mdi:fire-alert
 
 # =============================================================================
 # HOT WATER USAGE TRACKING
@@ -410,6 +499,28 @@ mqtt:
       value_template: "{{ 'ON' if value_json.vibration == true else 'OFF' }}"
       device_class: running
       icon: mdi:water-boiler
+
+# =============================================================================
+# MQTT STATESTREAM - Publish entity states to MQTT for dashboard
+# Purpose: Exposes circadian lighting state to the web dashboard via MQTT
+# Topics published: homeassistant/sensor/circadian_*/state, etc.
+# =============================================================================
+mqtt_statestream:
+  base_topic: homeassistant
+  publish_attributes: true
+  include:
+    entities:
+      # Circadian sensors
+      - sensor.circadian_phase
+      - sensor.circadian_brightness
+      - sensor.circadian_color_temp
+      # Circadian control flags
+      - input_boolean.circadian_enabled
+      - input_boolean.circadian_study_override
+      - input_boolean.circadian_living_override
+      # Override expiration timestamps
+      - input_datetime.circadian_study_override_expires
+      - input_datetime.circadian_living_override_expires
 
 # History tracking sensors (history_stats)
 sensor:

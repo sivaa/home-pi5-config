@@ -303,3 +303,326 @@ bedroom_night_override_start:
           channel: "Info"
           importance: default
           tag: "bedroom_night_override"
+
+# -----------------------------------------------------------------------------
+# THERMOSTAT BOOST - START (22°C for 60 minutes)
+# Purpose: Temporarily boost thermostat to 22°C for 60 minutes (called from dashboard)
+#
+# Flow:
+#   1. Map thermostat_id to climate entity and input helpers
+#   2. Save current setpoint to input_number
+#   3. Set thermostat to 22°C
+#   4. Set expiry datetime (now + 60 minutes)
+#   5. Publish state to MQTT for dashboard
+#
+# Usage:
+#   service: script.thermostat_boost_start
+#   data:
+#     thermostat_id: study  # or living_inner, living_outer, bedroom
+# -----------------------------------------------------------------------------
+thermostat_boost_start:
+  alias: "Thermostat Boost - Start"
+  description: "Boost thermostat to 22°C for 60 minutes (called from dashboard)"
+  mode: parallel
+  max: 4
+
+  fields:
+    thermostat_id:
+      description: "The thermostat to boost (study, living_inner, living_outer, bedroom)"
+      example: "study"
+
+  variables:
+    # Map thermostat_id to climate entity
+    climate_entity: >
+      {% set mapping = {
+        'study': 'climate.study_thermostat',
+        'living_inner': 'climate.living_inner_thermostat',
+        'living_outer': 'climate.living_outer_thermostat',
+        'bedroom': 'climate.bed_thermostat'
+      } %}
+      {{ mapping.get(thermostat_id, '') }}
+    # Map thermostat_id to input helpers
+    input_setpoint: "input_number.{{ thermostat_id }}_pre_boost_setpoint"
+    input_expiry: "input_datetime.{{ thermostat_id }}_boost_end"
+    # Current setpoint (default 17 if unavailable)
+    current_setpoint: >
+      {{ state_attr(climate_entity, 'temperature') | float(17) }}
+    # Expiry time (60 minutes from now)
+    expiry_time: "{{ (now() + timedelta(minutes=60)).strftime('%Y-%m-%d %H:%M:%S') }}"
+
+  sequence:
+    # Validate thermostat_id
+    - if:
+        - condition: template
+          value_template: "{{ climate_entity == '' }}"
+      then:
+        - stop: "Invalid thermostat_id provided"
+
+    # Save current setpoint
+    - service: input_number.set_value
+      target:
+        entity_id: "{{ input_setpoint }}"
+      data:
+        value: "{{ current_setpoint }}"
+
+    # Set expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: "{{ input_expiry }}"
+      data:
+        datetime: "{{ expiry_time }}"
+
+    # Set thermostat to 22°C
+    - service: climate.set_temperature
+      target:
+        entity_id: "{{ climate_entity }}"
+      data:
+        temperature: 22
+
+    # Publish state to MQTT for dashboard (retained so new connections get state)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/thermostat-boost/{{ thermostat_id }}"
+        retain: true
+        payload: >
+          {"active": true, "target_temp": 22, "original_temp": {{ current_setpoint }}, "expires_at": "{{ expiry_time }}"}
+
+    # Notification (low priority, just informational)
+    - service: notify.all_phones
+      data:
+        title: "🔥 Boost Active"
+        message: "{{ thermostat_id | replace('_', ' ') | title }} boosted to 22°C for 60 min"
+        data:
+          channel: "Info"
+          importance: low
+          tag: "thermostat_boost_{{ thermostat_id }}"
+
+# -----------------------------------------------------------------------------
+# THERMOSTAT BOOST - CANCEL
+# Purpose: Cancel active boost and restore original temperature
+#
+# Usage:
+#   service: script.thermostat_boost_cancel
+#   data:
+#     thermostat_id: study
+# -----------------------------------------------------------------------------
+thermostat_boost_cancel:
+  alias: "Thermostat Boost - Cancel"
+  description: "Cancel active boost and restore original temperature"
+  mode: parallel
+  max: 4
+
+  fields:
+    thermostat_id:
+      description: "The thermostat to cancel boost (study, living_inner, living_outer, bedroom)"
+      example: "study"
+
+  variables:
+    climate_entity: >
+      {% set mapping = {
+        'study': 'climate.study_thermostat',
+        'living_inner': 'climate.living_inner_thermostat',
+        'living_outer': 'climate.living_outer_thermostat',
+        'bedroom': 'climate.bed_thermostat'
+      } %}
+      {{ mapping.get(thermostat_id, '') }}
+    input_setpoint: "input_number.{{ thermostat_id }}_pre_boost_setpoint"
+    input_expiry: "input_datetime.{{ thermostat_id }}_boost_end"
+    saved_setpoint: "{{ states(input_setpoint) | float(17) }}"
+
+  sequence:
+    # Validate thermostat_id
+    - if:
+        - condition: template
+          value_template: "{{ climate_entity == '' }}"
+      then:
+        - stop: "Invalid thermostat_id provided"
+
+    # Restore saved setpoint
+    - service: climate.set_temperature
+      target:
+        entity_id: "{{ climate_entity }}"
+      data:
+        temperature: "{{ saved_setpoint }}"
+
+    # Clear expiry datetime (reset to epoch)
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: "{{ input_expiry }}"
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+    # Publish state to MQTT
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/thermostat-boost/{{ thermostat_id }}"
+        retain: true
+        payload: '{"active": false}'
+
+    # Notification
+    - service: notify.all_phones
+      data:
+        title: "❄️ Boost Cancelled"
+        message: "{{ thermostat_id | replace('_', ' ') | title }} restored to {{ saved_setpoint }}°C"
+        data:
+          channel: "Info"
+          importance: low
+          tag: "thermostat_boost_{{ thermostat_id }}"
+
+# -----------------------------------------------------------------------------
+# GLOBAL BOOST MODE - Enable 25°C limit for 60 minutes
+# Purpose: Allows user to set thermostats up to 25°C (normally capped at 22°C)
+#
+# Behavior:
+# - Saves current thermostat temps to input_numbers (for restoration on cancel)
+# - Enables 25°C limit for 60 minutes
+# - Does NOT change thermostat temps automatically - just unlocks higher limit
+# -----------------------------------------------------------------------------
+global_boost_mode_start:
+  alias: "Global Boost Mode - Enable 25°C limit"
+  description: "Enable 25°C max temp limit for all thermostats for 60 minutes"
+  mode: single
+
+  variables:
+    expiry_time: "{{ (now() + timedelta(minutes=60)).strftime('%Y-%m-%d %H:%M:%S') }}"
+    study_temp: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+    living_inner_temp: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+    living_outer_temp: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+    bedroom_temp: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+
+  sequence:
+    # 1. Save current temps to input_numbers (for restoration on cancel/expire)
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.global_boost_saved_study
+      data:
+        value: "{{ study_temp }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.global_boost_saved_living_inner
+      data:
+        value: "{{ living_inner_temp }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.global_boost_saved_living_outer
+      data:
+        value: "{{ living_outer_temp }}"
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.global_boost_saved_bedroom
+      data:
+        value: "{{ bedroom_temp }}"
+
+    # 2. Set expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.global_boost_end
+      data:
+        datetime: "{{ expiry_time }}"
+
+    # 3. Publish state to MQTT for dashboard (includes saved temps for visibility)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/global-boost-mode"
+        retain: true
+        payload: >
+          {
+            "active": true,
+            "expires_at": "{{ expiry_time }}",
+            "saved_temps": {
+              "study": {{ study_temp }},
+              "living_inner": {{ living_inner_temp }},
+              "living_outer": {{ living_outer_temp }},
+              "bedroom": {{ bedroom_temp }}
+            }
+          }
+
+    # 4. Notification
+    - service: notify.all_phones
+      data:
+        title: "🔥 Boost Mode Enabled"
+        message: "25°C limit unlocked for 60 min. Temps saved: Study={{ study_temp }}°C"
+        data:
+          channel: "Info"
+          importance: default
+          tag: "global_boost_mode"
+
+global_boost_mode_cancel:
+  alias: "Global Boost Mode - Disable and Restore Temps"
+  description: "Disable boost mode (25°C limit reverts to 22°C) and restore saved temps"
+  mode: single
+
+  variables:
+    study_saved: "{{ states('input_number.global_boost_saved_study') | float(18) }}"
+    living_inner_saved: "{{ states('input_number.global_boost_saved_living_inner') | float(18) }}"
+    living_outer_saved: "{{ states('input_number.global_boost_saved_living_outer') | float(18) }}"
+    bedroom_saved: "{{ states('input_number.global_boost_saved_bedroom') | float(18) }}"
+    heaters_paused_window: "{{ is_state('input_boolean.heaters_off_due_to_window', 'on') }}"
+    heaters_paused_co2: "{{ is_state('input_boolean.heaters_off_due_to_co2', 'on') }}"
+    heaters_paused: "{{ heaters_paused_window or heaters_paused_co2 }}"
+
+  sequence:
+    # 1. Restore temps (only if heaters are NOT paused)
+    - choose:
+        # Case: Heaters are paused - skip temp restoration
+        - conditions:
+            - condition: template
+              value_template: "{{ heaters_paused }}"
+          sequence:
+            - service: system_log.write
+              data:
+                message: >-
+                  Boost mode ended while heaters paused
+                  (window={{ heaters_paused_window }}, co2={{ heaters_paused_co2 }}).
+                  Temps NOT restored - will use resume automation values.
+                level: warning
+
+      # Default: Heaters running normally - restore temps
+      default:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: "{{ study_saved }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: "{{ living_inner_saved }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: "{{ living_outer_saved }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: "{{ bedroom_saved }}"
+
+    # 2. Clear expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.global_boost_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+    # 3. Publish state to MQTT
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/global-boost-mode"
+        retain: true
+        payload: '{"active": false}'
+
+    # 4. Notification (different message based on heater state)
+    - service: notify.all_phones
+      data:
+        title: "{% if heaters_paused %}⚠️ Boost Ended (Heaters Paused){% else %}❄️ Boost Mode Disabled{% endif %}"
+        message: >-
+          {% if heaters_paused %}Heaters paused ({% if heaters_paused_window %}window{% endif %}{% if heaters_paused_window and heaters_paused_co2 %}/{% endif %}{% if heaters_paused_co2 %}CO2{% endif %}) - temps will restore when heaters resume.
+          {% else %}Temps restored: Study={{ study_saved }}°C. Max now 22°C.
+          {% endif %}
+        data:
+          channel: "{% if heaters_paused %}Warning{% else %}Info{% endif %}"
+          importance: "{% if heaters_paused %}default{% else %}low{% endif %}"
+          tag: "global_boost_mode"

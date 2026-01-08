@@ -73,6 +73,62 @@
   color: white;
 }
 
+/* ========================================
+   BOOST MODE TOGGLE (Heater Header)
+   ======================================== */
+.boost-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 100ms ease;
+  touch-action: manipulation;
+}
+
+.boost-mode-toggle:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Active state - orange highlight */
+.boost-mode-toggle.active {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
+.boost-mode-toggle.active:hover {
+  background: rgba(249, 115, 22, 0.25);
+}
+
+.boost-mode-toggle .boost-icon {
+  font-size: 14px;
+}
+
+.boost-mode-toggle .boost-timer {
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 24px;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .boost-mode-toggle.active {
+  background: rgba(249, 115, 22, 0.2);
+}
+
+[data-theme="dark"] .boost-mode-toggle.active:hover {
+  background: rgba(249, 115, 22, 0.3);
+}
+
 /* Legacy header styles (kept for compatibility) */
 .thermostat-header {
   text-align: center;

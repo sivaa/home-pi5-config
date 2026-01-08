@@ -2214,15 +2214,16 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# HEATER SAFETY - 22°C MAXIMUM CAP
-# Trigger: Any thermostat setpoint set above 22°C
-# Action: Immediately cap to 22°C, send audit notification
-# Why: Prevent excessive heating and energy waste
-# Note: Runs in parallel to handle multiple heaters simultaneously
+# HEATER SAFETY - DYNAMIC TEMPERATURE CAP (22°C normal, 25°C boost)
+# Trigger: Any thermostat setpoint changes
+# Action: Cap to 22°C normally, or 25°C during dashboard boost mode
+# Why: Prevent excessive heating while allowing boost feature flexibility
+# Note: Checks input_datetime.{thermostat_id}_boost_end to determine boost state
+# Important: Variables are evaluated AFTER condition, so all logic is in action
 # -----------------------------------------------------------------------------
 - id: heater_safety_max_22c_cap
-  alias: "Heater Safety - 22°C Maximum Cap"
-  description: "If any thermostat is set above 22°C, immediately cap it to 22°C"
+  alias: "Heater Safety - Temperature Cap (22°C normal, 25°C boost)"
+  description: "Cap thermostats to 22°C normally, or 25°C during dashboard boost"
   mode: parallel
   max: 4
 
@@ -2235,14 +2236,42 @@
         - climate.bed_thermostat
       attribute: temperature
 
-  condition:
-    # Only trigger if temperature is above 22°C
-    - condition: template
-      value_template: >
-        {{ trigger.to_state.attributes.temperature is defined
-           and trigger.to_state.attributes.temperature | float(0) > 22 }}
+  # No condition here - all logic is in action section because variables
+  # are only available after condition passes
 
   variables:
+    # Map climate entity to thermostat_id for boost lookup
+    thermostat_id: >
+      {% set mapping = {
+        'climate.study_thermostat': 'study',
+        'climate.living_thermostat_inner': 'living_inner',
+        'climate.living_thermostat_outer': 'living_outer',
+        'climate.bed_thermostat': 'bedroom'
+      } %}
+      {{ mapping.get(trigger.entity_id, '') }}
+
+    # Check if per-thermostat boost is active (input_datetime is in the future)
+    boost_end_entity: "input_datetime.{{ thermostat_id }}_boost_end"
+    per_thermostat_boost_active: >
+      {{ thermostat_id != ''
+         and states(boost_end_entity) not in ['unknown', 'unavailable']
+         and as_timestamp(states(boost_end_entity)) > as_timestamp(now()) }}
+
+    # Check if GLOBAL boost mode is active (applies to all thermostats)
+    global_boost_active: >
+      {{ states('input_datetime.global_boost_end') not in ['unknown', 'unavailable']
+         and as_timestamp(states('input_datetime.global_boost_end')) > as_timestamp(now()) }}
+
+    # Boost is active if EITHER per-thermostat OR global boost mode is on
+    boost_active: "{{ per_thermostat_boost_active or global_boost_active }}"
+
+    # Dynamic cap: 25°C if any boost active, 22°C otherwise
+    max_temp: "{{ 25 if boost_active else 22 }}"
+
+    # Current temperature from trigger
+    current_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
+
+    # For logging/notification
     heater_name: >
       {% set names = {
         'climate.study_thermostat': 'Study',
@@ -2251,27 +2280,34 @@
         'climate.bed_thermostat': 'Bedroom'
       } %}
       {{ names.get(trigger.entity_id, trigger.entity_id) }}
-    attempted_temp: "{{ trigger.to_state.attributes.temperature | float(0) }}"
 
   action:
-    # Cap to 22°C
-    - service: climate.set_temperature
-      target:
-        entity_id: "{{ trigger.entity_id }}"
-      data:
-        temperature: 22
+    # Only cap if temperature exceeds the dynamic max
+    - if:
+        - condition: template
+          value_template: >
+            {{ trigger.to_state.attributes.temperature is defined
+               and current_temp > max_temp | int }}
+      then:
+        # Cap to dynamic max (22 or 25)
+        - service: climate.set_temperature
+          target:
+            entity_id: "{{ trigger.entity_id }}"
+          data:
+            temperature: "{{ max_temp }}"
 
-    # Audit notification
-    - service: notify.all_phones
-      data:
-        title: "🚫 {{ heater_name }} Capped to 22°C"
-        message: >
-          Attempted: {{ attempted_temp }}°C → Capped to 22°C
-          at {{ now().strftime('%H:%M:%S') }}
-        data:
-          channel: "Safety"
-          importance: high
-          tag: "heater_safety_cap"
+        # Audit notification
+        - service: notify.all_phones
+          data:
+            title: "🚫 {{ heater_name }} Capped to {{ max_temp }}°C"
+            message: >
+              Attempted: {{ current_temp }}°C → Capped to {{ max_temp }}°C
+              {% if boost_active %}(Boost mode - higher cap allowed){% endif %}
+              at {{ now().strftime('%H:%M:%S') }}
+            data:
+              channel: "Safety"
+              importance: high
+              tag: "heater_safety_cap"
 
 # -----------------------------------------------------------------------------
 # BEDROOM NIGHT MODE - START (23:00)
@@ -3632,3 +3668,123 @@
       data:
         message: "ROUTER ONLINE: {{ device_name }} ({{ trigger.entity_id }}) is back"
         level: info
+
+# =============================================================================
+# THERMOSTAT BOOST - EXPIRY AUTOMATIONS
+# Purpose: Auto-restore thermostat temperature when 60-minute boost expires
+# Dashboard feature: "Boost 22°C for 60 min" button
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# STUDY BOOST - EXPIRES
+# Trigger: Time matches input_datetime.study_boost_end
+# Action: Restore original temperature, publish to MQTT
+# -----------------------------------------------------------------------------
+- id: study_boost_expires
+  alias: "Study Boost - Expires"
+  description: "Restore study thermostat when boost timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.study_boost_end
+
+  condition:
+    # Only if boost is actually active (expiry is in the future or just passed)
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.study_boost_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.thermostat_boost_cancel
+      data:
+        thermostat_id: study
+
+# -----------------------------------------------------------------------------
+# LIVING INNER BOOST - EXPIRES
+# -----------------------------------------------------------------------------
+- id: living_inner_boost_expires
+  alias: "Living Inner Boost - Expires"
+  description: "Restore living inner thermostat when boost timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.living_inner_boost_end
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.living_inner_boost_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.thermostat_boost_cancel
+      data:
+        thermostat_id: living_inner
+
+# -----------------------------------------------------------------------------
+# LIVING OUTER BOOST - EXPIRES
+# -----------------------------------------------------------------------------
+- id: living_outer_boost_expires
+  alias: "Living Outer Boost - Expires"
+  description: "Restore living outer thermostat when boost timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.living_outer_boost_end
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.living_outer_boost_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.thermostat_boost_cancel
+      data:
+        thermostat_id: living_outer
+
+# -----------------------------------------------------------------------------
+# BEDROOM BOOST - EXPIRES
+# -----------------------------------------------------------------------------
+- id: bedroom_boost_expires
+  alias: "Bedroom Boost - Expires"
+  description: "Restore bedroom thermostat when boost timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.bedroom_boost_end
+
+  condition:
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.bedroom_boost_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.thermostat_boost_cancel
+      data:
+        thermostat_id: bedroom
+
+# -----------------------------------------------------------------------------
+# GLOBAL BOOST MODE - EXPIRES
+# Purpose: Disable global boost mode when timer expires (reverts to 22°C max)
+# NOTE: This does NOT change any thermostat temperatures, just the max limit
+# -----------------------------------------------------------------------------
+- id: global_boost_mode_expires
+  alias: "Global Boost Mode - Expires"
+  description: "Disable global boost mode when timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.global_boost_end
+
+  condition:
+    # Only if boost mode is actually active (expiry is recent)
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.global_boost_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.global_boost_mode_cancel
