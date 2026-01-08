@@ -35,9 +35,10 @@
   <link rel="stylesheet" href="styles/views/lights.css">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
-  <link rel="stylesheet" href="styles/views/thermostat.css?v=6">
+  <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
   <link rel="stylesheet" href="styles/views/mailbox.css">
   <link rel="stylesheet" href="styles/views/hot-water.css">
+  <link rel="stylesheet" href="styles/views/device-health.css">
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -573,6 +574,35 @@
         <!-- Vision 7: Lights Control -->
         <div x-show="currentView === 'lights'" x-cloak x-data="lightsView()">
           <div class="lights-view">
+            <!-- Circadian Status Bar -->
+            <div class="circadian-status" x-show="$store.circadian.enabled" x-cloak>
+              <div class="circadian-phase">
+                <span class="phase-icon" x-text="$store.circadian.phaseIcon"></span>
+                <span class="phase-name" x-text="$store.circadian.phase"></span>
+              </div>
+              <div class="circadian-stats">
+                <span class="stat">
+                  <span class="stat-icon">🔆</span>
+                  <span x-text="$store.circadian.brightness + '%'"></span>
+                </span>
+                <span class="stat">
+                  <span class="stat-icon">🌡️</span>
+                  <span x-text="$store.circadian.colorTemp + 'K'"></span>
+                </span>
+              </div>
+              <button class="circadian-toggle active"
+                      @click="$store.circadian.toggle()"
+                      title="Disable Circadian Auto">
+                <span>🔄 Auto</span>
+              </button>
+            </div>
+
+            <!-- Circadian Disabled Banner -->
+            <div class="circadian-disabled-banner" x-show="!$store.circadian.enabled" x-cloak>
+              <span>🌙 Circadian lighting is disabled</span>
+              <button @click="$store.circadian.toggle()">Enable</button>
+            </div>
+
             <!-- Master Control Toggle -->
             <div class="master-control"
                  :class="{
@@ -639,6 +669,26 @@
                     </button>
                   </div>
 
+                  <!-- Circadian Override Banner -->
+                  <div class="override-banner"
+                       x-show="$store.circadian.enabled && $store.circadian.overrides[light.id.includes('study') ? 'study' : 'living']?.active"
+                       x-cloak>
+                    <div class="override-info">
+                      <span class="override-icon">✋</span>
+                      <div class="override-text">
+                        <span class="override-title">Manual Override</span>
+                        <span class="override-expiry"
+                              x-text="'Expires in ' + $store.circadian.formatExpiry(light.id.includes('study') ? 'study' : 'living')">
+                        </span>
+                      </div>
+                    </div>
+                    <button class="override-clear"
+                            @click="$store.circadian.clearOverride(light.id.includes('study') ? 'study' : 'living')"
+                            title="Resume circadian schedule">
+                      Clear
+                    </button>
+                  </div>
+
                   <!-- Brightness Slider -->
                   <div class="light-control" x-show="light.state === 'ON' && light.available" x-transition
                        :class="{ 'control-disabled': !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
@@ -690,6 +740,10 @@
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
+                    <button class="preset-btn circadian-preset"
+                            x-show="$store.circadian.enabled"
+                            @click="$store.circadian.applySchedule(light.id.includes('study') ? 'study' : 'living')"
+                            title="Follow Circadian Schedule">🔄</button>
                   </div>
 
                   <!-- Link Quality -->
@@ -799,8 +853,16 @@
               <div class="thermostats-grid">
                 <template x-for="t in thermostats" :key="t.id">
                   <div class="thermostat-card"
+                       x-data="{ heatWave: false }"
+                       x-init="$watch('t.runningState', (newVal, oldVal) => {
+                         if (oldVal !== 'heat' && newVal === 'heat') {
+                           heatWave = true;
+                           setTimeout(() => heatWave = false, 4000);
+                         }
+                       })"
                        :class="{
                          heating: t.runningState === 'heat' && t.systemMode !== 'off',
+                         'heat-wave': heatWave,
                          off: t.systemMode === 'off',
                          unavailable: !t.available,
                          syncing: t.syncing,
@@ -862,21 +924,21 @@
                         <div class="target-row">
                           <button class="ctrl-btn"
                                   @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
-                                  @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
-                                  @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @mouseup="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
+                                  @mouseleave="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
                                   @touchstart.prevent="holdDelay = setTimeout(() => { adjustTemp(t.id, -1); holdInterval = setInterval(() => adjustTemp(t.id, -1), 150) }, 300)"
-                                  @touchend="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @touchend="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
                                   @click="if(!holdInterval) adjustTemp(t.id, -1)"
                                   :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) <= 5">−</button>
                           <span class="target-temp"><span x-text="tempParts(getDisplayTemp(t) || 17).whole"></span><span class="temp-degree">°</span><span class="temp-decimal" x-text="tempParts(getDisplayTemp(t) || 17).decimal"></span></span>
                           <button class="ctrl-btn"
                                   @mousedown="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
-                                  @mouseup="clearTimeout(holdDelay); clearInterval(holdInterval)"
-                                  @mouseleave="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @mouseup="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
+                                  @mouseleave="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
                                   @touchstart.prevent="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
-                                  @touchend="clearTimeout(holdDelay); clearInterval(holdInterval)"
+                                  @touchend="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
                                   @click="if(!holdInterval) adjustTemp(t.id, 1)"
-                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) >= 22">+</button>
+                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) >= (hasActiveOverride(t.id) ? 25 : 22)">+</button>
                         </div>
                       </div>
                     </div>
@@ -895,6 +957,34 @@
                               :disabled="!t.available || t.syncing">
                         ⏻ Off
                       </button>
+                    </div>
+
+                    <!-- Quick Boost (22°C for 60 minutes) -->
+                    <div class="quick-boost-section">
+                      <!-- No active boost: Show button -->
+                      <button class="boost-btn"
+                              x-show="!hasActiveOverride(t.id)"
+                              @click="setQuickBoost(t.id)"
+                              :disabled="!canBoost(t)">
+                        <span class="boost-icon">🔥</span>
+                        <span class="boost-text">Boost for 1hr</span>
+                      </button>
+
+                      <!-- Active boost: Show banner with countdown -->
+                      <div class="boost-active-banner"
+                           x-show="hasActiveOverride(t.id)"
+                           x-cloak>
+                        <div class="boost-info">
+                          <span class="boost-active-icon">⏱️</span>
+                          <div class="boost-details">
+                            <span class="boost-label">Boost Active</span>
+                            <span class="boost-remaining" x-text="getOverrideRemaining(t.id) + ' remaining'"></span>
+                          </div>
+                        </div>
+                        <button class="boost-cancel-btn" @click="cancelBoost(t.id)">
+                          Cancel
+                        </button>
+                      </div>
                     </div>
 
                     <!-- Night Mode Override Banner (Bedroom only, during night hours 23:00-06:00) -->
@@ -1457,6 +1547,178 @@
         </div>
         </template>
 
+        <!-- Device Health View - CPU OPTIMIZATION: x-if removes DOM when hidden -->
+        <template x-if="currentView === 'device-health'">
+        <div x-data="deviceHealthView()" x-init="init()" @keydown.window="$event.key === 'Escape' && clearFilters()">
+          <div class="device-health-view">
+            <!-- Filter Sidebar -->
+            <div class="health-sidebar" x-show="showFilters">
+              <!-- Status Filter -->
+              <div class="health-sidebar-section">
+                <div class="health-sidebar-title">Health Status</div>
+                <div class="health-status-filters">
+                  <button class="health-status-pill ok"
+                          :class="{ active: isStatusActive('ok'), inactive: !isStatusActive('ok') && filters.statuses.length > 0 }"
+                          @click="toggleStatus('ok')">
+                    <span class="health-status-count" x-text="stats.ok"></span>
+                    <span class="health-status-label">OK</span>
+                  </button>
+                  <button class="health-status-pill warning"
+                          :class="{ active: isStatusActive('warning'), inactive: !isStatusActive('warning') && filters.statuses.length > 0 }"
+                          @click="toggleStatus('warning')">
+                    <span class="health-status-count" x-text="stats.warning"></span>
+                    <span class="health-status-label">Warn</span>
+                  </button>
+                  <button class="health-status-pill critical"
+                          :class="{ active: isStatusActive('critical'), inactive: !isStatusActive('critical') && filters.statuses.length > 0 }"
+                          @click="toggleStatus('critical')">
+                    <span class="health-status-count" x-text="stats.critical"></span>
+                    <span class="health-status-label">Crit</span>
+                  </button>
+                  <button class="health-status-pill dead"
+                          :class="{ active: isStatusActive('dead'), inactive: !isStatusActive('dead') && filters.statuses.length > 0 }"
+                          @click="toggleStatus('dead')">
+                    <span class="health-status-count" x-text="stats.dead"></span>
+                    <span class="health-status-label">Dead</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Device Type Filter -->
+              <div class="health-sidebar-section">
+                <div class="health-sidebar-title">Device Type</div>
+                <div class="health-type-list">
+                  <template x-for="type in deviceTypes" :key="type.id">
+                    <div class="health-type-item"
+                         :class="{ inactive: !isTypeActive(type.id) && filters.types.length > 0 }"
+                         @click="toggleType(type.id)">
+                      <span class="health-type-icon" x-text="type.icon"></span>
+                      <span class="health-type-label" x-text="type.label"></span>
+                      <span class="health-type-count" x-text="countsByType[type.id] || 0"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Search -->
+              <div class="health-sidebar-section">
+                <div class="health-sidebar-title">Search</div>
+                <input type="text" class="health-search-input"
+                       placeholder="Device name..."
+                       x-model="searchQuery"
+                       @input="onSearchInput()">
+              </div>
+
+              <!-- Clear Filters -->
+              <button class="health-clear-btn" @click="clearFilters()">
+                Clear Filters
+              </button>
+            </div>
+
+            <!-- Main Content -->
+            <div class="health-main">
+              <!-- Header -->
+              <div class="health-header">
+                <h2 class="health-title">💚 Device Health</h2>
+                <div class="health-stats-bar">
+                  <div class="health-stat ok">
+                    <span class="health-stat-value" x-text="stats.ok"></span>
+                    <span>healthy</span>
+                  </div>
+                  <div class="health-stat attention">
+                    <span class="health-stat-value" x-text="stats.needsAttention"></span>
+                    <span>need attention</span>
+                  </div>
+                </div>
+                <button class="health-toggle-btn" @click="showFilters = !showFilters">
+                  <span x-text="showFilters ? '◀️ Hide' : '▶️ Filters'"></span>
+                </button>
+              </div>
+
+              <!-- Device List -->
+              <div class="health-list">
+                <!-- Column Headers: Status | Type | Device | Seen | Time | Battery | Signal | Value -->
+                <div class="health-list-header">
+                  <div class="health-col-header" :class="{ active: isSortedBy('health') }" @click="setSortBy('health')">
+                    <span class="health-sort-icon" x-text="getSortIcon('health')"></span>
+                  </div>
+                  <div class="health-col-header">📱</div>
+                  <div class="health-col-header" :class="{ active: isSortedBy('name') }" @click="setSortBy('name')">
+                    <span>Device</span>
+                    <span class="health-sort-icon" x-text="getSortIcon('name')"></span>
+                  </div>
+                  <div class="health-col-header" :class="{ active: isSortedBy('lastSeen') }" @click="setSortBy('lastSeen')">
+                    <span>Seen</span>
+                    <span class="health-sort-icon" x-text="getSortIcon('lastSeen')"></span>
+                  </div>
+                  <div class="health-col-header health-col-abstime">Data</div>
+                  <div class="health-col-header" :class="{ active: isSortedBy('battery') }" @click="setSortBy('battery')">
+                    <span>🔋</span>
+                    <span class="health-sort-icon" x-text="getSortIcon('battery')"></span>
+                  </div>
+                  <div class="health-col-header health-col-signal">📶</div>
+                  <div class="health-col-header health-col-value">Value</div>
+                </div>
+
+                <!-- Device Rows (Single line: Status | Type | Name | RelTime | AbsTime | Battery | Signal | Value) -->
+                <template x-for="device in devices" :key="device.ieee_address">
+                  <div class="health-device-row">
+                    <!-- 1. Status Dot -->
+                    <div class="health-status-dot" :class="getHealthStatus(device)"></div>
+
+                    <!-- 2. Type Icon -->
+                    <div class="health-device-type-icon" x-text="$store.deviceHealth.getDeviceTypeInfo(device)?.icon"></div>
+
+                    <!-- 3. Device Name -->
+                    <div class="health-device-name" x-text="device.friendly_name"></div>
+
+                    <!-- 4. Relative Time (e.g., "14m ago") -->
+                    <div class="health-last-seen" :class="getHealthStatus(device)" x-text="getLastSeen(device)"></div>
+
+                    <!-- 5. Last Data Time (when meaningful data was received) -->
+                    <div class="health-abs-time" x-text="getLastDataTime(device)"></div>
+
+                    <!-- 6. Battery -->
+                    <template x-if="hasBattery(device)">
+                      <div class="health-battery" :class="{ low: isBatteryLow(device) }">
+                        <span x-text="getBattery(device) + '%'"></span>
+                      </div>
+                    </template>
+                    <template x-if="!hasBattery(device)">
+                      <div class="health-battery-na">--</div>
+                    </template>
+
+                    <!-- 7. Signal (colored dot with tooltip) -->
+                    <template x-if="hasSignal(device)">
+                      <div class="health-signal-dot"
+                           :class="getSignalLevel(device)"
+                           :title="'Signal: ' + getLinkQuality(device)"></div>
+                    </template>
+                    <template x-if="!hasSignal(device)">
+                      <div class="health-signal-na">--</div>
+                    </template>
+
+                    <!-- 8. Last Value -->
+                    <div class="health-last-value" x-text="getLastValue(device)"></div>
+                  </div>
+                </template>
+
+                <!-- Loading State -->
+                <div class="health-loading" x-show="isLoading">
+                  Loading devices...
+                </div>
+
+                <!-- Empty State -->
+                <div class="health-empty" x-show="!isLoading && devices.length === 0">
+                  <div class="health-empty-icon">🔍</div>
+                  <div class="health-empty-text" x-text="filters.types.length > 0 || filters.statuses.length > 0 || searchQuery ? 'No devices match filters' : 'No devices found'"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </template>
+
         <!-- Vision 10: CO2 Monitor -->
         <div x-show="currentView === 'co2'" x-cloak x-data="co2View()" x-init="init()">
           <div class="co2-view">
@@ -1918,15 +2180,32 @@
             <!-- Tooltip -->
             <div class="hot-water-tooltip"
                  x-show="tooltipVisible"
-                 x-cloak
-                 :style="`left: ${tooltipX + 12}px; top: ${tooltipY - 40}px;`">
-              <template x-for="(line, idx) in tooltipContent.split('\n')" :key="idx">
-                <div class="hot-water-tooltip-row" x-show="line.includes('|')">
-                  <span class="hot-water-tooltip-time" x-text="line.split('|')[0]"></span>
-                  <span class="hot-water-tooltip-duration" x-text="line.split('|')[1]"></span>
-                </div>
-              </template>
-              <div class="hot-water-tooltip-empty" x-show="!tooltipContent.includes('|')" x-text="tooltipContent"></div>
+                 x-cloak>
+              <!-- Close button -->
+              <button class="hot-water-tooltip-close" @click="hideTooltip()">&times;</button>
+
+              <!-- Total header -->
+              <div class="hot-water-tooltip-header" x-show="tooltipTotal">
+                <span>Total</span>
+                <span class="hot-water-tooltip-total" x-text="tooltipTotal"></span>
+              </div>
+
+              <!-- Scrollable content -->
+              <div class="hot-water-tooltip-content" x-ref="tooltipContent">
+                <template x-for="(line, idx) in tooltipContent.split('\n')" :key="idx">
+                  <div class="hot-water-tooltip-row" x-show="line.includes('|')">
+                    <span class="hot-water-tooltip-time" x-text="line.split('|')[0]"></span>
+                    <span class="hot-water-tooltip-duration" x-text="line.split('|')[1]"></span>
+                  </div>
+                </template>
+                <div class="hot-water-tooltip-empty" x-show="!tooltipContent.includes('|')" x-text="tooltipContent"></div>
+              </div>
+
+              <!-- Scroll buttons - only shown when content overflows -->
+              <div class="hot-water-tooltip-scroll-buttons" x-show="tooltipScrollable">
+                <button class="hot-water-scroll-btn" @click="scrollTooltip(-200)">▲</button>
+                <button class="hot-water-scroll-btn" @click="scrollTooltip(200)">▼</button>
+              </div>
             </div>
 
             <!-- Footer -->
@@ -2938,8 +3217,8 @@
 
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
-    import { initThermostatStore } from './js/stores/thermostat-store.js?v=5';
-    import { thermostatView } from './views/thermostat.js?v=7';
+    import { initThermostatStore } from './js/stores/thermostat-store.js?v=11';
+    import { thermostatView } from './views/thermostat.js?v=10';
 
     // Expose thermostatView globally for Alpine x-data
     window.thermostatView = thermostatView;
@@ -3000,6 +3279,45 @@
     import { hotWaterView } from './views/hot-water.js?v=6';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
+  </script>
+
+  <!-- Device Health View Module - loads store and view -->
+  <script type="module">
+    import { initDeviceHealthStore } from './js/stores/device-health-store.js';
+    import { deviceHealthView } from './views/device-health.js';
+
+    // Expose view globally for Alpine x-data
+    window.deviceHealthView = deviceHealthView;
+    console.log('[device-health] Module loaded, deviceHealthView ready');
+
+    // Initialize device health store
+    function initDeviceHealth() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('deviceHealth')) {
+          initDeviceHealthStore(Alpine, CONFIG);
+          console.log('[device-health] Device health store initialized');
+        }
+        // Initialize MQTT subscriptions after MQTT connects
+        setTimeout(() => {
+          const deviceHealthStore = Alpine.store('deviceHealth');
+          if (deviceHealthStore) {
+            deviceHealthStore.init?.();
+            console.log('[device-health] MQTT subscriptions initializing');
+          }
+        }, 2000);
+      }
+    }
+
+    // Try to initialize when Alpine is ready
+    if (typeof Alpine !== 'undefined') {
+      initDeviceHealth();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initDeviceHealthStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initDeviceHealth);
+    }
   </script>
 
   <!-- Floor Plan Config for Network View -->
@@ -3126,14 +3444,14 @@
         : '/api/influx',
       influxDb: 'homeassistant',
       // Room configuration - isOutdoor: true excludes from home-wide averages
-      // Order: Row1: hallway, study | Row2: living, bedroom | Row3: bathroom, kitchen
+      // Order: bath, kitchen, hallway, study, bedroom, living, balcony
       rooms: [
-        { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '[Hallway] CO2', entityId: 'sensor.hallway_co2', isOutdoor: false },
-        { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
-        { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
-        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
         { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity', isOutdoor: false },
         { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity', isOutdoor: false },
+        { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '[Hallway] CO2', entityId: 'sensor.hallway_co2', isOutdoor: false },
+        { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
+        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
+        { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
         { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity', isOutdoor: true }
       ],
       staleThreshold: 5 * 60 * 1000,
@@ -3144,7 +3462,7 @@
         { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Thermostat', entityId: 'climate.study_thermostat', roomId: 'study', roomSensor: '[Study] Temperature & Humidity' },
         { id: 'living_inner', name: 'Living Inner', icon: '🛋️', sensor: '[Living] Thermostat Inner', entityId: 'climate.living_thermostat_inner', roomId: 'living', roomSensor: '[Living] Temperature & Humidity' },
         { id: 'living_outer', name: 'Living Outer', icon: '🛋️', sensor: '[Living] Thermostat Outer', entityId: 'climate.living_thermostat_outer', roomId: 'living', roomSensor: '[Living] Temperature & Humidity' },
-        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Thermostat', entityId: 'climate.bedroom_thermostat', roomId: 'bedroom', roomSensor: '[Bed] Temperature & Humidity Sensor' }
+        { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Thermostat', entityId: 'climate.bedroom_thermostat', roomId: 'bedroom', roomSensor: '[Bed] Temperature & Humidity' }
       ]
     };
 
@@ -3159,15 +3477,12 @@
         thermostat: [
           { name: '[Living] Thermostat Inner', label: 'Heater Inner' },
           { name: '[Living] Thermostat Outer', label: 'Heater Outer' }
-        ],
-        co2: [
-          { name: '[Hallway] CO2', label: 'Air Quality' }
         ]
       },
       bedroom: {
         climate: [
-          { name: '[Bed] Temperature & Humidity Sensor', label: 'East', isPrimary: true },
-          { name: '[Bed] Temperature & Humidity Sensor 9', label: 'North' }
+          { name: '[Bed] Temperature & Humidity', label: 'East', isPrimary: true },
+          { name: '[Bed] Temperature & Humidity 9', label: 'North' }
         ],
         thermostat: [
           { name: '[Bed] Thermostat', label: 'Heater' }
@@ -3336,6 +3651,10 @@
             // Subscribe to dashboard topics (for TTS notifications, commands, etc.)
             this.client.subscribe('dashboard/#', { qos: 0 });
             console.log('[mqtt] Subscribed to dashboard/# (TTS notifications)');
+
+            // Subscribe to Home Assistant statestream topics (for circadian lighting)
+            this.client.subscribe('homeassistant/#', { qos: 0 });
+            console.log('[mqtt] Subscribed to homeassistant/# (circadian state)');
 
             // Subscribe to light topics (state and availability)
             Alpine.store('lights').list.forEach(light => {
@@ -3784,6 +4103,153 @@
           }
         }
       });
+
+      // Circadian lighting store
+      // Receives state from Home Assistant via MQTT statestream
+      Alpine.store('circadian', {
+        // State from HA sensors
+        phase: 'Unknown',
+        brightness: 100,
+        colorTemp: 3125,
+        enabled: false,
+
+        // Per-light override status
+        overrides: {
+          study: { active: false, expires: null },
+          living: { active: false, expires: null }
+        },
+
+        // Computed helpers
+        get phaseIcon() {
+          const icons = { Night: '🌙', Sunrise: '🌅', Day: '☀️', Sunset: '🌆' };
+          return icons[this.phase] || '❓';
+        },
+
+        get colorTempLabel() {
+          if (this.colorTemp <= 2400) return 'Warm';
+          if (this.colorTemp <= 2800) return 'Warm White';
+          return 'Neutral';
+        },
+
+        // Format expiry as countdown
+        formatExpiry(room) {
+          const override = this.overrides[room];
+          if (!override?.active || !override?.expires) return '';
+          const now = Date.now();
+          const remaining = Math.max(0, override.expires - now);
+          const minutes = Math.ceil(remaining / 60000);
+          return minutes > 0 ? `${minutes} min` : 'Expiring...';
+        },
+
+        // Handle incoming MQTT messages - consolidated state from HA automation
+        handleMessage(topic, value) {
+          // Handle consolidated state from homeassistant/circadian/state
+          if (topic === 'homeassistant/circadian/state') {
+            try {
+              const data = typeof value === 'string' ? JSON.parse(value) : value;
+
+              this.phase = data.phase || 'Unknown';
+              this.brightness = data.brightness || 100;
+              this.colorTemp = data.colorTemp || 3125;
+              this.enabled = data.enabled === true;
+
+              if (data.overrides) {
+                if (data.overrides.study) {
+                  this.overrides.study.active = data.overrides.study.active === true;
+                  this.overrides.study.expires = data.overrides.study.expires ?
+                    new Date(data.overrides.study.expires).getTime() : null;
+                }
+                if (data.overrides.living) {
+                  this.overrides.living.active = data.overrides.living.active === true;
+                  this.overrides.living.expires = data.overrides.living.expires ?
+                    new Date(data.overrides.living.expires).getTime() : null;
+                }
+              }
+
+              console.log('[circadian] State updated:', {
+                phase: this.phase,
+                brightness: this.brightness,
+                enabled: this.enabled
+              });
+            } catch (e) {
+              console.error('[circadian] Failed to parse state:', e);
+            }
+            return;
+          }
+
+          // Legacy: handle individual statestream topics (if ever needed)
+          const state = typeof value === 'object' ? (value.state || value.raw) : value;
+          if (!state) return;
+
+          if (topic.includes('circadian_phase/state')) {
+            this.phase = state;
+          } else if (topic.includes('circadian_brightness/state')) {
+            this.brightness = parseInt(state) || 100;
+          } else if (topic.includes('circadian_color_temp/state')) {
+            this.colorTemp = parseInt(state) || 3125;
+          } else if (topic.includes('circadian_enabled/state')) {
+            this.enabled = state === 'on';
+          } else if (topic.includes('circadian_study_override/state')) {
+            this.overrides.study.active = state === 'on';
+          } else if (topic.includes('circadian_living_override/state')) {
+            this.overrides.living.active = state === 'on';
+          } else if (topic.includes('circadian_study_override_expires/state')) {
+            this.overrides.study.expires = new Date(state).getTime();
+          } else if (topic.includes('circadian_living_override_expires/state')) {
+            this.overrides.living.expires = new Date(state).getTime();
+          }
+        },
+
+        // Send command to HA via MQTT
+        sendCommand(action, room = null) {
+          const client = Alpine.store('mqtt').client;
+          if (!client || !Alpine.store('mqtt').connected) {
+            console.error('[circadian] MQTT not connected');
+            return;
+          }
+
+          const payload = { action };
+          if (room) payload.room = room;
+
+          client.publish('homeassistant/circadian/command', JSON.stringify(payload), { qos: 0 }, (err) => {
+            if (err) {
+              console.error('[circadian] Failed to send command:', err);
+            } else {
+              console.log('[circadian] Command sent:', payload);
+            }
+          });
+        },
+
+        // Toggle circadian enabled/disabled
+        toggle() {
+          this.sendCommand('toggle');
+        },
+
+        // Clear override for a specific light
+        clearOverride(room) {
+          this.sendCommand('clear_override', room);
+        },
+
+        // Apply current circadian schedule to a light
+        applySchedule(room) {
+          this.sendCommand('apply_circadian', room);
+        },
+
+        // Initialize: register MQTT handler for HA statestream topics
+        init() {
+          // Register handler for homeassistant/* topics
+          Alpine.store('mqtt').registerTopicHandler('homeassistant/*', (topic, data) => {
+            // Filter for circadian-related topics
+            if (topic.includes('circadian')) {
+              this.handleMessage(topic, data);
+            }
+          });
+          console.log('[circadian] Store initialized, listening for HA statestream');
+        }
+      });
+
+      // Initialize circadian store
+      Alpine.store('circadian').init();
 
       // Room detail modal store
       Alpine.store('roomDetail', {
@@ -4598,6 +5064,7 @@
           { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
           { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
+          { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
           { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' }
         ]
       },

@@ -44,6 +44,8 @@ export function hotWaterView() {
     tooltipX: 0,
     tooltipY: 0,
     tooltipContent: '',
+    tooltipTotal: '',
+    tooltipScrollable: false,
 
     // MQTT setup tracking
     _mqttSetup: false,
@@ -457,25 +459,13 @@ export function hotWaterView() {
           }
         });
 
-        bar.addEventListener('mousemove', function(e) {
-          self.moveTooltip(e);
-        });
-
-        bar.addEventListener('mouseleave', function() {
-          self.hideTooltip();
-        });
-
-        // Touch support
+        // Touch support - tooltip stays open until X clicked
         bar.addEventListener('touchstart', function(e) {
           const index = parseInt(this.dataset.index);
           const d = data[index];
           if (d) {
             self.showTooltip(e.touches[0], d);
           }
-        }, { passive: true });
-
-        bar.addEventListener('touchend', function() {
-          setTimeout(() => self.hideTooltip(), 1500);
         }, { passive: true });
       });
     },
@@ -485,11 +475,17 @@ export function hotWaterView() {
 
       if (flows.length === 0) {
         this.tooltipContent = 'No water usage';
+        this.tooltipTotal = '';
+        this.tooltipScrollable = false;
         this.tooltipX = e.clientX;
         this.tooltipY = e.clientY;
         this.tooltipVisible = true;
         return;
       }
+
+      // Calculate total duration
+      const totalSeconds = flows.reduce((sum, flow) => sum + flow.seconds, 0);
+      this.tooltipTotal = this.formatDuration(totalSeconds);
 
       // Build tooltip content with each flow event
       const lines = flows.map(flow => {
@@ -503,15 +499,25 @@ export function hotWaterView() {
       this.tooltipX = e.clientX;
       this.tooltipY = e.clientY;
       this.tooltipVisible = true;
-    },
 
-    moveTooltip(e) {
-      this.tooltipX = e.clientX;
-      this.tooltipY = e.clientY;
+      // Check if content is scrollable after DOM updates
+      this.$nextTick(() => {
+        const content = this.$refs.tooltipContent;
+        if (content) {
+          this.tooltipScrollable = content.scrollHeight > content.clientHeight;
+        }
+      });
     },
 
     hideTooltip() {
       this.tooltipVisible = false;
+    },
+
+    scrollTooltip(amount) {
+      const content = this.$refs.tooltipContent;
+      if (content) {
+        content.scrollBy({ top: amount, behavior: 'smooth' });
+      }
     },
 
     formatFlowTime(date) {
