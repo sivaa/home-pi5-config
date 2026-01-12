@@ -4,6 +4,9 @@
    ======================================== */
 
 /* ---------- Color Tokens ---------- */
+/* BVG/VBB colors verified from official S-Bahn Berlin route map and bus stop signage
+   S-Bahn source: https://sbahn.berlin/en/route-map/ - S1 line is pink/magenta
+   Bus source: Bus stop sign showing X9, 109, N9 lines at Zoologischer Garten */
 :root {
   --color-transport-bg: #0f172a;
   --color-transport-header: #1e293b;
@@ -12,8 +15,10 @@
   --color-transport-text: #f1f5f9;
   --color-transport-text-dim: #94a3b8;
   --color-transport-accent: #fbbf24;
-  --color-transport-sbahn: #22c55e;
-  --color-transport-bus: #a855f7;
+  --color-transport-sbahn: #E30078;        /* S1 line pink/magenta (verified from sbahn.berlin route map) */
+  --color-transport-bus: #9B2589;          /* BVG purple - all bus badges (verified from sign) */
+  --color-transport-bus-express: #006F35;  /* ExpressBus X - green bar color (matches Haltestelle H green) */
+  --color-transport-bus-metro: #9B2589;    /* MetroBus M - same purple as regular (BVG standard) */
   --color-transport-missed: #ef4444;
   --color-transport-urgent: #f97316;
   --color-transport-soon: #eab308;
@@ -31,48 +36,33 @@
   gap: var(--space-lg);
 }
 
-/* ---------- Header Banner (Compact with Status) ---------- */
-.transport-header {
-  background: var(--color-transport-header);
-  border: 2px solid var(--color-transport-accent);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md) var(--space-lg);
+/* ---------- Compact Status Bar ---------- */
+.transport-status-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-.transport-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-transport-accent);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-/* Header Status (inline with title) */
-.transport-header-status {
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: var(--space-md);
-  font-size: var(--font-size-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-md);
+  color: var(--color-transport-text);
+}
+
+.transport-status-bar .status-label {
+  font-weight: var(--font-weight-semibold);
+}
+
+.transport-status-bar .status-item {
   color: var(--color-transport-text-dim);
 }
 
-.header-status-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+.transport-status-bar .status-item strong {
+  color: var(--color-transport-text);
+  font-weight: var(--font-weight-semibold);
 }
 
 .status-divider {
   color: var(--color-transport-border);
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .refresh-btn-compact {
@@ -168,10 +158,12 @@
 
 .departure-line {
   font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
   text-align: center;
+  min-width: 50px;
+  box-sizing: border-box;
 }
 
 .departure-line.sbahn {
@@ -181,6 +173,16 @@
 
 .departure-line.bus {
   background: var(--color-transport-bus);
+  color: white;
+}
+
+.departure-line.bus-express {
+  background: var(--color-transport-bus-express);
+  color: white;
+}
+
+.departure-line.bus-metro {
+  background: var(--color-transport-bus-metro);
   color: white;
 }
 
@@ -203,26 +205,32 @@
   align-items: baseline;
   gap: var(--space-sm);
   white-space: nowrap;
+  min-width: 180px;
+  justify-content: flex-end;
 }
 
 .departure-time {
-  font-family: 'Courier New', monospace;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Liberation Mono', Menlo, Monaco, Consolas, monospace;
   font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
+  font-weight: 700;
   text-align: right;
+  letter-spacing: -0.5px;
+  min-width: 70px;
 }
 
 .departure-actual {
-  font-family: 'Courier New', monospace;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Liberation Mono', Menlo, Monaco, Consolas, monospace;
   font-size: var(--font-size-md);
   color: var(--color-transport-text-dim);
-  opacity: 0.7;
+  opacity: 0.8;
+  min-width: 50px;
 }
 
 .departure-delay {
   font-size: var(--font-size-sm);
   color: var(--color-transport-urgent);
-  margin-left: var(--space-xs);
+  min-width: 30px;
+  text-align: right;
 }
 
 /* Row status styling */
@@ -253,6 +261,31 @@
 
 .departure-row.status-ok .departure-time {
   color: var(--color-transport-ok);
+}
+
+/* Cancelled trip styling */
+.departure-row.status-cancelled {
+  opacity: 0.6;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.departure-row.status-cancelled .departure-line {
+  opacity: 0.7;
+}
+
+.departure-row.status-cancelled .departure-direction {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.departure-cancelled {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Liberation Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-transport-missed);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 /* Board footer */
@@ -458,6 +491,11 @@
 .badge-http {
   background: var(--color-transport-bus);
   color: white;
+}
+
+.badge-api {
+  background: var(--color-transport-soon);
+  color: var(--color-transport-bg);
 }
 
 .tech-hint {

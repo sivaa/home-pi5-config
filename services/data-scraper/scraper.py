@@ -19,6 +19,7 @@ import asyncio
 import json
 import os
 import re
+import signal
 import threading
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -185,7 +186,7 @@ async def scrape_bvg_departures():
         await page.goto(BUS_URL, wait_until='domcontentloaded', timeout=30000)
 
         # Wait for page to fully load (BVG uses heavy JS and iframes)
-        await page.wait_for_timeout(8000)
+        await page.wait_for_timeout(5000)
 
         # Dismiss cookie popup if present
         try:
@@ -196,19 +197,24 @@ async def scrape_bvg_departures():
         except Exception:
             pass
 
-        # Find the iframe with departure data
+        # Find the iframe with departure data (retry up to 3 times)
         frame = None
-        for f in page.frames:
-            try:
-                tabpanel = f.locator('[role="tabpanel"]')
-                if await tabpanel.count() > 0:
-                    frame = f
-                    break
-            except Exception:
-                continue
+        for attempt in range(3):
+            for f in page.frames:
+                try:
+                    tabpanel = f.locator('[role="tabpanel"]')
+                    if await tabpanel.count() > 0:
+                        frame = f
+                        break
+                except Exception:
+                    continue
+            if frame:
+                break
+            log(f"[BUS] Waiting for iframe (attempt {attempt + 1}/3)...")
+            await page.wait_for_timeout(3000)
 
         if not frame:
-            log("[BUS] ERROR: Could not find departure frame")
+            log("[BUS] ERROR: Could not find departure frame after retries")
             return []
 
         # Get all list items within the tabpanel
@@ -277,7 +283,8 @@ async def scrape_bvg_departures():
                     "minutes": minutes,
                     "time": f"{hour:02d}:{minute:02d}",
                     "delay": delay,
-                    "platform": None
+                    "platform": None,
+                    "cancelled": False  # BVG doesn't show cancelled trips in this view
                 })
 
             except Exception as e:
@@ -404,6 +411,9 @@ async def scrape_sbahn_departures():
                 if delay_match:
                     delay = int(delay_match.group(1))
 
+                # Check for cancelled trip
+                cancelled = bool(re.search(r'(?:trip\s+)?cancell?ed|fällt\s+aus|ausfall', text, re.IGNORECASE))
+
                 # Calculate minutes until departure (include delay in comparison)
                 dep_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                 actual_dep_time = dep_time + timedelta(minutes=delay)
@@ -429,7 +439,8 @@ async def scrape_sbahn_departures():
                     "minutes": minutes,
                     "time": f"{hour:02d}:{minute:02d}",
                     "delay": delay,
-                    "platform": platform
+                    "platform": platform,
+                    "cancelled": cancelled
                 })
 
             except Exception as e:
@@ -483,7 +494,8 @@ async def scrape_sbahn_departures():
                         "minutes": minutes,
                         "time": f"{hour:02d}:{minute:02d}",
                         "delay": 0,
-                        "platform": platform
+                        "platform": platform,
+                        "cancelled": False
                     })
                 except Exception:
                     continue
@@ -608,6 +620,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     """Start server - browser will launch on first request."""
+    # Auto-reap zombie child processes (Python as PID 1 doesn't do this by default)
+    signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+
     log(f"Starting transport scraper on port {PORT}")
     log(f"Browser will launch on first /api/transport request (lazy init)")
     log(f"Browser will shutdown after {INACTIVITY_TIMEOUT}s of inactivity")

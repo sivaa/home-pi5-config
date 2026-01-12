@@ -45,6 +45,17 @@ export function initTransportStore(Alpine, CONFIG) {
         this.error = data.error;
         this.fallback = data.fallback;
 
+        // If API returned an error in the response body, show technical details
+        if (data.error) {
+          this.errorDetails = {
+            url: this.API_URL,
+            message: data.error,
+            type: 'API',
+            timestamp: new Date().toLocaleTimeString('de-DE'),
+            hint: 'Scraper returned an error. Check container logs: docker logs data-scraper'
+          };
+        }
+
         console.log('[transport] Updated:', {
           sbahn: this.departures.sbahn.length,
           bus: this.departures.bus.length,
@@ -90,8 +101,9 @@ export function initTransportStore(Alpine, CONFIG) {
     },
 
     getNextDeparture() {
-      // Combine S-Bahn and bus departures
-      const all = [...this.departures.sbahn, ...this.departures.bus];
+      // Combine S-Bahn and bus departures, excluding cancelled trips
+      const all = [...this.departures.sbahn, ...this.departures.bus]
+        .filter(dep => !dep.cancelled);
       if (all.length === 0) return null;
       return all.sort((a, b) => a.minutes - b.minutes)[0];
     },

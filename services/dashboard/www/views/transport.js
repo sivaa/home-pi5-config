@@ -86,6 +86,13 @@ export function transportView() {
       return this.store?.getStatusClass?.(minutes) || '';
     },
 
+    getBusLineClass(line) {
+      // X lines (express) = red, M lines (metro) = cyan, regular = purple
+      if (line && line.startsWith('X')) return 'bus bus-express';
+      if (line && line.startsWith('M')) return 'bus bus-metro';
+      return 'bus';
+    },
+
     formatDelay(delay) {
       if (!delay || delay === 0) return '';
       return `+${delay}`;

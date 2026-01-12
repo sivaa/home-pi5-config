@@ -2252,28 +2252,20 @@
              @view-destroy.window="if ($event.detail === 'transport') destroy()"
              class="view transport-view">
 
-          <!-- Header with Status -->
-          <div class="transport-header">
-            <div class="transport-title">
-              <span class="icon-badge station">S</span>
-              <span>Zehlendorf Departures</span>
+          <!-- Compact Status Bar -->
+          <div class="transport-status-bar">
+            <div class="status-indicator">
+              <div class="status-dot" :class="{ 'error': isError }"></div>
+              <span class="status-label" x-text="isError ? 'Offline' : 'Online'"></span>
             </div>
-            <div class="transport-header-status">
-              <div class="header-status-left">
-                <div class="status-indicator">
-                  <div class="status-dot" :class="{ 'error': isError }"></div>
-                  <span x-text="isError ? 'Offline' : 'Online'"></span>
-                </div>
-                <span class="status-divider">│</span>
-                <span>Updated <span x-text="lastUpdated"></span></span>
-                <span class="status-divider">│</span>
-                <span>Next <span x-text="countdownSeconds"></span>s</span>
-              </div>
-              <button class="refresh-btn-compact" @click="refresh()" :disabled="isLoading">
-                <span x-show="!isLoading">🔄 Refresh</span>
-                <span x-show="isLoading">...</span>
-              </button>
-            </div>
+            <span class="status-divider">│</span>
+            <span class="status-item">Updated <strong x-text="lastUpdated"></strong></span>
+            <span class="status-divider">│</span>
+            <span class="status-item">Next <strong x-text="countdownSeconds + 's'"></strong></span>
+            <button class="refresh-btn-compact" @click="refresh()" :disabled="isLoading">
+              <span x-show="!isLoading">🔄 Refresh</span>
+              <span x-show="isLoading">...</span>
+            </button>
           </div>
 
           <!-- Loading State -->
@@ -2343,13 +2335,20 @@
                   </a>
                   <div class="departure-table">
                     <template x-for="dep in busDepartures" :key="dep.line + dep.direction + dep.minutes">
-                      <div class="departure-row" :class="getRowClass(dep.minutes)">
-                        <span class="departure-line bus" x-text="dep.line"></span>
+                      <div class="departure-row" :class="dep.cancelled ? 'status-cancelled' : getRowClass(dep.minutes)">
+                        <span class="departure-line" :class="getBusLineClass(dep.line)" x-text="dep.line"></span>
                         <span class="departure-direction" x-text="dep.direction"></span>
                         <div class="departure-time-container">
-                          <span class="departure-time" x-text="dep.minutes + ' min'"></span>
-                          <span class="departure-actual" x-text="dep.time"></span>
-                          <span class="departure-delay" x-text="formatDelay(dep.delay)"></span>
+                          <template x-if="dep.cancelled">
+                            <span class="departure-cancelled">✕ Trip cancelled</span>
+                          </template>
+                          <template x-if="!dep.cancelled">
+                            <span class="departure-time" x-text="dep.minutes + ' min'"></span>
+                          </template>
+                          <template x-if="!dep.cancelled">
+                            <span class="departure-actual" x-text="dep.time"></span>
+                          </template>
+                          <span class="departure-delay" x-text="dep.cancelled ? '' : formatDelay(dep.delay)"></span>
                         </div>
                       </div>
                     </template>
@@ -2374,13 +2373,20 @@
                   </a>
                   <div class="departure-table">
                     <template x-for="dep in sbahnDepartures" :key="dep.line + dep.direction + dep.minutes">
-                      <div class="departure-row" :class="getRowClass(dep.minutes)">
+                      <div class="departure-row" :class="dep.cancelled ? 'status-cancelled' : getRowClass(dep.minutes)">
                         <span class="departure-line sbahn" x-text="dep.line"></span>
                         <span class="departure-direction" x-text="dep.direction"></span>
                         <div class="departure-time-container">
-                          <span class="departure-time" x-text="dep.minutes + ' min'"></span>
-                          <span class="departure-actual" x-text="dep.time"></span>
-                          <span class="departure-delay" x-text="formatDelay(dep.delay)"></span>
+                          <template x-if="dep.cancelled">
+                            <span class="departure-cancelled">✕ Trip cancelled</span>
+                          </template>
+                          <template x-if="!dep.cancelled">
+                            <span class="departure-time" x-text="dep.minutes + ' min'"></span>
+                          </template>
+                          <template x-if="!dep.cancelled">
+                            <span class="departure-actual" x-text="dep.time"></span>
+                          </template>
+                          <span class="departure-delay" x-text="dep.cancelled ? '' : formatDelay(dep.delay)"></span>
                         </div>
                       </div>
                     </template>
