@@ -2280,7 +2280,7 @@
           <template x-if="isLoading && !isError">
             <div class="transport-loading">
               <div class="loading-spinner"></div>
-              <div class="loading-text" x-text="loadingMessage"></div>
+              <div class="loading-text">Fetching departures...</div>
               <div class="loading-hint">First request may take ~15-20s (browser startup)</div>
             </div>
           </template>
@@ -2291,22 +2291,22 @@
               <div class="error-icon">⚠️</div>
               <div class="error-title" x-text="$store.transport.error || 'API Unavailable'"></div>
 
-              <!-- Technical Details (collapsible) -->
-              <template x-if="errorDetails">
+              <!-- Technical Details -->
+              <template x-if="$store.transport.errorDetails">
                 <div class="error-technical">
                   <div class="tech-row">
                     <span class="tech-label">API:</span>
-                    <code class="tech-value" x-text="errorDetails.url"></code>
+                    <code class="tech-value" x-text="$store.transport.errorDetails.url"></code>
                   </div>
                   <div class="tech-row">
                     <span class="tech-label">Type:</span>
-                    <span class="tech-value tech-badge" :class="'badge-' + errorDetails.type?.toLowerCase()" x-text="errorDetails.type"></span>
+                    <span class="tech-value tech-badge" :class="'badge-' + $store.transport.errorDetails.type?.toLowerCase()" x-text="$store.transport.errorDetails.type"></span>
                   </div>
                   <div class="tech-row">
                     <span class="tech-label">Time:</span>
-                    <span class="tech-value" x-text="errorDetails.timestamp"></span>
+                    <span class="tech-value" x-text="$store.transport.errorDetails.timestamp"></span>
                   </div>
-                  <div class="tech-hint" x-text="errorDetails.hint"></div>
+                  <div class="tech-hint" x-text="$store.transport.errorDetails.hint"></div>
                 </div>
               </template>
 
