@@ -99,7 +99,8 @@ Scrapes both Bus and S-Bahn departures in parallel.
       "minutes": 5,
       "time": "22:30",
       "delay": 0,
-      "platform": "1"
+      "platform": "1",
+      "cancelled": false
     }
   ],
   "bus": [
@@ -109,7 +110,8 @@ Scrapes both Bus and S-Bahn departures in parallel.
       "minutes": 17,
       "time": "22:46",
       "delay": 0,
-      "platform": null
+      "platform": null,
+      "cancelled": false
     }
   ],
   "updated": "22:28",
@@ -119,6 +121,33 @@ Scrapes both Bus and S-Bahn departures in parallel.
     "bus": "https://www.bvg.de/de/verbindungen/echtzeit-abfahrten"
   }
 }
+```
+
+### Cancelled Trip Detection
+
+The scraper detects cancelled trips from bahnhof.de:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  CANCELLED TRIP DETECTION                                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Regex Pattern (case-insensitive):                              │
+│  /(?:trip\s+)?cancell?ed|fällt\s+aus|ausfall/                   │
+│                                                                 │
+│  Matches:                                                       │
+│  • "Trip cancelled" (English)                                   │
+│  • "cancelled" (English)                                        │
+│  • "canceled" (US spelling)                                     │
+│  • "fällt aus" (German)                                         │
+│  • "Ausfall" (German)                                           │
+│                                                                 │
+│  When detected:                                                 │
+│  • Sets cancelled: true in departure object                     │
+│  • Departure still included (for display purposes)              │
+│  • Dashboard shows "✕ Trip cancelled" with styling              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### GET /api/health
@@ -396,6 +425,7 @@ The scraper calculates "minutes until departure" considering delays:
 
 ## History
 
+- **Jan 12, 2026**: Added cancelled trip detection with regex pattern (Trip cancelled/fällt aus/Ausfall)
 - **Jan 12, 2026**: Fixed time calculation bug - scheduled times in past with delays showing ~1440 min instead of correct minutes
 - **Jan 12, 2026**: Added S-Bahn direction filtering (Wannsee blacklist), fixed direction extraction from bahnhof.de
 - **Jan 2026**: Major refactor - activity-based browser lifecycle, added S-Bahn scraping from bahnhof.de, parallel scraping
