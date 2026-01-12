@@ -1,0 +1,15 @@
+services:
+  data-scraper:
+    build: .
+    container_name: data-scraper
+    restart: unless-stopped
+    ports:
+      - "8890:8890"
+    environment:
+      - PORT=8890
+      - TZ=Europe/Berlin
+    # Playwright/Chromium needs shared memory
+    shm_size: '256mb'
+    # Security settings for headless Chrome
+    security_opt:
+      - seccomp:unconfined

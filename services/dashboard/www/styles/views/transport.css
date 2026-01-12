@@ -1,0 +1,508 @@
+/* ========================================
+   TRANSPORT VIEW - Station Board Design
+   Inspired by train station departure displays
+   ======================================== */
+
+/* ---------- Color Tokens ---------- */
+:root {
+  --color-transport-bg: #0f172a;
+  --color-transport-header: #1e293b;
+  --color-transport-surface: #1e293b;
+  --color-transport-border: #334155;
+  --color-transport-text: #f1f5f9;
+  --color-transport-text-dim: #94a3b8;
+  --color-transport-accent: #fbbf24;
+  --color-transport-sbahn: #22c55e;
+  --color-transport-bus: #a855f7;
+  --color-transport-missed: #ef4444;
+  --color-transport-urgent: #f97316;
+  --color-transport-soon: #eab308;
+  --color-transport-ok: #22c55e;
+}
+
+/* ---------- Main Container ---------- */
+.transport-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--color-transport-bg);
+  color: var(--color-transport-text);
+  padding: var(--space-lg);
+  gap: var(--space-lg);
+}
+
+/* ---------- Header Banner (Compact with Status) ---------- */
+.transport-header {
+  background: var(--color-transport-header);
+  border: 2px solid var(--color-transport-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.transport-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-transport-accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Header Status (inline with title) */
+.transport-header-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-transport-text-dim);
+}
+
+.header-status-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.status-divider {
+  color: var(--color-transport-border);
+  opacity: 0.5;
+}
+
+.refresh-btn-compact {
+  background: var(--color-transport-accent);
+  color: var(--color-transport-bg);
+  border: none;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  min-height: 36px;
+  touch-action: manipulation;
+  transition: opacity 0.2s;
+}
+
+.refresh-btn-compact:hover {
+  opacity: 0.9;
+}
+
+.refresh-btn-compact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Departure Boards Container ---------- */
+.transport-boards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  flex: 1;
+}
+
+/* ---------- Single Board ---------- */
+.departure-board {
+  background: var(--color-transport-surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-header {
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.board-header.sbahn {
+  background: var(--color-transport-sbahn);
+  color: white;
+}
+
+.board-header.bus {
+  background: var(--color-transport-bus);
+  color: white;
+}
+
+.board-stop-name {
+  font-weight: var(--font-weight-normal);
+  opacity: 0.9;
+  font-size: var(--font-size-md);
+}
+
+/* ---------- Departure Table ---------- */
+.departure-table {
+  flex: 1;
+  padding: var(--space-sm);
+}
+
+.departure-row {
+  display: grid;
+  grid-template-columns: 55px 1fr auto;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  align-items: center;
+  border-bottom: 1px solid var(--color-transport-border);
+  transition: background 0.15s ease;
+}
+
+.departure-row:last-child {
+  border-bottom: none;
+}
+
+.departure-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.departure-line {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.departure-line.sbahn {
+  background: var(--color-transport-sbahn);
+  color: white;
+}
+
+.departure-line.bus {
+  background: var(--color-transport-bus);
+  color: white;
+}
+
+.departure-direction {
+  font-size: var(--font-size-xl);
+  color: var(--color-transport-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.departure-direction::before {
+  content: '→ ';
+  opacity: 0.5;
+}
+
+/* Time container: relative time + actual time */
+.departure-time-container {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+
+.departure-time {
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+}
+
+.departure-actual {
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-size-md);
+  color: var(--color-transport-text-dim);
+  opacity: 0.7;
+}
+
+.departure-delay {
+  font-size: var(--font-size-sm);
+  color: var(--color-transport-urgent);
+  margin-left: var(--space-xs);
+}
+
+/* Row status styling */
+.departure-row.status-missed {
+  opacity: 0.4;
+}
+
+.departure-row.status-missed .departure-time {
+  text-decoration: line-through;
+  color: var(--color-transport-missed);
+}
+
+.departure-row.status-urgent {
+  background: rgba(249, 115, 22, 0.15);
+}
+
+.departure-row.status-urgent .departure-time {
+  color: var(--color-transport-urgent);
+}
+
+.departure-row.status-soon {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.departure-row.status-soon .departure-time {
+  color: var(--color-transport-soon);
+}
+
+.departure-row.status-ok .departure-time {
+  color: var(--color-transport-ok);
+}
+
+/* Board footer */
+.board-footer {
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-transport-text-dim);
+  border-top: 1px solid var(--color-transport-border);
+  background: rgba(0, 0, 0, 0.2);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ---------- Icon Badges (replace broken emojis) ---------- */
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  flex-shrink: 0;
+}
+
+.icon-badge.station {
+  background: var(--color-transport-sbahn);
+  color: white;
+}
+
+.icon-badge.sbahn-header {
+  background: white;
+  color: var(--color-transport-sbahn);
+  width: 28px;
+  height: 28px;
+}
+
+.icon-badge.sbahn-large {
+  background: var(--color-transport-sbahn);
+  color: white;
+  width: 56px;
+  height: 56px;
+  font-size: var(--font-size-xl);
+  border-radius: var(--radius-md);
+}
+
+/* ---------- Status Indicator (used in header) ---------- */
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-transport-ok);
+}
+
+.status-dot.error {
+  background: var(--color-transport-missed);
+}
+
+/* ---------- Error State ---------- */
+.transport-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: var(--space-md);
+}
+
+.error-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-transport-missed);
+  margin-bottom: var(--space-sm);
+}
+
+.error-message {
+  color: var(--color-transport-text-dim);
+  margin-bottom: var(--space-lg);
+}
+
+.fallback-links {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.fallback-link {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-transport-surface);
+  border: 1px solid var(--color-transport-border);
+  border-radius: var(--radius-md);
+  color: var(--color-transport-accent);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: background 0.2s;
+}
+
+.fallback-link:hover {
+  background: var(--color-transport-header);
+}
+
+/* ---------- Loading State ---------- */
+.transport-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  color: var(--color-transport-text-dim);
+}
+
+/* ---------- S-Bahn Link Card ---------- */
+.sbahn-link-board {
+  display: flex;
+  flex-direction: column;
+}
+
+.sbahn-link-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
+  text-decoration: none;
+  color: var(--color-transport-text);
+  transition: transform 0.2s, background 0.2s;
+  min-height: 120px;
+  touch-action: manipulation;
+}
+
+.sbahn-link-card:hover {
+  background: linear-gradient(135deg, #234876 0%, #3d4a5c 100%);
+  transform: translateY(-2px);
+}
+
+.sbahn-link-card:active {
+  transform: translateY(0);
+}
+
+.sbahn-link-icon {
+  font-size: 48px;
+  opacity: 0.9;
+}
+
+.sbahn-link-text {
+  flex: 1;
+}
+
+.sbahn-link-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--space-xs);
+}
+
+.sbahn-link-subtitle {
+  font-size: var(--font-size-md);
+  color: var(--color-transport-text-dim);
+}
+
+.sbahn-link-arrow {
+  font-size: var(--font-size-2xl);
+  opacity: 0.6;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.sbahn-link-card:hover .sbahn-link-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+
+.sbahn-link-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-transport-text-dim);
+  background: var(--color-transport-surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .transport-view {
+    padding: var(--space-md);
+    gap: var(--space-md);
+  }
+
+  .transport-header {
+    padding: var(--space-sm) var(--space-md);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .transport-title {
+    font-size: var(--font-size-md);
+  }
+
+  .transport-header-status {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .header-status-left {
+    justify-content: center;
+  }
+
+  .refresh-btn-compact {
+    width: 100%;
+  }
+
+  .transport-boards {
+    grid-template-columns: 1fr;
+  }
+
+  .departure-row {
+    grid-template-columns: 50px 1fr auto;
+  }
+
+  .departure-line {
+    font-size: var(--font-size-lg);
+  }
+
+  .departure-direction {
+    font-size: var(--font-size-lg);
+  }
+
+  .departure-time {
+    font-size: var(--font-size-lg);
+  }
+
+  .departure-actual {
+    font-size: var(--font-size-sm);
+  }
+}

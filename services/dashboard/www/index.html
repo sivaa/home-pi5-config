@@ -38,6 +38,7 @@
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
   <link rel="stylesheet" href="styles/views/mailbox.css">
   <link rel="stylesheet" href="styles/views/hot-water.css">
+  <link rel="stylesheet" href="styles/views/transport.css">
   <link rel="stylesheet" href="styles/views/device-health.css">
 
   <!-- Three.js for 3D Floor Plan -->
@@ -800,6 +801,20 @@
                 <span class="compact-stat offline" x-show="offlineCount > 0">📡<span x-text="offlineCount"></span></span>
               </div>
               <div class="compact-tabs">
+                <!-- Global Boost Mode Toggle -->
+                <button class="boost-mode-toggle"
+                        :class="{ active: $store.thermostats.globalBoostMode?.active }"
+                        @click="$store.thermostats.globalBoostMode?.active
+                                  ? $store.thermostats.disableGlobalBoostMode()
+                                  : $store.thermostats.enableGlobalBoostMode()"
+                        :title="$store.thermostats.globalBoostMode?.active
+                                  ? 'Click to disable boost mode'
+                                  : 'Enable 25°C max for 1 hour'">
+                  <span class="boost-icon">🔥</span>
+                  <span class="boost-timer"
+                        x-show="$store.thermostats.globalBoostMode?.active"
+                        x-text="$store.thermostats.getGlobalBoostModeTimeRemaining()"></span>
+                </button>
                 <button class="tab-btn-sm" :class="{ active: activeTab === 'overview' }" @click="setTab('overview')">Overview</button>
                 <button class="tab-btn-sm" :class="{ active: activeTab === 'timeline' }" @click="setTab('timeline')">Timeline</button>
                 <button class="tab-btn-sm" :class="{ active: activeTab === 'trends' }" @click="setTab('trends')">Trends</button>
@@ -809,7 +824,7 @@
 
             <!-- Heater Pause Banner (shown when heaters paused by automation) -->
             <div class="heater-pause-banner"
-                 x-show="$store.thermostats?.heaterPause?.active"
+                 x-show="$store.thermostats?.heaterPause?.active && !$store.thermostats?.co2Override?.active"
                  x-cloak
                  x-transition:enter="banner-enter"
                  x-transition:leave="banner-leave"
@@ -842,6 +857,44 @@
                 <span class="timer-value" x-text="getPauseDuration()"></span>
                 <span class="timer-label">paused</span>
               </div>
+
+              <!-- CO2 Override Button (only shown for CO2 reason) -->
+              <button class="co2-override-btn"
+                      x-show="$store.thermostats?.heaterPause?.reason === 'co2'"
+                      @click="$store.thermostats?.enableCO2Override()"
+                      title="Allow heaters for 6 hours despite high CO2">
+                <span class="override-btn-icon">🔓</span>
+                <span class="override-btn-text">Override 6h</span>
+              </button>
+            </div>
+
+            <!-- CO2 Override Active Banner (shown when override is enabled) -->
+            <div class="co2-override-banner"
+                 x-show="$store.thermostats?.co2Override?.active"
+                 x-cloak
+                 x-transition:enter="banner-enter"
+                 x-transition:leave="banner-leave">
+
+              <div class="banner-icon">🔓</div>
+
+              <div class="banner-content">
+                <div class="banner-title">CO2 Override Active</div>
+                <div class="banner-details">
+                  <span class="banner-detail-label">Heaters allowed despite high CO2</span>
+                </div>
+              </div>
+
+              <div class="banner-timer">
+                <span class="timer-icon">⏱️</span>
+                <span class="timer-value" x-text="$store.thermostats?.getCO2OverrideTimeRemaining() || '--'"></span>
+                <span class="timer-label">remaining</span>
+              </div>
+
+              <button class="co2-override-cancel-btn"
+                      @click="$store.thermostats?.disableCO2Override()"
+                      title="Cancel override and re-enable CO2 protection">
+                <span class="override-btn-text">Cancel</span>
+              </button>
             </div>
 
             <!-- ========================================
@@ -938,7 +991,7 @@
                                   @touchstart.prevent="holdDelay = setTimeout(() => { adjustTemp(t.id, 1); holdInterval = setInterval(() => adjustTemp(t.id, 1), 150) }, 300)"
                                   @touchend="clearTimeout(holdDelay); holdDelay = null; clearInterval(holdInterval); holdInterval = null"
                                   @click="if(!holdInterval) adjustTemp(t.id, 1)"
-                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) >= (hasActiveOverride(t.id) ? 25 : 22)">+</button>
+                                  :disabled="!t.available || t.syncing || (getDisplayTemp(t) || 17) >= ($store.thermostats.globalBoostMode?.active ? 25 : 22)">+</button>
                         </div>
                       </div>
                     </div>
@@ -957,34 +1010,6 @@
                               :disabled="!t.available || t.syncing">
                         ⏻ Off
                       </button>
-                    </div>
-
-                    <!-- Quick Boost (22°C for 60 minutes) -->
-                    <div class="quick-boost-section">
-                      <!-- No active boost: Show button -->
-                      <button class="boost-btn"
-                              x-show="!hasActiveOverride(t.id)"
-                              @click="setQuickBoost(t.id)"
-                              :disabled="!canBoost(t)">
-                        <span class="boost-icon">🔥</span>
-                        <span class="boost-text">Boost for 1hr</span>
-                      </button>
-
-                      <!-- Active boost: Show banner with countdown -->
-                      <div class="boost-active-banner"
-                           x-show="hasActiveOverride(t.id)"
-                           x-cloak>
-                        <div class="boost-info">
-                          <span class="boost-active-icon">⏱️</span>
-                          <div class="boost-details">
-                            <span class="boost-label">Boost Active</span>
-                            <span class="boost-remaining" x-text="getOverrideRemaining(t.id) + ' remaining'"></span>
-                          </div>
-                        </div>
-                        <button class="boost-cancel-btn" @click="cancelBoost(t.id)">
-                          Cancel
-                        </button>
-                      </div>
                     </div>
 
                     <!-- Night Mode Override Banner (Bedroom only, during night hours 23:00-06:00) -->
@@ -2219,6 +2244,139 @@
           </div>
         </div>
 
+        <!-- Transport View -->
+        <div x-show="currentView === 'transport'"
+             x-cloak
+             x-data="transportView()"
+             x-init="init()"
+             @view-destroy.window="if ($event.detail === 'transport') destroy()"
+             class="view transport-view">
+
+          <!-- Header with Status -->
+          <div class="transport-header">
+            <div class="transport-title">
+              <span class="icon-badge station">S</span>
+              <span>Zehlendorf Departures</span>
+            </div>
+            <div class="transport-header-status">
+              <div class="header-status-left">
+                <div class="status-indicator">
+                  <div class="status-dot" :class="{ 'error': isError }"></div>
+                  <span x-text="isError ? 'Offline' : 'Online'"></span>
+                </div>
+                <span class="status-divider">│</span>
+                <span>Updated <span x-text="lastUpdated"></span></span>
+                <span class="status-divider">│</span>
+                <span>Next <span x-text="countdownSeconds"></span>s</span>
+              </div>
+              <button class="refresh-btn-compact" @click="refresh()" :disabled="isLoading">
+                <span x-show="!isLoading">🔄 Refresh</span>
+                <span x-show="isLoading">...</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Error State -->
+          <template x-if="isError">
+            <div class="transport-error">
+              <div class="error-icon">⚠️</div>
+              <div class="error-title">API Unavailable</div>
+              <div class="error-message">Unable to fetch departure times</div>
+              <div class="fallback-links">
+                <a :href="$store.transport.fallback?.sbahn || 'https://www.bahnhof.de/berlin-zehlendorf/abfahrt?verkehrsmittel=s-bahn'"
+                   target="_blank" class="fallback-link">
+                  🚈 S-Bahn ↗
+                </a>
+                <a :href="$store.transport.fallback?.bus || 'https://www.bvg.de/de/verbindungen/echtzeit-abfahrten'"
+                   target="_blank" class="fallback-link">
+                  🚌 Bus ↗
+                </a>
+              </div>
+              <button class="refresh-btn" style="margin-top: var(--space-lg)" @click="refresh()">
+                🔄 Retry
+              </button>
+            </div>
+          </template>
+
+          <!-- Main Content -->
+          <template x-if="!isError">
+            <div style="display: contents;">
+
+              <!-- Two-Column Departure Boards (Bus first, S-Bahn second) -->
+              <div class="transport-boards">
+
+                <!-- Bus Board -->
+                <div class="departure-board">
+                  <a href="https://www.bvg.de/de/verbindungen/verbindungssuche#!P|SQ!qrCode|bvg&100050&BVG&"
+                     target="_blank" class="board-header bus" style="text-decoration: none; color: inherit;">
+                    <span>🚌</span>
+                    <span>Bus</span>
+                    <span class="board-stop-name">· Laehrstr. ↗</span>
+                  </a>
+                  <div class="departure-table">
+                    <template x-for="dep in busDepartures" :key="dep.line + dep.direction + dep.minutes">
+                      <div class="departure-row" :class="getRowClass(dep.minutes)">
+                        <span class="departure-line bus" x-text="dep.line"></span>
+                        <span class="departure-direction" x-text="dep.direction"></span>
+                        <div class="departure-time-container">
+                          <span class="departure-time" x-text="dep.minutes + ' min'"></span>
+                          <span class="departure-actual" x-text="dep.time"></span>
+                          <span class="departure-delay" x-text="formatDelay(dep.delay)"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="busDepartures.length === 0 && !isLoading">
+                      <div class="departure-row" style="opacity: 0.5; justify-content: center;">
+                        No departures
+                      </div>
+                    </template>
+                  </div>
+                  <div class="board-footer">
+                    Street level
+                  </div>
+                </div>
+
+                <!-- S-Bahn Board (live departures) -->
+                <div class="departure-board">
+                  <a href="https://www.bahnhof.de/en/berlin-zehlendorf/departure?transport=s-bahn"
+                     target="_blank" class="board-header sbahn" style="text-decoration: none; color: inherit;">
+                    <span class="icon-badge sbahn-header">S</span>
+                    <span>S-Bahn</span>
+                    <span class="board-stop-name">· S Zehlendorf ↗</span>
+                  </a>
+                  <div class="departure-table">
+                    <template x-for="dep in sbahnDepartures" :key="dep.line + dep.direction + dep.minutes">
+                      <div class="departure-row" :class="getRowClass(dep.minutes)">
+                        <span class="departure-line sbahn" x-text="dep.line"></span>
+                        <span class="departure-direction" x-text="dep.direction"></span>
+                        <div class="departure-time-container">
+                          <span class="departure-time" x-text="dep.minutes + ' min'"></span>
+                          <span class="departure-actual" x-text="dep.time"></span>
+                          <span class="departure-delay" x-text="formatDelay(dep.delay)"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="sbahnDepartures.length === 0 && !isLoading">
+                      <div class="departure-row" style="opacity: 0.5; justify-content: center;">
+                        <a href="https://www.bahnhof.de/berlin-zehlendorf/abfahrt?verkehrsmittel=s-bahn"
+                           target="_blank" style="color: inherit; text-decoration: none;">
+                          View S1 Departures ↗
+                        </a>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="board-footer">
+                    Platform 1: Wannsee · Platform 2: Oranienburg
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </template>
+
+        </div>
+
       </div>
     </main>
 
@@ -3217,7 +3375,7 @@
 
   <!-- Thermostat View Module - loads store and view -->
   <script type="module">
-    import { initThermostatStore } from './js/stores/thermostat-store.js?v=11';
+    import { initThermostatStore } from './js/stores/thermostat-store.js?v=14';
     import { thermostatView } from './views/thermostat.js?v=10';
 
     // Expose thermostatView globally for Alpine x-data
@@ -3279,6 +3437,44 @@
     import { hotWaterView } from './views/hot-water.js?v=6';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
+  </script>
+
+  <script type="module">
+    import { transportView } from './views/transport.js';
+    window.transportView = transportView;
+    console.log('[transport] Module loaded, transportView ready');
+  </script>
+
+  <!-- Transport Store Module - real-time departures -->
+  <script type="module">
+    import { initTransportStore } from './js/stores/transport-store.js';
+
+    function initTransport() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('transport')) {
+          initTransportStore(Alpine, CONFIG);
+          console.log('[transport] Transport store initialized');
+        }
+        // Initialize after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          const transportStore = Alpine.store('transport');
+          if (transportStore) {
+            transportStore.init?.();
+          }
+        }, 1000);
+      }
+    }
+
+    // Try to initialize when Alpine is ready
+    if (typeof Alpine !== 'undefined') {
+      initTransport();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initTransportStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initTransport);
+    }
   </script>
 
   <!-- Device Health View Module - loads store and view -->
@@ -3433,6 +3629,8 @@
     const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isNginxProxy = window.location.port === '8888';
     const CONFIG = {
+      // Pi host for scraper service - localhost for local dev, pi for Pi deployment
+      piHost: isLocalDev ? 'localhost' : 'pi',
       mqttUrl: isLocalDev
         ? 'ws://pi:9001'  // Local dev → connect to Pi's MQTT
         : isNginxProxy
@@ -5065,7 +5263,8 @@
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
           { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
           { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
-          { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' }
+          { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' },
+          { id: 'transport', name: 'Transport', icon: '🚉', title: 'Transport Departures', key: 'T' }
         ]
       },
       {
