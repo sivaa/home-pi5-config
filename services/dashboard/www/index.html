@@ -2276,12 +2276,40 @@
             </div>
           </div>
 
+          <!-- Loading State -->
+          <template x-if="isLoading && !isError">
+            <div class="transport-loading">
+              <div class="loading-spinner"></div>
+              <div class="loading-text" x-text="loadingMessage"></div>
+              <div class="loading-hint">First request may take ~15-20s (browser startup)</div>
+            </div>
+          </template>
+
           <!-- Error State -->
-          <template x-if="isError">
+          <template x-if="isError && !isLoading">
             <div class="transport-error">
               <div class="error-icon">⚠️</div>
-              <div class="error-title">API Unavailable</div>
-              <div class="error-message">Unable to fetch departure times</div>
+              <div class="error-title" x-text="$store.transport.error || 'API Unavailable'"></div>
+
+              <!-- Technical Details (collapsible) -->
+              <template x-if="errorDetails">
+                <div class="error-technical">
+                  <div class="tech-row">
+                    <span class="tech-label">API:</span>
+                    <code class="tech-value" x-text="errorDetails.url"></code>
+                  </div>
+                  <div class="tech-row">
+                    <span class="tech-label">Type:</span>
+                    <span class="tech-value tech-badge" :class="'badge-' + errorDetails.type?.toLowerCase()" x-text="errorDetails.type"></span>
+                  </div>
+                  <div class="tech-row">
+                    <span class="tech-label">Time:</span>
+                    <span class="tech-value" x-text="errorDetails.timestamp"></span>
+                  </div>
+                  <div class="tech-hint" x-text="errorDetails.hint"></div>
+                </div>
+              </template>
+
               <div class="fallback-links">
                 <a :href="$store.transport.fallback?.sbahn || 'https://www.bahnhof.de/berlin-zehlendorf/abfahrt?verkehrsmittel=s-bahn'"
                    target="_blank" class="fallback-link">

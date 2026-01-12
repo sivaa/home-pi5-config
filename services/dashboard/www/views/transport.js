@@ -78,6 +78,18 @@ export function transportView() {
       return this.store?.lastUpdated || '--:--';
     },
 
+    get errorDetails() {
+      return this.store?.errorDetails || null;
+    },
+
+    get loadingMessage() {
+      const elapsed = this.store?.getElapsedSeconds?.() || 0;
+      if (elapsed < 3) return 'Connecting to scraper...';
+      if (elapsed < 10) return 'Browser starting...';
+      if (elapsed < 20) return 'Scraping BVG + DB...';
+      return `Still loading... (${elapsed}s)`;
+    },
+
     // ========================================
     // STYLING HELPERS
     // ========================================

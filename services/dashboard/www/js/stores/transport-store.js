@@ -9,7 +9,9 @@ export function initTransportStore(Alpine, CONFIG) {
     loading: false,
     lastUpdated: null,
     error: null,
+    errorDetails: null,  // Technical details for debugging
     fallback: null,
+    fetchStartTime: null,
 
     // Configuration
     WALK_TIME: 5,  // Minutes to reach stops
@@ -22,11 +24,18 @@ export function initTransportStore(Alpine, CONFIG) {
       console.log('[transport] Fetching from backend...');
       this.loading = true;
       this.error = null;
+      this.errorDetails = null;
+      this.fetchStartTime = Date.now();
 
       try {
-        const response = await fetch(this.API_URL);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+        const response = await fetch(this.API_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new Error(`HTTP ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
@@ -39,12 +48,31 @@ export function initTransportStore(Alpine, CONFIG) {
         console.log('[transport] Updated:', {
           sbahn: this.departures.sbahn.length,
           bus: this.departures.bus.length,
-          error: this.error
+          error: this.error,
+          duration: Date.now() - this.fetchStartTime + 'ms'
         });
 
       } catch (e) {
         console.error('[transport] Fetch failed:', e);
-        this.error = 'Service unavailable';
+        const isTimeout = e.name === 'AbortError';
+        const isNetworkError = e.message === 'Failed to fetch' || e.name === 'TypeError';
+
+        this.error = isTimeout ? 'Request timeout' :
+                     isNetworkError ? 'Cannot connect to scraper' :
+                     e.message || 'Service unavailable';
+
+        this.errorDetails = {
+          url: this.API_URL,
+          message: e.message,
+          type: isTimeout ? 'TIMEOUT' : isNetworkError ? 'NETWORK' : 'HTTP',
+          timestamp: new Date().toLocaleTimeString('de-DE'),
+          hint: isNetworkError
+            ? 'Scraper container may be starting up (~15s) or not running'
+            : isTimeout
+            ? 'Browser may be launching. Try again in 20 seconds.'
+            : 'Check container logs: docker logs data-scraper'
+        };
+
         this.fallback = {
           sbahn: 'https://www.bahnhof.de/berlin-zehlendorf/abfahrt?verkehrsmittel=s-bahn',
           bus: 'https://www.bvg.de/de/verbindungen/echtzeit-abfahrten'
@@ -52,6 +80,13 @@ export function initTransportStore(Alpine, CONFIG) {
       }
 
       this.loading = false;
+      this.fetchStartTime = null;
+    },
+
+    // Get elapsed time since fetch started (for loading UI)
+    getElapsedSeconds() {
+      if (!this.fetchStartTime) return 0;
+      return Math.floor((Date.now() - this.fetchStartTime) / 1000);
     },
 
     getNextDeparture() {
