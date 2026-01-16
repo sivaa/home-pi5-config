@@ -219,10 +219,69 @@ fetch('http://pi:8123/api/services/shell_command/start', {
 
 ---
 
+## 🚨 CRITICAL: Service Hostnames with Host Network
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INCIDENT: Jan 17, 2026 - Heaters stuck OFF for 2+ hours                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  CAUSE: After switching to --network host, MQTT and InfluxDB were still    │
+│  configured with Docker hostnames ("mosquitto", "influxdb") instead of     │
+│  "localhost". Host network can't resolve Docker container names!           │
+│                                                                             │
+│  SYMPTOMS:                                                                  │
+│  - HA startup errors: "Failed to resolve 'mosquitto'"                      │
+│  - Automations fail silently                                                │
+│  - Watchdog scheduler enters bad state                                      │
+│  - Heater guard never releases even when conditions are met                │
+│                                                                             │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│                                                                             │
+│  RULE: When using --network host, ALL service connections must use         │
+│  "localhost" or "127.0.0.1", NEVER Docker container names!                 │
+│                                                                             │
+│  ✗ WRONG:  broker: "mosquitto"     host: "influxdb"                        │
+│  ✓ RIGHT:  broker: "localhost"     host: "localhost"                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Service Connection Settings (MUST use localhost)
+
+| Service | Config Location | Correct Setting |
+|---------|-----------------|-----------------|
+| MQTT | `.storage/core.config_entries` | `"broker": "localhost"` |
+| InfluxDB | `configuration.yaml` | `host: localhost` |
+
+### Why Docker Hostnames Don't Work
+
+```
+Bridge Network (zigbee2mqtt_default):
+├─ Docker provides internal DNS
+├─ "mosquitto" → 172.18.0.x ✓
+└─ "influxdb" → 172.18.0.y ✓
+
+Host Network (--network host):
+├─ Shares host's network namespace
+├─ No Docker DNS available
+├─ "mosquitto" → DNS FAILURE ✗
+├─ "influxdb" → DNS FAILURE ✗
+└─ "localhost:1883" → Works ✓ (ports published to host)
+```
+
+---
+
 ## History
 
+- **Jan 17, 2026**: Fixed MQTT/InfluxDB hostname issue after network migration
+  - Root cause: Using Docker hostnames with `--network host` causes DNS failures
+  - Fix: Changed `"mosquitto"` → `"localhost"` in MQTT config
+  - Fix: Changed `host: influxdb` → `host: localhost` in InfluxDB config
+  - Impact: Heaters were stuck off for 2+ hours, CO2 resume automation couldn't fire
 - **Jan 16, 2026**: Added Docker socket mount + shell_command for container control
   - Discovered: shell_commands run inside HA container, not host
   - Discovered: docker CLI not in HA image, must use curl + Docker API
   - Switched from `--network zigbee2mqtt_default` to `--network host`
+  - **MISSED**: Updating MQTT/InfluxDB configs to use localhost (fixed Jan 17)
 - **Dec 2024**: Initial setup with Zigbee2MQTT integration

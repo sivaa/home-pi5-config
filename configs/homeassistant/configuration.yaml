@@ -65,11 +65,12 @@ http:
 
 # MQTT - Configured via UI integration (Settings > Devices & Services > MQTT)
 # VPN provides network security - no MQTT authentication needed
-# broker: mosquitto, port: 1883 (anonymous access allowed)
+# broker: localhost, port: 1883 (must use localhost, not Docker hostname, with --network host)
 
 # InfluxDB integration - writes sensor data directly
+# NOTE: Must use localhost, not "influxdb" Docker hostname, when HA uses --network host
 influxdb:
-  host: influxdb
+  host: localhost
   port: 8086
   database: homeassistant
   default_measurement: state
