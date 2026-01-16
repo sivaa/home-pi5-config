@@ -1,0 +1,14 @@
+[Unit]
+Description=Data Scraper Cleanup Service - stops container after 30 min inactivity
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scraper-cleanup/scraper-cleanup.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scraper-cleanup
+
+# Don't restart on failure - timer will trigger again
+Restart=no

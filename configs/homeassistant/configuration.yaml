@@ -303,6 +303,10 @@ input_boolean:
   heaters_off_due_to_co2:
     name: Heaters Off Due To CO2
     icon: mdi:molecule-co2
+  # CO2 override flag (allows heaters when CO2 is high for 6 hours)
+  co2_override_active:
+    name: CO2 Override Active
+    icon: mdi:shield-off-outline
   # Bedroom night mode flag (23:00-06:00 temperature limit)
   bedroom_night_mode_active:
     name: Bedroom Night Mode Active
@@ -375,6 +379,12 @@ input_datetime:
     has_date: true
     has_time: true
     icon: mdi:fire-alert
+  # CO2 override expiry (allows heaters despite high CO2 for 6 hours)
+  co2_override_end:
+    name: CO2 Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:shield-off-outline
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
@@ -646,6 +656,16 @@ template:
           {% else %}
             Night
           {% endif %}
+
+# =============================================================================
+# SHELL COMMANDS
+# Purpose: Allow dashboard to trigger container operations via API
+# Usage: POST /api/services/shell_command/start_data_scraper
+# =============================================================================
+shell_command:
+  # Uses Docker socket (mounted in HA container) to start scraper via API
+  # curl talks to Docker API directly since docker CLI isn't in HA image
+  start_data_scraper: "curl -s --unix-socket /var/run/docker.sock -X POST http://localhost/v1.44/containers/data-scraper/start"
 
 # =============================================================================
 # AUTOMATIONS

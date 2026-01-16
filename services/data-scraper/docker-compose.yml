@@ -8,6 +8,9 @@ services:
     environment:
       - PORT=8890
       - TZ=Europe/Berlin
+    # Share /tmp with host for activity file (cleanup service needs it)
+    volumes:
+      - /tmp:/tmp
     # Playwright/Chromium needs shared memory
     shm_size: '256mb'
     # Security settings for headless Chrome

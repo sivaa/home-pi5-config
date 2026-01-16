@@ -58,6 +58,16 @@ pi-setup/
 
 ---
 
+## Quick Navigation (AI Agents)
+
+Working on a service? Read its CLAUDE.md first:
+- `services/*/CLAUDE.md` - Service-specific context (dashboard, zigbee-watchdog, heater-watchdog, etc.)
+- `scripts/CLAUDE.md` - Maintenance script rules and safety guidelines
+
+Don't know which service? Use: `find . -name CLAUDE.md`
+
+---
+
 ## Current Pi Configuration
 
 - **Location:** Berlin, Germany
@@ -99,6 +109,17 @@ pi-setup/
 
 ---
 
+## When Adding a New Service
+
+Checklist to prevent documentation debt:
+
+1. [ ] Create `services/<name>/CLAUDE.md` with purpose, architecture, key files
+2. [ ] If config files needed, add to `configs/<name>/`
+3. [ ] If numbered doc needed, add `docs/NN-<topic>.md`
+4. [ ] Update README.md service list if user-facing
+
+---
+
 ## Recovery Philosophy
 
 > *"We are preparing for the worst day and we need to recover and get it up exactly the same as before."*
@@ -112,7 +133,7 @@ All documentation should enable complete system restoration from scratch.
 ### 1. Dashboard Development Workflow
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  🔄 LOCAL FIRST → DEPLOY ONLY WHEN USER ASKS                    │
+│  🔄 LOCAL FIRST → THEN DEPLOY TO PI                             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. ALWAYS test dashboard changes LOCALLY first                 │
@@ -126,11 +147,31 @@ All documentation should enable complete system restoration from scratch.
 │     - Home Assistant: pi:8123                                   │
 │     - Zigbee2MQTT: pi:8080                                      │
 │                                                                 │
-│  3. ONLY deploy to Pi when user EXPLICITLY asks                 │
+│  3. Deploy to Pi after local testing passes:                    │
 │     - scp files to /opt/dashboard/www/                          │
 │     - Fix permissions: sudo chmod -R 755 /opt/dashboard/www     │
 │                                                                 │
 │  WHY: Faster testing & iteration cycles!                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 1b. Operations Requiring User Confirmation (IRREVOCABLE)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ⚠️  ALWAYS ASK USER BEFORE THESE OPERATIONS                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  • Deleting files or data (rm, DROP TABLE, etc.)               │
+│  • Git force push or rebase on shared branches                  │
+│  • Modifying Zigbee2MQTT database or network keys               │
+│  • Removing Docker volumes or persistent data                   │
+│  • Changing system configs (/etc/*, systemd units)              │
+│  • Revoking API keys, tokens, or credentials                    │
+│  • Database migrations that drop columns/tables                 │
+│  • Any operation that cannot be easily undone                   │
+│                                                                 │
+│  WHY: These operations can cause data loss or system breakage   │
+│       that requires significant effort to recover from.         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -142,20 +183,16 @@ All documentation should enable complete system restoration from scratch.
 - No services should run locally (Mac) unless user explicitly asks
 - Dashboard testing is the EXCEPTION (connects to Pi services)
 
-### 4. Old Backup Caution
-- Don't use anything from `zigbee-backup-old-device/` without user's explicit approval
-- It's a backup from old device - many things need to change
-
-### 5. Agent Documentation
+### 4. Agent Documentation
 - All coding agents should refer to proper documents
 - Create agents.md for high-level instructions
 
-### 6. SSH Connection to Pi
+### 5. SSH Connection to Pi
 - **ALWAYS use `pi@pi`** for SSH/SCP connections (not just `pi`)
 - Example: `ssh pi@pi "command"` or `scp file pi@pi:/path/`
 - The hostname `pi` alone may resolve to wrong user
 
-### 7. Zigbee2MQTT Operations (CRITICAL - 35 DEVICES AT RISK)
+### 6. Zigbee2MQTT Operations (CRITICAL - 35 DEVICES AT RISK)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -209,6 +246,47 @@ ssh pi@pi "sudo systemctl start zigbee2mqtt"
 ```
 
 **See also:** `configs/zigbee2mqtt/NETWORK_KEYS.md` for disaster recovery keys.
+
+### 7. Home Assistant Container Requirements (Jan 16, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ⚠️  HA RUNS ISOLATED - SHELL_COMMANDS EXECUTE INSIDE CONTAINER  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  PROBLEM: shell_command runs INSIDE HA container, not host.     │
+│  Docker CLI (`docker start`) isn't in the HA image.             │
+│                                                                 │
+│  REQUIREMENTS for HA to control Docker:                         │
+│  1. Mount Docker socket: -v /var/run/docker.sock:...            │
+│  2. Use curl + Docker API (not docker CLI)                      │
+│  3. Use --network host for localhost access                     │
+│                                                                 │
+│  See: configs/homeassistant/CLAUDE.md for full details          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Correct HA container startup:**
+```bash
+docker run -d --name homeassistant --restart unless-stopped \
+  -v /opt/homeassistant:/config \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --network host \
+  -e TZ=Europe/Berlin \
+  ghcr.io/home-assistant/home-assistant:stable
+```
+
+**shell_command must use curl, not docker:**
+```yaml
+# WRONG (docker CLI not in HA image)
+shell_command:
+  start_container: "docker start my-container"
+
+# CORRECT (use Docker API via socket)
+shell_command:
+  start_container: "curl -s --unix-socket /var/run/docker.sock -X POST http://localhost/v1.44/containers/my-container/start"
+```
 
 ---
 

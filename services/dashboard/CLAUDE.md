@@ -355,3 +355,46 @@ Row styling based on time until departure vs 5-min walk time:
 | `views/transport.js` | View lifecycle, helper functions |
 | `styles/views/transport.css` | Station board styling, color tokens |
 | `index.html` (transport section) | Alpine templates for departure rows |
+
+### Auto-Restart via Home Assistant (Jan 16, 2026)
+
+When the scraper container is stopped (by cleanup service after 30 min idle), the dashboard automatically restarts it:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TRANSPORT AUTO-RESTART                                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  transport-store.js fetchDepartures() fails (network error)                 │
+│       │                                                                     │
+│       ▼                                                                     │
+│  triggerContainerRestart()                                                  │
+│       │                                                                     │
+│       ├── Show "Starting transport service..."                              │
+│       │                                                                     │
+│       ▼  POST to HA API                                                     │
+│  http://pi:8123/api/services/shell_command/start_data_scraper               │
+│       │  Headers: Authorization: Bearer ${this.haToken}                     │
+│       │                                                                     │
+│       ▼  HA executes shell_command                                          │
+│  curl --unix-socket /var/run/docker.sock → Docker API                       │
+│       │                                                                     │
+│       ▼  Container starts                                                   │
+│  Wait 20 seconds for browser launch                                         │
+│       │                                                                     │
+│       ▼                                                                     │
+│  Retry fetchDepartures() → Success                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Properties in transport-store.js:**
+- `haToken` - Long-lived access token (same as weather-store, thermostat-store)
+- `HA_URL` - Home Assistant URL (http://pi:8123)
+- `containerStopped` - Tracks if container was detected as stopped
+- `retrying` - Prevents multiple restart attempts
+
+**Requirements:**
+- HA must have Docker socket mounted (see configs/homeassistant/CLAUDE.md)
+- HA API requires authentication (token in `haToken`)
+- shell_command in HA config must use `curl` (docker CLI not in HA image)

@@ -17,6 +17,13 @@ export function initTransportStore(Alpine, CONFIG) {
     WALK_TIME: 5,  // Minutes to reach stops
     // Always use 'pi' - scraper only runs on Pi (in Docker), never locally
     API_URL: 'http://pi:8890/api/transport',
+    HA_URL: 'http://pi:8123',  // Home Assistant for container restart
+    // Long-lived access token for HA API (same as other stores)
+    haToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no',
+
+    // Container auto-restart state
+    containerStopped: false,
+    retrying: false,
 
     // No auto-refresh - fetched on-demand when view opens
 
@@ -44,6 +51,7 @@ export function initTransportStore(Alpine, CONFIG) {
         this.lastUpdated = data.updated;
         this.error = data.error;
         this.fallback = data.fallback;
+        this.containerStopped = false;  // Container is working
 
         // If API returned an error in the response body, show technical details
         if (data.error) {
@@ -67,6 +75,14 @@ export function initTransportStore(Alpine, CONFIG) {
         console.error('[transport] Fetch failed:', e);
         const isTimeout = e.name === 'AbortError';
         const isNetworkError = e.message === 'Failed to fetch' || e.name === 'TypeError';
+
+        // If network error and not already retrying, try to restart container via HA
+        if (isNetworkError && !this.retrying) {
+          console.log('[transport] Network error - attempting container restart via HA');
+          this.containerStopped = true;
+          await this.triggerContainerRestart();
+          return;  // triggerContainerRestart will retry the fetch
+        }
 
         this.error = isTimeout ? 'Request timeout' :
                      isNetworkError ? 'Cannot connect to scraper' :
@@ -92,6 +108,50 @@ export function initTransportStore(Alpine, CONFIG) {
 
       this.loading = false;
       this.fetchStartTime = null;
+      this.retrying = false;
+    },
+
+    // Trigger container restart via Home Assistant shell_command
+    async triggerContainerRestart() {
+      this.error = 'Starting transport service...';
+      this.retrying = true;
+
+      try {
+        // Call HA shell_command to start container
+        const response = await fetch(`${this.HA_URL}/api/services/shell_command/start_data_scraper`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.haToken}`,
+          },
+        });
+
+        if (response.ok) {
+          console.log('[transport] Container start triggered, waiting 20s for browser launch...');
+          this.error = 'Service starting, please wait (~20s)...';
+
+          // Wait for container to start and browser to launch
+          await new Promise(resolve => setTimeout(resolve, 20000));
+
+          // Retry fetch
+          console.log('[transport] Retrying fetch after container start');
+          await this.fetchDepartures();
+        } else {
+          throw new Error(`HA returned ${response.status}`);
+        }
+      } catch (e) {
+        console.error('[transport] Failed to restart container:', e);
+        this.error = 'Cannot start service. Check Home Assistant.';
+        this.errorDetails = {
+          url: `${this.HA_URL}/api/services/shell_command/start_data_scraper`,
+          message: e.message,
+          type: 'HA_ERROR',
+          timestamp: new Date().toLocaleTimeString('de-DE'),
+          hint: 'Home Assistant shell_command failed. Is HA running?'
+        };
+        this.loading = false;
+        this.retrying = false;
+      }
     },
 
     // Get elapsed time since fetch started (for loading UI)

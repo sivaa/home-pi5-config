@@ -1,0 +1,13 @@
+[Unit]
+Description=Run scraper cleanup every 5 minutes
+
+[Timer]
+# Start 5 minutes after boot
+OnBootSec=5min
+# Then every 5 minutes
+OnUnitActiveSec=5min
+# Allow 1 minute flexibility for power efficiency
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

@@ -10,26 +10,23 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                DATA SCRAPER SERVICE (Activity-Based)                        │
+│                DATA SCRAPER SERVICE (Launch → Scrape → Kill)                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  STATE: IDLE (no dashboard viewing)                                         │
-│  ┌─────────────────────────────────────────────┐                           │
-│  │  HTTP Server only (no browser)              │  ← 0 MB for Chromium      │
-│  │  RAM: ~50MB total                           │                           │
-│  └─────────────────────────────────────────────┘                           │
+│  EVERY REQUEST:                                                             │
 │                                                                             │
-│  ════════════════════════════════════════════════════════════════════════  │
-│                                                                             │
-│  STATE: ACTIVE (dashboard open, user viewing transport)                     │
-│                                                                             │
-│  GET /api/transport (first request)                                        │
+│  GET /api/transport                                                         │
 │       │                                                                     │
 │       ▼                                                                     │
 │  ┌─────────────────────────────────────────────┐                           │
-│  │  Launch Chromium (~15s one-time)            │                           │
-│  │  RAM: ~200MB                                │                           │
-│  │  Start 5-min inactivity timer               │                           │
+│  │  1. Check cache (60s TTL)                   │                           │
+│  │     └── If hit: return cached, skip browser │                           │
+│  └─────────────────────────────────────────────┘                           │
+│       │ (cache miss)                                                        │
+│       ▼                                                                     │
+│  ┌─────────────────────────────────────────────┐                           │
+│  │  2. Launch Chromium (~10-15s)               │                           │
+│  │     RAM: ~200MB temporarily                 │                           │
 │  └─────────────────────────────────────────────┘                           │
 │       │                                                                     │
 │       ▼                                                                     │
@@ -39,17 +36,32 @@
 │  └────────┬────────┘    └────────┬────────┘                                │
 │           └──────────┬───────────┘                                          │
 │                      ▼                                                      │
+│  ┌─────────────────────────────────────────────┐                           │
+│  │  3. KILL browser immediately                │  ← No warm browser!       │
+│  │     Write timestamp to /tmp/scraper-last-activity                       │
+│  │     RAM: back to ~50MB                      │                           │
+│  └─────────────────────────────────────────────┘                           │
+│       │                                                                     │
+│       ▼                                                                     │
 │              { bus: [...], sbahn: [...] }                                   │
-│                                                                             │
-│  Subsequent requests: Browser warm → ~5s response                          │
-│  Each request resets 5-min timer                                           │
 │                                                                             │
 │  ════════════════════════════════════════════════════════════════════════  │
 │                                                                             │
-│  After 5 min with no requests:                                             │
+│  CONTAINER LIFECYCLE (managed by scraper-cleanup service):                  │
+│                                                                             │
 │  ┌─────────────────────────────────────────────┐                           │
-│  │  Auto-shutdown browser                      │                           │
-│  │  Return to IDLE state (0 MB Chromium)       │                           │
+│  │  Every 5 min: Check /tmp/scraper-last-activity                          │
+│  │  └── If > 30 min old: docker stop data-scraper                          │
+│  └─────────────────────────────────────────────┘                           │
+│                                                                             │
+│  ════════════════════════════════════════════════════════════════════════  │
+│                                                                             │
+│  AUTO-RESTART (via dashboard + Home Assistant):                             │
+│                                                                             │
+│  ┌─────────────────────────────────────────────┐                           │
+│  │  Dashboard fetch fails → Call HA shell_command                          │
+│  │  └── docker start data-scraper                                          │
+│  │  Wait 20s → Retry fetch                     │                           │
 │  └─────────────────────────────────────────────┘                           │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -175,57 +187,82 @@ Health check endpoint. Does NOT start the browser.
 | `ALLOWED_BUS_LINES` | Bus lines to show | `["X10", "285"]` |
 | `WRONG_DIRECTIONS` | Bus directions to filter out | `["teltow", "stahnsdorf", ...]` |
 | `WRONG_SBAHN_DIRECTIONS` | S-Bahn directions to filter out | `["wannsee"]` |
-| `INACTIVITY_TIMEOUT` | Browser shutdown delay | `5 * 60` (5 minutes) |
-| `CACHE_TTL` | Response cache duration | `30` seconds |
+| `CACHE_TTL` | Response cache duration | `60` seconds |
+| `ACTIVITY_FILE` | Timestamp file for cleanup service | `/tmp/scraper-last-activity` |
 
 ---
 
-## Activity-Based Browser Lifecycle
+## Launch → Scrape → Kill Architecture
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
 │  REQUEST TIMELINE                                                         │
 ├───────────────────────────────────────────────────────────────────────────┤
 │                                                                           │
-│  Dashboard inactive (hours)                                               │
-│  ─────────────────────────                                                │
-│  • No browser running                                                     │
-│  • 0 MB RAM for Chromium                                                  │
-│  • Container uses ~50MB total                                             │
+│  Dashboard requests transport data (every 60s)                            │
+│  ─────────────────────────────────────────────                            │
 │                                                                           │
-│  First request comes in  ──────────────────────────────┐                  │
-│  ─────────────────────────                             │                  │
-│  • Launch Chromium (~15s)                              │                  │
-│  • Scrape BVG + bahnhof.de in parallel                 ├── ~15-20s        │
-│  • Return response                                     │                  │
-│  • Start 5-min shutdown timer                          │                  │
-│                                                        │                  │
-│  Second request (within 5 min) ────────────────────────┘                  │
-│  ───────────────────────────────                                          │
-│  • Browser already warm                                                   │
-│  • Check cache (30s TTL)                                                  │
-│  • If cached: instant response                                            │
-│  • If stale: scrape (~5s)                                                 │
-│  • Reset 5-min timer                                                      │
+│  t=0s   Request arrives                                                   │
+│         └── Check cache (60s TTL)                                         │
+│             └── If HIT: Return instantly, done                            │
+│             └── If MISS: Continue to scrape                               │
 │                                                                           │
-│  No requests for 5 minutes                                                │
-│  ───────────────────────────                                              │
-│  • Timer fires                                                            │
-│  • Shutdown browser                                                       │
-│  • Release ~200MB RAM                                                     │
-│  • Back to idle state                                                     │
+│  t=0s   Launch Chromium                                                   │
+│         └── Fresh browser every time                                      │
+│         └── ~10-15s startup on ARM64                                      │
+│                                                                           │
+│  t=15s  Scrape BVG + bahnhof.de in parallel                               │
+│         └── Both sites in separate browser contexts                       │
+│         └── ~5-10s scraping                                               │
+│                                                                           │
+│  t=25s  KILL browser immediately                                          │
+│         └── playwright.stop()                                             │
+│         └── RAM back to ~50MB                                             │
+│         └── Write timestamp to /tmp/scraper-last-activity                 │
+│                                                                           │
+│  t=25s  Return JSON response                                              │
+│         └── Cached for 60s                                                │
+│         └── Next request hits cache, skips browser                        │
+│                                                                           │
+│  Result: ~80% CPU for 25s, then 0% until next request                     │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why Not Keep Browser Warm?
+
+The previous architecture kept the browser warm with a 5-minute inactivity timer. This had a bug:
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  THE BUG (Fixed Jan 2026)                                                 │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  Dashboard requests every 60s                                             │
+│  Timer was 5 minutes (300s)                                               │
+│  BUT: Each request RESET the timer                                        │
+│                                                                           │
+│  t=0s:    Request → Start 5-min timer                                     │
+│  t=60s:   Request → CANCEL timer, restart 5-min timer                     │
+│  t=120s:  Request → CANCEL timer, restart 5-min timer                     │
+│  ...forever...                                                            │
+│                                                                           │
+│  Result: Timer NEVER fires → Browser NEVER shuts down → 83% CPU forever   │
+│                                                                           │
+│  Fix: Remove warm browser concept. Launch → Scrape → Kill every time.     │
 │                                                                           │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Benefits
 
-| Metric | Before | After (Idle) | After (Active) |
-|--------|--------|--------------|----------------|
-| RAM Usage | ~300MB always | **~50MB** | ~200MB when viewing |
-| First Request | 30-40s | ~15s (browser launch) | ~5s (browser warm) |
-| Container Start | 30-40s | **Instant** | - |
-| S-Bahn Data | Link only | **Live departures** | Live departures |
+| Metric | Before (Bug) | After |
+|--------|--------------|-------|
+| CPU (viewing) | 83% constant | ~80% for 25s, then 0% |
+| CPU (average) | 83% | ~40-50% |
+| Temperature | 59°C | ~50-55°C |
+| Fan | 2,920 RPM constant | ~2,000 RPM or off |
+| RAM (between requests) | ~250MB | ~50MB |
 
 ---
 
@@ -338,14 +375,50 @@ ssh pi@pi "cd /opt/data-scraper && docker compose down && docker compose build &
    - **No S-Bahn data**: bahnhof.de structure changed, check regex patterns
    - **0 departures after filter**: All buses filtered out by direction
 
-### Browser Not Shutting Down
+### Container Stopped (Auto-Restart)
 
-Check if requests are still coming:
-```bash
-docker logs data-scraper --tail 20 | grep -E "Fetch|Launching|shutdown"
+If container was stopped by cleanup service after 30 min inactivity:
+1. Dashboard will show "Starting transport service..."
+2. It auto-restarts via Home Assistant shell_command
+3. Wait ~20s for browser to launch and scrape
+4. Data will appear automatically
+
+**How Auto-Restart Works:**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  AUTO-RESTART FLOW                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Dashboard (transport-store.js)                                             │
+│       │                                                                     │
+│       ▼  fetch fails (container stopped)                                    │
+│  triggerContainerRestart()                                                  │
+│       │                                                                     │
+│       ▼  POST /api/services/shell_command/start_data_scraper                │
+│  Home Assistant                                                             │
+│       │  (with Bearer token auth)                                           │
+│       ▼                                                                     │
+│  shell_command: curl → Docker socket API                                    │
+│       │  POST /v1.44/containers/data-scraper/start                          │
+│       ▼                                                                     │
+│  Container starts                                                           │
+│       │                                                                     │
+│       ▼  (20s delay)                                                        │
+│  Dashboard retries fetch → Success                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Browser stays alive as long as requests come within 5-minute window.
+**Key Requirements for HA Auto-Restart:**
+1. HA container must have Docker socket mounted (`-v /var/run/docker.sock:/var/run/docker.sock`)
+2. HA must use host network (`--network host`) for localhost:8123 access
+3. Dashboard needs HA long-lived access token in `haToken` property
+4. shell_command uses `curl` (not `docker` CLI - not in HA image)
+
+Manual restart:
+```bash
+ssh pi@pi "docker start data-scraper"
+```
 
 ### High Memory Usage
 
@@ -425,6 +498,12 @@ The scraper calculates "minutes until departure" considering delays:
 
 ## History
 
+- **Jan 16, 2026**: **Major fix** - Launch→Scrape→Kill architecture
+  - Root cause: Timer reset bug kept browser warm forever (83% CPU)
+  - Fix: Kill browser immediately after each scrape, no warm browser
+  - Added: Activity timestamp for cleanup service (/tmp/scraper-last-activity)
+  - Added: Cache TTL increased to 60s (matches request interval)
+  - Result: CPU drops to 0% between requests, ~40-50% average
 - **Jan 12, 2026**: Added cancelled trip detection with regex pattern (Trip cancelled/fällt aus/Ausfall)
 - **Jan 12, 2026**: Fixed time calculation bug - scheduled times in past with delays showing ~1440 min instead of correct minutes
 - **Jan 12, 2026**: Added S-Bahn direction filtering (Wannsee blacklist), fixed direction extraction from bahnhof.de

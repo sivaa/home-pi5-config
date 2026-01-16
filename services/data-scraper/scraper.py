@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Transport Scraper - Activity-based Playwright scraping for BVG Bus and DB S-Bahn
+Transport Scraper - On-demand Playwright scraping for BVG Bus and DB S-Bahn
 
-Architecture:
-- Browser launches on first request (lazy initialization)
-- Browser stays warm for subsequent requests
-- Browser auto-shuts down after 5 minutes of inactivity
-- Zero resources used when dashboard is not being viewed
+Architecture: Launch → Scrape → Kill
+- Browser launches fresh for each request
+- Browser is killed immediately after scraping completes
+- Zero CPU usage between requests
+- Activity timestamp written for cleanup service monitoring
+
+Why this architecture?
+- Previous "warm browser" approach had a bug: 5-min timeout never triggered
+  because dashboard requests every 60s reset the timer.
+- Result: Browser stayed warm forever → 83% CPU → 59°C → loud fan
+- New approach: No warm browser. Launch, scrape, kill. ~40-50% avg CPU.
 
 Why web scraping instead of REST APIs?
 - REST APIs (v6.bvg.transport.rest, v6.vbb.transport.rest) are unreliable
@@ -20,7 +26,7 @@ import json
 import os
 import re
 import signal
-import threading
+import time
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -49,18 +55,19 @@ WRONG_DIRECTIONS = ["teltow", "stahnsdorf", "lankwitz", "andréezeile", "steglit
 # Filter settings for S-Bahn (directions to exclude)
 WRONG_SBAHN_DIRECTIONS = ["wannsee"]
 
-# Browser lifecycle
-INACTIVITY_TIMEOUT = 5 * 60  # 5 minutes - shutdown browser after this idle time
-CACHE_TTL = 30  # Cache results for 30 seconds
+# Cache results for 60 seconds (matches dashboard refresh interval)
+CACHE_TTL = 60
+
+# Activity tracking for cleanup service
+ACTIVITY_FILE = "/tmp/scraper-last-activity"
 
 # ─────────────────────────────────────────────────────────────────
-# BROWSER STATE (Activity-Based Lifecycle)
+# BROWSER STATE (Launch → Scrape → Kill)
 # ─────────────────────────────────────────────────────────────────
 
 _playwright = None
 _browser = None
 _browser_lock = asyncio.Lock()
-_shutdown_timer = None
 _event_loop = None
 
 # Cache for scraped data
@@ -75,6 +82,15 @@ def log(msg):
     print(f"{datetime.now().isoformat()} {msg}", flush=True)
 
 
+def update_activity():
+    """Write activity timestamp for cleanup service."""
+    try:
+        with open(ACTIVITY_FILE, 'w') as f:
+            f.write(str(time.time()))
+    except Exception as e:
+        log(f"Failed to write activity file: {e}")
+
+
 def _get_event_loop():
     """Get or create event loop for async operations."""
     global _event_loop
@@ -85,18 +101,12 @@ def _get_event_loop():
 
 
 async def get_browser():
-    """Get or create browser (lazy initialization)."""
-    global _playwright, _browser, _shutdown_timer
+    """Launch browser if not already running."""
+    global _playwright, _browser
 
     async with _browser_lock:
-        # Cancel any pending shutdown
-        if _shutdown_timer:
-            _shutdown_timer.cancel()
-            _shutdown_timer = None
-
-        # Launch browser if not running
         if _browser is None:
-            log("Launching browser (first request or after idle)...")
+            log("Launching browser...")
             _playwright = await async_playwright().start()
             _browser = await _playwright.chromium.launch(
                 headless=True,
@@ -111,38 +121,18 @@ async def get_browser():
             )
             log("Browser ready")
 
-        # Schedule shutdown after inactivity
-        _schedule_shutdown()
-
         return _browser
 
 
-def _schedule_shutdown():
-    """Schedule browser shutdown after inactivity timeout."""
-    global _shutdown_timer
-
-    if _shutdown_timer:
-        _shutdown_timer.cancel()
-
-    def shutdown_callback():
-        log(f"Inactivity timeout ({INACTIVITY_TIMEOUT}s) - shutting down browser...")
-        loop = _get_event_loop()
-        loop.run_until_complete(_shutdown_browser())
-
-    _shutdown_timer = threading.Timer(INACTIVITY_TIMEOUT, shutdown_callback)
-    _shutdown_timer.daemon = True
-    _shutdown_timer.start()
-
-
-async def _shutdown_browser():
-    """Shutdown browser to release resources."""
-    global _playwright, _browser, _shutdown_timer
+async def shutdown_browser_now():
+    """Kill browser immediately after scrape."""
+    global _playwright, _browser
 
     async with _browser_lock:
         if _browser:
             try:
                 await _browser.close()
-                log("Browser closed")
+                log("Browser killed")
             except Exception as e:
                 log(f"Error closing browser: {e}")
             _browser = None
@@ -154,9 +144,6 @@ async def _shutdown_browser():
             except Exception as e:
                 log(f"Error stopping playwright: {e}")
             _playwright = None
-
-        _shutdown_timer = None
-        log("Browser shutdown complete - resources released")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -529,7 +516,11 @@ async def scrape_sbahn_departures():
 # ─────────────────────────────────────────────────────────────────
 
 async def fetch_transport_async():
-    """Fetch transport data - scrapes both Bus and S-Bahn in parallel."""
+    """Fetch transport data - scrapes both Bus and S-Bahn in parallel.
+
+    Architecture: Launch → Scrape → Kill
+    Browser is launched, scraping happens, then browser is killed immediately.
+    """
     # Check cache first
     if _cache["data"] and _cache["timestamp"]:
         age = (datetime.now() - _cache["timestamp"]).total_seconds()
@@ -583,6 +574,10 @@ async def fetch_transport_async():
             "fallback": FALLBACK
         }
 
+    finally:
+        # ALWAYS kill browser after scrape (Launch → Scrape → Kill architecture)
+        await shutdown_browser_now()
+
 
 def fetch_transport():
     """Synchronous wrapper for async fetch."""
@@ -607,7 +602,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/transport":
-            self.send_json(fetch_transport())
+            result = fetch_transport()
+            # Update activity timestamp for cleanup service
+            update_activity()
+            self.send_json(result)
         elif self.path == "/api/health":
             # Health check doesn't start browser
             self.send_json({
@@ -619,13 +617,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    """Start server - browser will launch on first request."""
+    """Start server - browser will launch fresh for each request."""
     # Auto-reap zombie child processes (Python as PID 1 doesn't do this by default)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
     log(f"Starting transport scraper on port {PORT}")
-    log(f"Browser will launch on first /api/transport request (lazy init)")
-    log(f"Browser will shutdown after {INACTIVITY_TIMEOUT}s of inactivity")
+    log(f"Architecture: Launch → Scrape → Kill (browser killed after each request)")
+    log(f"Cache TTL: {CACHE_TTL}s | Activity file: {ACTIVITY_FILE}")
     log(f"URLs: Bus={BUS_URL[:50]}... | S-Bahn={SBAHN_URL[:50]}...")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 

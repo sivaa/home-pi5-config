@@ -2,6 +2,9 @@
  * Transport Departures View
  * Full-page departure board for S-Bahn and Bus
  * Design: Train station split-flap aesthetic
+ *
+ * Auto-switch: After 20 minutes, switches to heater view automatically
+ * to prevent indefinite transport polling and reduce Pi CPU usage.
  */
 
 export function transportView() {
@@ -12,6 +15,10 @@ export function transportView() {
 
     countdownSeconds: 60,
     _countdownInterval: null,
+    _viewTimeout: null,
+
+    // View timeout: auto-switch to heater after 20 minutes
+    VIEW_TIMEOUT_MS: 20 * 60 * 1000,  // 20 minutes
 
     // ========================================
     // LIFECYCLE
@@ -30,6 +37,13 @@ export function transportView() {
         }
       }, 1000);
 
+      // Auto-switch to heater view after 20 minutes
+      // This prevents indefinite transport polling and reduces CPU usage
+      this._viewTimeout = setTimeout(() => {
+        console.log('[transport-view] 20-min timeout - auto-switching to heater view');
+        this.switchToHeater();
+      }, this.VIEW_TIMEOUT_MS);
+
       // Initial data fetch if store exists
       this.refresh();
     },
@@ -40,6 +54,23 @@ export function transportView() {
         clearInterval(this._countdownInterval);
         this._countdownInterval = null;
       }
+      if (this._viewTimeout) {
+        clearTimeout(this._viewTimeout);
+        this._viewTimeout = null;
+      }
+    },
+
+    // ========================================
+    // AUTO-SWITCH
+    // ========================================
+
+    switchToHeater() {
+      // Clean up this view first
+      this.destroy();
+      // Dispatch event to switch views
+      window.dispatchEvent(new CustomEvent('force-view-change', {
+        detail: { view: 'heater' }
+      }));
     },
 
     // ========================================
