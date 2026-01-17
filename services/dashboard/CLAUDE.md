@@ -36,7 +36,51 @@ Browser-based home dashboard served by nginx. Displays temperature, humidity, CO
 | `www/js/stores/*.js` | Alpine.js state stores |
 | `www/components/*.js` | Reusable UI components |
 | `www/styles/*.css` | CSS organized by feature |
-| `nginx/nginx.conf` | Server configuration |
+| `nginx/dashboard.conf` | Nginx proxy configuration |
+
+---
+
+## 🚨 Nginx Proxy Configuration (Jan 17, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INCIDENT: Dashboard in restart loop after HA network change               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  CAUSE: HA was switched to --network host, but nginx config still          │
+│  used "homeassistant" as upstream. Docker hostnames only resolve            │
+│  within bridge networks, not across to host network.                        │
+│                                                                             │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│                                                                             │
+│  NETWORK TOPOLOGY:                                                          │
+│                                                                             │
+│  zigbee2mqtt_default (bridge)        Host Network                           │
+│  ┌──────────────────────────┐        ┌────────────────────┐                │
+│  │  dashboard (nginx)       │        │  homeassistant     │                │
+│  │  influxdb                │◄──────►│  (ports on host)   │                │
+│  │  mosquitto               │  via   │                    │                │
+│  └──────────────────────────┘  172.18.0.1                 │                │
+│                                      └────────────────────┘                │
+│                                                                             │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│                                                                             │
+│  RULE: Services on --network host must be reached via Docker gateway IP    │
+│  (172.18.0.1), NOT via container name!                                      │
+│                                                                             │
+│  ✗ WRONG:  proxy_pass http://homeassistant:8123/api/;                       │
+│  ✓ RIGHT:  proxy_pass http://172.18.0.1:8123/api/;                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Upstream Configuration
+
+| Service | Network | Upstream Address | Notes |
+|---------|---------|------------------|-------|
+| InfluxDB | zigbee2mqtt_default | `influxdb:8086` | Docker DNS works |
+| Mosquitto | zigbee2mqtt_default | `mosquitto:9001` | Docker DNS works |
+| Home Assistant | host | `172.18.0.1:8123` | Must use gateway IP |
 
 ## Touch Device Optimizations (2025-12-29)
 
