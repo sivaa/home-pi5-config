@@ -85,8 +85,8 @@
 | Property | Value |
 |----------|-------|
 | **ID** | `mailbox_motion_alert` |
-| **Trigger** | Motion detected (`binary_sensor.motion_detector_occupancy` → on) |
-| **Quiet Hours** | 23:00 - 06:00 (no announcements) |
+| **Trigger** | Motion detected (`binary_sensor.mailbox_motion_sensor_occupancy` → on) |
+| **Quiet Hours** | 23:00 - 07:00 (no announcements) |
 | **Cooldown** | 30 seconds |
 | **Action** | TTS on all 3 speakers + mobile notification |
 
@@ -875,7 +875,7 @@ After a 34-hour power outage, 2 contact sensors (Bath, Kitchen) stayed offline w
 |-----------|---------|
 | `sensor.hallway_co2_co2` | CO2 level (ppm) |
 | `sensor.balcony_temperature_humidity_temperature` | Outdoor temperature reference |
-| `binary_sensor.motion_detector_occupancy` | Mailbox motion sensor |
+| `binary_sensor.mailbox_motion_sensor_occupancy` | Mailbox motion sensor |
 
 ### State Memory (input_boolean)
 

@@ -7,7 +7,7 @@
 # MAILBOX MOTION ALERT
 # Trigger: Motion detected at mailbox (PIR sensor)
 # Action: TTS announcement on ALL Google Home devices
-# Quiet Hours: 23:00 - 06:00 (no announcements)
+# Quiet Hours: 23:00 - 07:00 (no announcements)
 # Cooldown: 30 seconds (prevents spam from continuous motion)
 # -----------------------------------------------------------------------------
 - id: mailbox_motion_alert
@@ -17,13 +17,13 @@
 
   trigger:
     - platform: state
-      entity_id: binary_sensor.motion_detector_occupancy
+      entity_id: binary_sensor.mailbox_motion_sensor_occupancy
       to: "on"
 
   condition:
-    # Quiet hours: no announcements between 23:00 and 06:00
+    # Quiet hours: no announcements between 23:00 and 07:00
     - condition: time
-      after: "06:00:00"
+      after: "07:00:00"
       before: "23:00:00"
     # 30-second cooldown to prevent spam
     - condition: template
@@ -33,14 +33,12 @@
            else true }}
 
   action:
-    - service: tts.google_translate_say
+    # Use smart TTS with speaker availability check and mobile fallback
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: "Mailbox opened"
-        language: "en"
+        title: "📬 Mailbox"
+    # Always send mobile notification (in addition to TTS)
     - service: notify.all_phones
       data:
         title: "📬 Mailbox"
@@ -93,7 +91,7 @@
     - service: script.smart_tts_co2_alert
       data:
         message: >
-          Nithya, the Cruise Owner, please ventilate. The current CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
+          Nithya, please ventilate. CO2 level is above {{ (states('sensor.hallway_co2_co2') | int // 100) * 100 }}.
         co2_threshold: 1200
     - service: notify.all_phones
       data:
@@ -185,20 +183,24 @@
         {{ alerts | length > 0 and (now() - alerts | max).total_seconds() < 7200 }}
 
   action:
-    # Good news announcement - use all speakers for reliability
-    - service: tts.google_translate_say
+    # Use smart TTS with speaker availability check and mobile fallback
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: >
+          {# Get last trigger times for CO2 alerts #}
           {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
           {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}
+          {# Filter out 'none' values (alerts that never triggered) #}
           {% set alerts = [high_alert, critical_alert] | select('ne', none) | list %}
-          {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
-          Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
-        language: "en"
+          {# Guard: Only calculate minutes if we have alert history (defensive coding) #}
+          {% if alerts | length > 0 %}
+            {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
+            Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
+          {% else %}
+            Thanks Nithya! Air quality is good now. You can close the windows.
+          {% endif %}
+        title: "✅ Air Quality Good"
+    # Always send mobile notification (in addition to TTS)
     - service: notify.all_phones
       data:
         title: "✅ Air Quality Good"
@@ -313,7 +315,7 @@
 # MAILBOX SENSOR ONLINE ALERT
 # Trigger: Sensor becomes available (comes back online)
 # Action: TTS announcement on ALL Google Home devices
-# Quiet Hours: 23:00 - 06:00 (no announcements)
+# Quiet Hours: 23:00 - 07:00 (no announcements)
 # -----------------------------------------------------------------------------
 - id: mailbox_sensor_online
   alias: "Mailbox Sensor Online"
@@ -323,27 +325,25 @@
   trigger:
     # Trigger when sensor availability changes to online
     - platform: state
-      entity_id: binary_sensor.motion_detector_occupancy
+      entity_id: binary_sensor.mailbox_motion_sensor_occupancy
       from: "unavailable"
     - platform: state
-      entity_id: binary_sensor.motion_detector_occupancy
+      entity_id: binary_sensor.mailbox_motion_sensor_occupancy
       from: "unknown"
 
   condition:
-    # Quiet hours: no announcements between 23:00 and 06:00
+    # Quiet hours: no announcements between 23:00 and 07:00
     - condition: time
-      after: "06:00:00"
+      after: "07:00:00"
       before: "23:00:00"
 
   action:
-    - service: tts.google_translate_say
+    # Use smart TTS with speaker availability check and mobile fallback
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: "Mailbox sensor is now online."
-        language: "en"
+        title: "📡 Sensor Online"
+    # Always send mobile notification (in addition to TTS)
     - service: notify.all_phones
       data:
         title: "📡 Sensor Online"
@@ -610,6 +610,11 @@
 # Action: Turn off all heaters, notify user
 # Note: If door closes within 2 minutes, this automation does NOT fire
 # FIX: Uses guard flag to prevent state overwrite and duplicate notifications
+#
+# QUIET HOURS: Intentionally IGNORED.
+# Reason: Safety alert - if door is open at 3am with heaters running,
+#         user should be woken to prevent energy waste and freezing house.
+#         (Confirmed 2026-01-10: User wants night alerts for safety events)
 # -----------------------------------------------------------------------------
 - id: door_open_turn_off_heaters
   alias: "Door Open 2min - Turn Off All Heaters"
@@ -700,41 +705,45 @@
         - stop: "Transferred ownership from CO2 to door"
 
     # SAVE current heater states (now protected by guard)
-    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+    # RACE CONDITION FIX v2 (2026-01-12): Use TIMESTAMP-BASED detection
+    # If mode='off' but changed within last 60 seconds, treat as transient error → save as ON
+    # This catches the case where MQTT error flips state to OFF before this automation runs
+    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' or (states('climate.study_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.study_thermostat.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.study_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' or (states('climate.living_thermostat_inner') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_inner.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.living_inner_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' or (states('climate.living_thermostat_outer') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_outer.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.living_outer_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' or (states('climate.bed_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.bed_thermostat.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.bedroom_heater_was_on
 
     # SAVE current setpoints BEFORE turning off
     # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
+    # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
     - service: input_number.set_value
       target:
         entity_id: input_number.study_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_inner_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_outer_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.bedroom_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
 
     # Turn off all heaters
     - service: climate.set_hvac_mode
@@ -779,6 +788,11 @@
 # Action: Turn off all heaters, notify user
 # Note: If window closes within 30 seconds, this automation does NOT fire
 # FIX: Uses guard flag to prevent state overwrite and duplicate notifications
+#
+# QUIET HOURS: Intentionally IGNORED.
+# Reason: Safety alert - if window is open at 3am with heaters running,
+#         user should be woken to prevent energy waste and freezing house.
+#         (Confirmed 2026-01-10: User wants night alerts for safety events)
 # -----------------------------------------------------------------------------
 - id: window_open_turn_off_heaters
   alias: "Window Open 30s - Turn Off All Heaters"
@@ -877,41 +891,45 @@
         - stop: "Transferred ownership from CO2 to window"
 
     # SAVE current heater states (now protected by guard)
-    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+    # RACE CONDITION FIX v2 (2026-01-12): Use TIMESTAMP-BASED detection
+    # If mode='off' but changed within last 60 seconds, treat as transient error → save as ON
+    # This catches the case where MQTT error flips state to OFF before this automation runs
+    - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' or (states('climate.study_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.study_thermostat.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.study_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' or (states('climate.living_thermostat_inner') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_inner.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.living_inner_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' or (states('climate.living_thermostat_outer') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_outer.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.living_outer_heater_was_on
-    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+    - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' or (states('climate.bed_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.bed_thermostat.last_changed)) < 60) else 'off' }}"
       target:
         entity_id: input_boolean.bedroom_heater_was_on
 
     # SAVE current setpoints BEFORE turning off
     # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
+    # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
     - service: input_number.set_value
       target:
         entity_id: input_number.study_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_inner_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_outer_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.bedroom_heater_saved_temp
       data:
-        value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
 
     # Turn off all heaters
     - service: climate.set_hvac_mode
@@ -956,6 +974,12 @@
 # Condition: ALL 8 sensors must be closed AND guard flag is ON
 # Action: Restore heaters to saved state, clear guard flag
 # FIX: Only runs if heaters were previously turned off by window automation
+#
+# QUIET HOURS: Intentionally IGNORED for normal resume path.
+# Reason: Informational alert that heaters are resuming - user wants to know
+#         even at night that the safety situation is resolved.
+#         Note: CO2-handoff branch DOES respect quiet hours (line ~1044).
+#         (Confirmed 2026-01-10: User wants night alerts for heater state changes)
 # -----------------------------------------------------------------------------
 - id: all_windows_closed_resume_heaters
   alias: "All Windows Closed - Resume Heaters"
@@ -1166,6 +1190,11 @@
 # MAIN DOOR OPEN TOO LONG - REPEAT ALERT
 # Trigger: Main door open for more than 3 minutes
 # Action: Repeat TTS + mobile alert every 5 minutes until closed
+#
+# QUIET HOURS: Intentionally IGNORED.
+# Reason: Security alert - main door left open at 3am is a security concern.
+#         User should be woken immediately.
+#         (Confirmed 2026-01-10: User wants night alerts for security events)
 # -----------------------------------------------------------------------------
 - id: main_door_open_too_long
   alias: "Main Door Open Too Long - Repeat Alert"
@@ -1214,6 +1243,11 @@
 # Trigger: Any window/door open for 15 minutes when balcony temp < 18°C
 # Action: TTS announcement on kitchen display every 2 minutes until closed
 # Note: Independent of heater safety automations
+#
+# QUIET HOURS: Intentionally IGNORED.
+# Reason: Comfort/safety alert - window open in cold weather causes heat loss.
+#         User should be woken at night to close window and stay warm.
+#         (Confirmed 2026-01-10: User wants night alerts for cold weather events)
 # -----------------------------------------------------------------------------
 - id: window_open_cold_weather_alert
   alias: "Window Open Cold Weather Alert"
@@ -1266,7 +1300,10 @@
         sequence:
           - service: tts.google_translate_say
             data:
-              entity_id: media_player.kitchen_display
+              entity_id:
+                - media_player.kitchen_display
+                - media_player.broken_display
+                - media_player.master_bedroom_clock
               message: >
                 Attention! {{ window_name }} has been open for a long time
                 and it's {{ states('sensor.balcony_temperature_humidity_temperature') | round(0) }} degrees outside.
@@ -1466,6 +1503,10 @@
     - condition: state
       entity_id: input_boolean.heaters_off_due_to_co2
       state: "off"
+    # CO2 override must NOT be active (user chose to ignore CO2 temporarily)
+    - condition: state
+      entity_id: input_boolean.co2_override_active
+      state: "off"
     # At least one heater in 'heat' mode OR window flag is on
     - condition: or
       conditions:
@@ -1511,40 +1552,44 @@
           value_template: "{{ not window_owns_state }}"
       then:
         # SAVE current heater states
-        - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' else 'off' }}"
+        # RACE CONDITION FIX v2 (2026-01-12): Use TIMESTAMP-BASED detection
+        # If mode='off' but changed within last 60 seconds, treat as transient error → save as ON
+        # This catches the case where MQTT error flips state to OFF before this automation runs
+        - service: "input_boolean.turn_{{ 'on' if states('climate.study_thermostat') == 'heat' or (states('climate.study_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.study_thermostat.last_changed)) < 60) else 'off' }}"
           target:
             entity_id: input_boolean.study_heater_was_on
-        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' else 'off' }}"
+        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_inner') == 'heat' or (states('climate.living_thermostat_inner') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_inner.last_changed)) < 60) else 'off' }}"
           target:
             entity_id: input_boolean.living_inner_heater_was_on
-        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' else 'off' }}"
+        - service: "input_boolean.turn_{{ 'on' if states('climate.living_thermostat_outer') == 'heat' or (states('climate.living_thermostat_outer') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_outer.last_changed)) < 60) else 'off' }}"
           target:
             entity_id: input_boolean.living_outer_heater_was_on
-        - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' else 'off' }}"
+        - service: "input_boolean.turn_{{ 'on' if states('climate.bed_thermostat') == 'heat' or (states('climate.bed_thermostat') == 'off' and (as_timestamp(now()) - as_timestamp(states.climate.bed_thermostat.last_changed)) < 60) else 'off' }}"
           target:
             entity_id: input_boolean.bedroom_heater_was_on
 
         # SAVE current setpoints
+        # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
         - service: input_number.set_value
           target:
             entity_id: input_number.study_heater_saved_temp
           data:
-            value: "{{ state_attr('climate.study_thermostat', 'temperature') | float(18) }}"
+            value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.living_inner_heater_saved_temp
           data:
-            value: "{{ state_attr('climate.living_thermostat_inner', 'temperature') | float(18) }}"
+            value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.living_outer_heater_saved_temp
           data:
-            value: "{{ state_attr('climate.living_thermostat_outer', 'temperature') | float(18) }}"
+            value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.bedroom_heater_saved_temp
           data:
-            value: "{{ state_attr('climate.bed_thermostat', 'temperature') | float(18) }}"
+            value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
 
         # Turn off all heaters
         - service: climate.set_hvac_mode
@@ -1814,6 +1859,7 @@
                   - media_player.master_bedroom_clock
                 message: >-
                   {% if is_timeout %}CO2 sensor timeout. Resuming heaters as safety fallback.
+                  {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.{%- endif %}
                   {% else %}CO2 now {{ co2_level }}. Air improved.
                   {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
                   {%- endif %}
@@ -1863,6 +1909,10 @@
     - condition: numeric_state
       entity_id: sensor.hallway_co2_co2
       above: 1200
+    # CO2 override must NOT be active (user chose to ignore CO2 temporarily)
+    - condition: state
+      entity_id: input_boolean.co2_override_active
+      state: "off"
 
   variables:
     heater_name: >
@@ -3788,3 +3838,211 @@
 
   action:
     - service: script.global_boost_mode_cancel
+
+# -----------------------------------------------------------------------------
+# CO2 OVERRIDE - EXPIRES
+# Purpose: Cancel CO2 override when 6-hour timer expires
+# -----------------------------------------------------------------------------
+- id: co2_override_expires
+  alias: "CO2 Override - Expires"
+  description: "Cancel CO2 override when timer expires"
+  mode: single
+
+  trigger:
+    - platform: time
+      at: input_datetime.co2_override_end
+
+  condition:
+    # Only if expiry is recent (within 120 seconds)
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(states('input_datetime.co2_override_end')) - as_timestamp(now())) | abs < 120 }}
+
+  action:
+    - service: script.co2_override_cancel
+
+# -----------------------------------------------------------------------------
+# CO2 OVERRIDE - STATE PUBLISHER
+# Purpose: Publish CO2 override state to MQTT on HA startup for dashboard recovery
+# -----------------------------------------------------------------------------
+- id: co2_override_state_publisher
+  alias: "CO2 Override - State Publisher"
+  description: "Publish CO2 override state to MQTT on startup"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  action:
+    - delay:
+        seconds: 10  # Wait for MQTT to be ready
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/co2-override"
+        retain: true
+        payload: >
+          {"active": {{ is_state('input_boolean.co2_override_active', 'on') | lower }}, "expires_at": "{{ states('input_datetime.co2_override_end') }}"}
+
+# -----------------------------------------------------------------------------
+# THERMOSTAT ZOMBIE STATE RECOVERY
+# Purpose: Detect and recover thermostats stuck in OFF mode due to MQTT race conditions
+# Bug Reference: 2026-01-12 Living Outer stuck at OFF/7°C after MQTT sync error
+#
+# Detection Logic:
+#   - Thermostat is OFF with setpoint ≤ 7°C (frost protection)
+#   - Room temperature is below comfort threshold (17°C)
+#   - No guard flags active (not deliberately turned off)
+#
+# Action: Auto-recover to heat mode with 18°C setpoint + notification
+# -----------------------------------------------------------------------------
+- id: thermostat_zombie_state_recovery
+  alias: "Thermostat Zombie State Recovery"
+  description: "Detect and recover thermostats stuck in OFF mode due to MQTT errors"
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/30"  # Every 30 minutes
+
+  condition:
+    # Only run if no guard flags are active (heaters weren't deliberately turned off)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+
+  variables:
+    # Detect zombie thermostats: OFF mode + setpoint ≤ 7°C + room temp < 17°C
+    zombie_thermostats: >
+      {% set zombies = [] %}
+      {% if states('climate.study_thermostat') == 'off'
+            and (state_attr('climate.study_thermostat', 'temperature') | float(20)) <= 7
+            and (state_attr('climate.study_thermostat', 'current_temperature') | float(20)) < 17 %}
+        {% set zombies = zombies + ['study'] %}
+      {% endif %}
+      {% if states('climate.living_thermostat_inner') == 'off'
+            and (state_attr('climate.living_thermostat_inner', 'temperature') | float(20)) <= 7
+            and (state_attr('climate.living_thermostat_inner', 'current_temperature') | float(20)) < 17 %}
+        {% set zombies = zombies + ['living_inner'] %}
+      {% endif %}
+      {% if states('climate.living_thermostat_outer') == 'off'
+            and (state_attr('climate.living_thermostat_outer', 'temperature') | float(20)) <= 7
+            and (state_attr('climate.living_thermostat_outer', 'current_temperature') | float(20)) < 17 %}
+        {% set zombies = zombies + ['living_outer'] %}
+      {% endif %}
+      {% if states('climate.bed_thermostat') == 'off'
+            and (state_attr('climate.bed_thermostat', 'temperature') | float(20)) <= 7
+            and (state_attr('climate.bed_thermostat', 'current_temperature') | float(20)) < 17 %}
+        {% set zombies = zombies + ['bedroom'] %}
+      {% endif %}
+      {{ zombies }}
+
+  action:
+    # Only proceed if we found zombie thermostats
+    - condition: template
+      value_template: "{{ zombie_thermostats | length > 0 }}"
+
+    # Log to InfluxDB for debugging
+    - service: influxdb.write
+      data:
+        measurement: thermostat_events
+        tags:
+          event_type: zombie_recovery
+        fields:
+          thermostats: "{{ zombie_thermostats | join(',') }}"
+          count: "{{ zombie_thermostats | length }}"
+
+    # Send notification
+    - service: notify.all_phones
+      data:
+        title: "🧟 Thermostat Zombie Recovery"
+        message: "Auto-recovering stuck thermostat(s): {{ zombie_thermostats | join(', ') }}. Setting to 18°C."
+        data:
+          channel: "Warning"
+          importance: high
+          tag: "thermostat_zombie"
+
+    # TTS announcement (respect quiet hours 23:00-07:00)
+    - if:
+        - condition: template
+          value_template: "{{ now().hour >= 7 and now().hour < 23 }}"
+      then:
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+            message: "Recovering stuck thermostat. {{ zombie_thermostats | join(' and ') }}."
+            language: "en"
+
+    # Recover each zombie thermostat
+    - if:
+        - condition: template
+          value_template: "{{ 'study' in zombie_thermostats }}"
+      then:
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            hvac_mode: "heat"
+        - delay:
+            seconds: 2
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: 18
+
+    - if:
+        - condition: template
+          value_template: "{{ 'living_inner' in zombie_thermostats }}"
+      then:
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            hvac_mode: "heat"
+        - delay:
+            seconds: 2
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: 18
+
+    - if:
+        - condition: template
+          value_template: "{{ 'living_outer' in zombie_thermostats }}"
+      then:
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            hvac_mode: "heat"
+        - delay:
+            seconds: 2
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: 18
+
+    - if:
+        - condition: template
+          value_template: "{{ 'bedroom' in zombie_thermostats }}"
+      then:
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            hvac_mode: "heat"
+        - delay:
+            seconds: 2
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: 18

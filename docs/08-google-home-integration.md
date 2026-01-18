@@ -139,13 +139,9 @@ Home Assistant announces events via Google Home speakers using Text-to-Speech.
 │  MAILBOX SENSORS                                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  PIR Motion Sensor (SONOFF SNZB-03P)                                        │
-│  └─ Entity: binary_sensor.motion_detector_occupancy                         │
+│  └─ Entity: binary_sensor.mailbox_motion_sensor_occupancy                   │
 │  └─ MQTT Topic: zigbee2mqtt/[Mailbox] Motion Sensor                        │
 │  └─ Friendly Name: [Mailbox] Motion Sensor                                  │
-│                                                                             │
-│  NOTE: Entity keeps old name "motion_detector" even though device was      │
-│        renamed to "[Mailbox] Motion Sensor" in zigbee2mqtt.                │
-│        Home Assistant preserves entity IDs to avoid breaking automations.  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
