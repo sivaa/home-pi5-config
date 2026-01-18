@@ -1,1 +1,0 @@
-- the entire config, decision should be added to the local docs in detail. every setup, change, device, everything to know and recreate from scratch in a single shot.
