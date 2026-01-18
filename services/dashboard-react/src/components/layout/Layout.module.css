@@ -8,10 +8,21 @@
   flex-direction: column;
 }
 
+.contentWrapper {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
 .main {
   flex: 1;
+  overflow-y: auto;
   padding: var(--space-md);
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
+}
+
+/* Hide sidebar on mobile, show on desktop */
+@media (max-width: 1024px) {
+  .contentWrapper {
+    flex-direction: column;
+  }
 }

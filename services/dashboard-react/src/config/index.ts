@@ -76,14 +76,14 @@ export interface RoomSensorsConfig {
   co2?: SensorConfig[];
 }
 
-// All rooms in the apartment
+// All rooms in the apartment (ordered for Classic view display)
 export const ROOMS_CONFIG: RoomConfig[] = [
-  { id: 'hallway', name: 'Hallway', icon: '🚶', isOutdoor: false },
-  { id: 'study', name: 'Study', icon: '📚', isOutdoor: false },
-  { id: 'living', name: 'Living Room', icon: '🛋️', isOutdoor: false },
-  { id: 'bedroom', name: 'Bedroom', icon: '🛏️', isOutdoor: false },
   { id: 'bathroom', name: 'Bathroom', icon: '🚿', isOutdoor: false },
   { id: 'kitchen', name: 'Kitchen', icon: '🍳', isOutdoor: false },
+  { id: 'hallway', name: 'Hallway', icon: '🚶', isOutdoor: false },
+  { id: 'study', name: 'Study', icon: '📚', isOutdoor: false },
+  { id: 'bedroom', name: 'Bedroom', icon: '🛏️', isOutdoor: false },
+  { id: 'living', name: 'Living Room', icon: '🛋️', isOutdoor: false },
   { id: 'balcony', name: 'Balcony', icon: '🌿', isOutdoor: true },
 ];
 
@@ -95,11 +95,10 @@ export const ROOM_SENSORS: Record<string, RoomSensorsConfig> = {
       { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
       { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' },
     ],
-    co2: [{ name: 'CO2', label: 'CO2 Monitor' }],
   },
   bedroom: {
     climate: [
-      { name: '[Bed] Temperature & Humidity Sensor', label: 'Primary', isPrimary: true },
+      { name: '[Bed] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' },
     ],
   },
@@ -292,4 +291,22 @@ export const FLOOR_PLAN_ROOMS: FloorPlanRoom[] = [
   { id: 'study', name: 'Study', x: 140, y: 0, width: 100, height: 100 },
   { id: 'living', name: 'Living', x: 100, y: 100, width: 140, height: 100 },
   { id: 'balcony', name: 'Balcony', x: 0, y: 200, width: 60, height: 40 },
+];
+
+// Contact sensor configuration (doors and windows)
+export interface ContactSensorConfig {
+  name: string;
+  type: 'door' | 'window';
+  shortName: string;
+}
+
+export const CONTACT_SENSORS: ContactSensorConfig[] = [
+  { name: '[Bath] Window Contact Sensor', type: 'window', shortName: 'Bath Window' },
+  { name: '[Bed] Window Contact Sensor', type: 'window', shortName: 'Bed Window' },
+  { name: '[Kitchen] Window Contact Sensor', type: 'window', shortName: 'Kitchen Window' },
+  { name: '[Study] Window Contact Sensor - Large', type: 'window', shortName: 'Study Big' },
+  { name: '[Study] Window Contact Sensor - Small', type: 'window', shortName: 'Study Small' },
+  { name: '[Living] Window Contact Sensor - Balcony Door', type: 'door', shortName: 'Balcony Door' },
+  { name: '[Living] Window Contact Sensor - Window', type: 'window', shortName: 'Living Window' },
+  { name: '[Hallway] Window Contact Sensor - Main Door', type: 'door', shortName: 'Main Door' },
 ];

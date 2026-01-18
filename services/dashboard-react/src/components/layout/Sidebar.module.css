@@ -1,0 +1,167 @@
+/**
+ * Sidebar styles
+ */
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: var(--color-bg);
+}
+
+/* Hide sidebar on mobile */
+@media (max-width: 1024px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+/* Section */
+.section {
+  padding: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm) 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+}
+
+.sectionIcon {
+  font-size: 0.875rem;
+}
+
+/* HOME Section */
+.homeStats {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.homeStat {
+  flex: 1;
+  text-align: center;
+}
+
+.homeStatValue {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.homeStatLabel {
+  display: block;
+  font-size: 0.625rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* OUTSIDE Section */
+.outsideStats {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.outsideStat {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.outsideIcon {
+  font-size: 1rem;
+}
+
+.outsideValue {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.outsideLabel {
+  font-size: 0.625rem;
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}
+
+/* Status Lists (Heating, Doors, Windows) */
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statusItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.statusName {
+  color: var(--color-text);
+}
+
+.statusValue {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.statusDuration {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+}
+
+.statusOpen {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.statusOpen .statusName {
+  color: var(--color-danger);
+}
+
+.statusOk {
+  font-size: 0.75rem;
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.statusOk::before {
+  content: '✓';
+  font-size: 0.875rem;
+}
+
+/* Color States */
+.good {
+  color: var(--color-success) !important;
+}
+
+.warning {
+  color: var(--color-warning) !important;
+}
+
+.danger {
+  color: var(--color-danger) !important;
+}
