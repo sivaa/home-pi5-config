@@ -1,0 +1,22 @@
+[Unit]
+Description=Pi System Metrics Collector
+Documentation=file:///services/pi-metrics-collector/CLAUDE.md
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /opt/pi-metrics-collector/pi-metrics-collector.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Minimal hardening (needs /sys, /proc access for metrics)
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

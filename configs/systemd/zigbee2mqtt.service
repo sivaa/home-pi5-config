@@ -1,0 +1,35 @@
+[Unit]
+Description=Zigbee2MQTT with pre-start validation
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+# Limit restart attempts: max 3 failures in 5 minutes, then stop trying
+# (prevents infinite retry loops while allowing recovery from transient issues)
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+
+# Cleanup any existing container state (- prefix = don't fail if error)
+ExecStartPre=-/usr/bin/docker stop zigbee2mqtt
+ExecStartPre=-/usr/bin/docker rm zigbee2mqtt
+
+# Ensure container exists (creates from compose if needed)
+ExecStartPre=/usr/bin/docker compose -f /opt/zigbee2mqtt/docker-compose.yml up --no-start zigbee2mqtt
+
+# VALIDATION - prevents starting with corrupted database
+ExecStartPre=/opt/scripts/z2m-validate.sh
+
+# Start container ATTACHED (blocks until container exits, allows restart detection)
+ExecStart=/usr/bin/docker start -a zigbee2mqtt
+
+# Graceful stop (- prefix = don't fail if container not running)
+ExecStop=-/usr/bin/docker stop -t 30 zigbee2mqtt
+
+# Restart on failure with 30s delay
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
