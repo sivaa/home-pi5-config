@@ -19,6 +19,7 @@ const networkState = {
   signalElements: {},
   animationId: null,
   isInitialized: false,
+  viewActive: false,  // CPU optimization: track if view is visible
   panOffset: { x: 0, z: 0 },
   isPanning: false,
   lastPanPos: { x: 0, y: 0 },
@@ -48,9 +49,18 @@ export function networkView() {
     init() {
       console.log('[network-view] Initializing...');
 
+      // CPU optimization: mark view as active for animation loop
+      networkState.viewActive = true;
+
       // Sync with global theme store
       const globalTheme = document.documentElement.getAttribute('data-theme');
       this.darkTheme = globalTheme === 'dark';
+
+      // Defensive: disconnect any existing observer before creating new
+      // (prevents duplicate observers if destroy() wasn't called properly)
+      if (networkState.themeObserver) {
+        networkState.themeObserver.disconnect();
+      }
 
       // Watch for global theme changes (store reference for cleanup)
       networkState.themeObserver = new MutationObserver((mutations) => {
@@ -71,6 +81,14 @@ export function networkView() {
     },
 
     waitForContainer() {
+      // Guard: component may have been destroyed while waiting
+      // (prevents orphaned setTimeout callbacks from continuing)
+      // Also check viewActive to handle destroy() called during async wait
+      if (!this.$el || !document.contains(this.$el) || !networkState.viewActive) {
+        console.log('[network-view] Component destroyed or deactivated, aborting init');
+        return;
+      }
+
       const container = this.$refs.networkContainer;
       if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
         setTimeout(() => this.waitForContainer(), 100);
@@ -83,6 +101,11 @@ export function networkView() {
         }
         this.createLabels(container);
         this.onResize();
+        // Restart animation loop if it was stopped
+        if (!networkState.animationId) {
+          console.log('[network-view] Restarting animation loop');
+          this.animate();
+        }
         return;
       }
 
@@ -977,6 +1000,13 @@ export function networkView() {
       const height = 10;
 
       function loop() {
+        // CPU optimization: stop animation loop when view is hidden
+        if (!networkState.viewActive) {
+          console.log('[network-view] Animation loop stopped (view hidden)');
+          networkState.animationId = null;
+          return;
+        }
+
         networkState.animationId = requestAnimationFrame(loop);
 
         if (self.autoRotate && networkState.camera) {
@@ -1016,6 +1046,9 @@ export function networkView() {
 
     destroy() {
       console.log('[network-view] Destroying...');
+
+      // CPU optimization: signal animation loop to stop
+      networkState.viewActive = false;
 
       // Cancel animation loop
       if (networkState.animationId) {
