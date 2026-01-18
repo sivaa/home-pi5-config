@@ -24,8 +24,9 @@ fi
 if ls $USB_DEVICE 1>/dev/null 2>&1; then
     logger -t zigbee-watchdog "USB device available, restarting $CONTAINER"
 
-    if docker start "$CONTAINER"; then
-        logger -t zigbee-watchdog "Successfully restarted $CONTAINER"
+    # Use systemctl to trigger validation before starting
+    if systemctl start zigbee2mqtt; then
+        logger -t zigbee-watchdog "Successfully restarted zigbee2mqtt via systemctl"
 
         # Send notification via Home Assistant
         if [ -n "$HA_TOKEN" ]; then
@@ -38,9 +39,22 @@ if ls $USB_DEVICE 1>/dev/null 2>&1; then
 
         # Publish to MQTT for dashboard awareness
         mosquitto_pub -h localhost -t "zigbee2mqtt/watchdog" \
-            -m "{\"action\":\"restart\",\"timestamp\":\"$(date -Iseconds)\"}" 2>/dev/null || true
+            -m "{\"action\":\"restart\",\"status\":\"success\",\"timestamp\":\"$(date -Iseconds)\"}" 2>/dev/null || true
     else
-        logger -t zigbee-watchdog "ERROR: Failed to restart $CONTAINER"
+        logger -t zigbee-watchdog "CRITICAL: Restart BLOCKED - likely validation failure! Check: journalctl -u zigbee2mqtt"
+
+        # ALERT: Validation blocked restart - user needs to intervene
+        if [ -n "$HA_TOKEN" ]; then
+            curl -s -X POST "$HA_URL/api/services/notify/${NOTIFY_SERVICE#notify.}" \
+                -H "Authorization: Bearer $HA_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"message": "CRITICAL: Zigbee2MQTT restart was BLOCKED by validation! Database may be corrupted. Check Pi immediately!", "title": "Z2M Validation Failed"}' \
+                >/dev/null 2>&1 || true
+        fi
+
+        # Publish failure to MQTT
+        mosquitto_pub -h localhost -t "zigbee2mqtt/watchdog" \
+            -m "{\"action\":\"restart\",\"status\":\"blocked\",\"reason\":\"validation_failed\",\"timestamp\":\"$(date -Iseconds)\"}" 2>/dev/null || true
     fi
 else
     logger -t zigbee-watchdog "USB device not available, waiting..."

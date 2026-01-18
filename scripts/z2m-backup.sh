@@ -20,6 +20,13 @@ echo "========================================"
 echo "  Z2M Backup - $TIMESTAMP"
 echo "========================================"
 
+# Verify backup location is mounted (with timeout for stale NFS)
+if ! timeout 5 mountpoint -q /mnt/storage; then
+    echo "[ERROR] /mnt/storage is not mounted! Backups cannot proceed."
+    echo "        Check: mount | grep /mnt/storage"
+    exit 1
+fi
+
 # Create backup directory if it doesn't exist
 if ! mkdir -p "$BACKUP_DIR"; then
     echo "[ERROR] Failed to create backup directory: $BACKUP_DIR"
@@ -32,11 +39,8 @@ if [ ! -f "$DATA_DIR/database.db" ]; then
     exit 1
 fi
 
-if [ ! -f "$DATA_DIR/coordinator_backup.json" ]; then
-    echo "[WARNING] coordinator_backup.json not found - skipping"
-fi
-
 # Backup both files with same timestamp (atomic backup)
+# Note: coordinator_backup.json check is done later to ensure atomic backup
 echo "Backing up database.db..."
 if ! cp "$DATA_DIR/database.db" "$BACKUP_DIR/database.db.$TIMESTAMP"; then
     echo "[ERROR] Failed to backup database.db"
@@ -47,8 +51,16 @@ echo "Backing up coordinator_backup.json..."
 if [ -f "$DATA_DIR/coordinator_backup.json" ]; then
     if ! cp "$DATA_DIR/coordinator_backup.json" "$BACKUP_DIR/coordinator_backup.json.$TIMESTAMP"; then
         echo "[ERROR] Failed to backup coordinator_backup.json"
-        # Don't exit - database backup succeeded
+        echo "        Backup incomplete - database.db and coordinator must have same timestamp!"
+        # Remove the database backup to prevent mismatched timestamps
+        rm -f "$BACKUP_DIR/database.db.$TIMESTAMP"
+        exit 1
     fi
+else
+    echo "[ERROR] coordinator_backup.json missing - cannot create complete backup"
+    echo "        Removing database.db backup to prevent incomplete backup set"
+    rm -f "$BACKUP_DIR/database.db.$TIMESTAMP"
+    exit 1
 fi
 
 # Verify backups were created

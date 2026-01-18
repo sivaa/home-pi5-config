@@ -31,8 +31,43 @@ Every 60 seconds (via systemd timer):
 
   2. Is USB Zigbee dongle available?
      NO  -> log warning, exit (wait for USB)
-     YES -> restart container, send notification
+     YES -> restart via systemctl (triggers validation)
+           ├── Validation PASSES -> Z2M starts, send success notification
+           └── Validation FAILS  -> Z2M blocked, send CRITICAL alert
 ```
+
+## Validation Integration (Jan 9, 2026 Fix)
+
+The watchdog uses `systemctl start zigbee2mqtt` which triggers the validation chain:
+
+```
+Watchdog detects Z2M down
+         │
+         ▼
+systemctl start zigbee2mqtt
+         │
+         ▼
+┌────────────────────────────────┐
+│  Systemd ExecStartPre:         │
+│  /opt/scripts/z2m-validate.sh  │
+│  - Check database size         │
+│  - Compare to backup (≥30%)    │
+│  - Block if corrupted          │
+└────────────────────────────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+ PASS      FAIL
+    │         │
+    ▼         ▼
+ Z2M      CRITICAL ALERT
+starts    to phone + MQTT
+```
+
+**Why this matters:** On Jan 4, 2026, a corrupted database caused Z2M to form a new network, orphaning 35 devices. The validation prevents this by blocking startup if the database is corrupted.
+
+**Bug fixed (Jan 9, 2026):** The watchdog previously used `docker start` which bypassed validation entirely. Now uses `systemctl start` to ensure validation always runs.
 
 ## Files
 
@@ -89,17 +124,47 @@ systemctl list-timers zigbee-watchdog.timer
 ## Testing
 
 ```bash
-# Manually stop zigbee2mqtt
-docker stop zigbee2mqtt
+# Stop Z2M using systemctl (SAFE - don't use docker stop!)
+sudo systemctl stop zigbee2mqtt
 
-# Wait up to 60 seconds, then check
-docker ps | grep zigbee2mqtt
+# Watch watchdog logs (wait up to 60s for timer to fire)
+sudo journalctl -u zigbee-watchdog -f
+
+# Expected output: "Successfully restarted zigbee2mqtt via systemctl"
 
 # Or manually trigger the watchdog
 sudo systemctl start zigbee-watchdog.service
 ```
 
+**DO NOT USE** `docker stop zigbee2mqtt` for testing - always use `systemctl`.
+
 ## Troubleshooting
+
+### "CRITICAL: Restart BLOCKED - likely validation failure!"
+This means the database is corrupted and Z2M would form a new network if started.
+
+**Recovery steps:**
+```bash
+# 1. Check validation output
+sudo journalctl -u zigbee2mqtt -n 50
+
+# 2. List available backups
+ls -la /mnt/storage/backups/zigbee2mqtt/
+
+# 3. Find most recent backup
+ls -t /mnt/storage/backups/zigbee2mqtt/database.db.* | head -5
+
+# 4. Restore from backup (replace TIMESTAMP)
+sudo cp /mnt/storage/backups/zigbee2mqtt/database.db.TIMESTAMP \
+    /opt/zigbee2mqtt/data/database.db
+sudo cp /mnt/storage/backups/zigbee2mqtt/coordinator_backup.json.TIMESTAMP \
+    /opt/zigbee2mqtt/data/coordinator_backup.json
+
+# 5. Retry
+sudo systemctl start zigbee2mqtt
+```
+
+See `configs/zigbee2mqtt/NETWORK_KEYS.md` for full disaster recovery procedures.
 
 ### "USB device not available, waiting..."
 - USB dongle is disconnected or not detected

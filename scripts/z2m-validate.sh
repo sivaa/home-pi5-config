@@ -70,7 +70,7 @@ if [ "$DB_SIZE" -lt "$MIN_SIZE" ]; then
     echo ""
     echo "database.db is too small ($DB_SIZE bytes)."
     echo "Starting Z2M would cause NETWORK REFORMATION!"
-    echo "All 50+ devices would need re-pairing!"
+    echo "All 39 devices would need re-pairing!"
     echo ""
     echo "TO RECOVER:"
     echo "  1. Check available backups:"
