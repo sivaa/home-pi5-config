@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** December 27, 2025
-> **Total Devices:** 35 (including coordinator)
+> **Last Updated:** January 17, 2026
+> **Total Devices:** 39 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -19,13 +19,13 @@
 │                        │   Channel: 25    │                                  │
 │                        └────────┬─────────┘                                  │
 │                                 │                                            │
-│  ┌──────────┬──────────┬───────┼───────┬──────────┬──────────┬──────────┐  │
-│  │          │          │       │       │          │          │          │  │
-│┌─▼──┐ ┌───▼───┐ ┌───▼───┐ ┌──▼──┐ ┌──▼──┐ ┌───▼───┐ ┌───▼───┐ ┌───▼───┐│  │
-││IKEA│ │SONOFF │ │ NOUS  │ │ PIR │ │Door │ │ Plug  │ │SONOFF │ │ IKEA  ││  │
-││Lite│ │ Temp  │ │  E10  │ │ Mtn │ │ Cnt │ │ S60ZB │ │ TRVZB │ │Remote ││  │
-││(2x)│ │ (12x) │ │  CO2  │ │     │ │(8x) │ │ (3x)  │ │ (4x)  │ │ (2x)  ││  │
-│└────┘ └───────┘ └───────┘ └─────┘ └─────┘ └───────┘ └───────┘ └───────┘│  │
+│  ┌───────┬───────┬───────┼───────┬───────┬───────┬───────┬───────┬───────┐│
+│  │       │       │       │       │       │       │       │       │       ││
+│┌─▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼──┐ ┌─▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌▼──┐│
+││IKEA│ │SNOFF│ │NOUS │ │PIR │ │Door│ │Plug │ │SNOFF│ │IKEA │ │Light│ │Bot││
+││Lite│ │Temp │ │ E10 │ │Mtn │ │Cnt │ │S60ZB│ │TRVZB│ │Rmte │ │Swtch│ │   ││
+││(2x)│ │(12x)│ │ CO2 │ │    │ │(8x)│ │(3x) │ │(4x) │ │(2x) │ │(4x) │ │   ││
+│└────┘ └─────┘ └─────┘ └────┘ └────┘ └─────┘ └─────┘ └─────┘ └─────┘ └───┘│
 │                                                                              │
 │      Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox    │
 │                                                                              │
@@ -40,10 +40,10 @@
 |---|------|---------------|-------|--------------|------|
 | 0 | - | Coordinator | Sonoff Dongle V2 | ITEAD | USB Adapter |
 | 1 | Balcony | Temperature & Humidity | SNZB-02WD | SONOFF | Sensor (IP65) |
-| 2 | Study | Light Remote | E1524/E1810 | IKEA | Remote Control |
+| 2 | Study | IKEA Remote | E1524/E1810 | IKEA | Remote Control |
 | 3 | Study | IKEA Light | L1528 | IKEA | FLOALT Panel 30x90cm |
 | 4 | Study | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
-| 5 | Living | Light Remote | E1524/E1810 | IKEA | Remote Control |
+| 5 | Living | IKEA Remote | E1524/E1810 | IKEA | Remote Control |
 | 6 | Living | IKEA Light | L1529 | IKEA | FLOALT Panel 60x60cm |
 | 7 | Living | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
 | 8 | Kitchen | Temperature & Humidity | SNZB-02P | SONOFF | Sensor |
@@ -73,6 +73,10 @@
 | 32 | Living | [Living] Window Contact Sensor - Balcony Door | SNZB-04P | SONOFF | Door/Window Sensor |
 | 33 | Living | [Living] Window Contact Sensor - Window | SNZB-04P | SONOFF | Door/Window Sensor |
 | 34 | Hallway | [Hallway] Window Contact Sensor - Main Door | SNZB-04P | SONOFF | Door/Window Sensor |
+| 35 | Study | [Study] Light Switch | ZBM5-1C-80/86 | SONOFF | Wall Switch (Router) |
+| 36 | Bedroom | [Bed] Light Switch | ZBM5-1C-80/86 | SONOFF | Wall Switch (Router) |
+| 37 | Living | [Living] Light Switch | ZBM5-1C-80/86 | SONOFF | Wall Switch (Router) |
+| 38 | - | Fingerbot | TS0001_fingerbot | Tuya | Button Pusher |
 
 ---
 
@@ -499,6 +503,109 @@
 
 ---
 
+### SONOFF ZBM5-1C-80/86 - Wall Switch
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              SONOFF ZBM5-1C-80/86 WALL SWITCH                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Manufacturer: SONOFF                                           │
+│  Model: ZBM5-1C-80/86                                           │
+│  Protocol: Zigbee 3.0                                           │
+│  Power: Mains (230V AC)                                         │
+│  Type: Router (extends mesh network)                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Features:                                                      │
+│    - On/Off state control                                       │
+│    - Power-on behavior (off/on/toggle/previous)                │
+│    - Network indicator LED (on/off)                            │
+│    - Device work mode (router/end device)                      │
+│    - Detach relay mode (for smart load control)                │
+│    - OTA firmware updates supported                            │
+├─────────────────────────────────────────────────────────────────┤
+│  Pairing Procedure:                                             │
+│    1. Turn off power to the switch                              │
+│    2. Turn on power while holding button                        │
+│    3. LED flashes rapidly when in pairing mode                  │
+│    4. Release button when LED starts blinking                   │
+│    5. Interview completes in ~30 seconds                        │
+│                                                                 │
+│  Factory Reset:                                                 │
+│    Hold button for 10+ seconds until LED flashes rapidly       │
+│                                                                 │
+│  Locations: Study(1), Bed(1), Living(1) = 4 units              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "state": "ON",
+  "power_on_behavior": "off",
+  "device_work_mode": "Zigbee router",
+  "network_indicator": true,
+  "detach_relay_mode": {"detach_relay_outlet1": "DISABLE"},
+  "linkquality": 164
+}
+```
+
+---
+
+### Tuya Fingerbot Plus - TS0001_fingerbot
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               TUYA FINGERBOT PLUS (TS0001)                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Manufacturer: Tuya                                             │
+│  Model: TS0001_fingerbot                                        │
+│  Protocol: Zigbee 3.0                                           │
+│  Power: Battery                                                 │
+│  Type: End Device                                               │
+├─────────────────────────────────────────────────────────────────┤
+│  Features:                                                      │
+│    - Switch state (ON/OFF trigger)                             │
+│    - Mode: click, switch, program                              │
+│    - Upper position (0-50%)                                    │
+│    - Lower position (50-100%)                                  │
+│    - Delay (0-10 seconds)                                      │
+│    - Reverse direction toggle                                  │
+│    - Touch enable/disable                                      │
+│    - Battery level reporting                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Modes:                                                         │
+│    - click: Quick press and release                            │
+│    - switch: Push and hold (toggle)                            │
+│    - program: Custom sequence                                  │
+│                                                                 │
+│  Pairing Procedure:                                             │
+│    1. Press and hold button for 5+ seconds                     │
+│    2. LED blinks rapidly                                       │
+│    3. Device enters pairing mode                               │
+│    4. Interview completes in ~20 seconds                       │
+│                                                                 │
+│  Factory Reset:                                                 │
+│    Same as pairing - hold button 5+ seconds                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "state": "ON",
+  "battery": 85,
+  "mode": "click",
+  "lower": 85,
+  "upper": 0,
+  "delay": 0,
+  "reverse": "ON",
+  "touch": "ON",
+  "linkquality": 164
+}
+```
+
+---
+
 ## Disaster Recovery Checklist
 
 If rebuilding the Zigbee network from scratch:
@@ -517,6 +624,9 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF Smart Plug [2] (S60ZBTPF) - router!           │
 │    [ ] SONOFF Smart Plug [3] (S60ZBTPF) - router!           │
 │    [ ] NOUS E10 CO2 sensor (USB powered)                    │
+│    [ ] SONOFF ZBM5 Wall Switch Study - router!              │
+│    [ ] SONOFF ZBM5 Wall Switch Bed - router!                │
+│    [ ] SONOFF ZBM5 Wall Switch Living - router!             │
 │                                                             │
 │  Step 3: Pair battery devices (end devices)                 │
 │    [ ] SONOFF SNZB-02WD Balcony                             │
@@ -541,16 +651,19 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] IKEA Remote Study                                    │
 │    [ ] IKEA Remote Living                                   │
 │    [ ] HOBEIAN ZG-102ZM Vibration Sensor (optional)         │
+│    [ ] Tuya Fingerbot Plus (TS0001_fingerbot)               │
 │                                                             │
 │  Step 4: Rename all devices with [Room] prefix              │
 │                                                             │
 │  Step 5: Disable permit_join                                │
 │                                                             │
 │  Step 6: Set up light bindings (remotes → lights)           │
-│    [ ] Wake [Study] Light Remote (press button)             │
-│    [ ] Bind [Study] Light Remote → [Study] IKEA Light       │
-│    [ ] Wake [Living] Light Remote (press button)            │
-│    [ ] Bind [Living] Light Remote → [Living] IKEA Light     │
+│    [ ] Bind [Study] IKEA Remote → [Study] IKEA Light        │
+│        (genOnOff, genLevelCtrl, genScenes - keep pressing!) │
+│    [ ] Bind [Study] IKEA Remote → Coordinator               │
+│    [ ] Bind [Living] IKEA Remote → [Living] IKEA Light      │
+│        (genOnOff, genLevelCtrl, genScenes - keep pressing!) │
+│    [ ] Bind [Living] IKEA Remote → Coordinator              │
 │                                                             │
 │  Step 7: Verify bindings work (test toggle/brightness)      │
 │                                                             │
@@ -568,55 +681,135 @@ Direct binding allows IKEA remotes to control lights **without Zigbee2MQTT** or 
 │                      DIRECT ZIGBEE BINDINGS                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  [Study] Light Remote ────────────────→ [Study] IKEA Light                  │
-│     └─ genOnOff (toggle)                     └─ L1528 FLOALT 30x90          │
-│     └─ genLevelCtrl (brightness)                                            │
+│  [Study] IKEA Remote ─────────────────→ [Study] IKEA Light                  │
+│     ├─ genOnOff (toggle on/off)              └─ L1528 FLOALT 30x90          │
+│     ├─ genLevelCtrl (brightness up/down)                                    │
+│     └─ genScenes (color temp via arrows)                                    │
 │                                                                              │
-│  [Living] Light Remote ───────────────→ [Living] IKEA Light                 │
-│     └─ genOnOff (toggle)                     └─ L1529 FLOALT 60x60          │
-│     └─ genLevelCtrl (brightness)                                            │
+│  [Study] IKEA Remote ─────────────────→ Coordinator                         │
+│     ├─ genOnOff (for HA automations)                                        │
+│     └─ genLevelCtrl (for HA automations)                                    │
+│                                                                              │
+│  [Living] IKEA Remote ────────────────→ [Living] IKEA Light                 │
+│     ├─ genOnOff (toggle on/off)              └─ L1529 FLOALT 60x60          │
+│     ├─ genLevelCtrl (brightness up/down)                                    │
+│     └─ genScenes (color temp via arrows)                                    │
+│                                                                              │
+│  [Living] IKEA Remote ────────────────→ Coordinator                         │
+│     ├─ genOnOff (for HA automations)                                        │
+│     └─ genLevelCtrl (for HA automations)                                    │
 │                                                                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
+│  Button Functions:                                                           │
+│    • Center button → Toggle on/off (genOnOff)                               │
+│    • Up/Down buttons → Brightness (genLevelCtrl)                            │
+│    • Left/Right arrows → Color temp warm↔cold (genScenes)                   │
+│                                                                              │
 │  Benefits:                                                                   │
 │    ✓ Works even if Zigbee2MQTT is down                                      │
 │    ✓ Works even if Home Assistant is down                                   │
 │    ✓ Works even if the Pi is rebooting                                      │
 │    ✓ Faster response time (direct mesh communication)                       │
-│                                                                              │
-│  Bound Clusters:                                                             │
-│    • genOnOff - Toggle light on/off (center button)                         │
-│    • genLevelCtrl - Brightness up/down (side buttons)                       │
+│    ✓ Coordinator binding enables HA to see button events                    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Binding Commands
+### Binding Commands (After Re-Pairing)
+
+**IMPORTANT:** Remote must be kept awake during binding - **keep pressing buttons repeatedly** until binding completes (~15 seconds per binding).
 
 ```bash
-# Bind remote to light (remote must be AWAKE - press a button first!)
+# =============================================================================
+# STUDY REMOTE BINDINGS
+# =============================================================================
+
+# 1. Bind Study Remote → Study Light (keep pressing remote!)
 ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
   -t 'zigbee2mqtt/bridge/request/device/bind' \
-  -m '{\"from\": \"[Study] Light Remote\", \"to\": \"[Study] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+  -m '{\"from\": \"[Study] IKEA Remote\", \"to\": \"[Study] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
 
+# 2. Bind Study Remote → Study Light (genScenes for color temp)
 ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
   -t 'zigbee2mqtt/bridge/request/device/bind' \
-  -m '{\"from\": \"[Living] Light Remote\", \"to\": \"[Living] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+  -m '{\"from\": \"[Study] IKEA Remote\", \"to\": \"[Study] IKEA Light\", \"clusters\": [\"genScenes\"]}'"
 
-# Check existing bindings
-ssh pi@pi "docker logs zigbee2mqtt 2>&1 | grep -i 'bound cluster'"
+# 3. Bind Study Remote → Coordinator (for HA automations)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Study] IKEA Remote\", \"to\": \"Coordinator\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
 
-# Unbind (if needed)
+# =============================================================================
+# LIVING REMOTE BINDINGS
+# =============================================================================
+
+# 4. Bind Living Remote → Living Light (keep pressing remote!)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Living] IKEA Remote\", \"to\": \"[Living] IKEA Light\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+
+# 5. Bind Living Remote → Living Light (genScenes for color temp)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Living] IKEA Remote\", \"to\": \"[Living] IKEA Light\", \"clusters\": [\"genScenes\"]}'"
+
+# 6. Bind Living Remote → Coordinator (for HA automations)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/device/bind' \
+  -m '{\"from\": \"[Living] IKEA Remote\", \"to\": \"Coordinator\", \"clusters\": [\"genOnOff\", \"genLevelCtrl\"]}'"
+
+# =============================================================================
+# VERIFICATION
+# =============================================================================
+
+# Check binding responses
+ssh pi@pi "docker logs zigbee2mqtt 2>&1 | grep 'response/device/bind' | tail -10"
+
+# Monitor remote events (to verify coordinator binding)
+ssh pi@pi "timeout 30 docker exec mosquitto mosquitto_sub -v \
+  -t 'zigbee2mqtt/[Study] IKEA Remote' \
+  -t 'zigbee2mqtt/[Living] IKEA Remote'"
+
+# =============================================================================
+# UNBIND (if needed)
+# =============================================================================
+
 ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
   -t 'zigbee2mqtt/bridge/request/device/unbind' \
-  -m '{\"from\": \"[Study] Light Remote\", \"to\": \"[Study] IKEA Light\"}'"
+  -m '{\"from\": \"[Study] IKEA Remote\", \"to\": \"[Study] IKEA Light\"}'"
 ```
 
-### Important: Sleepy Device Wake-Up
+### Important: Sleepy Device Wake-Up Protocol
 
-IKEA remotes are "sleepy devices" - they sleep to save battery. To bind:
+IKEA remotes are "sleepy devices" - they sleep after ~3 seconds to save battery.
 
-1. **Press any button on the remote** to wake it up
-2. **Immediately send the bind command** (within 2-3 seconds)
-3. If binding fails with "Delivery failed", the remote went back to sleep - try again
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  BINDING WAKE-UP PROTOCOL                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  For EACH binding command:                                                   │
+│                                                                              │
+│  1. Have the SSH command ready (copied to clipboard)                        │
+│  2. Start pressing ANY button on the remote REPEATEDLY                      │
+│  3. While still pressing, execute the binding command                       │
+│  4. KEEP PRESSING until you see "status":"ok" (~15 seconds)                 │
+│                                                                              │
+│  If you see "Delivery failed" or "timed out":                               │
+│    → Remote went back to sleep → RETRY with faster button pressing          │
+│                                                                              │
+│  Wait 10 seconds between each binding command.                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Binding Status (Last Updated: 2026-01-08)
+
+| Binding | Status | Clusters |
+|---------|--------|----------|
+| Study Remote → Study Light | ✅ Active | genOnOff, genLevelCtrl, genScenes |
+| Study Remote → Coordinator | ✅ Active | genOnOff, genLevelCtrl |
+| Living Remote → Living Light | ✅ Active | genOnOff, genLevelCtrl, genScenes |
+| Living Remote → Coordinator | ✅ Active | genOnOff, genLevelCtrl |
 
 ---
 
@@ -642,6 +835,11 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2026-01-17 | Added 4 devices: 3x SONOFF ZBM5 wall switches (Study, Bed, Living) + 1x Tuya Fingerbot |
+| 2026-01-17 | Updated device count: 35 → 39 devices |
+| 2026-01-08 | Re-created IKEA remote bindings: genOnOff, genLevelCtrl, genScenes + Coordinator |
+| 2026-01-08 | Updated binding docs with correct device names: `[Study] IKEA Remote`, `[Living] IKEA Remote` |
+| 2026-01-08 | Added genScenes cluster for color temperature control via arrow buttons |
 | 2025-12-27 | Added 6x SNZB-04P contact sensors (Kitchen, Study×2, Living×2, Hallway Main Door) |
 | 2025-12-27 | Updated device count: 29 → 35 devices |
 | 2025-12-20 | Re-paired IKEA lights and remotes after network issues |

@@ -2,8 +2,8 @@
  * Zigbee Device Configuration
  * Device layout for network visualization
  *
- * Total Devices: 35 (including coordinator)
- * Last Updated: 2025-12-30
+ * Total Devices: 39 (including coordinator)
+ * Last Updated: 2026-01-17
  */
 
 export const ZIGBEE_DEVICES = [
@@ -23,6 +23,11 @@ export const ZIGBEE_DEVICES = [
   // CO2 Sensor (USB-powered router)
   { id: 'co2', name: '[Hallway] CO2', type: 'router', icon: '🌬️', room: 'hallway', x: 0.5, z: 0.5 },
 
+  // Light Switches (mains-powered routers) - SONOFF ZBM5-1C-80/86
+  { id: 'light-switch-study', name: '[Study] Light Switch', type: 'router', icon: '🔘', room: 'study', x: 0.78, z: 0.18 },
+  { id: 'light-switch-bed', name: '[Bed] Light Switch', type: 'router', icon: '🔘', room: 'bedroom', x: 0.12, z: 0.22 },
+  { id: 'light-switch-living', name: '[Living] Light Switch', type: 'router', icon: '🔘', room: 'living', x: 0.32, z: 0.42 },
+
   // === END DEVICES (Battery-powered) ===
 
   // Temperature Sensors
@@ -36,8 +41,8 @@ export const ZIGBEE_DEVICES = [
   { id: 'temp-kitchen-10', name: '[Kitchen] Temperature & Humidity 10', type: 'end-device', icon: '🌡️', room: 'kitchen', x: 0.55, z: 0.08 },
   { id: 'temp-bath', name: '[Bath] Temperature & Humidity', type: 'end-device', icon: '🌡️', room: 'bathroom', x: 0.85, z: 0.1 },
   { id: 'temp-bath-11', name: '[Bath] Temperature & Humidity 11', type: 'end-device', icon: '🌡️', room: 'bathroom', x: 0.9, z: 0.05 },
-  { id: 'temp-bed', name: '[Bed] Temperature & Humidity Sensor', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.2, z: 0.15 },
-  { id: 'temp-bed-9', name: '[Bed] Temperature & Humidity Sensor 9', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.15, z: 0.2 },
+  { id: 'temp-bed', name: '[Bed] Temperature & Humidity', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.2, z: 0.15 },
+  { id: 'temp-bed-9', name: '[Bed] Temperature & Humidity 9', type: 'end-device', icon: '🌡️', room: 'bedroom', x: 0.15, z: 0.2 },
 
   // Contact Sensors (8 total)
   { id: 'contact-bath', name: '[Bath] Window Contact Sensor', type: 'end-device', icon: '🪟', room: 'bathroom', x: 0.95, z: 0.08 },
@@ -64,4 +69,7 @@ export const ZIGBEE_DEVICES = [
 
   // Vibration Sensor (Hot Water)
   { id: 'vibration', name: 'Vibration Sensor', type: 'end-device', icon: '💧', room: 'bathroom', x: 0.88, z: 0.12 },
+
+  // Fingerbot (Tuya TS0001_fingerbot)
+  { id: 'fingerbot', name: 'Fingerbot', type: 'end-device', icon: '🤖', room: 'hallway', x: 0.52, z: 0.52 },
 ];

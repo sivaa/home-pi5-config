@@ -378,7 +378,7 @@ To rebuild this setup from scratch:
 
 **Important:** The Zigbee network key is auto-generated on first run. After devices are paired, backup the `configuration.yaml` from the Pi which contains the actual network key.
 
-> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 35 devices with pairing procedures.
+> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 39 devices with pairing procedures.
 
 ---
 

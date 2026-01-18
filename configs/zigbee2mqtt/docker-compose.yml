@@ -14,7 +14,11 @@ services:
   zigbee2mqtt:
     image: koenkk/zigbee2mqtt
     container_name: zigbee2mqtt
-    restart: unless-stopped
+    # IMPORTANT: Systemd manages restarts with pre-start validation
+    # See: configs/systemd/zigbee2mqtt.service
+    # DO NOT change to "unless-stopped" - it bypasses corruption protection!
+    restart: "no"
+    stop_grace_period: 30s
     depends_on:
       - mosquitto
     ports:

@@ -126,14 +126,30 @@ devices:
   '0x983268fffe653343':
     friendly_name: '[Hallway] Window Contact Sensor - Main Door'
   # === THERMOSTATS (TRVZB Radiator Valves) ===
+  # NOTE: timer_mode_target_temp disabled because TRVZB sends 0 when timer mode
+  # is not in use, but HA expects range 4.0-35.0. This causes constant errors:
+  # "Invalid value for number.xxx_timer_mode_target_temp: 0"
+  # Fix added 2026-01-12 after investigating Living Outer zombie state bug.
   '0xc4d8c8fffe02cef8':
     friendly_name: '[Study] Thermostat'
+    homeassistant:
+      timer_mode_target_temp:
+        enabled: false
   '0xc4d8c8fffe0d9fcc':
     friendly_name: '[Bed] Thermostat'
+    homeassistant:
+      timer_mode_target_temp:
+        enabled: false
   '0x286847fffe3926dd':
     friendly_name: '[Living] Thermostat Inner'
+    homeassistant:
+      timer_mode_target_temp:
+        enabled: false
   '0x286847fffe38ed6c':
     friendly_name: '[Living] Thermostat Outer'
+    homeassistant:
+      timer_mode_target_temp:
+        enabled: false
   # === VIBRATION SENSOR ===
   '0xa4c13863257ea097':
     friendly_name: Vibration Sensor

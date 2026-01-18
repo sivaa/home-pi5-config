@@ -82,15 +82,17 @@ Don't know which service? Use: `find . -name CLAUDE.md`
 - **Hardware:**
   - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
   - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
-- **Zigbee Devices:** 35 total (including coordinator)
+- **Zigbee Devices:** 39 total (including coordinator)
   - 12x Temperature sensors (SNZB-02P, SNZB-02WD)
   - 8x Window/door contact sensors (SNZB-04P)
   - 4x Thermostats (TRVZB radiator valves)
+  - 4x Light switches (SONOFF ZBM5-1C-80/86) - Study, Bed, Living
   - 3x Smart plugs (S60ZBTPF)
   - 2x IKEA FLOALT lights + 2x remotes
   - 1x CO2 sensor (NOUS E10)
   - 1x Motion sensor (SNZB-03P) - Mailbox
   - 1x Vibration sensor (Hot Water tracking)
+  - 1x Fingerbot (Tuya TS0001_fingerbot)
 - **Docker Services:** 8 containers
   - mosquitto (MQTT), zigbee2mqtt, homeassistant, influxdb
   - dashboard (nginx), mqtt-influx-bridge, cast-ip-monitor, heater-watchdog
