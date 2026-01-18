@@ -44,7 +44,7 @@ smart_tts_co2_alert:
         - condition: template
           value_template: >
             {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
-               and states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+               and states('sensor.hallway_co2_co2') | int >= co2_threshold | int }}
       then:
         # Play immediately on primary speaker
         - service: tts.google_translate_say
@@ -75,7 +75,7 @@ smart_tts_co2_alert:
                 - condition: template
                   value_template: >
                     {{ states('media_player.kitchen_display') not in ['unavailable', 'unknown']
-                       and states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+                       and states('sensor.hallway_co2_co2') | int >= co2_threshold | int }}
               sequence:
                 # Play on primary speaker (Kitchen Display)
                 - service: tts.google_translate_say
@@ -89,7 +89,7 @@ smart_tts_co2_alert:
             - if:
                 - condition: template
                   value_template: >
-                    {{ states('sensor.hallway_co2_co2') | int > co2_threshold | int - 1 }}
+                    {{ states('sensor.hallway_co2_co2') | int >= co2_threshold | int }}
               then:
                 # Check if ANY fallback speaker is available
                 - if:
@@ -252,6 +252,74 @@ smart_tts_window_alert:
                           tag: "tts_failed"
 
 # -----------------------------------------------------------------------------
+# SMART TTS - GENERIC ANNOUNCEMENT
+# Purpose: Simple TTS with speaker availability check and mobile fallback
+#
+# Use this for one-time announcements that don't need obsolescence checks.
+# For repeated alerts (CO2, window), use the specialized smart_tts scripts.
+#
+# Flow:
+#   1. Check which speakers are available (not unavailable/unknown)
+#   2. If ANY available: play on all available speakers
+#   3. If NONE available: send mobile notification as fallback
+#
+# Usage:
+#   service: script.smart_tts_announce
+#   data:
+#     message: "Your message here"
+#     title: "Optional title for mobile fallback"  # defaults to "📢 Announcement"
+# -----------------------------------------------------------------------------
+smart_tts_announce:
+  alias: "Smart TTS - Generic Announcement"
+  description: "TTS with speaker availability check and mobile fallback"
+  mode: parallel
+  max: 10
+
+  fields:
+    message:
+      description: "The message to announce"
+      example: "Mailbox opened"
+      required: true
+    title:
+      description: "Title for mobile fallback notification"
+      example: "📬 Mailbox"
+      default: "📢 Announcement"
+
+  sequence:
+    # Build list of available speakers
+    - variables:
+        kitchen_ok: "{{ states('media_player.kitchen_display') not in ['unavailable', 'unknown'] }}"
+        broken_ok: "{{ states('media_player.broken_display') not in ['unavailable', 'unknown'] }}"
+        bedroom_ok: "{{ states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}"
+        any_available: "{{ kitchen_ok or broken_ok or bedroom_ok }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ any_available }}"
+      then:
+        # At least one speaker available - play TTS on all available
+        - service: tts.google_translate_say
+          data:
+            entity_id: >
+              {% set speakers = [] %}
+              {% if kitchen_ok %}{% set speakers = speakers + ['media_player.kitchen_display'] %}{% endif %}
+              {% if broken_ok %}{% set speakers = speakers + ['media_player.broken_display'] %}{% endif %}
+              {% if bedroom_ok %}{% set speakers = speakers + ['media_player.master_bedroom_clock'] %}{% endif %}
+              {{ speakers }}
+            message: "{{ message }}"
+            language: "en"
+      else:
+        # ALL speakers unavailable - mobile fallback
+        - service: notify.all_phones
+          data:
+            title: "🔇 {{ title }}"
+            message: "{{ message }} (TTS failed - all speakers offline)"
+            data:
+              channel: "Alerts"
+              importance: high
+              tag: "tts_fallback"
+
+# -----------------------------------------------------------------------------
 # BEDROOM NIGHT MODE OVERRIDE - START
 # Purpose: Disable 17°C cap for 90 minutes (called from dashboard)
 #
@@ -336,8 +404,8 @@ thermostat_boost_start:
     climate_entity: >
       {% set mapping = {
         'study': 'climate.study_thermostat',
-        'living_inner': 'climate.living_inner_thermostat',
-        'living_outer': 'climate.living_outer_thermostat',
+        'living_inner': 'climate.living_thermostat_inner',
+        'living_outer': 'climate.living_thermostat_outer',
         'bedroom': 'climate.bed_thermostat'
       } %}
       {{ mapping.get(thermostat_id, '') }}
@@ -421,8 +489,8 @@ thermostat_boost_cancel:
     climate_entity: >
       {% set mapping = {
         'study': 'climate.study_thermostat',
-        'living_inner': 'climate.living_inner_thermostat',
-        'living_outer': 'climate.living_outer_thermostat',
+        'living_inner': 'climate.living_thermostat_inner',
+        'living_outer': 'climate.living_thermostat_outer',
         'bedroom': 'climate.bed_thermostat'
       } %}
       {{ mapping.get(thermostat_id, '') }}
@@ -626,3 +694,240 @@ global_boost_mode_cancel:
           channel: "{% if heaters_paused %}Warning{% else %}Info{% endif %}"
           importance: "{% if heaters_paused %}default{% else %}low{% endif %}"
           tag: "global_boost_mode"
+
+# -----------------------------------------------------------------------------
+# CO2 OVERRIDE - START (6 hours)
+# Purpose: Temporarily override CO2-based heater blocking for 6 hours
+#
+# Flow:
+#   1. Set override flag and expiry (now + 6 hours)
+#   2. If CO2 guard is active, restore heaters using saved states
+#   3. Clear CO2 guard flag
+#   4. Publish state to MQTT for dashboard
+#   5. Send notification
+#
+# Usage:
+#   service: script.co2_override_start
+# -----------------------------------------------------------------------------
+co2_override_start:
+  alias: "CO2 Override - Start"
+  description: "Override CO2-based heater blocking for 6 hours (called from dashboard)"
+  mode: single
+
+  variables:
+    expiry_time: "{{ (now() + timedelta(hours=6)).strftime('%Y-%m-%d %H:%M:%S') }}"
+    co2_guard_was_active: "{{ is_state('input_boolean.heaters_off_due_to_co2', 'on') }}"
+    window_guard_active: "{{ is_state('input_boolean.heaters_off_due_to_window', 'on') }}"
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
+    is_quiet_hours: "{{ now().hour >= 23 or now().hour < 7 }}"
+
+  sequence:
+    # 1. Set override flag
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.co2_override_active
+
+    # 2. Set expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.co2_override_end
+      data:
+        datetime: "{{ expiry_time }}"
+
+    # 3. If CO2 guard was active (and window guard is not), restore heaters
+    - if:
+        - condition: template
+          value_template: "{{ co2_guard_was_active and not window_guard_active }}"
+      then:
+        # Restore heater modes
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.study_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.living_inner_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.living_outer_heater_was_on', 'on') else 'off' }}"
+        - service: climate.set_hvac_mode
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            hvac_mode: "{{ 'heat' if is_state('input_boolean.bedroom_heater_was_on', 'on') else 'off' }}"
+
+        # Reset open_window flag on TRVs
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Study] Thermostat/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Bed] Thermostat/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
+            payload: '{"open_window": "OFF"}'
+        - service: mqtt.publish
+          data:
+            topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
+            payload: '{"open_window": "OFF"}'
+
+        - delay:
+            seconds: 3
+
+        # Restore setpoints
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: "{{ states('input_number.study_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: "{{ states('input_number.living_inner_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: "{{ states('input_number.living_outer_heater_saved_temp') | float(18) }}"
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
+
+    # 4. Clear CO2 guard flag (heaters are now allowed despite CO2)
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.heaters_off_due_to_co2
+
+    # 5. Publish state to MQTT for dashboard (retained)
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/co2-override"
+        retain: true
+        payload: >
+          {"active": true, "expires_at": "{{ expiry_time }}", "started_at": "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}", "co2_level": {{ co2_level }}}
+
+    # 6. TTS announcement (respect quiet hours)
+    - if:
+        - condition: template
+          value_template: "{{ not is_quiet_hours }}"
+      then:
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+            message: "CO2 override enabled for 6 hours. Heaters will run despite high CO2."
+            language: "en"
+
+    # 7. Mobile notification
+    - service: notify.all_phones
+      data:
+        title: "🔓 CO2 Override Enabled"
+        message: "Heaters allowed for 6 hours despite CO2 at {{ co2_level }} ppm. Expires {{ expiry_time[11:16] }}."
+        data:
+          channel: "Warning"
+          importance: default
+          tag: "co2_override"
+
+# -----------------------------------------------------------------------------
+# CO2 OVERRIDE - CANCEL
+# Purpose: Cancel CO2 override and re-enable CO2 protection
+#
+# Flow:
+#   1. Clear override flag
+#   2. Re-check CO2 level - if high, turn off heaters (without saving states)
+#   3. Clear expiry datetime
+#   4. Publish state to MQTT
+#   5. Send notification
+#
+# Usage:
+#   service: script.co2_override_cancel
+# -----------------------------------------------------------------------------
+co2_override_cancel:
+  alias: "CO2 Override - Cancel"
+  description: "Cancel CO2 override and re-enable CO2 protection"
+  mode: single
+
+  variables:
+    co2_level: "{{ states('sensor.hallway_co2_co2') | int(0) }}"
+    co2_is_high: "{{ co2_level > 1200 }}"
+    window_guard_active: "{{ is_state('input_boolean.heaters_off_due_to_window', 'on') }}"
+    is_quiet_hours: "{{ now().hour >= 23 or now().hour < 7 }}"
+
+  sequence:
+    # 1. Clear override flag
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.co2_override_active
+
+    # 2. Clear expiry datetime
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.co2_override_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+    # 3. If CO2 is still high and window guard is not active, re-enable CO2 blocking
+    - if:
+        - condition: template
+          value_template: "{{ co2_is_high and not window_guard_active }}"
+      then:
+        # Set CO2 guard flag (DON'T save states - they're still valid from original trigger)
+        - service: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.heaters_off_due_to_co2
+
+        # Turn off all heaters
+        - service: climate.set_hvac_mode
+          target:
+            entity_id:
+              - climate.study_thermostat
+              - climate.living_thermostat_inner
+              - climate.living_thermostat_outer
+              - climate.bed_thermostat
+          data:
+            hvac_mode: "off"
+
+    # 4. Publish state to MQTT
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/co2-override"
+        retain: true
+        payload: '{"active": false}'
+
+    # 5. TTS announcement (respect quiet hours)
+    - if:
+        - condition: template
+          value_template: "{{ not is_quiet_hours and co2_is_high }}"
+      then:
+        - service: tts.google_translate_say
+          data:
+            entity_id:
+              - media_player.kitchen_display
+              - media_player.broken_display
+            message: "CO2 override cancelled. Heaters paused due to high CO2."
+            language: "en"
+
+    # 6. Mobile notification
+    - service: notify.all_phones
+      data:
+        title: "{% if co2_is_high %}🔒 CO2 Override Cancelled{% else %}✅ CO2 Override Ended{% endif %}"
+        message: >-
+          {% if co2_is_high %}CO2 still high ({{ co2_level }} ppm). Heaters paused.
+          {% else %}CO2 now {{ co2_level }} ppm. Heaters can run normally.
+          {% endif %}
+        data:
+          channel: "{% if co2_is_high %}Warning{% else %}Info{% endif %}"
+          importance: "{% if co2_is_high %}default{% else %}low{% endif %}"
+          tag: "co2_override"

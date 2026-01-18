@@ -87,7 +87,7 @@ scp -r services/heater-watchdog pi@pi:/opt/pi-setup/services/
 scp configs/zigbee2mqtt/docker-compose.yml pi@pi:/opt/zigbee2mqtt/
 
 # Build and start
-ssh pi@pi "cd /opt/zigbee2mqtt && docker-compose up -d --build heater-watchdog"
+ssh pi@pi "cd /opt/zigbee2mqtt && docker compose up -d --build heater-watchdog"
 ```
 
 ### Step 4: Verify
@@ -214,7 +214,7 @@ After Pi rebuild:
 
 1. Create new HA access token (Step 1 above)
 2. Set `HEATER_WATCHDOG_HA_TOKEN` in `/opt/zigbee2mqtt/.env`
-3. Run: `docker-compose up -d --build heater-watchdog`
+3. Run: `docker compose up -d --build heater-watchdog`
 
 ## Testing
 
@@ -268,3 +268,109 @@ In addition to this Python watchdog service, there's an HA automation (`watchdog
 **Bug Fixed (2025-12-31):** Originally only checked window guard flag. Now also checks CO2 guard to catch CO2-triggered shutoffs where resume was missed.
 
 See `docs/15-ha-automations.md` for full details.
+
+---
+
+## Race Condition Fix (2026-01-12)
+
+### The Incident
+
+On 2026-01-12 at 08:08, Living Outer thermostat got stuck at OFF/7°C and stayed that way all day. Investigation revealed a race condition in the state save logic.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  BUG TIMELINE                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  08:08:18.109  Living Outer STARTED heating                     │
+│  08:08:18.380  Mode unexpectedly flipped to OFF (271ms later!)  │
+│  08:08:19-21   5x MQTT errors: timer_mode_target_temp: 0        │
+│  08:08:23.986  Window automation triggered                      │
+│                → Saved was_on = OFF (WRONG - it was just ON!)   │
+│                → Saved temp = 7°C (frost protection)            │
+│  08:09:16      Window closed, restore ran                       │
+│                → Saw was_on = OFF → Kept thermostat OFF         │
+│                                                                 │
+│  RESULT: Living Outer stuck at OFF/7°C all day                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Root Cause
+
+The state save logic checked **current state** at automation trigger time:
+
+```yaml
+# OLD CODE (BROKEN)
+- service: "input_boolean.turn_{{ 'on' if states('climate.xxx') == 'heat' else 'off' }}"
+```
+
+If the thermostat state corrupted **before** the automation ran (even by 271ms), the save would capture the wrong state.
+
+### The Fix: Timestamp-Based Detection
+
+New logic treats recent OFF states as likely transient errors:
+
+```yaml
+# NEW CODE (FIXED)
+# If mode='off' but changed within last 60 seconds, treat as transient → save as ON
+- service: "input_boolean.turn_{{ 'on' if
+    states('climate.xxx') == 'heat' or
+    (states('climate.xxx') == 'off' and
+     (as_timestamp(now()) - as_timestamp(states.climate.xxx.last_changed)) < 60)
+    else 'off' }}"
+```
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `configs/homeassistant/automations.yaml` | 3 automations updated with timestamp fix |
+| `configs/zigbee2mqtt/configuration.yaml` | Disabled `timer_mode_target_temp` for all 4 TRVZB thermostats |
+
+### Automations Fixed
+
+1. **door_open_turn_off_all_heaters** (lines 707-722)
+2. **window_open_turn_off_all_heaters** (lines 893-908)
+3. **co2_high_turn_off_all_heaters** (lines 1549-1569)
+
+---
+
+## Zombie State Recovery Automation (2026-01-12)
+
+Added as additional safety net to detect and recover thermostats stuck in zombie state.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ZOMBIE STATE RECOVERY                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  TRIGGER: Every 30 minutes                                      │
+│                                                                 │
+│  DETECTION (any thermostat):                                    │
+│  • Mode = OFF                                                   │
+│  • Setpoint ≤ 7°C (frost protection)                           │
+│  • Room temperature < 17°C                                      │
+│                                                                 │
+│  ACTION:                                                        │
+│  • Log warning                                                  │
+│  • Set mode to HEAT                                             │
+│  • Set setpoint to 18°C                                         │
+│  • Send notification                                            │
+│                                                                 │
+│  LOCATION: automations.yaml lines 3896-4045                     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Verification Test (2026-01-12 18:15-18:20)
+
+Live test performed:
+
+| Step | Time | Result |
+|------|------|--------|
+| Window opened | 18:15:46 | All 4 thermostats → OFF @ 7°C |
+| State saved | 18:16:22 | was_on=ON, saved_temp=18°C ✅ |
+| Window closed | 18:20:08 | All 4 thermostats → HEAT @ 18°C ✅ |
+
+**Conclusion:** Timestamp fix correctly preserved state through the full open/close cycle.

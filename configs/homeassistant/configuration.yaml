@@ -135,6 +135,7 @@ google_assistant:
     - switch
     - sensor
     - climate
+    - binary_sensor
   entity_config:
     # === LIGHTS (Voice controllable) ===
     light.study_ikea_light:
@@ -161,6 +162,40 @@ google_assistant:
       aliases:
         - "Plug"
         - "Power Plug"
+
+    # === LIGHT SWITCHES (Voice controllable) ===
+    switch.study_light_switch:
+      name: "Study Switch"
+      expose: true
+      room: "Study"
+      aliases:
+        - "Study Light Switch"
+        - "Office Switch"
+
+    switch.bed_light_switch:
+      name: "Bedroom Switch"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bedroom Light Switch"
+        - "Bed Switch"
+
+    switch.living_light_switch:
+      name: "Living Room Switch"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Living Light Switch"
+        - "Lounge Switch"
+
+    # === FINGERBOT (Voice controllable) ===
+    switch.fingerbot:
+      name: "Fingerbot"
+      expose: true
+      room: "Hallway"
+      aliases:
+        - "Button Pusher"
+        - "Robot Button"
 
     # === TEMPERATURE SENSORS (Read-only, queryable) ===
     sensor.study_temperature_humidity_temperature:
@@ -258,6 +293,114 @@ google_assistant:
       aliases:
         - "Bedroom Heater"
         - "Bed Heater"
+
+    # === ADDITIONAL SMART PLUGS (Voice controllable) ===
+    switch.smart_plug_2:
+      name: "Smart Plug 2"
+      expose: true
+      room: "Kitchen"
+      aliases:
+        - "Kitchen Plug"
+        - "Plug Two"
+
+    switch.smart_plug_3:
+      name: "Smart Plug 3"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bedroom Plug"
+        - "Plug Three"
+
+    # === PRESENCE SENSOR (Queryable) ===
+    binary_sensor.human_presence_occupancy:
+      name: "Human Presence"
+      expose: true
+      room: "Hallway"
+      aliases:
+        - "Presence Sensor"
+        - "Motion Detector"
+
+    # === VIBRATION SENSOR - Hot Water (Queryable) ===
+    binary_sensor.vibration_sensor_vibration:
+      name: "Hot Water Sensor"
+      expose: true
+      room: "Bathroom"
+      aliases:
+        - "Vibration Sensor"
+        - "Water Running"
+
+    # === ADDITIONAL HUMIDITY SENSORS ===
+    sensor.kitchen_temperature_humidity_humidity:
+      name: "Kitchen Humidity"
+      expose: true
+      room: "Kitchen"
+
+    sensor.bath_temperature_humidity_humidity:
+      name: "Bathroom Humidity"
+      expose: true
+      room: "Bathroom"
+
+    sensor.balcony_temperature_humidity_humidity:
+      name: "Balcony Humidity"
+      expose: true
+      room: "Balcony"
+
+    # === WINDOW/DOOR CONTACT SENSORS (Queryable) ===
+    binary_sensor.study_window_contact_sensor_large_contact:
+      name: "Study Large Window"
+      expose: true
+      room: "Study"
+      aliases:
+        - "Study Big Window"
+        - "Office Window"
+
+    binary_sensor.study_window_contact_sensor_small_contact:
+      name: "Study Small Window"
+      expose: true
+      room: "Study"
+      aliases:
+        - "Study Little Window"
+
+    binary_sensor.living_window_contact_sensor_window_contact:
+      name: "Living Room Window"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Lounge Window"
+
+    binary_sensor.living_window_contact_sensor_balcony_door_contact:
+      name: "Balcony Door"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "Living Balcony Door"
+
+    binary_sensor.bed_window_contact_sensor_contact:
+      name: "Bedroom Window"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Window"
+
+    binary_sensor.kitchen_window_contact_sensor_contact:
+      name: "Kitchen Window"
+      expose: true
+      room: "Kitchen"
+
+    binary_sensor.bath_window_contact_sensor_contact:
+      name: "Bathroom Window"
+      expose: true
+      room: "Bathroom"
+      aliases:
+        - "Bath Window"
+
+    binary_sensor.hallway_window_contact_sensor_main_door_contact:
+      name: "Front Door"
+      expose: true
+      room: "Entry"
+      aliases:
+        - "Main Door"
+        - "Entry Door"
 
 # =============================================================================
 # WEATHER INTEGRATION

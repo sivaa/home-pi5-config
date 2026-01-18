@@ -290,5 +290,5 @@ systemctl --user show-environment | grep WAYLAND
 
 ## Related
 
-- [WiFi Watchdog](../backups/configs/wifi-watchdog/README.md) - Similar systemd timer pattern
+- [WiFi Watchdog](../configs/wifi-watchdog/README.md) - Similar systemd timer pattern
 - [Router Reboot](../scripts/router-reboot.sh) - Cron-based scheduling example

@@ -2,6 +2,88 @@
 
 Utility scripts for Pi maintenance and automation.
 
+---
+
+## ⚠️ MANUAL-ONLY Scripts (NEVER AUTOMATE)
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  UNCOMPROMISABLE REQUIREMENT                                              ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                           ║
+║  The following scripts MUST be run MANUALLY by a human operator:          ║
+║                                                                           ║
+║    • disaster-recovery.sh   - System restoration                          ║
+║    • verify-recovery.sh     - Post-recovery verification                  ║
+║                                                                           ║
+║  NEVER schedule these via cron, timers, systemd, or any automation.       ║
+║  They contain TTY checks and will REFUSE to run non-interactively.        ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+### disaster-recovery.sh
+Automates Pi setup after fresh OS install. **MANUAL ONLY.**
+
+```
++--------------------------------------------------------------------------+
+|  DISASTER RECOVERY (MANUAL EXECUTION REQUIRED)                           |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  Phase 1: System setup (timezone, docker, packages)                     |
+|  Phase 2: Directory structure creation                                   |
+|  Phase 3: Repository clone                                               |
+|  Phase 4: Secrets validation                                             |
+|  Phase 5: Configuration deployment                                       |
+|  Phase 6: Docker services (optional, prompted)                          |
+|  Phase 7: Systemd services (optional, prompted)                         |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**Usage:**
+```bash
+# MUST use -t flag for interactive TTY
+ssh -t pi@pi 'bash -s' < scripts/disaster-recovery.sh
+```
+
+**Safeguards:**
+- Checks for TTY (refuses non-interactive execution)
+- Requires typing "yes" to confirm human operator
+- Multiple confirmation prompts throughout
+
+---
+
+### verify-recovery.sh
+Post-recovery health check. **MANUAL ONLY.**
+
+```
++--------------------------------------------------------------------------+
+|  RECOVERY VERIFICATION (MANUAL EXECUTION REQUIRED)                       |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  Checks:                                                                 |
+|    • 8 Docker containers running                                        |
+|    • Service endpoints responding (8888, 8123, 8080, 8086)              |
+|    • Zigbee coordinator online                                          |
+|    • Systemd timers active                                              |
+|    • Storage mounts present                                             |
+|    • Configuration files exist                                          |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**Usage:**
+```bash
+ssh pi@pi "/opt/scripts/verify-recovery.sh"
+```
+
+---
+
+## Scripts (Automation Allowed)
+
+These scripts CAN be automated (cron, systemd timers):
+
 ## Scripts
 
 ### router-reboot.sh
@@ -109,6 +191,10 @@ Creates hourly backups of Z2M database and coordinator state.
 |    - database.db.<YYYYMMDD_HHMM>                                        |
 |    - coordinator_backup.json.<YYYYMMDD_HHMM>                            |
 |                                                                          |
+|  Safety checks (Jan 9, 2026):                                           |
+|    - Verifies /mnt/storage is mounted before backup                     |
+|    - 5-second timeout prevents hang on stale NFS                        |
+|                                                                          |
 +--------------------------------------------------------------------------+
 ```
 
@@ -120,6 +206,15 @@ ssh pi@pi "sudo /opt/scripts/z2m-backup.sh"
 **List backups:**
 ```bash
 ssh pi@pi "ls -la /mnt/storage/backups/zigbee2mqtt/"
+```
+
+**If backup fails with "not mounted" error:**
+```bash
+# Check mount status
+ssh pi@pi "mount | grep /mnt/storage"
+
+# Remount if needed (check /etc/fstab for correct options)
+ssh pi@pi "sudo mount /mnt/storage"
 ```
 
 ---

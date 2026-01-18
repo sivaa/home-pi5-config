@@ -270,7 +270,7 @@ sudo journalctl --flush
 
 ### 3. Install WiFi Watchdog
 ```bash
-# Copy from repo backups/configs/wifi-watchdog/
+# Copy from repo configs/wifi-watchdog/
 sudo cp wifi-watchdog.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/wifi-watchdog.sh
 sudo cp wifi-watchdog.service /etc/systemd/system/
@@ -421,12 +421,12 @@ A systemd timer that monitors WiFi connectivity and restarts NetworkManager if t
 
 ```bash
 # Copy script (from repo backup)
-sudo cp backups/configs/wifi-watchdog/wifi-watchdog.sh /usr/local/bin/
+sudo cp configs/wifi-watchdog/wifi-watchdog.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/wifi-watchdog.sh
 
 # Copy systemd units
-sudo cp backups/configs/wifi-watchdog/wifi-watchdog.service /etc/systemd/system/
-sudo cp backups/configs/wifi-watchdog/wifi-watchdog.timer /etc/systemd/system/
+sudo cp configs/wifi-watchdog/wifi-watchdog.service /etc/systemd/system/
+sudo cp configs/wifi-watchdog/wifi-watchdog.timer /etc/systemd/system/
 
 # Enable and start
 sudo systemctl daemon-reload
@@ -452,7 +452,7 @@ journalctl -t wifi-watchdog -f
 
 ### Backup Location
 
-All watchdog files are backed up in: `backups/configs/wifi-watchdog/`
+All watchdog files are backed up in: `configs/wifi-watchdog/`
 
 ---
 

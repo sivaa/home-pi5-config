@@ -16,6 +16,10 @@ ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888
 # Set WAYLAND_DISPLAY since user services don't inherit it automatically
 Environment=WAYLAND_DISPLAY=wayland-0
 
+# Set display to 60Hz to reduce CPU load (120Hz causes excessive rendering)
+# Explicitly pass WAYLAND_DISPLAY to ensure it works on boot
+ExecStartPre=/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 || true'
+
 # Launch Epiphany with the dashboard URL
 # JS Fullscreen API will handle fullscreen via user click
 ExecStart=/usr/bin/epiphany --new-window http://localhost:8888

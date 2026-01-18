@@ -2848,6 +2848,7 @@
         brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
 
     # Study light (if on and not overridden)
+    # GOLDEN RULE: Only dim/warm, never brighten/cool
     - if:
         - condition: state
           entity_id: light.study_ikea_light
@@ -2856,14 +2857,27 @@
           entity_id: input_boolean.circadian_study_override
           state: "off"
       then:
-        - service: light.turn_on
-          entity_id: light.study_ikea_light
-          data:
-            brightness: "{{ brightness_value }}"
-            color_temp_kelvin: "{{ color_temp_kelvin }}"
-            transition: 30
+        - variables:
+            # Read current light state
+            current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(254) | int }}"
+            current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+            # GOLDEN RULE: Take minimum (only go down)
+            final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+            final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+        # Only apply if values would actually decrease
+        - if:
+            - condition: template
+              value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+          then:
+            - service: light.turn_on
+              entity_id: light.study_ikea_light
+              data:
+                brightness: "{{ final_brightness }}"
+                color_temp_kelvin: "{{ final_color_temp }}"
+                transition: 30
 
     # Living light (if on and not overridden)
+    # GOLDEN RULE: Only dim/warm, never brighten/cool
     - if:
         - condition: state
           entity_id: light.living_ikea_light
@@ -2872,12 +2886,24 @@
           entity_id: input_boolean.circadian_living_override
           state: "off"
       then:
-        - service: light.turn_on
-          entity_id: light.living_ikea_light
-          data:
-            brightness: "{{ brightness_value }}"
-            color_temp_kelvin: "{{ color_temp_kelvin }}"
-            transition: 30
+        - variables:
+            # Read current light state
+            current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(254) | int }}"
+            current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+            # GOLDEN RULE: Take minimum (only go down)
+            final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+            final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+        # Only apply if values would actually decrease
+        - if:
+            - condition: template
+              value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+          then:
+            - service: light.turn_on
+              entity_id: light.living_ikea_light
+              data:
+                brightness: "{{ final_brightness }}"
+                color_temp_kelvin: "{{ final_color_temp }}"
+                transition: 30
 
     # Clear debounce flag after 5 seconds (allows time for light state to update)
     - delay:
@@ -3064,20 +3090,32 @@
         - service: input_boolean.turn_off
           entity_id: input_boolean.circadian_study_override
 
-        # Restore settings if light is on
+        # Restore settings if light is on (GOLDEN RULE: only dim/warm)
         - if:
             - condition: state
               entity_id: light.study_ikea_light
               state: "on"
           then:
+            - variables:
+                # Read current light state
+                current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(254) | int }}"
+                current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+                # GOLDEN RULE: Take minimum (only go down)
+                final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+                final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
             - service: input_boolean.turn_on
               entity_id: input_boolean.circadian_automation_active
-            - service: light.turn_on
-              entity_id: light.study_ikea_light
-              data:
-                brightness: "{{ brightness_value }}"
-                color_temp_kelvin: "{{ color_temp_kelvin }}"
-                transition: 60
+            # Only apply if values would actually decrease
+            - if:
+                - condition: template
+                  value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+              then:
+                - service: light.turn_on
+                  entity_id: light.study_ikea_light
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 60
             - delay:
                 seconds: 5
             - service: input_boolean.turn_off
@@ -3087,7 +3125,7 @@
         - service: notify.all_phones
           data:
             title: "💡 Study Light"
-            message: "Override ended. Circadian schedule restored ({{ brightness_pct }}%)."
+            message: "Override ended. Circadian adjusted to {{ (final_brightness / 254 * 100) | round(0) }}%."
             data:
               channel: "Lights"
               importance: low
@@ -3107,20 +3145,32 @@
         - service: input_boolean.turn_off
           entity_id: input_boolean.circadian_living_override
 
-        # Restore settings if light is on
+        # Restore settings if light is on (GOLDEN RULE: only dim/warm)
         - if:
             - condition: state
               entity_id: light.living_ikea_light
               state: "on"
           then:
+            - variables:
+                # Read current light state
+                current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(254) | int }}"
+                current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+                # GOLDEN RULE: Take minimum (only go down)
+                final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+                final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
             - service: input_boolean.turn_on
               entity_id: input_boolean.circadian_automation_active
-            - service: light.turn_on
-              entity_id: light.living_ikea_light
-              data:
-                brightness: "{{ brightness_value }}"
-                color_temp_kelvin: "{{ color_temp_kelvin }}"
-                transition: 60
+            # Only apply if values would actually decrease
+            - if:
+                - condition: template
+                  value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+              then:
+                - service: light.turn_on
+                  entity_id: light.living_ikea_light
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 60
             - delay:
                 seconds: 5
             - service: input_boolean.turn_off
@@ -3130,7 +3180,7 @@
         - service: notify.all_phones
           data:
             title: "💡 Living Light"
-            message: "Override ended. Circadian schedule restored ({{ brightness_pct }}%)."
+            message: "Override ended. Circadian adjusted to {{ (final_brightness / 254 * 100) | round(0) }}%."
             data:
               channel: "Lights"
               importance: low

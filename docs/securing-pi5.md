@@ -750,7 +750,7 @@ scp configs/zigbee2mqtt/mosquitto.conf pi:/path/to/mosquitto/config/
 scp configs/zigbee2mqtt/configuration.yaml pi:/path/to/z2m/config/
 
 # Restart services
-ssh pi "cd /path/to/docker && docker-compose restart mosquitto zigbee2mqtt"
+ssh pi "cd /path/to/docker && docker compose restart mosquitto zigbee2mqtt"
 
 # Verify MQTT rejects anonymous
 mosquitto_sub -h pi -t "#" -v
@@ -794,7 +794,7 @@ influxdb:
 ```bash
 # WARNING: This may reset existing data!
 # Backup InfluxDB data first if needed
-ssh pi "docker-compose down influxdb && docker-compose up -d influxdb"
+ssh pi "docker compose down influxdb && docker compose up -d influxdb"
 ```
 
 ---

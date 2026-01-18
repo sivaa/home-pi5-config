@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** December 28, 2025
+> **Last Updated:** January 13, 2026
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -40,12 +40,14 @@
 │    Cloudflared:   Tunnel to ha.sivaa.in                     │
 │    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog   │
 ├─────────────────────────────────────────────────────────────┤
-│  Zigbee Devices: 35 total                                   │
+│  Zigbee Devices: 39 total                                   │
 │    Sensors: 23 (12x temp, 1x CO2, 1x PIR, 8x contact, 1x vib)│
 │    Thermostats: 4 (SONOFF TRVZB radiator valves)            │
 │    Lights:  2 (IKEA FLOALT panels)                          │
 │    Remotes: 2 (IKEA TRADFRI)                                │
 │    Plugs:   3 (SONOFF S60ZBTPF smart plugs)                 │
+│    Switches: 4 (SONOFF ZBM5 wall switches)                  │
+│    Other:  1 (Tuya Fingerbot)                               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -55,6 +57,8 @@
 
 | # | Document | Description |
 |---|----------|-------------|
+| 0 | [🚨 DISASTER RECOVERY](docs/00-DISASTER-RECOVERY.md) | **START HERE** - Complete system restoration guide |
+| - | [📋 PRD](docs/PRD.md) | Product Requirements Document - system overview & metrics |
 | 1 | [NVMe Boot Setup](docs/01-nvme-boot-setup.md) | How we configured NVMe as primary boot device |
 | 2 | [SD Card Storage](docs/02-sd-card-storage.md) | Repurposing SD card as extra storage |
 | 3 | [Zigbee Dongle](docs/03-zigbee-dongle.md) | Sonoff Zigbee 3.0 USB Dongle Plus V2 setup |
@@ -252,6 +256,14 @@ When ready to switch to React as default:
 
 | Date | Change |
 |------|--------|
+| 2026-01-13 | Created PRD.md with verified system metrics + verification script |
+| 2026-01-13 | Transport view: Official BVG/S-Bahn colors (#E30078 pink, #9B2589 purple) |
+| 2026-01-12 | Transport view: Live Bus + S-Bahn departures via Playwright web scraping |
+| 2026-01-12 | Transport view: Cancelled trip detection (fällt aus, Ausfall patterns) |
+| 2026-01-09 | Zigbee watchdog: Fixed to use systemctl (triggers validation) not docker |
+| 2026-01-08 | Device health view: Real-time status for all 35 Zigbee devices |
+| 2026-01-06 | Z2M validation: Pre-start database integrity checks via systemd |
+| 2026-01-04 | **INCIDENT**: Rapid Z2M restarts caused network loss - 35 devices orphaned |
 | 2026-01-02 | Added React dashboard v2 at /v2/ with bidirectional navigation (dual-dashboard setup) |
 | 2025-12-28 | Added kiosk browser: auto-launch dashboard in fullscreen on boot |
 | 2025-12-27 | Added heater-watchdog: poll-based safety monitor runs every 5min as defense-in-depth layer |
