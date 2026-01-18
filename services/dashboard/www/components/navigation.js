@@ -40,6 +40,12 @@ export function navigationComponent() {
         }
       }
 
+      // Set sidebar visibility class on page load
+      // Using JS class toggle instead of CSS :has() for kiosk browser compatibility
+      if (this.currentView === 'system') {
+        document.body.classList.add('sidebar-hidden');
+      }
+
       // SINGLE keyboard handler for all view shortcuts
       document.addEventListener('keydown', (e) => {
         // Ignore if typing in an input
@@ -107,6 +113,14 @@ export function navigationComponent() {
           if (appEl && appEl._x_dataStack) {
             appEl._x_dataStack[0].currentView = viewId;
           }
+        }
+
+        // Toggle sidebar visibility for full-width views (System)
+        // Using JS class toggle instead of CSS :has() for kiosk browser compatibility
+        if (viewId === 'system') {
+          document.body.classList.add('sidebar-hidden');
+        } else {
+          document.body.classList.remove('sidebar-hidden');
         }
       }
 

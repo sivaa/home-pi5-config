@@ -91,14 +91,15 @@
        DARK THEME
        ======================================== */
     [data-theme="dark"] {
-      /* Backgrounds - Apple-inspired dark grays */
-      --color-bg: #1C1C1E;
-      --color-surface: #2C2C2E;
+      /* Backgrounds - Modern glass aesthetic */
+      --color-bg: #0D0D0F;
+      --color-surface: #1A1A1C;
+      --color-surface-elevated: #252528;
 
       /* Text - High contrast for readability */
-      --color-text: #F5F5F7;
-      --color-text-secondary: #A1A1A6;
-      --color-text-tertiary: #6E6E73;
+      --color-text: #FAFAFA;
+      --color-text-secondary: #9CA3AF;
+      --color-text-tertiary: #6B7280;
 
       /* Borders */
       --color-border: #3A3A3C;
@@ -109,12 +110,44 @@
       --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
 
+      /* Glass effect shadow */
+      --shadow-glass: 0 4px 24px rgba(0, 0, 0, 0.3),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
       /* Accent colors - Brighter for dark backgrounds */
       --color-primary: #0A84FF;
       --color-success: #32D74B;
       --color-warning: #FFD60A;
       --color-danger: #FF453A;
       --color-info: #64D2FF;
+
+      /* Heating states - Warm Amber family */
+      --color-heating: #F59E0B;
+      --color-heating-light: #FBBF24;
+      --color-heating-bg: rgba(245, 158, 11, 0.12);
+      --color-heating-border: rgba(245, 158, 11, 0.25);
+      --color-heating-glow: rgba(245, 158, 11, 0.08);
+
+      /* Idle states - Soft Green family */
+      --color-idle: #22C55E;
+      --color-idle-bg: rgba(34, 197, 94, 0.12);
+      --color-idle-border: rgba(34, 197, 94, 0.25);
+
+      /* Off states - Neutral Gray */
+      --color-off: #6B7280;
+      --color-off-bg: rgba(107, 114, 128, 0.12);
+
+      /* Opacity tokens - consistent reusable values */
+      --color-heating-subtle: rgba(245, 158, 11, 0.12);
+      --color-heating-medium: rgba(245, 158, 11, 0.28);
+      --color-heating-strong: rgba(245, 158, 11, 0.40);
+
+      --color-idle-subtle: rgba(34, 197, 94, 0.12);
+      --color-idle-medium: rgba(34, 197, 94, 0.25);
+
+      /* Card gradient colors */
+      --color-card-gradient-light: rgba(38, 38, 42, 0.95);
+      --color-card-gradient-dark: rgba(18, 18, 20, 0.98);
 
       /* Temperature colors - Slightly adjusted */
       --color-cold: #64B5F6;

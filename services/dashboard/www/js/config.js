@@ -6,7 +6,14 @@
 export const CONFIG = {
   // Detect if running locally (localhost) vs on Pi
   // Local dev: connect directly to Pi services
-  // Pi deployment: use nginx proxy
+  // Pi deployment: use localhost (services on same machine)
+  isLocal: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+
+  // Pi host - localhost uses 'localhost', Pi deployment uses 'pi' or same host
+  piHost: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'localhost'  // Local dev → scraper runs locally
+    : 'pi',        // Pi deployment → use pi hostname
+
   mqttUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'ws://pi:9001'  // Local dev → connect to Pi's MQTT WebSocket
     : window.location.port === '8888'
@@ -21,13 +28,14 @@ export const CONFIG = {
       : 'http://' + window.location.hostname + ':8086',
   influxDb: 'homeassistant',
   // Room configuration - isOutdoor: true excludes from home-wide averages
+  // Order: bath, kitchen, hallway, study, bedroom, living, balcony
   rooms: [
-    { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '[Hallway] CO2', entityId: 'sensor.hallway_co2', isOutdoor: false },
-    { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
-    { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
-    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity Sensor', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
     { id: 'bathroom', name: 'Bathroom', icon: '🚿', sensor: '[Bath] Temperature & Humidity', entityId: 'sensor.bath_temperature_humidity', isOutdoor: false },
     { id: 'kitchen', name: 'Kitchen', icon: '🍳', sensor: '[Kitchen] Temperature & Humidity', entityId: 'sensor.kitchen_temperature_humidity', isOutdoor: false },
+    { id: 'hallway', name: 'Hallway', icon: '🚶', sensor: '[Hallway] CO2', entityId: 'sensor.hallway_co2', isOutdoor: false },
+    { id: 'study', name: 'Study', icon: '📚', sensor: '[Study] Temperature & Humidity', entityId: 'sensor.study_temperature_humidity', isOutdoor: false },
+    { id: 'bedroom', name: 'Bedroom', icon: '🛏️', sensor: '[Bed] Temperature & Humidity', entityId: 'sensor.bed_temperature_humidity_sensor', isOutdoor: false },
+    { id: 'living', name: 'Living Room', icon: '🛋️', sensor: '[Living] Temperature & Humidity', entityId: 'sensor.living_temperature_humidity', isOutdoor: false },
     { id: 'balcony', name: 'Balcony', icon: '🌿', sensor: '[Balcony] Temperature & Humidity', entityId: 'sensor.balcony_temperature_humidity', isOutdoor: true }
   ],
   staleThreshold: 5 * 60 * 1000,  // 5 minutes
@@ -70,7 +78,7 @@ export const CONFIG = {
       sensor: '[Bed] Thermostat',
       entityId: 'climate.bed_thermostat',
       roomId: 'bedroom',
-      roomSensor: '[Bed] Temperature & Humidity Sensor'
+      roomSensor: '[Bed] Temperature & Humidity'
     }
   ]
 };
@@ -83,14 +91,11 @@ export const ROOM_SENSORS = {
       { name: '[Living] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
       { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' }
-    ],
-    co2: [
-      { name: 'CO2', label: 'CO2 Monitor' }
     ]
   },
   bedroom: {
     climate: [
-      { name: '[Bed] Temperature & Humidity Sensor', label: 'Primary', isPrimary: true },
+      { name: '[Bed] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' }
     ]
   },
@@ -292,8 +297,10 @@ export const VIEW_CATEGORIES = [
     views: [
       { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
       { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
+      { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
       { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
-      { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W', primary: true }
+      { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W', primary: true },
+      { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' }
     ]
   },
   {

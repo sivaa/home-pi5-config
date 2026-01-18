@@ -1,0 +1,128 @@
+/**
+ * Toast Notification Styles
+ *
+ * Positioned bottom-right, stacking upward.
+ * GPU-friendly animations (transform, opacity only).
+ * No backdrop-filter for Pi performance.
+ */
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* CONTAINER                                              */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.toast-container {
+  position: fixed;
+  bottom: var(--space-lg, 24px);
+  right: var(--space-lg, 24px);
+  z-index: 1001;  /* Above modals (1000) */
+  max-width: 360px;
+  display: flex;
+  flex-direction: column-reverse;  /* New toasts at bottom */
+  gap: var(--space-sm, 8px);
+  pointer-events: none;  /* Don't block clicks on page */
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* TOAST ITEM                                             */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.toast {
+  pointer-events: auto;  /* Re-enable for toast itself */
+  background: var(--color-surface, #1e1e1e);
+  border-left: 4px solid var(--color-primary, #2196f3);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-md, 16px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  animation: toastSlideIn 0.25s ease-out;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast:hover {
+  transform: translateX(-4px);
+}
+
+.toast:active {
+  opacity: 0.8;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* TOAST TYPES                                            */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.toast.error {
+  border-left-color: var(--color-danger, #e53935);
+}
+
+.toast.warning {
+  border-left-color: var(--color-warning, #ff9800);
+}
+
+.toast.success {
+  border-left-color: var(--color-success, #43a047);
+}
+
+.toast.info {
+  border-left-color: var(--color-primary, #2196f3);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* TOAST CONTENT                                          */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.toast-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text-primary, #fff);
+  margin: 0 0 4px 0;
+}
+
+.toast-message {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.7));
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ANIMATIONS                                             */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Fade out when being removed (applied via JS if needed) */
+.toast.dismissing {
+  animation: toastSlideOut 0.2s ease-in forwards;
+}
+
+@keyframes toastSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* RESPONSIVE                                             */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@media (max-width: 480px) {
+  .toast-container {
+    left: var(--space-md, 16px);
+    right: var(--space-md, 16px);
+    max-width: none;
+  }
+}

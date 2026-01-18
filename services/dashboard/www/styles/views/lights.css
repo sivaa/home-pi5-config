@@ -633,3 +633,250 @@
   );
 }
 
+/* ========================================
+   CIRCADIAN LIGHTING STATUS BAR
+   Performance: No blur, simple shadows, 44px touch targets
+   ======================================== */
+
+.circadian-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.circadian-phase {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.phase-icon {
+  font-size: 1.5rem;
+}
+
+.phase-name {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.circadian-stats {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.circadian-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.stat-icon {
+  font-size: var(--font-size-md);
+}
+
+.circadian-toggle {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  touch-action: manipulation;
+  transition: background var(--transition-fast);
+}
+
+.circadian-toggle.active {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34C759;
+}
+
+.circadian-toggle:hover {
+  background: var(--color-border);
+}
+
+.circadian-toggle.active:hover {
+  background: rgba(52, 199, 89, 0.25);
+}
+
+/* Circadian Disabled Banner */
+.circadian-disabled-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--space-lg);
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border);
+}
+
+.circadian-disabled-banner button {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  cursor: pointer;
+  min-height: 44px;
+  font-weight: var(--font-weight-medium);
+  touch-action: manipulation;
+  transition: opacity var(--transition-fast);
+}
+
+.circadian-disabled-banner button:hover {
+  opacity: 0.9;
+}
+
+/* ========================================
+   OVERRIDE BANNER (Per-Light)
+   ======================================== */
+
+.override-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  background: rgba(255, 159, 10, 0.1);
+  border-radius: var(--radius-md);
+  border-left: 3px solid #FF9F0A;
+}
+
+.override-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.override-icon {
+  font-size: 1.25rem;
+}
+
+.override-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.override-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.override-expiry {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.override-clear {
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid #FF9F0A;
+  background: transparent;
+  color: #FF9F0A;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+  transition: background var(--transition-fast);
+}
+
+.override-clear:hover,
+.override-clear:active {
+  background: rgba(255, 159, 10, 0.15);
+}
+
+/* Circadian preset button */
+.preset-btn.circadian-preset {
+  background: rgba(0, 122, 255, 0.1);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+}
+
+.preset-btn.circadian-preset:hover {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+/* ========================================
+   DARK MODE - CIRCADIAN
+   ======================================== */
+
+[data-theme="dark"] .circadian-status {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .circadian-toggle.active {
+  background: rgba(48, 209, 88, 0.2);
+  color: #30D158;
+}
+
+[data-theme="dark"] .circadian-toggle.active:hover {
+  background: rgba(48, 209, 88, 0.3);
+}
+
+[data-theme="dark"] .circadian-disabled-banner {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .override-banner {
+  background: rgba(255, 159, 10, 0.15);
+}
+
+[data-theme="dark"] .override-clear:hover,
+[data-theme="dark"] .override-clear:active {
+  background: rgba(255, 159, 10, 0.25);
+}
+
+[data-theme="dark"] .preset-btn.circadian-preset {
+  background: rgba(10, 132, 255, 0.15);
+  border-color: rgba(10, 132, 255, 0.4);
+}
+
+[data-theme="dark"] .preset-btn.circadian-preset:hover {
+  background: rgba(10, 132, 255, 0.25);
+}
+
+/* ========================================
+   RESPONSIVE - CIRCADIAN
+   ======================================== */
+
+@media (max-width: 600px) {
+  .circadian-status {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .circadian-phase {
+    flex: 1 1 100%;
+    justify-content: center;
+    margin-bottom: var(--space-xs);
+  }
+
+  .circadian-stats {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .circadian-toggle {
+    flex: 1;
+    text-align: center;
+  }
+}
+

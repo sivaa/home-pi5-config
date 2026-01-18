@@ -1,6 +1,6 @@
 /**
  * Device Health Store
- * Monitors health status of ALL Zigbee devices (35 total)
+ * Monitors health status of ALL Zigbee devices (39 total)
  * Identifies dead/stale devices based on last_seen timestamps
  *
  * Data sources:

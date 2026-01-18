@@ -131,6 +131,7 @@ export function initMqttStore(Alpine, CONFIG) {
         // This fixes timer disappearing after MQTT disconnect/reconnect
         if (isReconnect) {
           console.log('[mqtt] Reconnected - reloading open sensor timestamps');
+          Alpine.store('notifications')?.success('MQTT Connected', 'Connection restored');
           setTimeout(() => {
             const sensorsStore = Alpine.store('sensors');
             sensorsStore?.loadOpenSensorTimestamps?.(CONFIG);
@@ -175,7 +176,11 @@ export function initMqttStore(Alpine, CONFIG) {
       });
 
       this.client.on('error', (err) => console.error('MQTT Error:', err));
-      this.client.on('close', () => { this.connected = false; this.connecting = true; });
+      this.client.on('close', () => {
+        this.connected = false;
+        this.connecting = true;
+        Alpine.store('notifications')?.error('MQTT Disconnected', 'Attempting to reconnect...');
+      });
       this.client.on('reconnect', () => { this.connecting = true; });
     }
   });
