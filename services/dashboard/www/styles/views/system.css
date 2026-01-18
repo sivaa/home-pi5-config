@@ -1,0 +1,605 @@
+/**
+ * System Performance View - Kiosk-Optimized
+ * Following ChatGPT Frontend Expert recommendations:
+ * - 48-72px KPI values for 2-3m viewing distance
+ * - Status pills with text (not just dots)
+ * - 8px spacing system
+ * - Threshold bands on charts
+ * - Full-width layout (no sidebar)
+ */
+
+/* ========================================
+   FULL-WIDTH LAYOUT (Hide Sidebar)
+   ======================================== */
+
+/* When System view is active, hide sidebar and go full width
+   Using .sidebar-hidden class on body (set by JS in navigation.js)
+   instead of CSS :has() for kiosk browser compatibility */
+body.sidebar-hidden .overview-panel {
+  display: none !important;
+}
+
+body.sidebar-hidden .main-content {
+  margin-right: 0 !important;
+}
+
+/* ========================================
+   VIEW CONTAINER
+   ======================================== */
+
+.system-view {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ========================================
+   HEADER - Simplified
+   ======================================== */
+
+.sys-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sys-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sys-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.sys-subtitle {
+  font-size: 1rem;
+  color: var(--color-text-tertiary);
+}
+
+.sys-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Time Pills - Larger for kiosk */
+.sys-time-pills {
+  display: flex;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.sys-pill {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.sys-pill:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.sys-pill.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Refresh Button - Larger */
+.sys-refresh {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sys-refresh:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.sys-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sys-refresh svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ========================================
+   METRIC CARDS - Kiosk Optimized
+   ======================================== */
+
+.sys-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .sys-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .sys-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sys-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  transition: border-color 0.15s ease;
+  position: relative;
+}
+
+.sys-metric:hover {
+  border-color: var(--color-border-hover);
+}
+
+/* Status indicator line at top of card */
+.sys-metric::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--color-text-tertiary);
+  opacity: 0.3;
+}
+
+.sys-metric.status-ok::before {
+  background: #22c55e;
+  opacity: 1;
+}
+
+.sys-metric.status-warning::before {
+  background: #f59e0b;
+  opacity: 1;
+}
+
+.sys-metric.status-critical::before {
+  background: #ef4444;
+  opacity: 1;
+}
+
+.sys-metric.status-active::before {
+  background: #8b5cf6;
+  opacity: 1;
+}
+
+/* Hide the old dot - replaced by top bar */
+.sys-metric-dot {
+  display: none;
+}
+
+/* Metric Content - Larger for kiosk */
+.sys-metric-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sys-metric-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* HERO KPI VALUE - 48-72px for kiosk viewing */
+.sys-metric-value {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/* Status pill inside card */
+.sys-metric-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.sys-metric.status-ok .sys-metric-status {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.sys-metric.status-warning .sys-metric-status {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.sys-metric.status-critical .sys-metric-status {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.sys-metric.status-active .sys-metric-status {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+
+/* Status icon in pill */
+.sys-metric-status::before {
+  content: '✓';
+  font-size: 0.75rem;
+}
+
+.sys-metric.status-warning .sys-metric-status::before {
+  content: '⚠';
+}
+
+.sys-metric.status-critical .sys-metric-status::before {
+  content: '✕';
+}
+
+.sys-metric.status-active .sys-metric-status::before {
+  content: '●';
+}
+
+.sys-metric-sub {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
+}
+
+/* ========================================
+   FAN STATE INDICATOR
+   5 bars showing cooling level (0=Off to 4=Max)
+   Each bar has a label underneath
+   ======================================== */
+
+.sys-fan-state-indicator {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sys-fan-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sys-fan-bar {
+  width: 16px;
+  height: 24px;
+  border-radius: 3px;
+  background: var(--color-border);
+  opacity: 0.3;
+  transition: all 0.2s ease;
+}
+
+.sys-fan-bar-label {
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Active bars light up with color gradient based on level */
+.sys-fan-bar.active {
+  opacity: 1;
+}
+
+/* When active, the label gets the same color as the bar */
+.sys-fan-bar-container:has(.sys-fan-bar.active) .sys-fan-bar-label {
+  color: var(--color-text-secondary);
+}
+
+.sys-fan-bar.level-0 {
+  height: 8px;
+}
+.sys-fan-bar.active.level-0 {
+  background: #6b7280;  /* Gray - Off */
+}
+
+.sys-fan-bar.level-1 {
+  height: 12px;
+}
+.sys-fan-bar.active.level-1 {
+  background: #22c55e;  /* Green - Low */
+}
+
+.sys-fan-bar.level-2 {
+  height: 16px;
+}
+.sys-fan-bar.active.level-2 {
+  background: #eab308;  /* Yellow - Medium */
+}
+
+.sys-fan-bar.level-3 {
+  height: 20px;
+}
+.sys-fan-bar.active.level-3 {
+  background: #f97316;  /* Orange - High */
+}
+
+.sys-fan-bar.level-4 {
+  height: 24px;
+}
+.sys-fan-bar.active.level-4 {
+  background: #ef4444;  /* Red - Max */
+}
+
+/* Fan state text (e.g., "FAN OFF", "FAN LOW") */
+.sys-fan-state-text {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+
+/* ========================================
+   CHARTS SECTION
+   ======================================== */
+
+.sys-charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .sys-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sys-chart-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sys-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.sys-chart-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.sys-chart-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Chart Legend */
+.sys-chart-legend {
+  display: flex;
+  gap: 16px;
+}
+
+.sys-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.sys-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+}
+
+.sys-legend-item.cpu .sys-legend-dot {
+  background: #3b82f6;
+}
+
+.sys-legend-item.temp .sys-legend-dot {
+  background: #ef4444;
+}
+
+.sys-legend-item.fan .sys-legend-dot {
+  background: #8b5cf6;
+}
+
+.sys-legend-item.mem .sys-legend-dot {
+  background: #22c55e;
+}
+
+/* Threshold legend */
+.sys-legend-item.threshold {
+  opacity: 0.7;
+}
+
+.sys-legend-item.threshold .sys-legend-dot {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: #ef4444;
+  opacity: 0.5;
+}
+
+/* SVG Chart - Taller for better visibility */
+.sys-chart-svg {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+/* ========================================
+   MEMORY PROGRESS BAR
+   ======================================== */
+
+.sys-memory-bar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.sys-memory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sys-memory-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sys-memory-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.sys-progress {
+  height: 12px;
+  background: var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sys-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  transition: width 0.3s ease;
+}
+
+.sys-progress-fill.status-warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.sys-progress-fill.status-critical {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* ========================================
+   FOOTER
+   ======================================== */
+
+.sys-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sys-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.sys-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.sys-footer-status.loading .sys-status-dot {
+  background: #f59e0b;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.sys-footer-time {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+/* ========================================
+   LOADING STATE
+   ======================================== */
+
+.system-view.is-loading .sys-chart-svg {
+  opacity: 0.5;
+}
+
+.system-view.is-loading .sys-refresh {
+  pointer-events: none;
+}
+
+.system-view.is-loading .sys-refresh svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

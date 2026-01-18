@@ -40,6 +40,8 @@
   <link rel="stylesheet" href="styles/views/hot-water.css">
   <link rel="stylesheet" href="styles/views/transport.css">
   <link rel="stylesheet" href="styles/views/device-health.css">
+  <link rel="stylesheet" href="styles/views/system.css?v=8">
+  <link rel="stylesheet" href="styles/notifications.css">
 
   <!-- Three.js for 3D Floor Plan -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2244,6 +2246,144 @@
           </div>
         </div>
 
+        <!-- System Performance View (Redesigned) -->
+        <div x-show="currentView === 'system'" x-cloak x-data="systemView()" x-init="init()" class="view system-view" :class="{ 'is-loading': isLoading }">
+
+            <!-- Header with Time Range -->
+            <div class="sys-header">
+              <div class="sys-header-left">
+                <h2 class="sys-title">System Performance</h2>
+                <span class="sys-subtitle">Raspberry Pi 5 health metrics</span>
+              </div>
+              <div class="sys-header-right">
+                <div class="sys-time-pills">
+                  <template x-for="range in timeRanges" :key="range.id">
+                    <button class="sys-pill"
+                            :class="{ 'active': range.id === selectedRange }"
+                            @click="setTimeRange(range.id)"
+                            x-text="range.label">
+                    </button>
+                  </template>
+                </div>
+                <button class="sys-refresh" @click="refresh()" :disabled="isLoading">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Metric Cards Row -->
+            <div class="sys-metrics">
+              <!-- CPU -->
+              <div class="sys-metric" :class="getCpuStatus()">
+                <div class="sys-metric-content">
+                  <span class="sys-metric-label">CPU</span>
+                  <span class="sys-metric-value"><span x-text="cpuPercent"></span>%</span>
+                  <span class="sys-metric-status" x-text="getCpuStatusLabel()"></span>
+                  <span class="sys-metric-sub">Load <span x-text="loadAvg"></span></span>
+                </div>
+              </div>
+
+              <!-- Temperature -->
+              <div class="sys-metric" :class="getTempStatus()">
+                <div class="sys-metric-content">
+                  <span class="sys-metric-label">Temperature</span>
+                  <span class="sys-metric-value"><span x-text="cpuTemp"></span>&deg;C</span>
+                  <span class="sys-metric-status" x-text="getTempStatusLabel()"></span>
+                </div>
+              </div>
+
+              <!-- Memory -->
+              <div class="sys-metric" :class="getMemStatus()">
+                <div class="sys-metric-content">
+                  <span class="sys-metric-label">Memory</span>
+                  <span class="sys-metric-value"><span x-text="memPercent"></span>%</span>
+                  <span class="sys-metric-status" x-text="getMemStatusLabel()"></span>
+                  <span class="sys-metric-sub" x-text="memUsed"></span>
+                </div>
+              </div>
+
+              <!-- Fan -->
+              <div class="sys-metric" :class="getFanStatus()">
+                <div class="sys-metric-content">
+                  <span class="sys-metric-label">Fan</span>
+                  <span class="sys-metric-value"><span x-text="fanRpm"></span></span>
+                  <span class="sys-metric-status" x-text="getFanStatusLabel()"></span>
+                  <!-- Fan State Indicator: 5 bars showing cooling level (0=Off to 4=Max) -->
+                  <div class="sys-fan-state-indicator">
+                    <template x-for="(state, index) in [{name:'OFF', level:0}, {name:'LOW', level:1}, {name:'MED', level:2}, {name:'HIGH', level:3}, {name:'MAX', level:4}]" :key="index">
+                      <div class="sys-fan-bar-container">
+                        <div class="sys-fan-bar"
+                             :class="{
+                               'active': ($store.system?.fan_state ?? -1) >= state.level,
+                               ['level-' + state.level]: true
+                             }">
+                        </div>
+                        <span class="sys-fan-bar-label" x-text="state.name"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <span class="sys-fan-state-text" x-text="($store.system?.fan_state ?? -1) === 0 ? 'FAN OFF' : (fanStateLabel ? 'FAN ' + fanStateLabel.toUpperCase() : '')"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="sys-charts">
+              <!-- Processor Chart Card -->
+              <div class="sys-chart-card">
+                <div class="sys-chart-header">
+                  <div>
+                    <h3 class="sys-chart-title">Processor</h3>
+                    <span class="sys-chart-desc">CPU usage over time</span>
+                  </div>
+                  <div class="sys-chart-legend">
+                    <span class="sys-legend-item cpu"><span class="sys-legend-dot"></span>CPU %</span>
+                  </div>
+                </div>
+                <svg id="system-cpu-chart" class="sys-chart-svg"></svg>
+              </div>
+
+              <!-- Thermal Chart Card -->
+              <div class="sys-chart-card">
+                <div class="sys-chart-header">
+                  <div>
+                    <h3 class="sys-chart-title">Thermal</h3>
+                    <span class="sys-chart-desc">Temperature and cooling</span>
+                  </div>
+                  <div class="sys-chart-legend">
+                    <span class="sys-legend-item temp"><span class="sys-legend-dot"></span>Temp</span>
+                    <span class="sys-legend-item fan"><span class="sys-legend-dot"></span>Fan</span>
+                  </div>
+                </div>
+                <svg id="system-temp-chart" class="sys-chart-svg"></svg>
+              </div>
+            </div>
+
+            <!-- Memory Progress Bar -->
+            <div class="sys-memory-bar">
+              <div class="sys-memory-header">
+                <span class="sys-memory-title">Memory Usage</span>
+                <span class="sys-memory-value" x-text="memUsed"></span>
+              </div>
+              <div class="sys-progress">
+                <div class="sys-progress-fill" :class="getMemStatus()" :style="{ width: (memPercent || 0) + '%' }"></div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="sys-footer">
+              <span class="sys-footer-status" :class="{ 'loading': isLoading }">
+                <span class="sys-status-dot"></span>
+                <span x-text="isLoading ? 'Updating...' : 'Live'"></span>
+              </span>
+              <span class="sys-footer-time">Updated <span x-text="lastUpdate"></span></span>
+            </div>
+
+        </div>
+
         <!-- Transport View -->
         <div x-show="currentView === 'transport'"
              x-cloak
@@ -3471,6 +3611,29 @@
     import { hotWaterView } from './views/hot-water.js?v=6';
     window.hotWaterView = hotWaterView;
     console.log('[hot-water] Module loaded, hotWaterView ready');
+  </script>
+
+  <!-- System Performance View Module -->
+  <script type="module">
+    import { systemView } from './views/system.js?v=8';
+    window.systemView = systemView;
+    console.log('[system] Module loaded, systemView ready');
+  </script>
+
+  <!-- System Performance Store Module -->
+  <script type="module">
+    import { initSystemStore } from './js/stores/system-store.js?v=2';
+
+    function initSystem() {
+      const CONFIG = window.CONFIG;
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        initSystemStore(Alpine, CONFIG);
+        console.log('[system] Store initialized');
+      } else {
+        setTimeout(initSystem, 100);
+      }
+    }
+    initSystem();
   </script>
 
   <script type="module">
@@ -5129,6 +5292,14 @@
             }
           });
 
+          // Listen for forced view changes (e.g., auto-switch from transport to heater after 20 min)
+          window.addEventListener('force-view-change', (e) => {
+            if (e.detail && e.detail.view) {
+              console.log(`[app] Force view change to: ${e.detail.view}`);
+              this.setView(e.detail.view);
+            }
+          });
+
           // Request browser notification permission on first user interaction
           // This enables device offline alerts to show as push notifications
           const requestNotificationPermission = () => {
@@ -5298,6 +5469,7 @@
           { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
           { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
           { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' },
+          { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' },
           { id: 'transport', name: 'Transport', icon: '🚉', title: 'Transport Departures', key: 'T' }
         ]
       },
@@ -5357,6 +5529,12 @@
           if (appEl && appEl._x_dataStack && appEl._x_dataStack[0]) {
             this.currentView = appEl._x_dataStack[0].currentView || this.currentView;
           }
+
+          // Set sidebar visibility class on page load
+          // Using JS class toggle instead of CSS :has() for kiosk browser compatibility
+          if (this.currentView === 'system') {
+            document.body.classList.add('sidebar-hidden');
+          }
           // Keyboard shortcuts handled via @keydown.window Alpine directive
         },
 
@@ -5388,6 +5566,13 @@
             const appEl = document.querySelector('[x-data="app()"]');
             if (appEl && appEl._x_dataStack && appEl._x_dataStack[0]) {
               appEl._x_dataStack[0].currentView = viewId;
+            }
+            // Toggle sidebar visibility for full-width views (System)
+            // Using JS class toggle instead of CSS :has() for kiosk browser compatibility
+            if (viewId === 'system') {
+              document.body.classList.add('sidebar-hidden');
+            } else {
+              document.body.classList.remove('sidebar-hidden');
             }
           }
           this.moreMenuOpen = false;
@@ -7075,7 +7260,27 @@
     });
   </script>
 
+  <!-- Notifications Store - for user-visible error toasts -->
+  <script type="module">
+    import { initNotificationsStore } from './js/stores/notifications-store.js';
+
+    document.addEventListener('alpine:init', () => {
+      initNotificationsStore(Alpine, window.CONFIG);
+      console.log('[notifications] Notifications store registered');
+    });
+  </script>
+
   <!-- Alpine.js - MUST load last after all stores and views are defined -->
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Toast Notifications Container -->
+  <div class="toast-container" x-data x-show="$store.notifications?.toasts?.length > 0">
+    <template x-for="toast in $store.notifications?.toasts || []" :key="toast.id">
+      <div class="toast" :class="toast.type" @click="$store.notifications.remove(toast.id)">
+        <div class="toast-title" x-text="toast.title"></div>
+        <p class="toast-message" x-text="toast.message"></p>
+      </div>
+    </template>
+  </div>
 </body>
 </html>
