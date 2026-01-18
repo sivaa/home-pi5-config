@@ -218,7 +218,7 @@ border-color: var(--color-danger);
 
 ## Device Health View (2026-01-08)
 
-Real-time monitoring of all 36 Zigbee devices with health status, battery levels, and signal strength.
+Real-time monitoring of all 39 Zigbee devices with health status, battery levels, and signal strength.
 
 ### Architecture
 
@@ -442,3 +442,53 @@ When the scraper container is stopped (by cleanup service after 30 min idle), th
 - HA must have Docker socket mounted (see configs/homeassistant/CLAUDE.md)
 - HA API requires authentication (token in `haToken`)
 - shell_command in HA config must use `curl` (docker CLI not in HA image)
+
+---
+
+## SONOFF TRVZB Thermostat Control (2026-01-18)
+
+> **Rule:** Only send `occupied_heating_setpoint`. Never use TRV internal modes.
+
+### The Incident
+
+Study thermostat heated to 19.5°C when setpoint was 18°C for 60+ minutes.
+
+```
+Dashboard showed:     TRV was actually using:
+  Target: 18°C   →    timer_mode_target_temp: 23°C (stale!)
+```
+
+### Root Cause
+
+The dashboard code was sending `temporary_mode_select: 'timer'` to "clear internal boost mode", but this activated timer mode which used a stale `timer_mode_target_temp` value (23°C) instead of the actual setpoint.
+
+### The Fix
+
+HA handles all scheduling. Dashboard should just send the setpoint:
+
+```javascript
+// thermostat-store.js setTargetTemp()
+this.publishCommand(thermostat, {
+  occupied_heating_setpoint: clampedTemp  // Only this!
+});
+```
+
+### What NOT to Send
+
+| Property | Why Not |
+|----------|---------|
+| `temporary_mode_select` | Activates timer/boost mode on TRV |
+| `timer_mode_target_temp` | Can override setpoint if timer mode is active |
+| `temporary_mode_duration` | Part of timer mode system |
+
+### Debugging
+
+```bash
+# Check if a TRV has stale timer target
+ssh pi@pi 'curl -s "http://localhost:8123/api/states" -H "Auth..." | grep timer_mode_target'
+
+# Fix a stuck thermostat (if timer mode is active)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/[Study] Thermostat/set' \
+  -m '{\"occupied_heating_setpoint\": 18, \"timer_mode_target_temp\": 18}'"
+```

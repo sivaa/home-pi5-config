@@ -1997,6 +1997,125 @@
 }
 
 /* ========================================
+   CO2 OVERRIDE BUTTON & BANNER
+   For temporarily allowing heaters despite high CO2
+   ======================================== */
+
+/* Override button inside pause banner */
+.co2-override-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  min-height: 44px;
+  border: 2px solid currentColor;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.co2-override-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.co2-override-btn:active {
+  transform: scale(0.98);
+}
+
+[data-theme="dark"] .co2-override-btn {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .co2-override-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.override-btn-icon {
+  font-size: var(--font-size-lg);
+}
+
+.override-btn-text {
+  white-space: nowrap;
+}
+
+/* CO2 Override Active Banner */
+.co2-override-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 2px solid #10b981;
+  color: #065f46;
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme="dark"] .co2-override-banner {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  border-color: #34d399;
+  color: #d1fae5;
+}
+
+/* Cancel button inside override banner */
+.co2-override-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-md);
+  min-height: 44px;
+  border: 2px solid currentColor;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+}
+
+.co2-override-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.co2-override-cancel-btn:active {
+  transform: scale(0.98);
+}
+
+[data-theme="dark"] .co2-override-cancel-btn {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .co2-override-cancel-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive for CO2 override */
+@media (max-width: 768px) {
+  .co2-override-btn,
+  .co2-override-cancel-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .co2-override-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-md);
+    gap: var(--space-sm);
+  }
+}
+
+/* ========================================
    MANUAL OVERRIDE BANNER
    Shows when thermostat has a manual temperature override
    ======================================== */

@@ -123,6 +123,15 @@ export function initThermostatStore(Alpine, CONFIG) {
       expiresAt: null          // When override ends (ms timestamp), null if not active
     },
 
+    // CO2 override state (allows heaters when CO2 is high for 6 hours)
+    // State comes from MQTT (dashboard/co2-override)
+    co2Override: {
+      active: false,
+      expiresAt: null,     // When override ends (ms timestamp)
+      co2Level: null,      // CO2 level when override started
+      _tick: 0             // Incremented every 30s to force timer re-render
+    },
+
     // HA API config
     haApiUrl: '/api/ha',
     haToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkZjJhY2UwMTBmNGY0Y2NiYTI0ZGZhMGUyZjg5NWYzNiIsImlhdCI6MTc2Njg1NjU1NywiZXhwIjoyMDgyMjE2NTU3fQ.2t04JrsGafT9hDhg0BniYG90i1O7a7DHqpdst9x3-no',
@@ -176,6 +185,10 @@ export function initThermostatStore(Alpine, CONFIG) {
       mqtt.client.subscribe('dashboard/global-boost-mode', { qos: 1 });
       console.log('[thermostat-store] Subscribed to dashboard/global-boost-mode');
 
+      // Subscribe to CO2 override state
+      mqtt.client.subscribe('dashboard/co2-override', { qos: 1 });
+      console.log('[thermostat-store] Subscribed to dashboard/co2-override');
+
       // PERFORMANCE: Use central dispatcher instead of client.on('message')
       // This prevents duplicate JSON parsing across multiple stores
 
@@ -198,6 +211,11 @@ export function initThermostatStore(Alpine, CONFIG) {
       // Handle global boost mode state (from HA scripts)
       mqtt.registerTopicHandler('dashboard/global-boost-mode', (topic, data) => {
         this.handleGlobalBoostModeUpdate(data);
+      });
+
+      // Handle CO2 override state (from HA scripts)
+      mqtt.registerTopicHandler('dashboard/co2-override', (topic, data) => {
+        this.handleCO2OverrideUpdate(data);
       });
 
       // Handle bridge events (device_leave, etc.)
@@ -226,10 +244,13 @@ export function initThermostatStore(Alpine, CONFIG) {
         }
       });
 
-      // Start timer tick for boost mode countdown (every 30 seconds)
+      // Start timer tick for boost mode and CO2 override countdowns (every 30 seconds)
       setInterval(() => {
         if (this.globalBoostMode.active) {
           this.globalBoostMode._tick++;
+        }
+        if (this.co2Override.active) {
+          this.co2Override._tick++;
         }
       }, 30000);
 
@@ -771,6 +792,115 @@ export function initThermostatStore(Alpine, CONFIG) {
     },
 
     // ============================================
+    // CO2 OVERRIDE
+    // ============================================
+
+    /**
+     * Handle CO2 override state update from MQTT
+     */
+    handleCO2OverrideUpdate(data) {
+      const wasActive = this.co2Override.active;
+
+      if (data.active) {
+        this.co2Override = {
+          active: true,
+          expiresAt: data.expires_at ? new Date(data.expires_at).getTime() : null,
+          co2Level: data.co2_level || null,
+          _tick: this.co2Override._tick || 0
+        };
+
+        if (!wasActive) {
+          const expiresStr = data.expires_at ? data.expires_at.substring(11, 16) : '?';
+          console.log(`[thermostat-store] CO2 Override ENABLED until ${expiresStr}`);
+        }
+      } else {
+        this.co2Override = { active: false, expiresAt: null, co2Level: null, _tick: 0 };
+
+        if (wasActive) {
+          console.log('[thermostat-store] CO2 Override DISABLED');
+        }
+      }
+    },
+
+    /**
+     * Check if CO2 override is active
+     */
+    isCO2OverrideActive() {
+      return this.co2Override.active ?? false;
+    },
+
+    /**
+     * Get CO2 override time remaining
+     * @returns {string} Formatted time remaining (e.g., "5h 42m")
+     */
+    getCO2OverrideTimeRemaining() {
+      // Reference _tick to trigger Alpine reactivity when it updates
+      const _ = this.co2Override._tick;
+
+      if (!this.co2Override.active || !this.co2Override.expiresAt) return '';
+
+      const remaining = this.co2Override.expiresAt - Date.now();
+      if (remaining <= 0) return 'Expired';
+
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    },
+
+    /**
+     * Enable CO2 override (calls HA script)
+     */
+    async enableCO2Override() {
+      // Optimistically update state immediately for responsive UI
+      const expiresAt = Date.now() + 6 * 60 * 60 * 1000; // 6 hours from now
+      this.co2Override = {
+        active: true,
+        expiresAt: expiresAt,
+        co2Level: this.heaterPause.co2Level || null,
+        _tick: 0
+      };
+      console.log('[thermostat-store] CO2 Override ENABLED (optimistic) until', new Date(expiresAt).toLocaleTimeString());
+
+      try {
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.co2_override_start'
+        });
+        console.log('[thermostat-store] CO2 Override confirmed by HA');
+      } catch (err) {
+        console.error('[thermostat-store] HA call failed (state remains optimistic):', err);
+        // Keep optimistic state - MQTT will sync if HA eventually processes it
+      }
+    },
+
+    /**
+     * Disable CO2 override (calls HA script)
+     */
+    async disableCO2Override() {
+      // Optimistically update state immediately for responsive UI
+      this.co2Override = {
+        active: false,
+        expiresAt: null,
+        co2Level: null,
+        _tick: 0
+      };
+      console.log('[thermostat-store] CO2 Override DISABLED (optimistic)');
+
+      try {
+        await this.callHAService('script', 'turn_on', {
+          entity_id: 'script.co2_override_cancel'
+        });
+        console.log('[thermostat-store] CO2 Override disable confirmed by HA');
+      } catch (err) {
+        console.error('[thermostat-store] HA call failed (state remains optimistic):', err);
+        // Keep optimistic state - MQTT will sync if HA eventually processes it
+      }
+    },
+
+    // ============================================
     // EVENT DETECTION
     // ============================================
 
@@ -927,13 +1057,11 @@ export function initThermostatStore(Alpine, CONFIG) {
       thermostat.pendingTarget = clampedTemp;
       thermostat.syncing = true;
 
-      // SONOFF TRVZB has internal 'boost' mode that enforces 22°C and fights temp changes.
-      // Sending temporary_mode_select: 'timer' clears the internal boost mode.
-      // Note: SONOFF TRVZB only accepts 'boost' or 'timer' for temporary_mode_select.
+      // Just set the temperature. HA handles all scheduling.
+      // Don't use TRV internal modes (timer/boost) - they cause stale target issues.
+      // See: 2026-01-18 incident where timer_mode_target_temp (23°C) overrode setpoint (18°C)
       this.publishCommand(thermostat, {
-        occupied_heating_setpoint: clampedTemp,
-        temporary_mode_select: 'timer',
-        temporary_mode_duration: 0  // No timer, just clear boost mode
+        occupied_heating_setpoint: clampedTemp
       });
     },
 
@@ -975,6 +1103,7 @@ export function initThermostatStore(Alpine, CONFIG) {
       const client = Alpine.store('mqtt').client;
       if (!client || !Alpine.store('mqtt').connected) {
         console.error('[thermostat-store] MQTT not connected');
+        Alpine.store('notifications')?.error('Connection Lost', 'Cannot send command - MQTT disconnected');
         thermostat.syncing = false;
         return;
       }
@@ -997,12 +1126,14 @@ export function initThermostatStore(Alpine, CONFIG) {
       client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
         if (err) {
           console.error('[thermostat-store] Publish failed:', err);
+          Alpine.store('notifications')?.error('Command Failed', `Failed to update ${thermostat.name}`);
           thermostat.syncing = false;
           thermostat.pendingTarget = null;
         } else {
           // Clear syncing after timeout if no response
           setTimeout(() => {
             if (thermostat.syncing) {
+              Alpine.store('notifications')?.warning('No Response', `${thermostat.name} did not acknowledge`);
               thermostat.syncing = false;
               thermostat.pendingTarget = null;
             }
