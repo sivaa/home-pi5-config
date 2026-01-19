@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** January 17, 2026
-> **Total Devices:** 39 (including coordinator)
+> **Last Updated:** January 19, 2026
+> **Total Devices:** 44 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -9,27 +9,27 @@
 ## The Network at a Glance
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ZIGBEE NETWORK MAP                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│                        ┌──────────────────┐                                  │
-│                        │   Coordinator    │                                  │
-│                        │  Sonoff V2 USB   │                                  │
-│                        │   Channel: 25    │                                  │
-│                        └────────┬─────────┘                                  │
-│                                 │                                            │
-│  ┌───────┬───────┬───────┼───────┬───────┬───────┬───────┬───────┬───────┐│
-│  │       │       │       │       │       │       │       │       │       ││
-│┌─▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼──┐ ┌─▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌▼──┐│
-││IKEA│ │SNOFF│ │NOUS │ │PIR │ │Door│ │Plug │ │SNOFF│ │IKEA │ │Light│ │Bot││
-││Lite│ │Temp │ │ E10 │ │Mtn │ │Cnt │ │S60ZB│ │TRVZB│ │Rmte │ │Swtch│ │   ││
-││(2x)│ │(12x)│ │ CO2 │ │    │ │(8x)│ │(3x) │ │(4x) │ │(2x) │ │(4x) │ │   ││
-│└────┘ └─────┘ └─────┘ └────┘ └────┘ └─────┘ └─────┘ └─────┘ └─────┘ └───┘│
-│                                                                              │
-│      Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox    │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                              ZIGBEE NETWORK MAP                                       │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                       │
+│                           ┌──────────────────┐                                        │
+│                           │   Coordinator    │                                        │
+│                           │  Sonoff V2 USB   │                                        │
+│                           │   Channel: 25    │                                        │
+│                           └────────┬─────────┘                                        │
+│                                    │                                                  │
+│  ┌───────┬───────┬───────┬────────┼────────┬───────┬───────┬───────┬───────┬───────┐ │
+│  │       │       │       │        │        │       │       │       │       │       │ │
+│┌─▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌──▼──┐ ┌──▼──┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐ ┌▼──┐│
+││IKEA│ │SNOFF│ │NOUS │ │SNOFF│ │ PIR │ │Door │ │Plug │ │SNOFF│ │IKEA │ │Light│ │Bot││
+││Lite│ │Temp │ │ E10 │ │06P  │ │ Mtn │ │ Cnt │ │S60ZB│ │TRVZB│ │Rmte │ │Swtch│ │   ││
+││(2x)│ │(12x)│ │ CO2 │ │(5x) │ │     │ │(8x) │ │(3x) │ │(4x) │ │(2x) │ │(3x) │ │   ││
+│└────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └───┘│
+│                                                                                       │
+│       Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox            │
+│                                                                                       │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -77,6 +77,11 @@
 | 36 | Bedroom | [Bed] Light Switch | ZBM5-1C-80/86 | SONOFF | Wall Switch (Router) |
 | 37 | Living | [Living] Light Switch | ZBM5-1C-80/86 | SONOFF | Wall Switch (Router) |
 | 38 | - | Fingerbot | TS0001_fingerbot | Tuya | Button Pusher |
+| 39 | Study | [Study] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
+| 40 | Living | [Living] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
+| 41 | Kitchen | [Kitchen] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
+| 42 | Bath | [Bath] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
+| 43 | Bed | [Bed] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
 
 ---
 
@@ -606,6 +611,59 @@
 
 ---
 
+### SONOFF SNZB-06P - Human Presence Sensor (mmWave)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               SONOFF SNZB-06P PRESENCE SENSOR                    │
+├─────────────────────────────────────────────────────────────────┤
+│  Manufacturer: SONOFF                                            │
+│  Model: SNZB-06P                                                 │
+│  Protocol: Zigbee 3.0                                            │
+│  Power: USB-C (5V)                                               │
+│  Type: End Device (requires mains power but not a router)        │
+├─────────────────────────────────────────────────────────────────┤
+│  Sensors:                                                        │
+│    - Occupancy (human presence via mmWave radar)                │
+│    - Illuminance (lux)                                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Features:                                                       │
+│    - 5GHz mmWave radar (detects stationary humans)              │
+│    - No PIR blind spots                                         │
+│    - Detection range: 4m                                        │
+│    - Detection angle: 120°                                      │
+│    - Illuminance threshold configurable                         │
+│    - Motion sensitivity (low/medium/high)                       │
+│    - Presence keep time (15s to 30min)                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Pairing Procedure:                                              │
+│    1. Power on via USB-C                                         │
+│    2. Hold button for 5+ seconds                                 │
+│    3. LED blinks rapidly when in pairing mode                    │
+│    4. Interview completes in ~30 seconds                         │
+│                                                                  │
+│  Factory Reset:                                                  │
+│    Hold button 10+ seconds until LED flashes rapidly             │
+│                                                                  │
+│  Locations: Study, Living, Kitchen, Bath, Bed (5 units)         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "occupancy": true,
+  "illuminance": 156,
+  "illuminance_lux": 156,
+  "motion_sensitivity": "medium",
+  "presence_keep_time": 30,
+  "illuminance_threshold": 500,
+  "linkquality": 180
+}
+```
+
+---
+
 ## Disaster Recovery Checklist
 
 If rebuilding the Zigbee network from scratch:
@@ -652,6 +710,11 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] IKEA Remote Living                                   │
 │    [ ] HOBEIAN ZG-102ZM Vibration Sensor (optional)         │
 │    [ ] Tuya Fingerbot Plus (TS0001_fingerbot)               │
+│    [ ] SONOFF SNZB-06P Study Human Presence (USB powered)   │
+│    [ ] SONOFF SNZB-06P Living Human Presence (USB powered)  │
+│    [ ] SONOFF SNZB-06P Kitchen Human Presence (USB powered) │
+│    [ ] SONOFF SNZB-06P Bath Human Presence (USB powered)    │
+│    [ ] SONOFF SNZB-06P Bed Human Presence (USB powered)     │
 │                                                             │
 │  Step 4: Rename all devices with [Room] prefix              │
 │                                                             │
@@ -835,6 +898,10 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2026-01-19 | Added 5x SONOFF SNZB-06P human presence sensors (Study, Living, Kitchen, Bath, Bed) |
+| 2026-01-19 | Updated device count: 39 → 44 devices |
+| 2026-01-19 | Fixed light switch count: was documented as 4, actually 3 (Study, Bed, Living) |
+| 2026-01-19 | Synced Z2M configuration.yaml with actual Pi config |
 | 2026-01-17 | Added 4 devices: 3x SONOFF ZBM5 wall switches (Study, Bed, Living) + 1x Tuya Fingerbot |
 | 2026-01-17 | Updated device count: 35 → 39 devices |
 | 2026-01-08 | Re-created IKEA remote bindings: genOnOff, genLevelCtrl, genScenes + Coordinator |

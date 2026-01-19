@@ -63,9 +63,13 @@ devices:
     friendly_name: '[Study] IKEA Remote'
   '0x90fd9ffffee43106':
     friendly_name: '[Living] IKEA Remote'
-  # === LIGHT SWITCH (Router) ===
+  # === LIGHT SWITCHES (Routers) ===
   '0x4c97a1fffecd9a31':
     friendly_name: '[Study] Light Switch'
+  '0x58263afffefc1d02':
+    friendly_name: '[Bed] Light Switch'
+  '0x58263afffefc5706':
+    friendly_name: '[Living] Light Switch'
   # === SMART PLUGS (Routers) ===
   '0xa4c13802b54effff':
     friendly_name: Smart Plug [1]
@@ -92,7 +96,7 @@ devices:
     friendly_name: '[Balcony] Temperature & Humidity'
   '0xc09b9efffef541a8':
     friendly_name: '[Bed] Temperature & Humidity'
-  # === TEMPERATURE SENSORS (7 additional SNZB-02WD) ===
+  # === TEMPERATURE SENSORS (6 additional SNZB-02P) ===
   '0x8c73dafffe2a0459':
     friendly_name: '[Living] Temperature & Humidity 6'
   '0x8c73dafffe2a0638':
@@ -126,31 +130,42 @@ devices:
   '0x983268fffe653343':
     friendly_name: '[Hallway] Window Contact Sensor - Main Door'
   # === THERMOSTATS (TRVZB Radiator Valves) ===
-  # NOTE: timer_mode_target_temp disabled because TRVZB sends 0 when timer mode
-  # is not in use, but HA expects range 4.0-35.0. This causes constant errors:
-  # "Invalid value for number.xxx_timer_mode_target_temp: 0"
-  # Fix added 2026-01-12 after investigating Living Outer zombie state bug.
+  # NOTE: timer_mode_target_temp set to false to completely suppress HA discovery.
+  # TRVZB sends 0 when timer mode is not in use, but HA expects range 4.0-35.0.
+  # Using "enabled: false" still creates disabled entity which errors on value 0.
+  # Using "false" (boolean) completely removes the entity from HA discovery.
+  # Fix updated 2026-01-19 after discovering "enabled: false" wasn't enough.
   '0xc4d8c8fffe02cef8':
     friendly_name: '[Study] Thermostat'
     homeassistant:
-      timer_mode_target_temp:
-        enabled: false
+      timer_mode_target_temp: false
   '0xc4d8c8fffe0d9fcc':
     friendly_name: '[Bed] Thermostat'
     homeassistant:
-      timer_mode_target_temp:
-        enabled: false
+      timer_mode_target_temp: false
   '0x286847fffe3926dd':
     friendly_name: '[Living] Thermostat Inner'
     homeassistant:
-      timer_mode_target_temp:
-        enabled: false
+      timer_mode_target_temp: false
   '0x286847fffe38ed6c':
     friendly_name: '[Living] Thermostat Outer'
     homeassistant:
-      timer_mode_target_temp:
-        enabled: false
+      timer_mode_target_temp: false
   # === VIBRATION SENSOR ===
   '0xa4c13863257ea097':
     friendly_name: Vibration Sensor
+  # === FINGERBOT ===
+  '0xa4c1384949538a9b':
+    friendly_name: Fingerbot
+  # === HUMAN PRESENCE SENSORS (SNZB-06P mmWave) ===
+  '0xf84477fffe0437f4':
+    friendly_name: '[Bed] Human Presence'
+  '0xc4d8c8fffe1e40b5':
+    friendly_name: '[Living] Human Presence'
+  '0xc4d8c8fffe1e4673':
+    friendly_name: '[Kitchen] Human Presence'
+  '0xd44867fffe08083c':
+    friendly_name: '[Study] Human Presence'
+  '0xd44867fffe079897':
+    friendly_name: '[Bath] Human Presence'
 version: 4

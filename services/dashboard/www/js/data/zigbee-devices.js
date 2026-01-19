@@ -2,8 +2,8 @@
  * Zigbee Device Configuration
  * Device layout for network visualization
  *
- * Total Devices: 39 (including coordinator)
- * Last Updated: 2026-01-17
+ * Total Devices: 44 (including coordinator)
+ * Last Updated: 2026-01-19
  */
 
 export const ZIGBEE_DEVICES = [
@@ -72,4 +72,11 @@ export const ZIGBEE_DEVICES = [
 
   // Fingerbot (Tuya TS0001_fingerbot)
   { id: 'fingerbot', name: 'Fingerbot', type: 'end-device', icon: '🤖', room: 'hallway', x: 0.52, z: 0.52 },
+
+  // Human Presence Sensors (SONOFF SNZB-06P mmWave)
+  { id: 'presence-study', name: '[Study] Human Presence', type: 'end-device', icon: '👤', room: 'study', x: 0.72, z: 0.20 },
+  { id: 'presence-living', name: '[Living] Human Presence', type: 'end-device', icon: '👤', room: 'living', x: 0.42, z: 0.40 },
+  { id: 'presence-kitchen', name: '[Kitchen] Human Presence', type: 'end-device', icon: '👤', room: 'kitchen', x: 0.62, z: 0.12 },
+  { id: 'presence-bath', name: '[Bath] Human Presence', type: 'end-device', icon: '👤', room: 'bathroom', x: 0.82, z: 0.08 },
+  { id: 'presence-bed', name: '[Bed] Human Presence', type: 'end-device', icon: '👤', room: 'bedroom', x: 0.18, z: 0.18 },
 ];

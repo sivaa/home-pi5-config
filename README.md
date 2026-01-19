@@ -40,13 +40,14 @@
 │    Cloudflared:   Tunnel to ha.sivaa.in                     │
 │    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog   │
 ├─────────────────────────────────────────────────────────────┤
-│  Zigbee Devices: 39 total                                   │
-│    Sensors: 23 (12x temp, 1x CO2, 1x PIR, 8x contact, 1x vib)│
+│  Zigbee Devices: 44 total                                   │
+│    Sensors: 28 (12x temp, 1x CO2, 1x PIR, 8x contact,       │
+│             1x vib, 5x presence)                            │
 │    Thermostats: 4 (SONOFF TRVZB radiator valves)            │
 │    Lights:  2 (IKEA FLOALT panels)                          │
 │    Remotes: 2 (IKEA TRADFRI)                                │
 │    Plugs:   3 (SONOFF S60ZBTPF smart plugs)                 │
-│    Switches: 4 (SONOFF ZBM5 wall switches)                  │
+│    Switches: 3 (SONOFF ZBM5 wall switches)                  │
 │    Other:  1 (Tuya Fingerbot)                               │
 └─────────────────────────────────────────────────────────────┘
 ```
