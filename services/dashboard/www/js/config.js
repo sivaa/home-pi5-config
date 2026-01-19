@@ -91,31 +91,36 @@ export const ROOM_SENSORS = {
       { name: '[Living] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Living] Temperature & Humidity 6', label: 'Sensor 2' },
       { name: '[Living] Temperature & Humidity 7', label: 'Sensor 3' }
-    ]
+    ],
+    presence: { name: '[Living] Human Presence' }
   },
   bedroom: {
     climate: [
       { name: '[Bed] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Bed] Temperature & Humidity 9', label: 'Sensor 2' }
-    ]
+    ],
+    presence: { name: '[Bed] Human Presence' }
   },
   study: {
     climate: [
       { name: '[Study] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Study] Temperature & Humidity 8', label: 'Sensor 2' }
-    ]
+    ],
+    presence: { name: '[Study] Human Presence' }
   },
   kitchen: {
     climate: [
       { name: '[Kitchen] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Kitchen] Temperature & Humidity 10', label: 'Sensor 2' }
-    ]
+    ],
+    presence: { name: '[Kitchen] Human Presence' }
   },
   bathroom: {
     climate: [
       { name: '[Bath] Temperature & Humidity', label: 'Primary', isPrimary: true },
       { name: '[Bath] Temperature & Humidity 11', label: 'Sensor 2' }
-    ]
+    ],
+    presence: { name: '[Bath] Human Presence' }
   },
   balcony: {
     climate: [

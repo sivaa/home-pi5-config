@@ -901,6 +901,30 @@
       pointer-events: none;
     }
 
+    /* Presence indicators (SNZB-06P occupancy sensors) */
+    .floor-presence-icon {
+      fill: var(--color-text-tertiary);
+      opacity: 0.2;
+      transition: fill 0.2s ease, opacity 0.2s ease;
+    }
+
+    /* Room is occupied - green icon */
+    .floor-plan-presence g.occupied .floor-presence-icon {
+      fill: #22c55e;
+      opacity: 1;
+    }
+
+    /* Sensor data is stale (>10 min) - very faint */
+    .floor-plan-presence g.stale .floor-presence-icon {
+      fill: var(--color-text-tertiary);
+      opacity: 0.08;
+    }
+
+    /* No sensor for this room - hide completely */
+    .floor-plan-presence g.no-sensor {
+      display: none;
+    }
+
     /* Dark mode adjustments */
     [data-theme="dark"] .floor-room {
       fill: var(--color-surface);
@@ -908,6 +932,20 @@
 
     [data-theme="dark"] .floor-room-hallway {
       fill: rgba(255, 255, 255, 0.03);
+    }
+
+    [data-theme="dark"] .floor-presence-icon {
+      fill: rgba(255, 255, 255, 0.25);
+      opacity: 1;  /* Override base 0.2 opacity - fill alpha handles subtlety */
+    }
+
+    [data-theme="dark"] .floor-plan-presence g.occupied .floor-presence-icon {
+      fill: #4ade80;
+    }
+
+    [data-theme="dark"] .floor-plan-presence g.stale .floor-presence-icon {
+      fill: rgba(255, 255, 255, 0.1);
+      opacity: 1;
     }
 
     /* Hide panel on smaller screens */

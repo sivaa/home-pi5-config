@@ -2659,6 +2659,34 @@
                   <tspan x="45" dy="10" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
               </g>
+              <!-- Presence indicators (SNZB-06P sensors) -->
+              <g class="floor-plan-presence">
+                <!-- Bathroom (0,0,35,20) - upper right -->
+                <g transform="translate(28, 3)" :class="getRoomOccupancyClass('bathroom')">
+                  <path class="floor-presence-icon" transform="scale(0.25)"
+                        d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
+                </g>
+                <!-- Kitchen (0,20,35,20) -->
+                <g transform="translate(28, 23)" :class="getRoomOccupancyClass('kitchen')">
+                  <path class="floor-presence-icon" transform="scale(0.25)"
+                        d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
+                </g>
+                <!-- Study (55,0,37.39,40) -->
+                <g transform="translate(85, 3)" :class="getRoomOccupancyClass('study')">
+                  <path class="floor-presence-icon" transform="scale(0.25)"
+                        d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
+                </g>
+                <!-- Bedroom (0,40,45,36.65) -->
+                <g transform="translate(38, 43)" :class="getRoomOccupancyClass('bedroom')">
+                  <path class="floor-presence-icon" transform="scale(0.25)"
+                        d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
+                </g>
+                <!-- Living (45,40,47.39,36.65) -->
+                <g transform="translate(85, 43)" :class="getRoomOccupancyClass('living')">
+                  <path class="floor-presence-icon" transform="scale(0.25)"
+                        d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
+                </g>
+              </g>
               <!-- Wall structure -->
               <g class="floor-plan-walls" fill="none">
                 <!-- Outer perimeter -->
@@ -3872,7 +3900,8 @@
         thermostat: [
           { name: '[Living] Thermostat Inner', label: 'Heater Inner' },
           { name: '[Living] Thermostat Outer', label: 'Heater Outer' }
-        ]
+        ],
+        presence: { name: '[Living] Human Presence' }
       },
       bedroom: {
         climate: [
@@ -3881,7 +3910,8 @@
         ],
         thermostat: [
           { name: '[Bed] Thermostat', label: 'Heater' }
-        ]
+        ],
+        presence: { name: '[Bed] Human Presence' }
       },
       study: {
         climate: [
@@ -3890,19 +3920,22 @@
         ],
         thermostat: [
           { name: '[Study] Thermostat', label: 'Heater' }
-        ]
+        ],
+        presence: { name: '[Study] Human Presence' }
       },
       kitchen: {
         climate: [
           { name: '[Kitchen] Temperature & Humidity', label: 'East', isPrimary: true },
           { name: '[Kitchen] Temperature & Humidity 10', label: 'Inner' }
-        ]
+        ],
+        presence: { name: '[Kitchen] Human Presence' }
       },
       bathroom: {
         climate: [
           { name: '[Bath] Temperature & Humidity', label: 'East', isPrimary: true },
           { name: '[Bath] Temperature & Humidity 11', label: 'Inner' }
-        ]
+        ],
+        presence: { name: '[Bath] Human Presence' }
       },
       balcony: {
         climate: [
@@ -4107,6 +4140,12 @@
               const sensorFound = Alpine.store('rooms').updateSensor(deviceName, data);
               if (sensorFound) return;
 
+              // Route presence sensor data to rooms store
+              if (data.occupancy !== undefined) {
+                const presenceFound = Alpine.store('rooms').handlePresenceMessage(deviceName, data);
+                if (presenceFound) return;
+              }
+
               Alpine.store('lights').updateLight(deviceName, data);
             } catch (e) {
               console.error('MQTT parse error:', e);
@@ -4153,7 +4192,11 @@
             // Computed room averages
             avgTemperature: null,
             avgHumidity: null,
-            tempSpread: null
+            tempSpread: null,
+            // Presence tracking (SNZB-06P sensors)
+            presenceSensor: roomSensorConfig.presence?.name || null,
+            occupancy: null,
+            lastOccupancySeen: null
           };
         }),
         lastUpdate: null,
@@ -4329,6 +4372,44 @@
               room.stale = true;
             }
           });
+        },
+
+        // Calculate trend from history (rising/falling/stable)
+        getTrend(historyArray, thresholdPercent = 2) {
+          if (!historyArray || historyArray.length < 10) return 'stable';
+          const recent = historyArray.slice(-5);
+          const previous = historyArray.slice(-10, -5);
+          if (previous.length < 3) return 'stable';
+          const recentAvg = recent.reduce((a, b) => a + b.value, 0) / recent.length;
+          const previousAvg = previous.reduce((a, b) => a + b.value, 0) / previous.length;
+          const change = ((recentAvg - previousAvg) / previousAvg) * 100;
+          if (change > thresholdPercent) return 'rising';
+          if (change < -thresholdPercent) return 'falling';
+          return 'stable';
+        },
+
+        // Get temperature trend for a room
+        getTempTrend(room) {
+          return this.getTrend(room.tempHistory, 1.5);
+        },
+
+        // Get humidity trend for a room
+        getHumidTrend(room) {
+          return this.getTrend(room.humidHistory, 3);
+        },
+
+        // Handle presence sensor updates (SNZB-06P)
+        handlePresenceMessage(sensorName, data) {
+          const room = this.list.find(r => r.presenceSensor === sensorName);
+          if (!room) return false;
+
+          if (data.occupancy !== undefined) {
+            room.occupancy = data.occupancy;
+            room.lastOccupancySeen = Date.now();
+            this.lastUpdate = Date.now();
+            this.version++;
+          }
+          return true;
         }
       });
 
@@ -5399,6 +5480,22 @@
           if (temp < 19) return 'floor-temp-warm';         // Light orange
           if (temp < 21) return 'floor-temp-hot';          // Orange
           return 'floor-temp-very-hot';                    // Red
+        },
+
+        // Get occupancy class for floor plan presence icon
+        // Shows occupied (green) / empty (subtle) / stale (very faint) / no-sensor (hidden)
+        getRoomOccupancyClass(roomId) {
+          const room = Alpine.store('rooms').list.find(r => r.id === roomId);
+          if (!room?.presenceSensor) return 'no-sensor';
+
+          // Check if data is stale (>10 minutes old)
+          const isStale = room.lastOccupancySeen
+            ? (Date.now() - room.lastOccupancySeen > 10 * 60 * 1000)
+            : true;
+
+          if (isStale) return 'stale';
+          if (room.occupancy === true) return 'occupied';
+          return '';  // Not occupied, not stale - show subtle icon
         },
 
         getOpenContactCount() {

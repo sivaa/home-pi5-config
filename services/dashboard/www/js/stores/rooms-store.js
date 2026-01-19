@@ -40,7 +40,11 @@ export function initRoomsStore(Alpine, CONFIG) {
         // Computed room averages
         avgTemperature: null,
         avgHumidity: null,
-        tempSpread: null
+        tempSpread: null,
+        // Presence tracking (SNZB-06P sensors)
+        presenceSensor: roomSensorConfig.presence?.name || null,
+        occupancy: null,
+        lastOccupancySeen: null
       };
     }),
     lastUpdate: null,
@@ -236,6 +240,24 @@ export function initRoomsStore(Alpine, CONFIG) {
       );
       if (roomWithSensor) {
         this._updateSensorInRoom(roomWithSensor, sensorName, data);
+        return;
+      }
+
+      // Check if this is a presence sensor
+      if (data.occupancy !== undefined) {
+        this.handlePresenceMessage(sensorName, data);
+      }
+    },
+
+    // Update occupancy state from presence sensor (SNZB-06P)
+    handlePresenceMessage(sensorName, data) {
+      const room = this.list.find(r => r.presenceSensor === sensorName);
+      if (!room) return;
+
+      if (data.occupancy !== undefined) {
+        room.occupancy = data.occupancy;
+        room.lastOccupancySeen = Date.now();
+        this.lastUpdate = Date.now();
       }
     },
 
@@ -247,6 +269,10 @@ export function initRoomsStore(Alpine, CONFIG) {
         topics.add(room.sensor);
         // Additional sensors
         room.sensors.forEach(s => topics.add(s.name));
+        // Presence sensor
+        if (room.presenceSensor) {
+          topics.add(room.presenceSensor);
+        }
       });
       return Array.from(topics);
     },
