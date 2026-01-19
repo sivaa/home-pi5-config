@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 # MAILBOX MOTION ALERT
 # Trigger: Motion detected at mailbox (PIR sensor)
-# Action: TTS announcement on ALL Google Home devices
+# Action: TTS announcement on KITCHEN DISPLAY only + mobile notification
 # Quiet Hours: 23:00 - 07:00 (no announcements)
 # Cooldown: 30 seconds (prevents spam from continuous motion)
 # -----------------------------------------------------------------------------
@@ -33,11 +33,12 @@
            else true }}
 
   action:
-    # Use smart TTS with speaker availability check and mobile fallback
-    - service: script.smart_tts_announce
+    # TTS announcement on KITCHEN DISPLAY ONLY
+    - service: tts.google_translate_say
       data:
+        entity_id: media_player.kitchen_display
         message: "Mailbox opened"
-        title: "📬 Mailbox"
+        language: "en"
     # Always send mobile notification (in addition to TTS)
     - service: notify.all_phones
       data:
@@ -310,47 +311,6 @@
                 tag: "window_{{ trigger.entity_id | replace('.', '_') }}"
           - delay:
               minutes: 1
-
-# -----------------------------------------------------------------------------
-# MAILBOX SENSOR ONLINE ALERT
-# Trigger: Sensor becomes available (comes back online)
-# Action: TTS announcement on ALL Google Home devices
-# Quiet Hours: 23:00 - 07:00 (no announcements)
-# -----------------------------------------------------------------------------
-- id: mailbox_sensor_online
-  alias: "Mailbox Sensor Online"
-  description: "Announces when mailbox motion sensor comes back online"
-  mode: single
-
-  trigger:
-    # Trigger when sensor availability changes to online
-    - platform: state
-      entity_id: binary_sensor.mailbox_motion_sensor_occupancy
-      from: "unavailable"
-    - platform: state
-      entity_id: binary_sensor.mailbox_motion_sensor_occupancy
-      from: "unknown"
-
-  condition:
-    # Quiet hours: no announcements between 23:00 and 07:00
-    - condition: time
-      after: "07:00:00"
-      before: "23:00:00"
-
-  action:
-    # Use smart TTS with speaker availability check and mobile fallback
-    - service: script.smart_tts_announce
-      data:
-        message: "Mailbox sensor is now online."
-        title: "📡 Sensor Online"
-    # Always send mobile notification (in addition to TTS)
-    - service: notify.all_phones
-      data:
-        title: "📡 Sensor Online"
-        message: "Mailbox motion sensor is back online"
-        data:
-          channel: "Info"
-          importance: default
 
 # =============================================================================
 # HEATER NOTIFICATIONS
@@ -2841,11 +2801,11 @@
     - service: input_boolean.turn_on
       entity_id: input_boolean.circadian_automation_active
 
-    # Read scheduled values from template sensors
+    # Read scheduled values from template sensors (with safe defaults if unavailable)
     - variables:
-        brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
-        color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
-        brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+        brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
+        color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
+        brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
 
     # Study light (if on and not overridden)
     # GOLDEN RULE: Only dim/warm, never brighten/cool
@@ -2859,8 +2819,8 @@
       then:
         - variables:
             # Read current light state
-            current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(254) | int }}"
-            current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+            current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(255) | int }}"
+            current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
             # GOLDEN RULE: Take minimum (only go down)
             final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
             final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
@@ -2888,8 +2848,8 @@
       then:
         - variables:
             # Read current light state
-            current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(254) | int }}"
-            current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+            current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(255) | int }}"
+            current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
             # GOLDEN RULE: Take minimum (only go down)
             final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
             final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
@@ -2940,8 +2900,8 @@
     room: "{{ 'study' if trigger.entity_id == 'light.study_ikea_light' else 'living' }}"
     override_flag: "input_boolean.circadian_{{ room }}_override"
     light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
-    brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
-    brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+    brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
+    brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
     phase: "{{ states('sensor.circadian_phase') }}"
 
   action:
@@ -3071,9 +3031,9 @@
           state: "on"
 
   variables:
-    brightness_pct: "{{ states('sensor.circadian_brightness') | int }}"
-    color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
-    brightness_value: "{{ (brightness_pct / 100 * 254) | round(0) }}"
+    brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
+    color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
+    brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
 
   action:
     # Check Study override expiry
@@ -3098,8 +3058,8 @@
           then:
             - variables:
                 # Read current light state
-                current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(254) | int }}"
-                current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+                current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
                 # GOLDEN RULE: Take minimum (only go down)
                 final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
                 final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
@@ -3116,20 +3076,19 @@
                     brightness: "{{ final_brightness }}"
                     color_temp_kelvin: "{{ final_color_temp }}"
                     transition: 60
+                # Notification only when light was actually changed
+                - service: notify.all_phones
+                  data:
+                    title: "💡 Study Light"
+                    message: "Override ended. Adjusted to {{ ((final_brightness / 255) * 100) | round(0) }}%."
+                    data:
+                      channel: "Lights"
+                      importance: low
+                      tag: "circadian_override_study"
             - delay:
                 seconds: 5
             - service: input_boolean.turn_off
               entity_id: input_boolean.circadian_automation_active
-
-        # Notification
-        - service: notify.all_phones
-          data:
-            title: "💡 Study Light"
-            message: "Override ended. Circadian adjusted to {{ (final_brightness / 254 * 100) | round(0) }}%."
-            data:
-              channel: "Lights"
-              importance: low
-              tag: "circadian_override_study"
 
     # Check Living override expiry
     - if:
@@ -3153,8 +3112,8 @@
           then:
             - variables:
                 # Read current light state
-                current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(254) | int }}"
-                current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(6500) | int }}"
+                current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
                 # GOLDEN RULE: Take minimum (only go down)
                 final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
                 final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
@@ -3171,20 +3130,19 @@
                     brightness: "{{ final_brightness }}"
                     color_temp_kelvin: "{{ final_color_temp }}"
                     transition: 60
+                # Notification only when light was actually changed
+                - service: notify.all_phones
+                  data:
+                    title: "💡 Living Light"
+                    message: "Override ended. Adjusted to {{ ((final_brightness / 255) * 100) | round(0) }}%."
+                    data:
+                      channel: "Lights"
+                      importance: low
+                      tag: "circadian_override_living"
             - delay:
                 seconds: 5
             - service: input_boolean.turn_off
               entity_id: input_boolean.circadian_automation_active
-
-        # Notification
-        - service: notify.all_phones
-          data:
-            title: "💡 Living Light"
-            message: "Override ended. Circadian adjusted to {{ (final_brightness / 254 * 100) | round(0) }}%."
-            data:
-              channel: "Lights"
-              importance: low
-              tag: "circadian_override_living"
 
 # -----------------------------------------------------------------------------
 # CIRCADIAN PHASE NOTIFICATION
@@ -3347,8 +3305,8 @@
             - variables:
                 room: "{{ trigger.payload_json.room }}"
                 light_entity: "{{ 'light.study_ikea_light' if room == 'study' else 'light.living_ikea_light' }}"
-                brightness_value: "{{ (states('sensor.circadian_brightness') | int / 100 * 254) | round(0) }}"
-                color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int }}"
+                brightness_value: "{{ (states('sensor.circadian_brightness') | int(100) / 100 * 255) | round(0) }}"
+                color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
             - service: input_boolean.turn_on
               target:
                 entity_id: input_boolean.circadian_automation_active
@@ -4096,3 +4054,136 @@
             entity_id: climate.bed_thermostat
           data:
             temperature: 18
+
+# =============================================================================
+# PRESENCE-BASED LIGHTING (AUTO-OFF)
+# =============================================================================
+# Trigger: mmWave human presence sensors
+# Action: Turn off lights when no presence detected
+# Note: Lights are turned ON manually, only AUTO-OFF when room is empty
+# Created: 2026-01-19
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# BEDROOM - Light OFF when unoccupied
+# -----------------------------------------------------------------------------
+- id: bed_presence_light_off
+  alias: "[Bed] Light Off When Unoccupied"
+  description: "Turn off bedroom light when no human presence"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.bed_human_presence_occupancy
+      to: "off"
+
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.bed_light_switch
+
+# -----------------------------------------------------------------------------
+# LIVING - IKEA Light OFF when unoccupied
+# -----------------------------------------------------------------------------
+- id: living_presence_ikea_light_off
+  alias: "[Living] IKEA Light Off When Unoccupied"
+  description: "Turn off Living IKEA light when no human presence"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.living_human_presence_occupancy
+      to: "off"
+
+  action:
+    - service: light.turn_off
+      target:
+        entity_id: light.living_ikea_light
+
+# -----------------------------------------------------------------------------
+# STUDY - IKEA Light OFF when unoccupied
+# -----------------------------------------------------------------------------
+- id: study_presence_ikea_light_off
+  alias: "[Study] IKEA Light Off When Unoccupied"
+  description: "Turn off Study IKEA light when no human presence"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.study_human_presence_occupancy
+      to: "off"
+
+  action:
+    - service: light.turn_off
+      target:
+        entity_id: light.study_ikea_light
+
+# -----------------------------------------------------------------------------
+# KITCHEN - TTS reminder if lights appear on when unoccupied
+# Uses illumination sensor (no smart lights in kitchen)
+# Only triggers after sunset to avoid false alerts from sunlight
+# -----------------------------------------------------------------------------
+- id: kitchen_presence_light_reminder
+  alias: "[Kitchen] Light Reminder When Unoccupied"
+  description: "TTS reminder if kitchen lights appear on when no presence (after sunset)"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.kitchen_human_presence_occupancy
+      to: "off"
+
+  condition:
+    # Only trigger after sunset (avoids false alerts from sunlight)
+    - condition: state
+      entity_id: sun.sun
+      state: "below_horizon"
+    # And illumination is bright (light is on)
+    - condition: state
+      entity_id: sensor.kitchen_human_presence_illumination
+      state: "bright"
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "Kitchen light is still on"
+        language: "en"
+
+# -----------------------------------------------------------------------------
+# BATHROOM - TTS reminder if lights appear on when unoccupied
+# Uses illumination sensor (no smart lights in bathroom)
+# Only triggers after sunset to avoid false alerts from sunlight
+# -----------------------------------------------------------------------------
+- id: bath_presence_light_reminder
+  alias: "[Bath] Light Reminder When Unoccupied"
+  description: "TTS reminder if bathroom lights appear on when no presence (after sunset)"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      to: "off"
+
+  condition:
+    # Only trigger after sunset (avoids false alerts from sunlight)
+    - condition: state
+      entity_id: sun.sun
+      state: "below_horizon"
+    # And illumination is bright (light is on)
+    - condition: state
+      entity_id: sensor.bath_human_presence_illumination
+      state: "bright"
+
+  action:
+    - service: tts.google_translate_say
+      data:
+        entity_id:
+          - media_player.kitchen_display
+          - media_player.broken_display
+          - media_player.master_bedroom_clock
+        message: "Bathroom light is still on"
+        language: "en"
