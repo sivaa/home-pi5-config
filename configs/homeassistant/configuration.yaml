@@ -11,6 +11,7 @@ homeassistant:
 frontend:
 config:
 mobile_app:
+sun:  # Required for sun.sun entity (sunrise/sunset tracking)
 
 # =============================================================================
 # NOTIFICATION GROUPS
