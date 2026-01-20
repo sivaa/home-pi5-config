@@ -5540,6 +5540,9 @@
           const light = Alpine.store('lights')?.list?.find(l => l.id === lightId);
           if (!light) return 'no-light';
 
+          // Show as OFF if unavailable (can't know real state)
+          if (!light.available) return 'off';
+
           return light.state === 'ON' ? 'lit' : 'off';
         },
 
