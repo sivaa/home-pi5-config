@@ -4432,6 +4432,12 @@
             this.lastUpdate = Date.now();
             this.version++;
           }
+
+          // Store illumination from presence sensor (SNZB-06P reports "bright" or "dim")
+          if (data.illumination !== undefined) {
+            room.illumination = data.illumination;
+          }
+
           return true;
         }
       });
@@ -5522,28 +5528,22 @@
         },
 
         // Get light class for floor plan light indicator
+        // Uses illumination from presence sensor (SNZB-06P reports "bright"/"dim")
         // Shows lit (bright yellow) / off (subtle) / no-light (hidden)
         getRoomLightClass(roomId) {
-          // Map room IDs to light IDs
-          const roomLightMap = {
-            'study': 'study_light',
-            'living': 'living_light',
-            'bedroom': null,
-            'kitchen': null,
-            'bathroom': null,
-            'hallway': null
-          };
+          const room = Alpine.store('rooms')?.list?.find(r => r.id === roomId);
 
-          const lightId = roomLightMap[roomId];
-          if (!lightId) return 'no-light';
+          // No presence sensor in this room (e.g., hallway) - hide indicator
+          if (!room?.presenceSensor) return 'no-light';
 
-          const light = Alpine.store('lights')?.list?.find(l => l.id === lightId);
-          if (!light) return 'no-light';
+          // Check if presence data is stale (>10 min) - show as off
+          const isStale = room.lastOccupancySeen
+            ? (Date.now() - room.lastOccupancySeen > 10 * 60 * 1000)
+            : true;
+          if (isStale) return 'off';
 
-          // Show as OFF if unavailable (can't know real state)
-          if (!light.available) return 'off';
-
-          return light.state === 'ON' ? 'lit' : 'off';
+          // Use illumination from presence sensor
+          return room.illumination === 'bright' ? 'lit' : 'off';
         },
 
         getOpenContactCount() {
