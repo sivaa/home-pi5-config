@@ -5528,7 +5528,7 @@
         },
 
         // Get light class for floor plan light indicator
-        // Uses illumination from presence sensor (SNZB-06P reports "bright"/"dim")
+        // Priority: 1) Smart light state  2) Illumination from presence sensor
         // Shows lit (bright yellow) / off (subtle) / no-light (hidden)
         getRoomLightClass(roomId) {
           const room = Alpine.store('rooms')?.list?.find(r => r.id === roomId);
@@ -5536,13 +5536,30 @@
           // No presence sensor in this room (e.g., hallway) - hide indicator
           if (!room?.presenceSensor) return 'no-light';
 
-          // Check if presence data is stale (>10 min) - show as off
+          // Map room IDs to light IDs (rooms with smart lights)
+          const roomLightMap = {
+            'study': 'study_light',
+            'living': 'living_light'
+          };
+
+          // Priority 1: Check smart light state if room has one
+          const lightId = roomLightMap[roomId];
+          if (lightId) {
+            const light = Alpine.store('lights')?.list?.find(l => l.id === lightId);
+            if (light?.available) {
+              // Light is online - use its actual state
+              return light.state === 'ON' ? 'lit' : 'off';
+            }
+            // Light unavailable - fall through to illumination
+          }
+
+          // Priority 2: Use illumination from presence sensor
+          // (for rooms without smart lights, or when light is offline)
           const isStale = room.lastOccupancySeen
             ? (Date.now() - room.lastOccupancySeen > 10 * 60 * 1000)
             : true;
           if (isStale) return 'off';
 
-          // Use illumination from presence sensor
           return room.illumination === 'bright' ? 'lit' : 'off';
         },
 
