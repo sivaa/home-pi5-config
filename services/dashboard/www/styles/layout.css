@@ -925,6 +925,31 @@
       display: none;
     }
 
+    /* Light indicators (left side of room cells) */
+    .floor-light-icon {
+      fill: var(--color-text-tertiary);
+      opacity: 0.15;
+      transition: fill 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+    }
+
+    /* Light is ON - bright yellow with subtle glow */
+    .floor-plan-lights g.lit .floor-light-icon {
+      fill: #fbbf24;
+      opacity: 1;
+      filter: drop-shadow(0 0 2px #fbbf24);
+    }
+
+    /* Light is OFF - subtle indicator */
+    .floor-plan-lights g.off .floor-light-icon {
+      fill: var(--color-text-tertiary);
+      opacity: 0.15;
+    }
+
+    /* No light in this room - hide completely */
+    .floor-plan-lights g.no-light {
+      display: none;
+    }
+
     /* Dark mode adjustments */
     [data-theme="dark"] .floor-room {
       fill: var(--color-surface);
@@ -945,6 +970,21 @@
 
     [data-theme="dark"] .floor-plan-presence g.stale .floor-presence-icon {
       fill: rgba(255, 255, 255, 0.1);
+      opacity: 1;
+    }
+
+    [data-theme="dark"] .floor-light-icon {
+      fill: rgba(255, 255, 255, 0.2);
+      opacity: 1;
+    }
+
+    [data-theme="dark"] .floor-plan-lights g.lit .floor-light-icon {
+      fill: #fbbf24;
+      filter: drop-shadow(0 0 3px #fbbf24);
+    }
+
+    [data-theme="dark"] .floor-plan-lights g.off .floor-light-icon {
+      fill: rgba(255, 255, 255, 0.15);
       opacity: 1;
     }
 

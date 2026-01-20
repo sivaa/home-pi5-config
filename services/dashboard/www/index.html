@@ -2659,6 +2659,29 @@
                   <tspan x="45" dy="10" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
               </g>
+              <!-- Light indicators (IKEA FLOALT lights) -->
+              <g class="floor-plan-lights">
+                <!-- Bathroom (0,0,35,20) - no light -->
+                <g transform="translate(2, 3)" :class="getRoomLightClass('bathroom')">
+                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                </g>
+                <!-- Kitchen (0,20,35,20) - no light -->
+                <g transform="translate(2, 23)" :class="getRoomLightClass('kitchen')">
+                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                </g>
+                <!-- Study (55,0,37.39,40) - has study_light -->
+                <g transform="translate(57, 3)" :class="getRoomLightClass('study')">
+                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                </g>
+                <!-- Bedroom (0,40,45,36.65) - no light -->
+                <g transform="translate(2, 43)" :class="getRoomLightClass('bedroom')">
+                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                </g>
+                <!-- Living (45,40,47.39,36.65) - has living_light -->
+                <g transform="translate(47, 43)" :class="getRoomLightClass('living')">
+                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                </g>
+              </g>
               <!-- Presence indicators (SNZB-06P sensors) -->
               <g class="floor-plan-presence">
                 <!-- Bathroom (0,0,35,20) - upper right -->
@@ -5496,6 +5519,28 @@
           if (isStale) return 'stale';
           if (room.occupancy === true) return 'occupied';
           return '';  // Not occupied, not stale - show subtle icon
+        },
+
+        // Get light class for floor plan light indicator
+        // Shows lit (bright yellow) / off (subtle) / no-light (hidden)
+        getRoomLightClass(roomId) {
+          // Map room IDs to light IDs
+          const roomLightMap = {
+            'study': 'study_light',
+            'living': 'living_light',
+            'bedroom': null,
+            'kitchen': null,
+            'bathroom': null,
+            'hallway': null
+          };
+
+          const lightId = roomLightMap[roomId];
+          if (!lightId) return 'no-light';
+
+          const light = Alpine.store('lights')?.list?.find(l => l.id === lightId);
+          if (!light) return 'no-light';
+
+          return light.state === 'ON' ? 'lit' : 'off';
         },
 
         getOpenContactCount() {
