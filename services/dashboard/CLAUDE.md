@@ -626,13 +626,17 @@ Unified timeline of mobile notifications and TTS announcements, with filtering b
 
 ### Channels
 
-| Channel | Icon | Color | Source |
-|---------|------|-------|--------|
-| Critical | 🚨 | Red | High-priority alerts |
-| Alerts | ⚠️ | Amber | Standard alerts |
-| Warning | ⚡ | Orange | Warning notifications |
-| Heater | 🔥 | Red | Heating system alerts |
-| Info | ℹ️ | Blue | Informational |
+| Channel | Icon | Color | Use Cases |
+|---------|------|-------|-----------|
+| Critical | 🚨 | Red | Freezing temps, CO2 emergency, system failures |
+| Safety | 🛡️ | Red | Window safety, heater safety interlocks |
+| Heater | 🔥 | Orange | Heating system, thermostat changes |
+| Alerts | ⚠️ | Amber | Standard alerts, CO2 warnings |
+| Warning | ⚡ | Orange | General warnings |
+| Zigbee | 📡 | Purple | Zigbee network issues, device offline |
+| Lights | 💡 | Yellow | Lighting reminders, circadian updates |
+| Info | ℹ️ | Blue | Informational, status updates |
+| Audit | 📝 | Indigo | Setpoint changes, audit trail |
 | TTS | 🔊 | Purple | Voice announcements |
 | Default | 📋 | Gray | Uncategorized |
 

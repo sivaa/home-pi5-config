@@ -25,14 +25,18 @@ export function initNotificationHistoryStore(Alpine, CONFIG) {
     // Constants
     MAX_NOTIFICATIONS: 500,
 
-    // Channel/Type configuration
+    // Channel/Type configuration (based on actual HA automation channels)
     channels: {
       Critical: { icon: '🚨', color: '#ef4444', label: 'Critical' },
+      Safety: { icon: '🛡️', color: '#dc2626', label: 'Safety' },
+      Heater: { icon: '🔥', color: '#ea580c', label: 'Heater' },
       Alerts: { icon: '⚠️', color: '#f59e0b', label: 'Alerts' },
       Warning: { icon: '⚡', color: '#f97316', label: 'Warning' },
-      Heater: { icon: '🔥', color: '#ef4444', label: 'Heater' },
+      Zigbee: { icon: '📡', color: '#8b5cf6', label: 'Zigbee' },
+      Lights: { icon: '💡', color: '#eab308', label: 'Lights' },
       Info: { icon: 'ℹ️', color: '#3b82f6', label: 'Info' },
-      TTS: { icon: '🔊', color: '#8b5cf6', label: 'TTS' },
+      Audit: { icon: '📝', color: '#6366f1', label: 'Audit' },
+      TTS: { icon: '🔊', color: '#a855f7', label: 'TTS' },
       Default: { icon: '📋', color: '#6b7280', label: 'Default' }
     },
 
