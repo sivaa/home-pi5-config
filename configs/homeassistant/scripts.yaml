@@ -5,16 +5,17 @@
 
 # -----------------------------------------------------------------------------
 # SMART TTS - CO2 ALERT WITH RETRY
-# Purpose: TTS announcement with primary speaker preference, retry, and obsolescence check
+# Purpose: TTS on kitchen_display with retry logic, obsolescence check, and fallback cascade
 #
 # Flow:
-#   1. Check if primary speaker (kitchen_display) is available
+#   1. Check if kitchen_display is available
 #   2. If available AND CO2 still high: play immediately
 #   3. If unavailable: wait up to 5 minutes (event-driven with wait_template)
-#   4. If primary becomes available AND CO2 still high: play on primary
-#   5. If timeout (5 min) AND CO2 still high: play on fallback speakers
+#   4. If kitchen_display becomes available AND CO2 still high: play on it
+#   5. If timeout (5 min) AND CO2 still high:
+#      a. Try broken_display + master_bedroom_clock (fallback)
+#      b. If all speakers unavailable: send mobile notification
 #   6. If CO2 drops below threshold during wait: skip (announcement obsolete)
-#   7. If ALL speakers unavailable: send mobile notification warning
 #
 # Usage:
 #   service: script.smart_tts_co2_alert
@@ -84,45 +85,39 @@ smart_tts_co2_alert:
                     message: "{{ message }}"
                     language: "en"
 
-          # Default: Timeout reached (5 min) - use fallback speakers if CO2 still high
+          # Default: Timeout reached (5 min) - kitchen_display still unavailable, try fallback speakers
           default:
             - if:
                 - condition: template
                   value_template: >
                     {{ states('sensor.hallway_co2_co2') | int >= co2_threshold | int }}
               then:
-                # Check if ANY fallback speaker is available
-                - if:
-                    - condition: template
-                      value_template: >
-                        {{ states('media_player.broken_display') not in ['unavailable', 'unknown']
-                           or states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}
-                  then:
-                    # Notify that we're using fallback (Kitchen Display was unavailable)
+                # Check fallback speaker availability
+                - variables:
+                    broken_ok: "{{ states('media_player.broken_display') not in ['unavailable', 'unknown'] }}"
+                    bedroom_ok: "{{ states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}"
+
+                - choose:
+                    # Try fallback speakers (broken_display and/or bedroom_clock)
+                    - conditions: "{{ broken_ok or bedroom_ok }}"
+                      sequence:
+                        - service: tts.google_translate_say
+                          data:
+                            entity_id: >
+                              {% set speakers = [] %}
+                              {% if broken_ok %}{% set speakers = speakers + ['media_player.broken_display'] %}{% endif %}
+                              {% if bedroom_ok %}{% set speakers = speakers + ['media_player.master_bedroom_clock'] %}{% endif %}
+                              {{ speakers }}
+                            message: "{{ message }}"
+                            language: "en"
+
+                  # All speakers unavailable - send mobile notification
+                  default:
                     - service: notify.all_phones
                       data:
-                        title: "🔇 TTS Fallback"
-                        message: "Kitchen Display unavailable for 5 min. Using fallback speakers."
-                        data:
-                          channel: "Alerts"
-                          importance: default
-                          tag: "tts_fallback"
-                    # Play on fallback speakers
-                    - service: tts.google_translate_say
-                      data:
-                        entity_id:
-                          - media_player.broken_display
-                          - media_player.master_bedroom_clock
-                        message: "{{ message }}"
-                        language: "en"
-                  else:
-                    # ALL speakers unavailable - critical notification!
-                    - service: notify.all_phones
-                      data:
-                        title: "🔇 TTS FAILED - No Speakers!"
+                        title: "🔇 TTS Failed - All Speakers Offline"
                         message: >
-                          CO2 is {{ states('sensor.hallway_co2_co2') }} ppm but ALL Google Home speakers are unavailable!
-                          Kitchen Display, Broken Display, and Bedroom Clock are all offline.
+                          CO2 is {{ states('sensor.hallway_co2_co2') }} ppm. {{ message }}
                         data:
                           channel: "Critical"
                           importance: max
@@ -130,17 +125,17 @@ smart_tts_co2_alert:
 
 # -----------------------------------------------------------------------------
 # SMART TTS - WINDOW ALERT WITH RETRY
-# Purpose: TTS announcement for window alerts with speaker availability check,
-#          retry logic, fallback speakers, and obsolescence check
+# Purpose: TTS on kitchen_display with retry logic, obsolescence check, and fallback cascade
 #
 # Flow:
-#   1. Check if primary speaker (kitchen_display) is available
+#   1. Check if kitchen_display is available
 #   2. If available AND window still open: play immediately
 #   3. If unavailable: wait up to 5 minutes (event-driven with wait_template)
-#   4. If primary becomes available AND window still open: play on primary
-#   5. If timeout (5 min) AND window still open: play on fallback speakers
+#   4. If kitchen_display becomes available AND window still open: play on it
+#   5. If timeout (5 min) AND window still open:
+#      a. Try broken_display + master_bedroom_clock (fallback)
+#      b. If all speakers unavailable: send mobile notification
 #   6. If window closes during wait: skip (announcement obsolete)
-#   7. If ALL speakers unavailable: send mobile notification warning
 #
 # Usage:
 #   service: script.smart_tts_window_alert
@@ -150,7 +145,7 @@ smart_tts_co2_alert:
 # -----------------------------------------------------------------------------
 smart_tts_window_alert:
   alias: "Smart TTS - Window Alert with Retry"
-  description: "TTS with primary speaker preference, retry logic, and obsolescence check for window alerts"
+  description: "TTS on kitchen_display with retry logic and obsolescence check for window alerts"
   mode: parallel
   max: 4
 
@@ -208,44 +203,37 @@ smart_tts_window_alert:
                     message: "{{ message }}"
                     language: "en"
 
-          # Default: Timeout reached (5 min) - use fallback speakers if window still open
+          # Default: Timeout reached (5 min) - kitchen_display still unavailable, try fallback speakers
           default:
             - if:
                 - condition: template
                   value_template: "{{ is_state(window_entity, 'on') }}"
               then:
-                # Check if ANY fallback speaker is available
-                - if:
-                    - condition: template
-                      value_template: >
-                        {{ states('media_player.broken_display') not in ['unavailable', 'unknown']
-                           or states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}
-                  then:
-                    # Notify that we're using fallback (Kitchen Display was unavailable)
+                # Check fallback speaker availability
+                - variables:
+                    broken_ok: "{{ states('media_player.broken_display') not in ['unavailable', 'unknown'] }}"
+                    bedroom_ok: "{{ states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}"
+
+                - choose:
+                    # Try fallback speakers (broken_display and/or bedroom_clock)
+                    - conditions: "{{ broken_ok or bedroom_ok }}"
+                      sequence:
+                        - service: tts.google_translate_say
+                          data:
+                            entity_id: >
+                              {% set speakers = [] %}
+                              {% if broken_ok %}{% set speakers = speakers + ['media_player.broken_display'] %}{% endif %}
+                              {% if bedroom_ok %}{% set speakers = speakers + ['media_player.master_bedroom_clock'] %}{% endif %}
+                              {{ speakers }}
+                            message: "{{ message }}"
+                            language: "en"
+
+                  # All speakers unavailable - send mobile notification
+                  default:
                     - service: notify.all_phones
                       data:
-                        title: "🔇 TTS Fallback"
-                        message: "Kitchen Display unavailable for 5 min. Using fallback speakers for window alert."
-                        data:
-                          channel: "Alerts"
-                          importance: default
-                          tag: "tts_fallback"
-                    # Play on fallback speakers
-                    - service: tts.google_translate_say
-                      data:
-                        entity_id:
-                          - media_player.broken_display
-                          - media_player.master_bedroom_clock
+                        title: "🔇 TTS Failed - All Speakers Offline"
                         message: "{{ message }}"
-                        language: "en"
-                  else:
-                    # ALL speakers unavailable - critical notification!
-                    - service: notify.all_phones
-                      data:
-                        title: "🔇 TTS FAILED - No Speakers!"
-                        message: >
-                          {{ message }}
-                          (ALL Google Home speakers are unavailable!)
                         data:
                           channel: "Critical"
                           importance: max
@@ -253,15 +241,15 @@ smart_tts_window_alert:
 
 # -----------------------------------------------------------------------------
 # SMART TTS - GENERIC ANNOUNCEMENT
-# Purpose: Simple TTS with speaker availability check and mobile fallback
+# Purpose: TTS with speaker fallback cascade and mobile notification backup
 #
 # Use this for one-time announcements that don't need obsolescence checks.
 # For repeated alerts (CO2, window), use the specialized smart_tts scripts.
 #
 # Flow:
-#   1. Check which speakers are available (not unavailable/unknown)
-#   2. If ANY available: play on all available speakers
-#   3. If NONE available: send mobile notification as fallback
+#   1. kitchen_display (primary)
+#   2. broken_display + master_bedroom_clock (fallback)
+#   3. phone notification (final fallback)
 #
 # Usage:
 #   service: script.smart_tts_announce
@@ -271,7 +259,7 @@ smart_tts_window_alert:
 # -----------------------------------------------------------------------------
 smart_tts_announce:
   alias: "Smart TTS - Generic Announcement"
-  description: "TTS with speaker availability check and mobile fallback"
+  description: "TTS with fallback cascade: kitchen → broken+bedroom → phones"
   mode: parallel
   max: 10
 
@@ -286,34 +274,41 @@ smart_tts_announce:
       default: "📢 Announcement"
 
   sequence:
-    # Build list of available speakers
+    # Calculate speaker availability once
     - variables:
         kitchen_ok: "{{ states('media_player.kitchen_display') not in ['unavailable', 'unknown'] }}"
         broken_ok: "{{ states('media_player.broken_display') not in ['unavailable', 'unknown'] }}"
         bedroom_ok: "{{ states('media_player.master_bedroom_clock') not in ['unavailable', 'unknown'] }}"
-        any_available: "{{ kitchen_ok or broken_ok or bedroom_ok }}"
 
-    - if:
-        - condition: template
-          value_template: "{{ any_available }}"
-      then:
-        # At least one speaker available - play TTS on all available
-        - service: tts.google_translate_say
-          data:
-            entity_id: >
-              {% set speakers = [] %}
-              {% if kitchen_ok %}{% set speakers = speakers + ['media_player.kitchen_display'] %}{% endif %}
-              {% if broken_ok %}{% set speakers = speakers + ['media_player.broken_display'] %}{% endif %}
-              {% if bedroom_ok %}{% set speakers = speakers + ['media_player.master_bedroom_clock'] %}{% endif %}
-              {{ speakers }}
-            message: "{{ message }}"
-            language: "en"
-      else:
-        # ALL speakers unavailable - mobile fallback
+    - choose:
+        # Priority 1: Kitchen Display (primary)
+        - conditions: "{{ kitchen_ok }}"
+          sequence:
+            - service: tts.google_translate_say
+              data:
+                entity_id: media_player.kitchen_display
+                message: "{{ message }}"
+                language: "en"
+
+        # Priority 2: Fallback speakers (broken_display and/or bedroom_clock)
+        - conditions: "{{ broken_ok or bedroom_ok }}"
+          sequence:
+            - service: tts.google_translate_say
+              data:
+                entity_id: >
+                  {% set speakers = [] %}
+                  {% if broken_ok %}{% set speakers = speakers + ['media_player.broken_display'] %}{% endif %}
+                  {% if bedroom_ok %}{% set speakers = speakers + ['media_player.master_bedroom_clock'] %}{% endif %}
+                  {{ speakers }}
+                message: "{{ message }}"
+                language: "en"
+
+      # Priority 3: Phone notification (final fallback - all speakers offline)
+      default:
         - service: notify.all_phones
           data:
             title: "🔇 {{ title }}"
-            message: "{{ message }} (TTS failed - all speakers offline)"
+            message: "{{ message }} (All speakers offline)"
             data:
               channel: "Alerts"
               importance: high
@@ -817,18 +812,15 @@ co2_override_start:
         payload: >
           {"active": true, "expires_at": "{{ expiry_time }}", "started_at": "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}", "co2_level": {{ co2_level }}}
 
-    # 6. TTS announcement (respect quiet hours)
+    # 6. TTS announcement (respect quiet hours, uses fallback cascade)
     - if:
         - condition: template
           value_template: "{{ not is_quiet_hours }}"
       then:
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
             message: "CO2 override enabled for 6 hours. Heaters will run despite high CO2."
-            language: "en"
+            title: "🔓 CO2 Override"
 
     # 7. Mobile notification
     - service: notify.all_phones
@@ -906,18 +898,15 @@ co2_override_cancel:
         retain: true
         payload: '{"active": false}'
 
-    # 5. TTS announcement (respect quiet hours)
+    # 5. TTS announcement (respect quiet hours, uses fallback cascade)
     - if:
         - condition: template
           value_template: "{{ not is_quiet_hours and co2_is_high }}"
       then:
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
             message: "CO2 override cancelled. Heaters paused due to high CO2."
-            language: "en"
+            title: "🔒 CO2 Override Cancelled"
 
     # 6. Mobile notification
     - service: notify.all_phones

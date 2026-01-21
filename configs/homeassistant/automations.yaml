@@ -33,13 +33,12 @@
            else true }}
 
   action:
-    # TTS announcement on KITCHEN DISPLAY ONLY
-    - service: tts.google_translate_say
+    # TTS announcement with fallback cascade (kitchen → broken+bedroom → phone)
+    - service: script.smart_tts_announce
       data:
-        entity_id: media_player.kitchen_display
         message: "Mailbox opened"
-        language: "en"
-    # Always send mobile notification (in addition to TTS)
+        title: "📬 Mailbox"
+    # Always send mobile notification (in addition to TTS - for when away from home)
     - service: notify.all_phones
       data:
         title: "📬 Mailbox"
@@ -287,7 +286,7 @@
           - condition: template
             value_template: "{{ is_state(trigger.entity_id, 'on') }}"
         sequence:
-          # Use smart TTS script with retry, fallback speakers, and obsolescence check
+          # Use smart TTS script with retry, mobile fallback, and obsolescence check
           - service: script.smart_tts_window_alert
             data:
               message: >
@@ -654,14 +653,10 @@
             data:
               channel: "Info"
               tag: "window_heater_safety"
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
-              - media_player.master_bedroom_clock
             message: "{{ door_name }} open. Door control takes over from CO2."
-            language: "en"
+            title: "🚪 CO2 Handoff"
         - stop: "Transferred ownership from CO2 to door"
 
     # SAVE current heater states (now protected by guard)
@@ -716,18 +711,14 @@
       data:
         hvac_mode: "off"
 
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: >-
           {{ door_name }} open 2 minutes.
           {%- if heaters_running != 'None' %} Pausing {{ heaters_running }}.
           {%- else %} No heaters active.
           {%- endif %}
-        language: "en"
+        title: "🚪 {{ door_name }}"
 
     - service: notify.all_phones
       data:
@@ -840,14 +831,10 @@
             data:
               channel: "Info"
               tag: "window_heater_safety"
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
-              - media_player.master_bedroom_clock
             message: "{{ window_name }} open. Window control takes over from CO2."
-            language: "en"
+            title: "🪟 CO2 Handoff"
         - stop: "Transferred ownership from CO2 to window"
 
     # SAVE current heater states (now protected by guard)
@@ -902,18 +889,14 @@
       data:
         hvac_mode: "off"
 
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: >-
           {{ window_name }} open 30 seconds.
           {%- if heaters_running != 'None' %} Pausing {{ heaters_running }}.
           {%- else %} No heaters active.
           {%- endif %}
-        language: "en"
+        title: "🪟 {{ window_name }}"
 
     - service: notify.all_phones
       data:
@@ -1027,14 +1010,10 @@
             - condition: template
               value_template: "{{ now().hour < 23 and now().hour >= 7 }}"
           then:
-            - service: tts.google_translate_say
+            - service: script.smart_tts_announce
               data:
-                entity_id:
-                  - media_player.kitchen_display
-                  - media_player.broken_display
-                  - media_player.master_bedroom_clock
                 message: "Windows closed, but CO2 is still {{ states('sensor.hallway_co2_co2') | int }}. Heaters staying off."
-                language: "en"
+                title: "🪟 Windows Closed, CO2 High"
         - service: notify.all_phones
           data:
             title: "🪟 Windows Closed, CO2 Still High"
@@ -1122,17 +1101,13 @@
     - delay:
         seconds: 2
 
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: >-
           Windows closed.
           {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
           {%- endif %}
-        language: "en"
+        title: "✅ Windows Closed"
 
     - service: notify.all_phones
       data:
@@ -1175,16 +1150,12 @@
             entity_id: binary_sensor.hallway_window_contact_sensor_main_door_contact
             state: "on"
         sequence:
-          - service: tts.google_translate_say
+          - service: script.smart_tts_announce
             data:
-              entity_id:
-                - media_player.kitchen_display
-                - media_player.broken_display
-                - media_player.master_bedroom_clock
               message: >
                 Attention! The main door has been open for more than 3 minutes.
                 Please close the main door.
-              language: "en"
+              title: "🚪 Main Door Still Open"
 
           - service: notify.all_phones
             data:
@@ -1258,17 +1229,13 @@
             entity_id: sensor.balcony_temperature_humidity_temperature
             below: 18
         sequence:
-          - service: tts.google_translate_say
+          - service: script.smart_tts_announce
             data:
-              entity_id:
-                - media_player.kitchen_display
-                - media_player.broken_display
-                - media_player.master_bedroom_clock
               message: >
                 Attention! {{ window_name }} has been open for a long time
                 and it's {{ states('sensor.balcony_temperature_humidity_temperature') | round(0) }} degrees outside.
                 Please close it to keep the apartment warm.
-              language: "en"
+              title: "🪟 Window Open Cold"
           - delay:
               minutes: 2
 
@@ -1398,14 +1365,10 @@
       data:
         hvac_mode: "off"
 
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: "{{ heater_name }} blocked. Close {{ open_windows }}."
-        language: "en"
+        title: "🚫 {{ heater_name }} Blocked"
 
     - service: notify.all_phones
       data:
@@ -1562,22 +1525,18 @@
           data:
             hvac_mode: "off"
 
-    # TTS Announcement (respect quiet hours)
+    # TTS Announcement (respect quiet hours, uses fallback cascade)
     - if:
         - condition: template
           value_template: "{{ not is_quiet_hours }}"
       then:
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
-              - media_player.master_bedroom_clock
             message: >-
               CO2 is {{ co2_level }}. Heaters paused.
               {%- if heaters_running != 'None' %} Stopping {{ heaters_running }}.
               {%- endif %}
-            language: "en"
+            title: "🌫️ CO2 High"
 
     # Mobile notification (always)
     - service: notify.all_phones
@@ -1709,19 +1668,15 @@
             - service: input_boolean.turn_off
               target:
                 entity_id: input_boolean.heaters_off_due_to_co2
-            # TTS notification (respect quiet hours)
+            # TTS notification (respect quiet hours, uses fallback cascade)
             - if:
                 - condition: template
                   value_template: "{{ not is_quiet_hours }}"
               then:
-                - service: tts.google_translate_say
+                - service: script.smart_tts_announce
                   data:
-                    entity_id:
-                      - media_player.kitchen_display
-                      - media_player.broken_display
-                      - media_player.master_bedroom_clock
                     message: "CO2 is now {{ co2_level }}. Air improved, but window still open. Heaters staying off."
-                    language: "en"
+                    title: "✅ CO2 Normal"
             # Mobile notification
             - service: notify.all_phones
               data:
@@ -1806,17 +1761,13 @@
         - delay:
             seconds: 2
 
-        # TTS (respect quiet hours)
+        # TTS (respect quiet hours, uses fallback cascade)
         - if:
             - condition: template
               value_template: "{{ not is_quiet_hours }}"
           then:
-            - service: tts.google_translate_say
+            - service: script.smart_tts_announce
               data:
-                entity_id:
-                  - media_player.kitchen_display
-                  - media_player.broken_display
-                  - media_player.master_bedroom_clock
                 message: >-
                   {% if is_timeout %}CO2 sensor timeout. Resuming heaters as safety fallback.
                   {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.{%- endif %}
@@ -1824,7 +1775,7 @@
                   {%- if heaters_restored != 'None' %} Resuming {{ heaters_restored }}.
                   {%- endif %}
                   {% endif %}
-                language: "en"
+                title: "{% if is_timeout %}⚠️ CO2 Timeout{% else %}✅ CO2 Normal{% endif %}"
 
         # Mobile notification
         - service: notify.all_phones
@@ -1965,6 +1916,52 @@
               "devices": device_status,
               "success": any_available,
               "all_available": all_available,
+              "automation": trigger.event.context.parent_id | default('manual')
+            } | tojson
+          }}
+        retain: false
+
+# =============================================================================
+# MOBILE NOTIFICATION MQTT PUBLISHER
+# Purpose: Log all mobile notifications to MQTT for dashboard history view
+# Topic: dashboard/notify (non-retained)
+# Note: Captures all notify.all_phones calls for timeline display
+# =============================================================================
+- id: mobile_notification_mqtt_publisher
+  alias: "Mobile Notification MQTT Publisher"
+  description: "Publishes all mobile notifications to MQTT for dashboard logging"
+  mode: parallel
+  max: 10
+
+  trigger:
+    - platform: event
+      event_type: call_service
+      event_data:
+        domain: notify
+        service: all_phones
+
+  variables:
+    service_data: "{{ trigger.event.data.service_data }}"
+    title: "{{ service_data.title | default('Notification') }}"
+    message: "{{ service_data.message | default('') }}"
+    channel: "{{ service_data.data.channel | default('Default') if service_data.data is defined else 'Default' }}"
+    importance: "{{ service_data.data.importance | default('default') if service_data.data is defined else 'default' }}"
+    tag: "{{ service_data.data.tag | default('') if service_data.data is defined else '' }}"
+
+  action:
+    - service: mqtt.publish
+      data:
+        topic: "dashboard/notify"
+        payload: >
+          {{
+            {
+              "timestamp": now().isoformat(),
+              "type": "mobile",
+              "title": title,
+              "message": message,
+              "channel": channel,
+              "importance": importance,
+              "tag": tag,
               "automation": trigger.event.context.parent_id | default('manual')
             } | tojson
           }}
@@ -3973,18 +3970,15 @@
           importance: high
           tag: "thermostat_zombie"
 
-    # TTS announcement (respect quiet hours 23:00-07:00)
+    # TTS announcement (respect quiet hours 23:00-07:00, uses fallback cascade)
     - if:
         - condition: template
           value_template: "{{ now().hour >= 7 and now().hour < 23 }}"
       then:
-        - service: tts.google_translate_say
+        - service: script.smart_tts_announce
           data:
-            entity_id:
-              - media_player.kitchen_display
-              - media_player.broken_display
             message: "Recovering stuck thermostat. {{ zombie_thermostats | join(' and ') }}."
-            language: "en"
+            title: "🔧 Thermostat Recovery"
 
     # Recover each zombie thermostat
     - if:
@@ -4121,69 +4115,79 @@
 # -----------------------------------------------------------------------------
 # KITCHEN - TTS reminder if lights appear on when unoccupied
 # Uses illumination sensor (no smart lights in kitchen)
-# Only triggers after sunset to avoid false alerts from sunlight
+# Repeats every 3 minutes until light is turned off
+# Only during non-quiet hours (07:00-23:00) and after sunset
 # -----------------------------------------------------------------------------
 - id: kitchen_presence_light_reminder
   alias: "[Kitchen] Light Reminder When Unoccupied"
-  description: "TTS reminder if kitchen lights appear on when no presence (after sunset)"
+  description: "Repeating TTS reminder every 3 min if kitchen light on with no presence"
   mode: single
 
   trigger:
-    - platform: state
-      entity_id: binary_sensor.kitchen_human_presence_occupancy
-      to: "off"
+    # Check every 3 minutes
+    - platform: time_pattern
+      minutes: "/3"
 
   condition:
-    # Only trigger after sunset (avoids false alerts from sunlight)
+    # No human presence in kitchen
     - condition: state
-      entity_id: sun.sun
-      state: "below_horizon"
-    # And illumination is bright (light is on)
+      entity_id: binary_sensor.kitchen_human_presence_occupancy
+      state: "off"
+    # Light is on (illumination sensor reads bright)
     - condition: state
       entity_id: sensor.kitchen_human_presence_illumination
       state: "bright"
+    # Non-quiet hours (07:00-23:00)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
+    # After sunset (avoid false positives from sunlight)
+    - condition: state
+      entity_id: sun.sun
+      state: "below_horizon"
 
   action:
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: "Kitchen light is still on"
-        language: "en"
+        title: "💡 Kitchen Light"
 
 # -----------------------------------------------------------------------------
 # BATHROOM - TTS reminder if lights appear on when unoccupied
 # Uses illumination sensor (no smart lights in bathroom)
-# Only triggers after sunset to avoid false alerts from sunlight
+# Repeats every 3 minutes until light is turned off
+# Only during non-quiet hours (07:00-23:00) and after sunset
 # -----------------------------------------------------------------------------
 - id: bath_presence_light_reminder
   alias: "[Bath] Light Reminder When Unoccupied"
-  description: "TTS reminder if bathroom lights appear on when no presence (after sunset)"
+  description: "Repeating TTS reminder every 3 min if bathroom light on with no presence"
   mode: single
 
   trigger:
-    - platform: state
-      entity_id: binary_sensor.bath_human_presence_occupancy
-      to: "off"
+    # Check every 3 minutes
+    - platform: time_pattern
+      minutes: "/3"
 
   condition:
-    # Only trigger after sunset (avoids false alerts from sunlight)
+    # No human presence in bathroom
     - condition: state
-      entity_id: sun.sun
-      state: "below_horizon"
-    # And illumination is bright (light is on)
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      state: "off"
+    # Light is on (illumination sensor reads bright)
     - condition: state
       entity_id: sensor.bath_human_presence_illumination
       state: "bright"
+    # Non-quiet hours (07:00-23:00)
+    - condition: time
+      after: "07:00:00"
+      before: "23:00:00"
+    # After sunset (avoid false positives from sunlight)
+    - condition: state
+      entity_id: sun.sun
+      state: "below_horizon"
 
   action:
-    - service: tts.google_translate_say
+    - service: script.smart_tts_announce
       data:
-        entity_id:
-          - media_player.kitchen_display
-          - media_player.broken_display
-          - media_player.master_bedroom_clock
         message: "Bathroom light is still on"
-        language: "en"
+        title: "💡 Bathroom Light"

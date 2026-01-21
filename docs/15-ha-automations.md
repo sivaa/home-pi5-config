@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2026-01-04
-> **Total Automations:** 47
+> **Last Updated:** 2026-01-21
+> **Total Automations:** 49
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -25,6 +25,7 @@
 | [Heater Safety Limits](#-heater-safety-limits) | 2 | Cap all thermostats at 22°C max |
 | [Circadian Lighting](#-circadian-lighting) | 8 | Schedule-based brightness/color temp with override detection |
 | [Sensor Offline Alerts](#-sensor-offline-alerts) | 3 | Alert when contact sensors go unavailable |
+| [Presence Light Reminders](#-presence-light-reminders) | 2 | Repeating TTS for lights left on |
 
 ---
 
@@ -88,21 +89,13 @@
 | **Trigger** | Motion detected (`binary_sensor.mailbox_motion_sensor_occupancy` → on) |
 | **Quiet Hours** | 23:00 - 07:00 (no announcements) |
 | **Cooldown** | 30 seconds |
-| **Action** | TTS on all 3 speakers + mobile notification |
-
-#### 2. Mailbox Sensor Online
-| Property | Value |
-|----------|-------|
-| **ID** | `mailbox_sensor_online` |
-| **Trigger** | Sensor changes from `unavailable`/`unknown` to available |
-| **Quiet Hours** | 23:00 - 06:00 |
-| **Action** | TTS on all 3 speakers + mobile notification |
+| **Action** | TTS on kitchen display only + mobile notification |
 
 ---
 
 ### 🌬️ CO2 Monitoring
 
-#### 3. CO2 High Level Alert
+#### 2. CO2 High Level Alert
 | Property | Value |
 |----------|-------|
 | **ID** | `co2_high_alert` |
@@ -112,7 +105,7 @@
 | **Action** | TTS on kitchen display + mobile notification |
 | **Message** | "Nithya, the Criuse Owner, please ventilate..." |
 
-#### 4. CO2 Critical Level Alert
+#### 3. CO2 Critical Level Alert
 | Property | Value |
 |----------|-------|
 | **ID** | `co2_critical_alert` |
@@ -121,7 +114,7 @@
 | **Action** | TTS + mobile notification with vibration pattern |
 | **Message** | "Warning! CO2 level is critical... Please open windows immediately!" |
 
-#### 5. CO2 Good Level Notification
+#### 4. CO2 Good Level Notification
 | Property | Value |
 |----------|-------|
 | **ID** | `co2_good_level` |
@@ -253,6 +246,28 @@ These automations use the `smart_tts_window_alert` script for robust TTS with re
 
 **Known Limitation:** If temperature drops from warm to freezing mid-window (e.g., opens at 5°C, drops to -3°C at minute 7), the alert may be delayed to 15 minutes via the cold weather backup. This is rare as temperature rarely drops 5°C in 5 minutes.
 
+#### Uniform TTS Fallback Cascade
+
+All TTS notifications now use a uniform fallback hierarchy via `script.smart_tts_announce`:
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  TTS PRIORITY CASCADE (All Notifications)                          │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  PRIORITY 1: kitchen_display (primary speaker)                     │
+│     └─ If available → Play TTS immediately                        │
+│                                                                    │
+│  PRIORITY 2: broken_display + master_bedroom_clock (fallback)      │
+│     └─ If kitchen unavailable but fallbacks available → Play TTS  │
+│                                                                    │
+│  PRIORITY 3: Mobile notification (final fallback)                  │
+│     └─ If ALL speakers unavailable → Send push notification       │
+│        └─ Message includes "(All speakers offline)"               │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
 #### Smart TTS Window Alert Script
 
 The `smart_tts_window_alert` script (defined in `scripts.yaml`) provides:
@@ -271,7 +286,7 @@ The `smart_tts_window_alert` script (defined in `scripts.yaml`) provides:
 │     ├─ Kitchen Display available? → Play TTS                      │
 │     └─ Timeout (5 min)? → Use fallback speakers                   │
 │                                                                    │
-│  3. Fallback speakers:                                             │
+│  3. Fallback speakers (checked in parallel):                       │
 │     ├─ media_player.broken_display (Living Room)                  │
 │     └─ media_player.master_bedroom_clock (Bedroom)                │
 │                                                                    │
@@ -837,6 +852,74 @@ After a 34-hour power outage, 2 contact sensors (Bath, Kitchen) stayed offline w
 
 ---
 
+### 💡 Presence Light Reminders
+
+These automations provide **repeating TTS reminders** when lights are left on in rooms without presence. Uses illumination sensors (no smart lights in Kitchen/Bathroom) to detect light state.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      REPEATING LIGHT REMINDER FLOW                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  EVERY 3 MINUTES (time_pattern)                                                 │
+│       │                                                                         │
+│       ▼                                                                         │
+│  ┌────────────────────────────────────────────────────────────────────┐         │
+│  │ CHECK CONDITIONS:                                                  │         │
+│  │ ✓ No human presence (occupancy = off)                             │         │
+│  │ ✓ Light is on (illumination = bright)                             │         │
+│  │ ✓ Non-quiet hours (07:00 - 23:00)                                 │         │
+│  │ ✓ After sunset (sun below horizon)                                │         │
+│  └────────────────────────────────────────────────────────────────────┘         │
+│       │                                                                         │
+│       ▼ All conditions met                                                      │
+│  ┌────────────────────────────────────────────────────────────────────┐         │
+│  │ 🔊 TTS ANNOUNCEMENT                                                │         │
+│  │ "Kitchen light is still on" or "Bathroom light is still on"       │         │
+│  │ → Repeats every 3 minutes until resolved                          │         │
+│  └────────────────────────────────────────────────────────────────────┘         │
+│                                                                                 │
+│  RESOLUTION (any of these stops reminders):                                     │
+│  • Turn off the light                                                           │
+│  • Enter the room (presence detected)                                           │
+│  • Quiet hours begin (23:00)                                                    │
+│  • Sunrise (sun above horizon)                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Why Repeating?** Single announcements were easily missed. Repeating every 3 minutes ensures action is taken while not being overly annoying.
+
+**Why Sunset Condition?** The illumination sensor detects "bright" from both electric lights AND sunlight. The sunset condition prevents false positives during the day.
+
+#### 45. Kitchen Light Reminder
+| Property | Value |
+|----------|-------|
+| **ID** | `kitchen_presence_light_reminder` |
+| **Trigger** | Every 3 minutes (time pattern) |
+| **Conditions** | No presence + illumination bright + 07:00-23:00 + after sunset |
+| **Mode** | Single |
+| **Action** | TTS "Kitchen light is still on" |
+| **Speakers** | Kitchen Display, Broken Display, Master Bedroom Clock |
+
+#### 46. Bathroom Light Reminder
+| Property | Value |
+|----------|-------|
+| **ID** | `bath_presence_light_reminder` |
+| **Trigger** | Every 3 minutes (time pattern) |
+| **Conditions** | No presence + illumination bright + 07:00-23:00 + after sunset |
+| **Mode** | Single |
+| **Action** | TTS "Bathroom light is still on" |
+| **Speakers** | Kitchen Display, Broken Display, Master Bedroom Clock |
+
+**Sensors Used:**
+| Room | Presence Sensor | Illumination Sensor |
+|------|-----------------|---------------------|
+| Kitchen | `binary_sensor.kitchen_human_presence_occupancy` | `sensor.kitchen_human_presence_illumination` |
+| Bathroom | `binary_sensor.bath_human_presence_occupancy` | `sensor.bath_human_presence_illumination` |
+
+---
+
 ## Entity Reference
 
 ### Contact Sensors (8 total)
@@ -1069,6 +1152,7 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2026-01-21 | **Uniform TTS Fallback Hierarchy:** Implemented consistent TTS fallback cascade across ALL notifications. Priority: (1) kitchen_display, (2) broken_display + master_bedroom_clock, (3) phone notification. Updated 3 smart_tts scripts (`smart_tts_announce`, `smart_tts_co2_alert`, `smart_tts_window_alert`) and converted 16 direct TTS calls in automations to use `script.smart_tts_announce`. CO2 override scripts now also use the cascade. This ensures no notification is silently lost if primary speaker is offline. |
 | 2026-01-07 | **Unified temperature-aware window alerts:** Replaced `bath_window_open_too_long` and `bed_window_open_too_long` with single `window_open_too_long` automation. Now covers ALL 7 windows + balcony door. **Key change:** 5-minute alert when temp ≤0°C (freezing), 10-minute when >0°C. Uses balcony sensor for outdoor temp. If sensor unavailable, defaults to freezing behavior (safer). Main door unchanged at 3-min (security). Cold weather alert (15min, <18°C) provides backup for edge cases. |
 | 2026-01-04 | **Added Sensor Offline Alert system:** After a 34-hour power outage, 2 contact sensors stayed offline blocking heater resume (unavailable ≠ off). Added 3 automations: (1) `contact_sensor_offline_alert` - immediate notification after 5 min offline, (2) `contact_sensor_offline_repeat` - repeat every 4 hours, (3) `contact_sensor_back_online` - recovery notification. Also increased Z2M passive timeout 1500→2400 for better short-outage recovery. Documented 8 Circadian Lighting automations. Total count: 33→47 automations. |
 | 2025-12-31 | **Fixed CO2 guard not triggering heater resume:** The `watchdog_recovery_periodic_resume_check` automation only checked `heaters_off_due_to_window` flag, missing cases where heaters were paused due to high CO2. When `co2_low_resume_heaters` missed the threshold crossing (e.g., HA busy, value jumped), heaters stayed off indefinitely. Fix: Watchdog now checks BOTH window AND CO2 guard flags and routes to the appropriate resume automation. |
