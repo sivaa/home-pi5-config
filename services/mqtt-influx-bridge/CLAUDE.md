@@ -32,7 +32,8 @@
 |-------|---------|
 | `zigbee2mqtt/#` | All Zigbee device events (state changes, sensor readings) |
 | `dashboard/audit/#` | Source tracking (was change from Dashboard or External?) |
-| `homeassistant/tts/result` | TTS announcement results |
+| `dashboard/tts` | TTS announcement results |
+| `dashboard/notify` | Mobile notification logging (from HA automation) |
 | `zigbee2mqtt/Vibration Sensor` | Hot water usage detection |
 
 ---

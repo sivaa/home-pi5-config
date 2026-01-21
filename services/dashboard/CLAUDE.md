@@ -492,3 +492,178 @@ ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
   -t 'zigbee2mqtt/[Study] Thermostat/set' \
   -m '{\"occupied_heating_setpoint\": 18, \"timer_mode_target_temp\": 18}'"
 ```
+
+---
+
+## MQTT Visibility Pause (2026-01-20)
+
+MQTT connection is paused when the browser tab is hidden to save resources and prevent stale data accumulation.
+
+### Lifecycle
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  MQTT Connection Lifecycle with Visibility Handling          │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Browser Opens → MQTT connects ──────────────────────────┐   │
+│                                                          │   │
+│  Tab hidden (500ms debounce) → MQTT disconnects         │   │
+│                                                          │   │
+│  Tab visible → MQTT reconnects → Re-subscribes → Fresh! ←┘   │
+│                                                              │
+│  Browser Closes → Connection terminates                      │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Details
+
+| Property | Purpose |
+|----------|---------|
+| `_visibilityPaused` | True when disconnected due to tab hidden |
+| `_visibilityDebounceTimer` | 500ms debounce for rapid tab switches |
+| `_visibilityListenerRegistered` | Prevents duplicate listener registration |
+
+### Key Behaviors
+
+1. **500ms debounce** - Rapid tab switches don't cause connect/disconnect churn
+2. **Subscriptions persist** - `_topicHandlers` Map survives disconnect; `on('connect')` re-subscribes
+3. **Notification suppressed** - "MQTT Disconnected" toast NOT shown for visibility pause
+4. **Data recovery on resume** - `connectionCount > 0` triggers `loadOpenSensorTimestamps()` for fresh data
+
+### Console Output
+
+```
+[mqtt] Tab hidden - pausing MQTT connection
+[mqtt] Tab visible - resuming MQTT connection
+```
+
+### Testing
+
+1. Open dashboard in browser
+2. Switch to another tab → wait 500ms → check console for "Tab hidden - pausing"
+3. Switch back → verify "Tab visible - resuming" → verify data flows again
+4. Rapidly switch tabs → should NOT see multiple disconnect/connect logs
+
+---
+
+## Notification History View (2026-01-21)
+
+Unified timeline of mobile notifications and TTS announcements, with filtering by type, channel, date, and search.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  NOTIFICATION DATA FLOW                                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Home Assistant                                                 │
+│       │                                                         │
+│       ├── notify.all_phones ──► MQTT: dashboard/notify          │
+│       │   (via mobile_notification_mqtt_publisher automation)   │
+│       │                                                         │
+│       └── tts.google_say ────► MQTT: dashboard/tts              │
+│           (via tts_publisher automation)                        │
+│                                                                 │
+│                    │                                            │
+│                    ▼                                            │
+│           mqtt-influx-bridge                                    │
+│                    │                                            │
+│      ┌─────────────┴─────────────┐                              │
+│      ▼                           ▼                              │
+│  notifications              tts_events                          │
+│  (InfluxDB measurement)     (InfluxDB measurement)              │
+│                                                                 │
+│                    │                                            │
+│                    ▼                                            │
+│      notification-history-store.js                              │
+│      ├── MQTT real-time updates                                 │
+│      ├── InfluxDB historical queries                            │
+│      └── Filter logic (type, channel, date, search)             │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Sources
+
+| Source | Topic/Measurement | Data |
+|--------|-------------------|------|
+| Mobile Notifications | `dashboard/notify` → `notifications` | title, message, channel, importance |
+| TTS Announcements | `dashboard/tts` → `tts_events` | message, success, all_available, devices |
+
+### Filter Logic
+
+**OR within category, AND across categories:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Example: [Mobile, TTS] types + [Alerts] channel                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Step 1: Type filter (OR)                                       │
+│    type === 'mobile' OR type === 'tts'                          │
+│                                                                 │
+│  Step 2: Channel filter (OR)                                    │
+│    channel === 'Alerts'                                         │
+│                                                                 │
+│  Step 3: Combine (AND)                                          │
+│    passesTypeFilter AND passesChannelFilter                     │
+│                                                                 │
+│  Result: Mobile OR TTS that are ALSO in Alerts channel          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `js/stores/notification-history-store.js` | Alpine store with MQTT handlers, InfluxDB queries, filtering |
+| `views/notification-history.js` | View controller with lifecycle management |
+| `styles/views/notification-history.css` | Card layout, filter chips, responsive design |
+
+### Channels
+
+| Channel | Icon | Color | Source |
+|---------|------|-------|--------|
+| Critical | 🚨 | Red | High-priority alerts |
+| Alerts | ⚠️ | Amber | Standard alerts |
+| Warning | ⚡ | Orange | Warning notifications |
+| Heater | 🔥 | Red | Heating system alerts |
+| Info | ℹ️ | Blue | Informational |
+| TTS | 🔊 | Purple | Voice announcements |
+| Default | 📋 | Gray | Uncategorized |
+
+### View Lifecycle
+
+```javascript
+// notification-history.js
+init() {
+  this.$store.notificationHistory.activate();  // Sets up MQTT, loads historical
+}
+
+destroy() {
+  this.$store.notificationHistory.deactivate();  // Cleans up MQTT handlers
+}
+```
+
+### Testing
+
+```bash
+# 1. Trigger a test notification
+ssh pi@pi 'curl -X POST http://localhost:8123/api/services/notify/all_phones \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\": \"Test\", \"message\": \"Test notification\", \"data\": {\"channel\": \"Alerts\"}}"'
+
+# 2. Verify MQTT message received
+ssh pi@pi 'timeout 5 docker exec mosquitto mosquitto_sub -t "dashboard/notify" -C 1'
+
+# 3. Verify InfluxDB write
+ssh pi@pi 'curl -s "http://localhost:8086/query?db=homeassistant" \
+  --data-urlencode "q=SELECT * FROM notifications ORDER BY time DESC LIMIT 5"'
+
+# 4. Open dashboard → Notifications view → verify data appears
+```

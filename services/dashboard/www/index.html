@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="styles/views/hot-water.css">
   <link rel="stylesheet" href="styles/views/transport.css">
   <link rel="stylesheet" href="styles/views/device-health.css">
+  <link rel="stylesheet" href="styles/views/notification-history.css">
   <link rel="stylesheet" href="styles/views/system.css?v=8">
   <link rel="stylesheet" href="styles/notifications.css">
 
@@ -2551,6 +2552,164 @@
 
         </div>
 
+        <!-- Notification History View -->
+        <div x-show="currentView === 'notifications'"
+             x-cloak
+             x-data="notificationHistoryView()"
+             x-init="init()"
+             @view-changed.window="if ($event.detail.view !== 'notifications') destroy()"
+             class="view notification-history-view">
+
+          <div class="notification-history-container">
+            <!-- Header -->
+            <div class="notification-header">
+              <div class="notification-header-left">
+                <h1 class="notification-title">Notification History</h1>
+                <div class="notification-stats">
+                  <span class="stat-badge" x-text="stats.total + ' total'"></span>
+                  <span class="stat-badge stat-recent" x-show="stats.lastHour > 0" x-text="stats.lastHour + ' last hour'"></span>
+                </div>
+              </div>
+              <div class="notification-header-right">
+                <button class="btn-icon" @click="refresh()" :disabled="loading">
+                  <span x-show="!loading">↻</span>
+                  <span x-show="loading" class="loading-indicator"></span>
+                </button>
+                <button class="btn-icon" :class="{ active: showFilters }" @click="toggleFilters()">
+                  <span>⚙️</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="notification-filters" x-show="showFilters" x-cloak>
+              <!-- Type Filter -->
+              <div class="filter-section">
+                <span class="filter-label">Type</span>
+                <div class="filter-chips">
+                  <button class="filter-chip"
+                          :class="{ active: isTypeSelected('mobile') }"
+                          @click="toggleType('mobile')">
+                    <span class="chip-icon">📱</span>
+                    <span class="chip-label">Mobile</span>
+                    <span class="chip-count" x-text="stats.byType.mobile || 0"></span>
+                  </button>
+                  <button class="filter-chip"
+                          :class="{ active: isTypeSelected('tts') }"
+                          @click="toggleType('tts')">
+                    <span class="chip-icon">🔊</span>
+                    <span class="chip-label">TTS</span>
+                    <span class="chip-count" x-text="stats.byType.tts || 0"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Channel Filter -->
+              <div class="filter-section">
+                <span class="filter-label">Channel</span>
+                <div class="filter-chips">
+                  <template x-for="channel in availableChannels" :key="channel">
+                    <button class="filter-chip"
+                            :class="{ active: isChannelSelected(channel) }"
+                            @click="toggleChannel(channel)">
+                      <span class="chip-icon" x-text="getChannelInfo(channel).icon"></span>
+                      <span class="chip-label" x-text="channel"></span>
+                      <span class="chip-count" x-text="stats.byChannel[channel] || 0"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Date Range Filter -->
+              <div class="filter-section">
+                <span class="filter-label">Time Range</span>
+                <div class="filter-chips">
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('today') }" @click="setDateRange('today')">Today</button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('yesterday') }" @click="setDateRange('yesterday')">Yesterday</button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('week') }" @click="setDateRange('week')">Week</button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('all') }" @click="setDateRange('all')">All</button>
+                </div>
+              </div>
+
+              <!-- Search -->
+              <div class="filter-section">
+                <span class="filter-label">Search</span>
+                <input type="text"
+                       class="filter-search"
+                       placeholder="Search notifications..."
+                       :value="filters.search"
+                       @input="setSearch($event.target.value)">
+              </div>
+
+              <!-- Clear Filters -->
+              <button class="btn-clear-filters" x-show="hasActiveFilters()" @click="clearFilters()">
+                Clear all filters
+              </button>
+            </div>
+
+            <!-- Loading State -->
+            <div class="notification-loading" x-show="loading">
+              <span class="loading-indicator"></span>
+              <span>Loading notifications...</span>
+            </div>
+
+            <!-- Error State -->
+            <div class="notification-error" x-show="error && !loading">
+              <span>⚠️</span>
+              <span x-text="error"></span>
+              <button @click="refresh()">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div class="notification-empty" x-show="!loading && !error && notifications.length === 0">
+              <span class="empty-icon">📭</span>
+              <span class="empty-text">No notifications found</span>
+              <span class="empty-hint" x-show="hasActiveFilters()">Try adjusting your filters</span>
+            </div>
+
+            <!-- Notification List -->
+            <div class="notification-list" x-show="!loading && notifications.length > 0">
+              <template x-for="notification in notifications" :key="notification.id">
+                <div class="notification-card"
+                     :class="[
+                       'type-' + notification.type,
+                       getImportanceClass(notification.importance),
+                       notification.type === 'tts' ? getTtsStatusClass(notification) : ''
+                     ]">
+                  <!-- Left: Type Icon -->
+                  <div class="notification-icon">
+                    <span x-text="getTypeIcon(notification.type)"></span>
+                  </div>
+
+                  <!-- Center: Content -->
+                  <div class="notification-content">
+                    <div class="notification-title-row">
+                      <span class="notification-item-title" x-text="notification.title"></span>
+                      <span class="notification-channel-badge"
+                            :style="{ backgroundColor: getChannelInfo(notification.channel).color + '20', color: getChannelInfo(notification.channel).color }"
+                            x-text="notification.channel"></span>
+                    </div>
+                    <div class="notification-message" x-show="notification.message" x-text="truncateMessage(notification.message, 120)"></div>
+                    <div class="notification-meta">
+                      <span class="meta-automation" x-text="formatAutomation(notification.automation)"></span>
+                      <template x-if="notification.type === 'tts'">
+                        <span class="meta-tts-status" :class="getTtsStatusClass(notification)" x-text="getTtsStatus(notification)"></span>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Right: Time -->
+                  <div class="notification-time">
+                    <span class="time-relative" x-text="formatRelativeTime(notification.timestamp)"></span>
+                    <span class="time-absolute" x-text="formatTime(notification.timestamp)"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -3764,6 +3923,36 @@
     }
   </script>
 
+  <!-- Notification History View Module - loads store and view -->
+  <script type="module">
+    import { initNotificationHistoryStore } from './js/stores/notification-history-store.js';
+    import { notificationHistoryView } from './views/notification-history.js';
+
+    // Expose view globally for Alpine x-data
+    window.notificationHistoryView = notificationHistoryView;
+    console.log('[notification-history] Module loaded, notificationHistoryView ready');
+
+    // Initialize store when Alpine is ready
+    function initNotificationHistory() {
+      if (typeof Alpine !== 'undefined' && CONFIG) {
+        if (!Alpine.store('notificationHistory')) {
+          initNotificationHistoryStore(Alpine, CONFIG);
+          console.log('[notification-history] Notification history store initialized');
+        }
+      }
+    }
+
+    // Wait for Alpine + CONFIG to be available
+    if (typeof Alpine !== 'undefined' && typeof CONFIG !== 'undefined') {
+      initNotificationHistory();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initNotificationHistoryStore(Alpine, window.CONFIG);
+      });
+      document.addEventListener('DOMContentLoaded', initNotificationHistory);
+    }
+  </script>
+
   <!-- Floor Plan Config for Network View -->
   <script type="module">
     import { FLOOR_PLAN_CONFIG } from './js/config.js';
@@ -4004,6 +4193,11 @@
         client: null,
         connectionCount: 0,
 
+        // Visibility-based pause state
+        _visibilityPaused: false,           // True when disconnected due to tab hidden
+        _visibilityDebounceTimer: null,     // Debounce for rapid tab switches
+        _visibilityListenerRegistered: false,
+
         // Topic handlers registry: Map<pattern, Array<callback>>
         _topicHandlers: new Map(),
 
@@ -4080,8 +4274,55 @@
 
         getMetrics() { return { ...this._metrics }; },
 
+        // Handle visibility change with 500ms debounce
+        _handleVisibilityChange() {
+          if (this._visibilityDebounceTimer) {
+            clearTimeout(this._visibilityDebounceTimer);
+            this._visibilityDebounceTimer = null;
+          }
+          const isHidden = document.hidden;
+          this._visibilityDebounceTimer = setTimeout(() => {
+            this._visibilityDebounceTimer = null;
+            if (isHidden && this.connected) {
+              console.log('[mqtt] Tab hidden - pausing MQTT connection');
+              this._pauseConnection();
+            } else if (!isHidden && this._visibilityPaused) {
+              console.log('[mqtt] Tab visible - resuming MQTT connection');
+              this._resumeConnection();
+            }
+          }, 500);
+        },
+
+        // Pause MQTT connection when tab is hidden
+        _pauseConnection() {
+          if (!this.client) return;
+          this._visibilityPaused = true;
+          this.client.end(false);  // graceful: preserves client state for reconnect()
+          this.connected = false;
+          this.connecting = false;
+        },
+
+        // Resume MQTT connection when tab becomes visible
+        _resumeConnection() {
+          if (!this._visibilityPaused) return;
+          this._visibilityPaused = false;
+          this.connecting = true;
+          this.client.reconnect();
+        },
+
+        // Register visibility change listener (once per session)
+        _registerVisibilityListener() {
+          if (this._visibilityListenerRegistered) return;
+          document.addEventListener('visibilitychange', () => this._handleVisibilityChange());
+          this._visibilityListenerRegistered = true;
+          console.log('[mqtt] Visibility listener registered');
+        },
+
         connect() {
           this.connecting = true;
+
+          // Register visibility listener (once)
+          this._registerVisibilityListener();
 
           this.client = mqtt.connect(CONFIG.mqttUrl, {
             clientId: 'climate-' + Math.random().toString(16).substr(2, 8),
@@ -4176,7 +4417,14 @@
           });
 
           this.client.on('error', (err) => console.error('MQTT Error:', err));
-          this.client.on('close', () => { this.connected = false; this.connecting = true; });
+          this.client.on('close', () => {
+            this.connected = false;
+            // Only show notification and set connecting if NOT intentionally paused
+            if (!this._visibilityPaused) {
+              this.connecting = true;
+              Alpine.store('notifications')?.error('MQTT Disconnected', 'Attempting to reconnect...');
+            }
+          });
           this.client.on('reconnect', () => { this.connecting = true; });
         }
       });
@@ -5627,6 +5875,7 @@
         id: 'monitor', name: 'Monitor', icon: '📈',
         views: [
           { id: 'timeline', name: 'Timeline', icon: '📖', title: 'Event Timeline', key: '5' },
+          { id: 'notifications', name: 'Alerts', icon: '📱', title: 'Notification History', key: 'P' },
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
           { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
           { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },

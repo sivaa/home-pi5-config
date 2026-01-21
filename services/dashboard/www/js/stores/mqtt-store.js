@@ -15,6 +15,11 @@ export function initMqttStore(Alpine, CONFIG) {
     client: null,
     connectionCount: 0,  // Track connection count for reconnect detection
 
+    // Visibility-based pause state
+    _visibilityPaused: false,           // True when disconnected due to tab hidden
+    _visibilityDebounceTimer: null,     // Debounce for rapid tab switches
+    _visibilityListenerRegistered: false,
+
     // Topic handlers registry: Map<pattern, Array<callback>>
     // Patterns support exact match or wildcard '*' suffix
     _topicHandlers: new Map(),
@@ -101,8 +106,82 @@ export function initMqttStore(Alpine, CONFIG) {
       return { ...this._metrics };
     },
 
+    /**
+     * Handle visibility change with 500ms debounce
+     * @private
+     */
+    _handleVisibilityChange() {
+      // Clear any pending debounce timer
+      if (this._visibilityDebounceTimer) {
+        clearTimeout(this._visibilityDebounceTimer);
+        this._visibilityDebounceTimer = null;
+      }
+
+      const isHidden = document.hidden;
+
+      // Debounce to prevent churn from rapid tab switches
+      this._visibilityDebounceTimer = setTimeout(() => {
+        this._visibilityDebounceTimer = null;
+
+        if (isHidden && this.connected) {
+          console.log('[mqtt] Tab hidden - pausing MQTT connection');
+          this._pauseConnection();
+        } else if (!isHidden && this._visibilityPaused) {
+          console.log('[mqtt] Tab visible - resuming MQTT connection');
+          this._resumeConnection();
+        }
+      }, 500);
+    },
+
+    /**
+     * Pause MQTT connection when tab is hidden
+     * @private
+     */
+    _pauseConnection() {
+      if (!this.client) return;
+
+      this._visibilityPaused = true;
+
+      // Graceful disconnect (force=false) preserves client state for reconnect()
+      this.client.end(false);
+      this.connected = false;
+      this.connecting = false;
+    },
+
+    /**
+     * Resume MQTT connection when tab becomes visible
+     * @private
+     */
+    _resumeConnection() {
+      if (!this._visibilityPaused) return;
+
+      this._visibilityPaused = false;
+      this.connecting = true;
+
+      // Reconnect - the 'connect' event handler will re-subscribe
+      this.client.reconnect();
+    },
+
+    /**
+     * Register visibility change listener (once per session)
+     * @private
+     */
+    _registerVisibilityListener() {
+      if (this._visibilityListenerRegistered) return;
+
+      document.addEventListener('visibilitychange', () => {
+        this._handleVisibilityChange();
+      });
+
+      this._visibilityListenerRegistered = true;
+      console.log('[mqtt] Visibility listener registered');
+    },
+
     connect() {
       this.connecting = true;
+
+      // Register visibility listener (once)
+      this._registerVisibilityListener();
 
       this.client = mqtt.connect(CONFIG.mqttUrl, {
         clientId: 'climate-' + Math.random().toString(16).substr(2, 8),
@@ -178,8 +257,11 @@ export function initMqttStore(Alpine, CONFIG) {
       this.client.on('error', (err) => console.error('MQTT Error:', err));
       this.client.on('close', () => {
         this.connected = false;
-        this.connecting = true;
-        Alpine.store('notifications')?.error('MQTT Disconnected', 'Attempting to reconnect...');
+        // Only show notification and set connecting if NOT intentionally paused
+        if (!this._visibilityPaused) {
+          this.connecting = true;
+          Alpine.store('notifications')?.error('MQTT Disconnected', 'Attempting to reconnect...');
+        }
       });
       this.client.on('reconnect', () => { this.connecting = true; });
     }

@@ -56,6 +56,20 @@ const influx = new Influx.InfluxDB({
       tags: [
         'device_name'
       ]
+    },
+    {
+      measurement: 'notifications',
+      fields: {
+        title: Influx.FieldType.STRING,
+        message: Influx.FieldType.STRING,
+        tag: Influx.FieldType.STRING
+      },
+      tags: [
+        'type',        // 'mobile' or 'tts'
+        'channel',     // Critical, Alerts, Heater, Info, Default
+        'automation',  // Parent automation ID
+        'importance'   // max, high, default, low
+      ]
     }
   ]
 });
@@ -122,8 +136,19 @@ client.on('connect', () => {
       console.error('Subscribe error (hot_water):', err);
     } else {
       console.log('Subscribed to Hot Water sensor');
+    }
+  });
+
+  // Subscribe to mobile notification events (for dashboard logging)
+  const notifyTopic = 'dashboard/notify';
+  console.log(`Subscribing to ${notifyTopic}...`);
+  client.subscribe(notifyTopic, { qos: 0 }, (err) => {
+    if (err) {
+      console.error('Subscribe error (notify):', err);
+    } else {
+      console.log('Subscribed to Mobile Notifications');
       console.log('');
-      console.log('Listening for Zigbee, audit, TTS, and hot water events...');
+      console.log('Listening for Zigbee, audit, TTS, hot water, and notification events...');
       console.log('─'.repeat(60));
     }
   });
@@ -153,6 +178,12 @@ client.on('message', async (topic, message) => {
     // Route TTS messages to TTS handler (persistent logging)
     if (topic === CONFIG.tts.topic) {
       await writeTTSEvent(payload);
+      return;
+    }
+
+    // Route mobile notification messages to notification handler
+    if (topic === 'dashboard/notify') {
+      await writeNotificationEvent(payload);
       return;
     }
 
@@ -293,6 +324,49 @@ async function writeHotWaterEvent(payload) {
     console.log(`${icon} [Hot Water] running=${running}`);
   } catch (err) {
     console.error('Hot water write error:', err.message);
+    stats.errors++;
+  }
+}
+
+/**
+ * Write mobile notification event to InfluxDB
+ */
+async function writeNotificationEvent(payload) {
+  try {
+    await influx.writePoints([{
+      measurement: 'notifications',
+      tags: {
+        type: payload.type || 'mobile',
+        channel: payload.channel || 'Default',
+        automation: payload.automation || 'unknown',
+        importance: payload.importance || 'default'
+      },
+      fields: {
+        title: payload.title || '',
+        message: payload.message || '',
+        tag: payload.tag || ''
+      },
+      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date()
+    }]);
+
+    stats.eventsWritten++;
+
+    // Log notification event with channel-based icon
+    const channelIcons = {
+      'Critical': '🚨',
+      'Alerts': '⚠️',
+      'Heater': '🔥',
+      'Info': 'ℹ️',
+      'Default': '📱'
+    };
+    const icon = channelIcons[payload.channel] || '📱';
+    const shortTitle = (payload.title || 'Notification').substring(0, 30);
+    console.log(
+      `${icon} [Notify] ${payload.channel || 'Default'}: "${shortTitle}" ` +
+      `(${payload.automation || 'manual'})`
+    );
+  } catch (err) {
+    console.error('Notification write error:', err.message);
     stats.errors++;
   }
 }
