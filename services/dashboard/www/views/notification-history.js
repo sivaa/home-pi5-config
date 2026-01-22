@@ -6,7 +6,7 @@
 export function notificationHistoryView() {
   return {
     // Local UI state
-    showFilters: false,
+    showFilters: true,  // Show filters by default for discoverability
 
     // ═══════════════════════════════════════════════════════════════════════
     // LIFECYCLE
@@ -186,10 +186,15 @@ export function notificationHistoryView() {
 
     /**
      * Format automation name for display
+     * Hides ULID-style IDs (e.g., 01KFJ50SVE5GRY5ACHPX298ERE)
      */
     formatAutomation(automation) {
       if (!automation || automation === 'unknown' || automation === 'manual') {
-        return 'Manual';
+        return null; // Return null to hide the element entirely
+      }
+      // Hide ULID-style automation IDs (26 chars, starts with 01, alphanumeric)
+      if (/^[0-9][0-9A-Z]{20,}$/i.test(automation)) {
+        return null;
       }
       // Convert snake_case to Title Case
       return automation

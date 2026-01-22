@@ -2624,10 +2624,22 @@
               <div class="filter-section">
                 <span class="filter-label">Time Range</span>
                 <div class="filter-chips">
-                  <button class="filter-chip" :class="{ active: isDateRangeActive('today') }" @click="setDateRange('today')">Today</button>
-                  <button class="filter-chip" :class="{ active: isDateRangeActive('yesterday') }" @click="setDateRange('yesterday')">Yesterday</button>
-                  <button class="filter-chip" :class="{ active: isDateRangeActive('week') }" @click="setDateRange('week')">Week</button>
-                  <button class="filter-chip" :class="{ active: isDateRangeActive('all') }" @click="setDateRange('all')">All</button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('today') }" @click="setDateRange('today')">
+                    <span class="chip-icon">📅</span>
+                    <span class="chip-label">Today</span>
+                  </button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('yesterday') }" @click="setDateRange('yesterday')">
+                    <span class="chip-icon">◀️</span>
+                    <span class="chip-label">Yesterday</span>
+                  </button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('week') }" @click="setDateRange('week')">
+                    <span class="chip-icon">📆</span>
+                    <span class="chip-label">Week</span>
+                  </button>
+                  <button class="filter-chip" :class="{ active: isDateRangeActive('all') }" @click="setDateRange('all')">
+                    <span class="chip-icon">🗓️</span>
+                    <span class="chip-label">All</span>
+                  </button>
                 </div>
               </div>
 
@@ -2676,9 +2688,9 @@
                        getImportanceClass(notification.importance),
                        notification.type === 'tts' ? getTtsStatusClass(notification) : ''
                      ]">
-                  <!-- Left: Type Icon -->
+                  <!-- Left: Channel Icon -->
                   <div class="notification-icon">
-                    <span x-text="getTypeIcon(notification.type)"></span>
+                    <span x-text="getChannelInfo(notification.channel).icon"></span>
                   </div>
 
                   <!-- Center: Content -->
@@ -2686,12 +2698,12 @@
                     <div class="notification-title-row">
                       <span class="notification-item-title" x-text="notification.title"></span>
                       <span class="notification-channel-badge"
-                            :style="{ backgroundColor: getChannelInfo(notification.channel).color + '20', color: getChannelInfo(notification.channel).color }"
+                            :style="{ backgroundColor: getChannelInfo(notification.channel).color + '30', color: getChannelInfo(notification.channel).color, fontWeight: 600 }"
                             x-text="notification.channel"></span>
                     </div>
                     <div class="notification-message" x-show="notification.message" x-text="truncateMessage(notification.message, 120)"></div>
-                    <div class="notification-meta">
-                      <span class="meta-automation" x-text="formatAutomation(notification.automation)"></span>
+                    <div class="notification-meta" x-show="formatAutomation(notification.automation) || notification.type === 'tts'">
+                      <span class="meta-automation" x-show="formatAutomation(notification.automation)" x-text="formatAutomation(notification.automation)"></span>
                       <template x-if="notification.type === 'tts'">
                         <span class="meta-tts-status" :class="getTtsStatusClass(notification)" x-text="getTtsStatus(notification)"></span>
                       </template>
