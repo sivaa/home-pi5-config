@@ -272,8 +272,86 @@ Host Network (--network host):
 
 ---
 
+## CO2 Episode Tracking (Jan 23, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CO2 EPISODE STATE MACHINE                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  IDLE STATE (not tracking):                                                 │
+│    co2_high_started = "1970-01-01 00:00:00" (sentinel)                      │
+│    co2_window_opened = "1970-01-01 00:00:00" (sentinel)                     │
+│                                                                             │
+│                   ↓ CO2 crosses 1200 ppm                                    │
+│                                                                             │
+│  TRACKING STATE:                                                            │
+│    co2_high_started = when CO2 first went high                              │
+│    co2_window_opened = when first window opened (or still sentinel)         │
+│                                                                             │
+│                   ↓ CO2 drops below 500 ppm                                 │
+│                                                                             │
+│  ANNOUNCE + RESET:                                                          │
+│    TTS: "CO2 was high for X minutes, ventilated in Y minutes"               │
+│    Reset both to sentinel                                                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why This Was Built
+
+**Problem:** The original `co2_good_level` TTS message showed wrong ventilation time because it used `automation.co2_alert.attributes.last_triggered`, which gets reset every 30 minutes by the reminder automation.
+
+**Solution:** Use persistent `input_datetime` helpers with sentinel value pattern:
+- Sentinel = `"1970-01-01 00:00:00"` (timestamp < 86400)
+- Track two metrics: episode duration + ventilation duration
+- Survives HA restarts (unlike `last_changed`)
+
+### Key Entities
+
+| Entity | Purpose |
+|--------|---------|
+| `input_datetime.co2_high_started` | When CO2 first crossed 1200 ppm |
+| `input_datetime.co2_window_opened` | When first window opened during episode |
+
+### Related Automations
+
+| Automation | Trigger | Action |
+|------------|---------|--------|
+| `co2_episode_start` | CO2 > 1200 | Set `co2_high_started` (if sentinel) |
+| `co2_episode_window_opened` | Any window opens | Set `co2_window_opened` (if episode active & sentinel) |
+| `co2_episode_cleanup_on_start` | HA starts | Reset both to sentinel |
+| `co2_good_level` | CO2 < 500 | Calculate metrics, announce, reset |
+
+### Sentinel Value Pattern
+
+```jinja2
+{# In templates, check if tracking is active: #}
+{% set sentinel = 86400 %}  {# 1 day after epoch #}
+{% set ts = as_timestamp(states('input_datetime.co2_high_started')) | default(0) %}
+{% if ts > sentinel %}
+  {# Episode is active #}
+{% else %}
+  {# Not tracking #}
+{% endif %}
+```
+
+### Example TTS Output
+
+```
+"Thanks Nithya! Air quality is good now. CO2 was high for 45 minutes,
+ ventilated in 30 minutes. You can close the windows."
+```
+
+---
+
 ## History
 
+- **Jan 23, 2026**: Added CO2 episode tracking for accurate ventilation time announcements
+  - Problem: `last_triggered` reset by 30-min reminders, showed wrong time in TTS
+  - Solution: Sentinel-based `input_datetime` helpers + 3 new automations
+  - Tracks: episode duration (CO2 > 1200 → < 500) + ventilation duration (window open → < 500)
+  - Grammar: Singular/plural handling ("1 minute" vs "2 minutes")
 - **Jan 17, 2026**: Fixed MQTT/InfluxDB hostname issue after network migration
   - Root cause: Using Docker hostnames with `--network host` causes DNS failures
   - Fix: Changed `"mosquitto"` → `"localhost"` in MQTT config
