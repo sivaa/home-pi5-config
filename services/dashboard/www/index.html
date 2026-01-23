@@ -2376,9 +2376,13 @@
 
             <!-- Footer -->
             <div class="sys-footer">
-              <span class="sys-footer-status" :class="{ 'loading': isLoading }">
+              <span class="sys-footer-status" :class="{
+                'loading': isLoading,
+                'stale': !isLoading && $store.system?.lastUpdate && $store.system?.isStale && !$store.system?.isCriticallyStale,
+                'critical-stale': !isLoading && $store.system?.lastUpdate && $store.system?.isCriticallyStale
+              }">
                 <span class="sys-status-dot"></span>
-                <span x-text="isLoading ? 'Updating...' : 'Live'"></span>
+                <span x-text="$store.system?.statusText || 'Waiting...'"></span>
               </span>
               <span class="sys-footer-time">Updated <span x-text="lastUpdate"></span></span>
             </div>

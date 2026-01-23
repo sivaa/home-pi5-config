@@ -16,6 +16,7 @@ export function transportView() {
     countdownSeconds: 60,
     _countdownInterval: null,
     _viewTimeout: null,
+    _initialized: false,  // Guard against x-init re-running on x-show toggle
 
     // View timeout: auto-switch to heater after 20 minutes
     VIEW_TIMEOUT_MS: 20 * 60 * 1000,  // 20 minutes
@@ -26,6 +27,13 @@ export function transportView() {
 
     init() {
       console.log('[transport-view] Initializing...');
+
+      // Guard against re-initialization when x-show toggles
+      if (this._initialized) {
+        console.log('[transport-view] Already initialized, skipping');
+        return;
+      }
+      this._initialized = true;
 
       // Start countdown to next refresh
       this.resetCountdown();
@@ -58,6 +66,7 @@ export function transportView() {
         clearTimeout(this._viewTimeout);
         this._viewTimeout = null;
       }
+      this._initialized = false;  // Reset for next mount after destroy
     },
 
     // ========================================

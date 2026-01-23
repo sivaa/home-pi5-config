@@ -53,6 +53,8 @@ export function initSystemStore(Alpine, CONFIG) {
     // ========================================
     _mqttSetup: false,
     _unsubscribeMqtt: null,
+    _staleCheckInterval: null,
+    _staleTick: 0,  // Touched periodically to force stale getter re-evaluation
     viewActive: false,
 
     // ========================================
@@ -72,6 +74,38 @@ export function initSystemStore(Alpine, CONFIG) {
       return `${Math.floor(seconds / 3600)}h ago`;
     },
 
+    /**
+     * Data is stale if no update received in > 2 minutes
+     * (publish interval is 60s, so 2 min means we missed 1+ updates)
+     * Note: _staleTick forces periodic re-evaluation since Date.now() isn't reactive
+     */
+    get isStale() {
+      void this._staleTick;  // Touch for reactivity
+      if (!this.lastUpdate) return true;
+      return Date.now() - this.lastUpdate > 2 * 60 * 1000;
+    },
+
+    /**
+     * Data is critically stale if no update in > 5 minutes
+     * (likely the service has crashed or lost MQTT connection)
+     */
+    get isCriticallyStale() {
+      void this._staleTick;  // Touch for reactivity
+      if (!this.lastUpdate) return true;
+      return Date.now() - this.lastUpdate > 5 * 60 * 1000;
+    },
+
+    /**
+     * Status text for the footer
+     */
+    get statusText() {
+      if (this.loading) return 'Updating...';
+      if (!this.lastUpdate) return 'Waiting...';  // No data received yet
+      if (this.isCriticallyStale) return 'Data Stale';
+      if (this.isStale) return 'Data Stale';
+      return 'Live';
+    },
+
     // ========================================
     // LIFECYCLE
     // ========================================
@@ -81,11 +115,23 @@ export function initSystemStore(Alpine, CONFIG) {
       this.viewActive = true;
       this.setupMqttListener();
       this.loadHistoricalData();
+
+      // Start stale check timer (forces reactivity every 30s for stale getters)
+      if (!this._staleCheckInterval) {
+        this._staleCheckInterval = setInterval(() => {
+          this._staleTick++;
+        }, 30000);
+      }
     },
 
     deactivateView() {
       console.log('[system] View deactivated');
       this.viewActive = false;
+      // Stop stale timer when view is not visible (saves CPU cycles)
+      if (this._staleCheckInterval) {
+        clearInterval(this._staleCheckInterval);
+        this._staleCheckInterval = null;
+      }
       // Keep MQTT subscription active for data freshness
     },
 
@@ -252,6 +298,10 @@ export function initSystemStore(Alpine, CONFIG) {
       if (this._unsubscribeMqtt) {
         this._unsubscribeMqtt();
         this._unsubscribeMqtt = null;
+      }
+      if (this._staleCheckInterval) {
+        clearInterval(this._staleCheckInterval);
+        this._staleCheckInterval = null;
       }
       this._mqttSetup = false;
     }

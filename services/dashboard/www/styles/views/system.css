@@ -573,6 +573,26 @@ body.sidebar-hidden .main-content {
   animation: pulse 1s infinite;
 }
 
+/* Stale state - amber indicator (no data for 2+ minutes) */
+.sys-footer-status.stale .sys-status-dot {
+  background: #f59e0b;
+  animation: none;
+}
+
+.sys-footer-status.stale {
+  color: #f59e0b;
+}
+
+/* Critical stale state - red indicator (no data for 5+ minutes) */
+.sys-footer-status.critical-stale .sys-status-dot {
+  background: #ef4444;
+  animation: none;
+}
+
+.sys-footer-status.critical-stale {
+  color: #ef4444;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

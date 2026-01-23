@@ -243,12 +243,17 @@ class MqttPublisher:
         self.host = host
         self.port = port
         self.topic = topic
-        self.client = mqtt.Client(client_id='pi-metrics-collector')
+        self.client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id='pi-metrics-collector'
+        )
         self._connected = False
 
     def connect(self):
         """Connect to MQTT broker."""
         try:
+            # Set bounded reconnect delay (1-30 seconds) to prevent stuck backoff
+            self.client.reconnect_delay_set(min_delay=1, max_delay=30)
             self.client.on_connect = self._on_connect
             self.client.on_disconnect = self._on_disconnect
             self.client.connect(self.host, self.port, keepalive=60)
@@ -256,22 +261,35 @@ class MqttPublisher:
         except Exception as e:
             logger.error(f'MQTT connection failed: {e}')
 
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
+        if reason_code.is_failure:
+            logger.error(f'MQTT connection failed: {reason_code}')
+        else:
             logger.info('Connected to MQTT broker')
             self._connected = True
-        else:
-            logger.error(f'MQTT connection failed with code: {rc}')
 
-    def _on_disconnect(self, client, userdata, rc):
-        logger.warning(f'Disconnected from MQTT broker (rc={rc})')
+    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+        logger.warning(f'Disconnected from MQTT broker (reason={reason_code})')
         self._connected = False
 
     def publish(self, metrics: dict):
         """Publish metrics to MQTT topic."""
         if not self._connected:
-            logger.warning('MQTT not connected, skipping publish')
-            return
+            logger.warning('MQTT not connected, attempting reconnect...')
+            try:
+                self.client.reconnect()
+                # Wait up to 5 seconds for reconnect (loop_start handles callbacks)
+                for _ in range(10):
+                    time.sleep(0.5)
+                    if self._connected:
+                        logger.info('MQTT reconnected successfully')
+                        break
+                if not self._connected:
+                    logger.error('MQTT reconnect timeout - skipping publish')
+                    return
+            except Exception as e:
+                logger.error(f'MQTT reconnect failed: {e}')
+                return
 
         try:
             payload = json.dumps(metrics)
