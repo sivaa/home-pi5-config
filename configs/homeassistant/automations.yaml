@@ -305,9 +305,9 @@
 
           {# ===== Build message ===== #}
           {% if episode_minutes > 0 and ventilation_minutes > 0 %}
-            Thanks Nithya! Air quality is good now. CO2 was high for {{ episode_minutes }} minutes, ventilated in {{ ventilation_minutes }} minutes. You can close the windows.
+            Thanks Nithya! Air quality is good now. CO2 was high for {{ episode_minutes }} minute{{ 's' if episode_minutes != 1 else '' }}, ventilated in {{ ventilation_minutes }} minute{{ 's' if ventilation_minutes != 1 else '' }}. You can close the windows.
           {% elif episode_minutes > 0 %}
-            Thanks Nithya! Air quality is good now. CO2 normalized in {{ episode_minutes }} minutes. You can close the windows.
+            Thanks Nithya! Air quality is good now. CO2 normalized in {{ episode_minutes }} minute{{ 's' if episode_minutes != 1 else '' }}. You can close the windows.
           {% else %}
             Thanks Nithya! Air quality is good now. You can close the windows.
           {% endif %}
