@@ -148,10 +148,108 @@
           vibrationPattern: "100, 1000, 100, 1000, 100"
 
 # -----------------------------------------------------------------------------
+# CO2 EPISODE START TRACKER
+# Trigger: CO2 crosses above 1200 ppm
+# Action: Record episode start time (if not already tracking)
+# Note: Uses sentinel value "1970-01-01 00:00:00" to indicate "not tracking"
+# -----------------------------------------------------------------------------
+- id: co2_episode_start
+  alias: "CO2 Episode Start Tracker"
+  description: "Records when CO2 first crosses 1200 ppm; also records window open time if window is already open"
+  mode: single
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      above: 1200
+
+  condition:
+    # Only set if not already tracking (sentinel = timestamp < 86400, i.e. before 1970-01-02)
+    - condition: template
+      value_template: >
+        {{ states('input_datetime.co2_high_started') in ['unknown', 'unavailable', '']
+           or as_timestamp(states('input_datetime.co2_high_started')) | default(0) < 86400 }}
+
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.co2_high_started
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+    # If any window is already open, record that time too
+    - if:
+        - condition: or
+          conditions:
+            - condition: state
+              entity_id: binary_sensor.bath_window_contact_sensor_contact
+              state: "on"
+            - condition: state
+              entity_id: binary_sensor.bed_window_contact_sensor_contact
+              state: "on"
+            - condition: state
+              entity_id: binary_sensor.kitchen_window_contact_sensor_contact
+              state: "on"
+            - condition: state
+              entity_id: binary_sensor.study_window_contact_sensor_large_contact
+              state: "on"
+            - condition: state
+              entity_id: binary_sensor.study_window_contact_sensor_small_contact
+              state: "on"
+            - condition: state
+              entity_id: binary_sensor.living_window_contact_sensor_window_contact
+              state: "on"
+      then:
+        - service: input_datetime.set_datetime
+          target:
+            entity_id: input_datetime.co2_window_opened
+          data:
+            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+# -----------------------------------------------------------------------------
+# CO2 EPISODE - WINDOW OPENED
+# Trigger: Any window opens
+# Condition: CO2 episode is active AND window time not yet recorded
+# Action: Record when first window opened during this episode
+# -----------------------------------------------------------------------------
+- id: co2_episode_window_opened
+  alias: "CO2 Episode - Window Opened"
+  description: "Records when first window opens during a CO2 episode"
+  mode: single
+
+  trigger:
+    - platform: state
+      entity_id:
+        - binary_sensor.bath_window_contact_sensor_contact
+        - binary_sensor.bed_window_contact_sensor_contact
+        - binary_sensor.kitchen_window_contact_sensor_contact
+        - binary_sensor.study_window_contact_sensor_large_contact
+        - binary_sensor.study_window_contact_sensor_small_contact
+        - binary_sensor.living_window_contact_sensor_window_contact
+      to: "on"
+
+  condition:
+    # Episode is active (co2_high_started is set, not sentinel - timestamp > 86400)
+    - condition: template
+      value_template: >
+        {{ as_timestamp(states('input_datetime.co2_high_started')) | default(0) > 86400 }}
+    # Window time not yet recorded (is sentinel - timestamp < 86400)
+    - condition: template
+      value_template: >
+        {{ as_timestamp(states('input_datetime.co2_window_opened')) | default(0) < 86400 }}
+
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.co2_window_opened
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+# -----------------------------------------------------------------------------
 # CO2 GOOD LEVEL NOTIFICATION
 # Trigger: CO2 level drops below 500 ppm (good air quality)
-# Action: Thank Nithya and announce ventilation complete
-# Cooldown: 30 minutes (stable good level)
+# Action: Thank Nithya with episode/ventilation time metrics, then reset episode tracking
+# Cooldown: 30 minutes (prevents repeated notifications if CO2 bounces)
 # -----------------------------------------------------------------------------
 - id: co2_good_level
   alias: "CO2 Good Level Notification"
@@ -174,28 +272,42 @@
         {{ (now() - state_attr('automation.co2_good_level_notification', 'last_triggered')).total_seconds() > 1800
            if state_attr('automation.co2_good_level_notification', 'last_triggered') is not none
            else true }}
-    # Only announce if there was a recent high alert (within last 2 hours)
+    # Only announce if there's an active CO2 episode (episode tracker is set, not sentinel)
+    # Sentinel = timestamp < 86400 (before 1970-01-02)
     - condition: template
       value_template: >
-        {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
-        {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}
-        {% set alerts = [high_alert, critical_alert] | select('ne', none) | list %}
-        {{ alerts | length > 0 and (now() - alerts | max).total_seconds() < 7200 }}
+        {{ as_timestamp(states('input_datetime.co2_high_started')) | default(0) > 86400 }}
 
   action:
     # Use smart TTS with speaker availability check and mobile fallback
     - service: script.smart_tts_announce
       data:
         message: >
-          {# Get last trigger times for CO2 alerts #}
-          {% set high_alert = state_attr('automation.co2_high_level_alert', 'last_triggered') %}
-          {% set critical_alert = state_attr('automation.co2_critical_level_alert', 'last_triggered') %}
-          {# Filter out 'none' values (alerts that never triggered) #}
-          {% set alerts = [high_alert, critical_alert] | select('ne', none) | list %}
-          {# Guard: Only calculate minutes if we have alert history (defensive coding) #}
-          {% if alerts | length > 0 %}
-            {% set minutes = ((now() - alerts | max).total_seconds() / 60) | round(0) | int %}
-            Thanks Nithya! Air quality is good now. Ventilated in {{ minutes }} minutes. You can close the windows.
+          {# Sentinel = timestamp < 86400 (before 1970-01-02, i.e. day 0 of Unix time = "not tracking") #}
+          {% set sentinel = 86400 %}
+          {% set now_ts = as_timestamp(now()) %}
+
+          {# ===== METRIC 1: Episode time (CO2 > 1200 → < 500) ===== #}
+          {% set episode_start_ts = as_timestamp(states('input_datetime.co2_high_started')) | default(0) %}
+          {% if episode_start_ts > sentinel %}
+            {% set episode_minutes = [0, ((now_ts - episode_start_ts) / 60) | round(0) | int] | max %}
+          {% else %}
+            {% set episode_minutes = 0 %}
+          {% endif %}
+
+          {# ===== METRIC 2: Ventilation time (window opened during episode → < 500) ===== #}
+          {% set window_ts = as_timestamp(states('input_datetime.co2_window_opened')) | default(0) %}
+          {% if window_ts > sentinel %}
+            {% set ventilation_minutes = [0, ((now_ts - window_ts) / 60) | round(0) | int] | max %}
+          {% else %}
+            {% set ventilation_minutes = 0 %}
+          {% endif %}
+
+          {# ===== Build message ===== #}
+          {% if episode_minutes > 0 and ventilation_minutes > 0 %}
+            Thanks Nithya! Air quality is good now. CO2 was high for {{ episode_minutes }} minutes, ventilated in {{ ventilation_minutes }} minutes. You can close the windows.
+          {% elif episode_minutes > 0 %}
+            Thanks Nithya! Air quality is good now. CO2 normalized in {{ episode_minutes }} minutes. You can close the windows.
           {% else %}
             Thanks Nithya! Air quality is good now. You can close the windows.
           {% endif %}
@@ -208,6 +320,54 @@
         data:
           channel: "Info"
           importance: default
+    # Reset episode tracking timestamps to sentinel (cleanup for next episode)
+    - service: input_datetime.set_datetime
+      target:
+        entity_id:
+          - input_datetime.co2_high_started
+          - input_datetime.co2_window_opened
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+# -----------------------------------------------------------------------------
+# CO2 EPISODE CLEANUP ON STARTUP
+# Trigger: Home Assistant starts
+# Condition: CO2 is already good (< 500 ppm) AND episode tracking is active
+# Action: Reset episode timestamps to sentinel (cleanup stale state)
+# Why: If HA restarts mid-episode and CO2 normalized during downtime,
+#      the "good level" trigger won't fire (needs crossing, not just being below)
+# -----------------------------------------------------------------------------
+- id: co2_episode_cleanup_on_start
+  alias: "CO2 Episode Cleanup on Startup"
+  description: "Resets stale CO2 episode tracking if air is already good on HA start"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  condition:
+    # CO2 is already good
+    - condition: numeric_state
+      entity_id: sensor.hallway_co2_co2
+      below: 500
+    # Episode tracking is active (not sentinel)
+    - condition: template
+      value_template: >
+        {{ as_timestamp(states('input_datetime.co2_high_started')) | default(0) > 86400 }}
+
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id:
+          - input_datetime.co2_high_started
+          - input_datetime.co2_window_opened
+      data:
+        datetime: "1970-01-01 00:00:00"
+    - service: system_log.write
+      data:
+        message: "CO2 Episode Cleanup: Reset stale episode tracking on startup (CO2 already good)"
+        level: info
 
 # -----------------------------------------------------------------------------
 # WINDOW OPEN TOO LONG (TEMPERATURE-AWARE)
@@ -2759,34 +2919,41 @@
 # Purpose: Automatic brightness and color temperature scheduling for IKEA lights
 # Lights: light.study_ikea_light, light.living_ikea_light
 # Color Temp Range: 320 mired (neutral) to 454 mired (warmest)
-# Brightness Range: 20% (night) to 100% (day)
+# Brightness Range: 1% (night) to 100% (day)
 #
 # Schedule:
-#   Night (22:00-06:00): 20% brightness, 454 mired (2200K warmest)
-#   Sunrise (06:00-07:30): Gradual 20%→100%, 454→320 mired
+#   Night (22:00-06:00): 1% brightness, 454 mired (2200K warmest)
+#   Sunrise (06:00-07:30): Gradual 1%→100%, 454→320 mired
 #   Day (07:30-18:00): 100% brightness, 320 mired (3125K neutral)
-#   Sunset (18:00-22:00): Gradual 100%→20%, 320→454 mired
+#   Sunset (18:00-22:00): Gradual 100%→1%, 320→454 mired
+#
+# Update Frequency: Every 1 minute for ultra-smooth transitions (~0.4%/min)
+#
+# Golden Rule: Phase-aware dimming/brightening
+#   - Sunrise phase: ALLOW brightening (light turned on at night can brighten)
+#   - Other phases: Only dim/warm, never brighten/cool
 #
 # Override Detection: Uses debounce flag to detect manual changes (IKEA remotes
 # use direct Zigbee binding, bypassing HA context). Any brightness/color change
-# when automation_active=off triggers 30-minute override.
+# ≥5 units when automation_active=off triggers 30-minute override.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # CIRCADIAN SCHEDULE UPDATE
-# Trigger: Every 10 minutes
+# Trigger: Every 1 minute (ultra-smooth transitions)
 # Action: Apply scheduled brightness and color temp to ON lights (not overridden)
 # Note: Sets debounce flag to prevent false override detection
+# Golden Rule: During Sunrise, allow brightening; otherwise only dim/warm
 # -----------------------------------------------------------------------------
 - id: circadian_schedule_update
   alias: "Circadian - Schedule Update"
-  description: "Updates light brightness and color temp every 10 minutes"
+  description: "Updates light brightness and color temp every minute"
   mode: single
   max_exceeded: silent
 
   trigger:
     - platform: time_pattern
-      minutes: "/10"
+      minutes: "/1"
 
   condition:
     - condition: state
@@ -2803,9 +2970,12 @@
         brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
         color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
         brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
+        phase: "{{ states('sensor.circadian_phase') }}"
 
     # Study light (if on and not overridden)
-    # GOLDEN RULE: Only dim/warm, never brighten/cool
+    # GOLDEN RULE (Phase-Aware):
+    #   - Sunrise: Allow brightening (light turned on at night can brighten with schedule)
+    #   - Other phases: Only dim/warm, never brighten/cool
     - if:
         - condition: state
           entity_id: light.study_ikea_light
@@ -2818,13 +2988,28 @@
             # Read current light state
             current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(255) | int }}"
             current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
-            # GOLDEN RULE: Take minimum (only go down)
-            final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+            # GOLDEN RULE: Phase-aware brightness
+            # During Sunrise: use scheduled values (allow brightening)
+            # Other phases: take minimum (only dim)
+            final_brightness: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int }}
+              {% else %}
+                {{ [brightness_value | int, current_brightness] | min }}
+              {% endif %}
+            # Color temp always uses min (warmer = lower K, always safe to warm up)
             final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
-        # Only apply if values would actually decrease
+            # Check if we should apply changes
+            should_apply: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+              {% else %}
+                {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+              {% endif %}
+        # Apply if there's a meaningful change
         - if:
             - condition: template
-              value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+              value_template: "{{ should_apply }}"
           then:
             - service: light.turn_on
               entity_id: light.study_ikea_light
@@ -2834,7 +3019,9 @@
                 transition: 30
 
     # Living light (if on and not overridden)
-    # GOLDEN RULE: Only dim/warm, never brighten/cool
+    # GOLDEN RULE (Phase-Aware):
+    #   - Sunrise: Allow brightening (light turned on at night can brighten with schedule)
+    #   - Other phases: Only dim/warm, never brighten/cool
     - if:
         - condition: state
           entity_id: light.living_ikea_light
@@ -2847,13 +3034,28 @@
             # Read current light state
             current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(255) | int }}"
             current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
-            # GOLDEN RULE: Take minimum (only go down)
-            final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+            # GOLDEN RULE: Phase-aware brightness
+            # During Sunrise: use scheduled values (allow brightening)
+            # Other phases: take minimum (only dim)
+            final_brightness: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int }}
+              {% else %}
+                {{ [brightness_value | int, current_brightness] | min }}
+              {% endif %}
+            # Color temp always uses min (warmer = lower K, always safe to warm up)
             final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
-        # Only apply if values would actually decrease
+            # Check if we should apply changes
+            should_apply: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+              {% else %}
+                {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+              {% endif %}
+        # Apply if there's a meaningful change
         - if:
             - condition: template
-              value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+              value_template: "{{ should_apply }}"
           then:
             - service: light.turn_on
               entity_id: light.living_ikea_light
@@ -2873,10 +3075,11 @@
 # Trigger: Light turns on
 # Action: Set to warmest color temp (2200K) with scheduled brightness
 # Note: Power-on always uses warmest color for gentle start
+# Minimum Floor: 5% brightness on power-on (prevents confusing near-invisible state)
 # -----------------------------------------------------------------------------
 - id: circadian_power_on
   alias: "Circadian - Light Power On"
-  description: "When light turns on, set to warm color temp with scheduled brightness"
+  description: "When light turns on, set to warm color temp with scheduled brightness (min 5%)"
   mode: parallel
   max: 2
 
@@ -2898,7 +3101,10 @@
     override_flag: "input_boolean.circadian_{{ room }}_override"
     light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
     brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
-    brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
+    # Power-on floor: minimum 5% brightness so users can see the light turned on
+    # At night (1% scheduled), this ensures light is visible on power-on
+    brightness_pct_floored: "{{ [brightness_pct | int, 5] | max }}"
+    brightness_value: "{{ (brightness_pct_floored / 100 * 255) | round(0) }}"
     phase: "{{ states('sensor.circadian_phase') }}"
 
   action:
@@ -2914,7 +3120,7 @@
     - delay:
         milliseconds: 300
 
-    # Apply: warmest color temp (2200K) + scheduled brightness
+    # Apply: warmest color temp (2200K) + scheduled brightness (min 5%)
     - service: light.turn_on
       target:
         entity_id: "{{ trigger.entity_id }}"
@@ -2933,12 +3139,13 @@
 # CIRCADIAN OVERRIDE DETECTION
 # Trigger: Light brightness or color_temp changes
 # Condition: Automation is NOT actively changing lights (debounce check)
+# Threshold: Ignore changes < 5 units (Zigbee noise at low brightness)
 # Action: Set 30-minute override timer
 # Note: Detects remote presses via timing, not context (remotes bypass HA context)
 # -----------------------------------------------------------------------------
 - id: circadian_override_detect
   alias: "Circadian - Override Detection"
-  description: "Detects manual light changes and sets 30-minute override"
+  description: "Detects manual light changes (≥5 units) and sets 30-minute override"
   mode: parallel
   max: 2
 
@@ -2968,6 +3175,14 @@
     - condition: state
       entity_id: input_boolean.circadian_automation_active
       state: "off"
+    # Threshold: Ignore changes < 5 units to filter Zigbee noise at low brightness
+    # At 1% brightness (value ~3), small fluctuations of ±1-2 would otherwise trigger overrides
+    - condition: template
+      value_template: >
+        {% set old_val = trigger.from_state.attributes.get(trigger.attribute, 0) | int(0) %}
+        {% set new_val = trigger.to_state.attributes.get(trigger.attribute, 0) | int(0) %}
+        {% set change = (new_val - old_val) | abs %}
+        {{ change >= 5 }}
 
   variables:
     room: "{{ 'study' if 'study' in trigger.entity_id else 'living' }}"
@@ -3031,6 +3246,7 @@
     brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
     color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
     brightness_value: "{{ (brightness_pct / 100 * 255) | round(0) }}"
+    phase: "{{ states('sensor.circadian_phase') }}"
 
   action:
     # Check Study override expiry
@@ -3047,7 +3263,7 @@
         - service: input_boolean.turn_off
           entity_id: input_boolean.circadian_study_override
 
-        # Restore settings if light is on (GOLDEN RULE: only dim/warm)
+        # Restore settings if light is on (GOLDEN RULE: phase-aware)
         - if:
             - condition: state
               entity_id: light.study_ikea_light
@@ -3057,15 +3273,29 @@
                 # Read current light state
                 current_brightness: "{{ state_attr('light.study_ikea_light', 'brightness') | default(255) | int }}"
                 current_color_temp: "{{ state_attr('light.study_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
-                # GOLDEN RULE: Take minimum (only go down)
-                final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+                # GOLDEN RULE: Phase-aware brightness
+                # During Sunrise: use scheduled values (allow brightening)
+                # Other phases: take minimum (only dim)
+                final_brightness: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int }}
+                  {% else %}
+                    {{ [brightness_value | int, current_brightness] | min }}
+                  {% endif %}
                 final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+                # Check if we should apply changes
+                should_apply: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                  {% else %}
+                    {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+                  {% endif %}
             - service: input_boolean.turn_on
               entity_id: input_boolean.circadian_automation_active
-            # Only apply if values would actually decrease
+            # Apply if there's a meaningful change
             - if:
                 - condition: template
-                  value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+                  value_template: "{{ should_apply }}"
               then:
                 - service: light.turn_on
                   entity_id: light.study_ikea_light
@@ -3077,7 +3307,7 @@
                 - service: notify.all_phones
                   data:
                     title: "💡 Study Light"
-                    message: "Override ended. Adjusted to {{ ((final_brightness / 255) * 100) | round(0) }}%."
+                    message: "Override ended. Adjusted to {{ ((final_brightness | int / 255) * 100) | round(0) }}%."
                     data:
                       channel: "Lights"
                       importance: low
@@ -3101,7 +3331,7 @@
         - service: input_boolean.turn_off
           entity_id: input_boolean.circadian_living_override
 
-        # Restore settings if light is on (GOLDEN RULE: only dim/warm)
+        # Restore settings if light is on (GOLDEN RULE: phase-aware)
         - if:
             - condition: state
               entity_id: light.living_ikea_light
@@ -3111,15 +3341,29 @@
                 # Read current light state
                 current_brightness: "{{ state_attr('light.living_ikea_light', 'brightness') | default(255) | int }}"
                 current_color_temp: "{{ state_attr('light.living_ikea_light', 'color_temp_kelvin') | default(4000) | int }}"
-                # GOLDEN RULE: Take minimum (only go down)
-                final_brightness: "{{ [brightness_value | int, current_brightness] | min }}"
+                # GOLDEN RULE: Phase-aware brightness
+                # During Sunrise: use scheduled values (allow brightening)
+                # Other phases: take minimum (only dim)
+                final_brightness: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int }}
+                  {% else %}
+                    {{ [brightness_value | int, current_brightness] | min }}
+                  {% endif %}
                 final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+                # Check if we should apply changes
+                should_apply: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                  {% else %}
+                    {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+                  {% endif %}
             - service: input_boolean.turn_on
               entity_id: input_boolean.circadian_automation_active
-            # Only apply if values would actually decrease
+            # Apply if there's a meaningful change
             - if:
                 - condition: template
-                  value_template: "{{ final_brightness < current_brightness or final_color_temp < current_color_temp }}"
+                  value_template: "{{ should_apply }}"
               then:
                 - service: light.turn_on
                   entity_id: light.living_ikea_light
@@ -3131,7 +3375,7 @@
                 - service: notify.all_phones
                   data:
                     title: "💡 Living Light"
-                    message: "Override ended. Adjusted to {{ ((final_brightness / 255) * 100) | round(0) }}%."
+                    message: "Override ended. Adjusted to {{ ((final_brightness | int / 255) * 100) | round(0) }}%."
                     data:
                       channel: "Lights"
                       importance: low
@@ -3181,9 +3425,9 @@
           {% elif phase == 'Day' %}
             Day mode: Full brightness (100%)
           {% elif phase == 'Sunset' %}
-            Sunset mode: Gradually dimming for sleep
+            Sunset mode: Gradually dimming to 1%
           {% elif phase == 'Night' %}
-            Night mode: Minimal light (20%)
+            Night mode: Minimal light (1%)
           {% endif %}
         data:
           channel: "Lights"

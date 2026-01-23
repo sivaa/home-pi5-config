@@ -531,6 +531,19 @@ input_datetime:
     has_time: true
     icon: mdi:shield-off-outline
 
+  # CO2 Episode Tracking - for accurate ventilation time announcements
+  # Sentinel value "1970-01-01 00:00:00" means "not tracking"
+  co2_high_started:
+    name: "CO2 Episode Started"
+    has_date: true
+    has_time: true
+    icon: mdi:molecule-co2
+  co2_window_opened:
+    name: "CO2 Window Opened"
+    has_date: true
+    has_time: true
+    icon: mdi:window-open
+
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
 # Purpose: Save thermostat setpoints before window-triggered shutoff
@@ -738,10 +751,11 @@ template:
       # CIRCADIAN LIGHTING SENSORS
       # Purpose: Calculate scheduled brightness and color temp based on time
       # Schedule:
-      #   Night (22:00-06:00): 20% brightness, 454 mired (warmest)
-      #   Sunrise (06:00-07:30): Gradual 20%→100%, 454→320 mired
+      #   Night (22:00-06:00): 1% brightness, 454 mired (warmest)
+      #   Sunrise (06:00-07:30): Gradual 1%→100%, 454→320 mired
       #   Day (07:30-18:00): 100% brightness, 320 mired (neutral)
-      #   Sunset (18:00-22:00): Gradual 100%→20%, 320→454 mired
+      #   Sunset (18:00-22:00): Gradual 100%→1%, 320→454 mired
+      # Update frequency: Every 1 minute for ~0.4% steps during transitions
       # =========================================================================
       - name: "Circadian Brightness"
         unique_id: circadian_brightness
@@ -752,15 +766,15 @@ template:
           {% set minute = now().minute %}
           {% set t = hour + minute / 60 %}
           {% if t < 6 %}
-            20
+            1
           {% elif t < 7.5 %}
-            {{ (20 + (t - 6) / 1.5 * 80) | round(0) }}
+            {{ (1 + (t - 6) / 1.5 * 99) | round(0) }}
           {% elif t < 18 %}
             100
           {% elif t < 22 %}
-            {{ (100 - (t - 18) / 4 * 80) | round(0) }}
+            {{ (100 - (t - 18) / 4 * 99) | round(0) }}
           {% else %}
-            20
+            1
           {% endif %}
 
       - name: "Circadian Color Temp"
