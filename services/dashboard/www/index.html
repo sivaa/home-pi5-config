@@ -2561,22 +2561,62 @@
              class="view notification-history-view">
 
           <div class="notification-history-container">
-            <!-- Header -->
-            <div class="notification-header">
-              <div class="notification-header-left">
-                <h1 class="notification-title">Notification History</h1>
-                <div class="notification-stats">
-                  <span class="stat-badge" x-text="stats.total + ' total'"></span>
-                  <span class="stat-badge stat-recent" x-show="stats.lastHour > 0" x-text="stats.lastHour + ' last hour'"></span>
-                </div>
-              </div>
-              <div class="notification-header-right">
-                <button class="btn-icon" @click="refresh()" :disabled="loading">
-                  <span x-show="!loading">↻</span>
-                  <span x-show="loading" class="loading-indicator"></span>
+            <!-- Compact Toolbar (ChatGPT UX Round 2: explicit labels, reordered, toggle pills) -->
+            <div class="notification-toolbar">
+              <!-- Row 1 on mobile: Date + Count + Filter -->
+              <div class="toolbar-row-1">
+                <!-- Date Range Dropdown -->
+                <button class="toolbar-date-btn" @click="showDateDropdown = !showDateDropdown">
+                  <span x-text="getDateRangeLabel()"></span>
+                  <span class="dropdown-arrow">▼</span>
                 </button>
-                <button class="btn-icon" :class="{ active: showFilters }" @click="toggleFilters()">
-                  <span>⚙️</span>
+                <!-- Count (explicit: "N notifications") -->
+                <span class="toolbar-count" x-text="getNotificationCountLabel()"></span>
+                <!-- Filter panel toggle (always show count, even 0) -->
+                <button class="filter-panel-btn"
+                        :class="{ active: showFilters, 'has-filters': getActiveFilterCount() > 0 }"
+                        @click="toggleFilters()">
+                  <span>Filter</span>
+                  <span class="filter-count" x-text="'(' + getActiveFilterCount() + ')'"></span>
+                </button>
+              </div>
+
+              <!-- Row 2 on mobile: Quick Filters + Sort -->
+              <div class="toolbar-row-2">
+                <!-- Quick Filters (toggle pills: outline OFF, filled with × ON) -->
+                <div class="toolbar-quick-filters">
+                  <button class="quick-filter-pill"
+                          :class="{ active: failuresOnly }"
+                          @click="toggleFailuresOnly()">
+                    <span class="pill-label">Failures</span>
+                    <span class="pill-x" x-show="failuresOnly">×</span>
+                  </button>
+                  <button class="quick-filter-pill"
+                          :class="{ active: highOnly }"
+                          @click="toggleHighOnly()">
+                    <span class="pill-label">High severity</span>
+                    <span class="pill-x" x-show="highOnly">×</span>
+                  </button>
+                </div>
+
+                <!-- Sort button with prefix -->
+                <button class="sort-btn" @click="setSortBy(sortBy === 'newest' ? 'oldest' : sortBy === 'oldest' ? 'failures' : 'newest')">
+                  <span class="sort-prefix">Sort:</span>
+                  <span class="sort-label" x-text="getSortLabel()"></span>
+                  <span class="dropdown-arrow">▼</span>
+                </button>
+              </div>
+
+              <!-- Clear all + Refresh (right side, row 1 on desktop) -->
+              <div class="toolbar-actions">
+                <button class="clear-btn"
+                        x-show="hasActiveFilters()"
+                        @click="clearFilters()">
+                  Clear all
+                </button>
+                <button class="refresh-btn" @click="refresh()" :disabled="loading">
+                  <span x-show="!loading">Refresh</span>
+                  <span x-show="loading" class="loading-indicator"></span>
                 </button>
               </div>
             </div>
@@ -2682,39 +2722,28 @@
             <!-- Notification List -->
             <div class="notification-list" x-show="!loading && notifications.length > 0">
               <template x-for="notification in notifications" :key="notification.id">
-                <div class="notification-card"
-                     :class="[
-                       'type-' + notification.type,
-                       getImportanceClass(notification.importance),
-                       notification.type === 'tts' ? getTtsStatusClass(notification) : ''
-                     ]">
-                  <!-- Left: Channel Icon -->
-                  <div class="notification-icon">
-                    <span x-text="getChannelInfo(notification.channel).icon"></span>
+                <div class="notification-row">
+                  <!-- Left Column: Icon + Badges -->
+                  <div class="row-left">
+                    <span class="row-icon" x-text="getTypeIcon(notification.type)"></span>
+                    <!-- Importance badge (only for critical/high) -->
+                    <span class="badge badge-critical" x-show="notification.importance === 'max'">Critical</span>
+                    <span class="badge badge-high" x-show="notification.importance === 'high'">High</span>
+                    <!-- TTS status badge -->
+                    <span class="badge badge-failed" x-show="notification.type === 'tts' && !notification.success">Failed</span>
                   </div>
 
-                  <!-- Center: Content -->
-                  <div class="notification-content">
-                    <div class="notification-title-row">
-                      <span class="notification-item-title" x-text="notification.title"></span>
-                      <span class="notification-channel-badge"
-                            :style="{ backgroundColor: getChannelInfo(notification.channel).color + '30', color: getChannelInfo(notification.channel).color, fontWeight: 600 }"
-                            x-text="notification.channel"></span>
+                  <!-- Center Column: Title + Message -->
+                  <div class="row-center">
+                    <div class="row-title">
+                      <span x-text="notification.title"></span>
+                      <span class="row-channel" x-text="notification.channel"></span>
                     </div>
-                    <div class="notification-message" x-show="notification.message" x-text="truncateMessage(notification.message, 120)"></div>
-                    <div class="notification-meta" x-show="formatAutomation(notification.automation) || notification.type === 'tts'">
-                      <span class="meta-automation" x-show="formatAutomation(notification.automation)" x-text="formatAutomation(notification.automation)"></span>
-                      <template x-if="notification.type === 'tts'">
-                        <span class="meta-tts-status" :class="getTtsStatusClass(notification)" x-text="getTtsStatus(notification)"></span>
-                      </template>
-                    </div>
+                    <div class="row-message" x-show="notification.message" x-text="truncateMessage(notification.message, 80)"></div>
                   </div>
 
-                  <!-- Right: Time -->
-                  <div class="notification-time">
-                    <span class="time-relative" x-text="formatRelativeTime(notification.timestamp)"></span>
-                    <span class="time-absolute" x-text="formatTime(notification.timestamp)"></span>
-                  </div>
+                  <!-- Right Column: Time -->
+                  <div class="row-time" x-text="formatRelativeTime(notification.timestamp)"></div>
                 </div>
               </template>
             </div>
@@ -2844,7 +2873,7 @@
                 <g transform="translate(57, 3)" :class="getRoomLightClass('study')">
                   <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
                 </g>
-                <!-- Bedroom (0,40,45,36.65) - no light -->
+                <!-- Bedroom (0,40,45,36.65) - has switch, no smart bulb -->
                 <g transform="translate(2, 43)" :class="getRoomLightClass('bedroom')">
                   <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
                 </g>
@@ -4366,6 +4395,13 @@
               this.client.subscribe(`${CONFIG.baseTopic}/${light.topic}/availability`, { qos: 0 });
             });
 
+            // Subscribe to switch topics (state and availability)
+            Alpine.store('switches').list.forEach(sw => {
+              this.client.subscribe(`${CONFIG.baseTopic}/${sw.topic}`, { qos: 0 });
+              this.client.subscribe(`${CONFIG.baseTopic}/${sw.topic}/availability`, { qos: 0 });
+            });
+            console.log('[mqtt] Subscribed to switch topics');
+
             // On reconnect, reload open sensor timestamps
             if (isReconnect) {
               console.log('[mqtt] Reconnected - reloading open sensor timestamps');
@@ -4398,9 +4434,10 @@
 
               // 3. Built-in routing for backward compatibility
               if (topic.endsWith('/availability')) {
-                const lightTopic = deviceName.replace('/availability', '');
+                const deviceTopic = deviceName.replace('/availability', '');
                 const isOnline = data.state === 'online' || data === 'online' || msgStr === 'online';
-                Alpine.store('lights').setAvailability(lightTopic, isOnline);
+                Alpine.store('lights').setAvailability(deviceTopic, isOnline);
+                Alpine.store('switches').setAvailability(deviceTopic, isOnline);
                 return;
               }
 
@@ -4423,6 +4460,7 @@
               }
 
               Alpine.store('lights').updateLight(deviceName, data);
+              Alpine.store('switches').updateSwitch(deviceName, data);
             } catch (e) {
               console.error('MQTT parse error:', e);
             }
@@ -4866,6 +4904,45 @@
               if (scene.colorTemp !== undefined) light.colorTemp = scene.colorTemp;
             });
           }
+        }
+      });
+
+      // Switches store (read-only state tracking for smart switches)
+      // Used for bedroom light indicator (no smart bulb, only smart switch)
+      Alpine.store('switches', {
+        list: [
+          {
+            id: 'bedroom_switch',
+            name: 'Bedroom Light Switch',
+            roomId: 'bedroom',
+            topic: '[Bed] Light Switch',
+            state: 'OFF',
+            linkquality: null,
+            lastSeen: null,
+            available: true
+          }
+        ],
+
+        updateSwitch(topic, data) {
+          const sw = this.list.find(s => s.topic === topic);
+          if (sw) {
+            if (data.state !== undefined) sw.state = data.state;
+            if (data.linkquality !== undefined) sw.linkquality = data.linkquality;
+            sw.lastSeen = Date.now();
+            console.log(`[switches] ${sw.name} state: ${sw.state}`);
+          }
+        },
+
+        setAvailability(topic, isOnline) {
+          const sw = this.list.find(s => s.topic === topic);
+          if (sw) {
+            sw.available = isOnline;
+            console.log(`[switches] ${sw.name} availability: ${isOnline ? 'online' : 'offline'}`);
+          }
+        },
+
+        getSwitchForRoom(roomId) {
+          return this.list.find(s => s.roomId === roomId && s.available);
         }
       });
 
@@ -5788,7 +5865,7 @@
         },
 
         // Get light class for floor plan light indicator
-        // Priority: 1) Smart light state  2) Illumination from presence sensor
+        // Priority: 1) Smart light state  2) Smart switch state  3) Illumination from presence sensor
         // Shows lit (bright yellow) / off (subtle) / no-light (hidden)
         getRoomLightClass(roomId) {
           const room = Alpine.store('rooms')?.list?.find(r => r.id === roomId);
@@ -5810,11 +5887,18 @@
               // Light is online - use its actual state
               return light.state === 'ON' ? 'lit' : 'off';
             }
-            // Light unavailable - fall through to illumination
+            // Light unavailable - fall through to switch/illumination
           }
 
-          // Priority 2: Use illumination from presence sensor
-          // (for rooms without smart lights, or when light is offline)
+          // Priority 2: Check smart switch state (for rooms with switch but no smart bulb)
+          // Only bedroom has this configuration - Study/Living use their smart lights instead
+          const sw = Alpine.store('switches')?.getSwitchForRoom(roomId);
+          if (sw) {
+            return sw.state === 'ON' ? 'lit' : 'off';
+          }
+
+          // Priority 3: Use illumination from presence sensor
+          // (for rooms without smart lights/switches, or when devices are offline)
           const isStale = room.lastOccupancySeen
             ? (Date.now() - room.lastOccupancySeen > 10 * 60 * 1000)
             : true;

@@ -548,6 +548,114 @@ MQTT connection is paused when the browser tab is hidden to save resources and p
 
 ---
 
+## Switches Store (2026-01-23)
+
+Read-only state tracking for SONOFF smart switches used in floor plan light indicators.
+
+### Purpose
+
+The floor plan shows light status for each room. Some rooms (Bedroom) have smart switches but no smart bulbs. This store tracks switch state so the indicator can show ON/OFF based on the switch position.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  SWITCH STATE FLOW                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  SONOFF Switch → Zigbee2MQTT → MQTT Broker                      │
+│                                   │                             │
+│                                   ▼                             │
+│                              mqtt-store.js                      │
+│                                   │                             │
+│                                   ▼ message dispatch            │
+│                            switches store                       │
+│                           updateSwitch(topic, data)             │
+│                                   │                             │
+│                                   ▼                             │
+│                         getRoomLightClass()                     │
+│                         Priority 2: Check switch                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Light Indicator Priority
+
+```
+getRoomLightClass(roomId):
+  │
+  ├─► Priority 1: Smart light available & ON? → 'lit'
+  │   (Study, Living rooms with IKEA FLOALT)
+  │
+  ├─► Priority 2: Smart switch available & ON? → 'lit'
+  │   (Bedroom only - has switch but no smart bulb)
+  │
+  └─► Priority 3: Presence sensor illumination 'bright'? → 'lit'
+      (Kitchen, Bathroom - no light or switch)
+```
+
+### Room-to-Switch Mapping
+
+| Room | Has Smart Light | Has Smart Switch | Indicator Uses |
+|------|-----------------|------------------|----------------|
+| Study | ✓ (IKEA FLOALT) | ✓ (SONOFF) | Smart light state |
+| Living | ✓ (IKEA FLOALT) | ✓ (SONOFF) | Smart light state |
+| Bedroom | ✗ | ✓ (SONOFF) | **Switch state** |
+| Kitchen | ✗ | ✗ | Illumination |
+| Bathroom | ✗ | ✗ | Illumination |
+
+### Switch Configuration
+
+```javascript
+// Defined inline in index.html (Alpine.store('switches'))
+{
+  id: 'bedroom_switch',
+  name: 'Bedroom Light Switch',
+  roomId: 'bedroom',
+  topic: '[Bed] Light Switch',
+  state: 'OFF',          // 'ON' or 'OFF'
+  available: true,       // false if switch offline
+  linkquality: null,
+  lastSeen: null
+}
+```
+
+### MQTT Topics
+
+| Topic | Purpose |
+|-------|---------|
+| `zigbee2mqtt/[Bed] Light Switch` | State updates (state, linkquality) |
+| `zigbee2mqtt/[Bed] Light Switch/availability` | Online/offline status |
+
+### Testing
+
+```bash
+# 1. Check store state in browser console
+Alpine.store('switches').list[0]
+# → { id: 'bedroom_switch', state: 'OFF', available: true, ... }
+
+# 2. Toggle switch via MQTT
+ssh pi@pi 'docker exec mosquitto mosquitto_pub \
+  -t "zigbee2mqtt/[Bed] Light Switch/set" -m "{\"state\": \"ON\"}"'
+
+# 3. Verify floor plan indicator changed to amber dot
+# 4. Toggle OFF
+ssh pi@pi 'docker exec mosquitto mosquitto_pub \
+  -t "zigbee2mqtt/[Bed] Light Switch/set" -m "{\"state\": \"OFF\"}"'
+```
+
+### Key Code Locations
+
+| Location | Purpose |
+|----------|---------|
+| `index.html:~4910` | Switches store definition |
+| `index.html:~4396` | MQTT subscription for switch topics |
+| `index.html:~4437` | Availability routing (dispatch to switches store) |
+| `index.html:~4463` | State routing (dispatch to switches store) |
+| `index.html:~5870` | `getRoomLightClass()` with switch priority |
+
+---
+
 ## Notification History View (2026-01-21)
 
 Unified timeline of mobile notifications and TTS announcements, with filtering by type, channel, date, and search.
