@@ -4365,6 +4365,7 @@
 - id: kitchen_presence_light_reminder
   alias: "[Kitchen] Light Reminder When Unoccupied"
   description: "Repeating TTS reminder every 3 min if kitchen light on with no presence"
+  enabled: false
   mode: single
 
   trigger:
@@ -4405,6 +4406,7 @@
 - id: bath_presence_light_reminder
   alias: "[Bath] Light Reminder When Unoccupied"
   description: "Repeating TTS reminder every 3 min if bathroom light on with no presence"
+  enabled: false
   mode: single
 
   trigger:
