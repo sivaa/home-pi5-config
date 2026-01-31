@@ -17,8 +17,24 @@ ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888
 Environment=WAYLAND_DISPLAY=wayland-0
 
 # Set display to 60Hz to reduce CPU load (120Hz causes excessive rendering)
+# Rotate 180° (upside down) to match physical mount orientation
 # Explicitly pass WAYLAND_DISPLAY to ensure it works on boot
-ExecStartPre=/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 || true'
+#
+#   ┌──────────────────────────────────────────────┐
+#   │  Physical mount has HDMI port on top,        │
+#   │  so the image needs flipping:                │
+#   │                                              │
+#   │  Without transform:    With --transform 180: │
+#   │  ┌──────────┐         ┌──────────┐          │
+#   │  │ ɹǝʇɐǝH  │         │  Heater  │          │
+#   │  │  23.5°C  │         │  23.5°C  │          │
+#   │  └──────────┘         └──────────┘          │
+#   │  (upside down!)       (correct ✓)            │
+#   │                                              │
+#   │  Touch input auto-remaps via Wayland         │
+#   │  (labwc maps ILITEK → HDMI-A-1 in rc.xml)   │
+#   └──────────────────────────────────────────────┘
+ExecStartPre=/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 --transform 180 || true'
 
 # Launch Epiphany with the dashboard URL
 # JS Fullscreen API will handle fullscreen via user click
