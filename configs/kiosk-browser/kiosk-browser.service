@@ -3,15 +3,20 @@ Description=Kiosk Browser - Dashboard Display
 # Run after display mode is set and labwc is ready
 After=default.target display-boot-check.service
 Wants=display-boot-check.service
+# Stop restarting after 5 failures in 5 minutes. Prevents infinite
+# crash-restart loops (e.g. broken Wayland, missing library) from
+# silently churning CPU and flooding the journal forever.
+StartLimitBurst=5
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
 
-# Wait for labwc to be fully ready (after display-boot-check's 10s + 5s extra)
+# Wait for labwc to be fully ready (runs after display-boot-check completes; adds 5s buffer)
 ExecStartPre=/bin/sleep 5
 
 # Wait for nginx dashboard container to be responding (up to 60s)
-ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888 > /dev/null && exit 0; sleep 2; done; exit 1'
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888 > /dev/null && exit 0; sleep 2; done; echo "ERROR: Dashboard not responding at http://localhost:8888 after 60s" >&2; exit 1'
 
 # Set WAYLAND_DISPLAY since user services don't inherit it automatically
 Environment=WAYLAND_DISPLAY=wayland-0
@@ -34,19 +39,51 @@ Environment=WAYLAND_DISPLAY=wayland-0
 #   │  Touch input auto-remaps via Wayland         │
 #   │  (labwc maps ILITEK → HDMI-A-1 in rc.xml)   │
 #   └──────────────────────────────────────────────┘
-ExecStartPre=/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 --transform 180 || true'
+#
+# '-' prefix: if wlr-randr fails (display disconnected, wrong mode),
+# systemd logs the failure but continues startup. Without this, a
+# missing display would prevent the service from starting entirely.
+ExecStartPre=-/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 --transform 180'
 
-# Launch Epiphany with the dashboard URL
-# JS Fullscreen API will handle fullscreen via user click
-ExecStart=/usr/bin/epiphany --new-window http://localhost:8888
+# ┌──────────────────────────────────────────────────────────────┐
+# │  PRIVATE INSTANCE: Session Accumulation Prevention          │
+# │                                                             │
+# │  INCIDENT (Feb 2026): Epiphany session restore + --new-    │
+# │  window caused 1 extra window per daily reboot:            │
+# │                                                             │
+# │  Day 1: 1 window → Day 28: 28 windows × ~3 processes each │
+# │  = 84 WebKit processes → 27% CPU, 50% RAM (4GB), 59°C     │
+# │                                                             │
+# │  WHY --private-instance eliminates this structurally:       │
+# │                                                             │
+# │  Old approach (fragile):                                    │
+# │  epiphany --new-window → persistent profile dir             │
+# │  ↑ survives reboot, session_state.xml accumulates windows  │
+# │                                                             │
+# │  New approach (structural):                                 │
+# │  epiphany --private-instance --profile=/tmp/kiosk-profile  │
+# │  ↑ /tmp wiped on reboot (tmpfs on Debian Trixie)           │
+# │  ↑ rm + mkdir on start catches crash-restart loops          │
+# │  ↑ isolated data — no cross-pollution with main profile    │
+# │  ↑ no bookmarks/history/cookies cruft building up          │
+# │  ↑ accumulation is structurally impossible, not cleaned up │
+# └──────────────────────────────────────────────────────────────┘
+#
+# Wipe and recreate profile dir. The mkdir -p is critical: if Epiphany
+# can't write to the profile path, it may silently fall back to the
+# persistent ~/.local/share/epiphany/ profile — reintroducing the
+# exact session accumulation bug this fix prevents.
+ExecStartPre=/bin/sh -c 'rm -rf /tmp/kiosk-profile && mkdir -p /tmp/kiosk-profile'
+
+# Launch Epiphany in private instance with ephemeral profile
+# --private-instance: isolated data profile, no shared state with main Epiphany
+# --profile=/tmp/kiosk-profile: ephemeral dir, wiped on reboot + rm above
+# labwc window rule auto-fullscreens on launch; JS Fullscreen API provides in-app toggle
+ExecStart=/usr/bin/epiphany --private-instance --profile=/tmp/kiosk-profile http://localhost:8888
 
 # Restart if browser crashes (but not if manually stopped)
 Restart=on-failure
 RestartSec=10
-
-# Output to journal for debugging
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=default.target

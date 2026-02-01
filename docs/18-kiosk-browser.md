@@ -1,7 +1,7 @@
 # Kiosk Browser: Auto-Launch Dashboard on Boot
 
 > **Date:** December 28, 2025
-> **Updated:** December 29, 2025 (Fixed kiosk-toggle timing issue)
+> **Updated:** February 1, 2026 (Fixed session accumulation: private instance + ephemeral profile)
 > **Purpose:** Automatically open dashboard in fullscreen browser when Pi restarts
 
 ---
@@ -42,8 +42,9 @@ BOOT SEQUENCE TIMELINE
       |-> Sets day/night mode based on time
       |
 15s   kiosk-browser.service starts
+      |-> Wipes /tmp/kiosk-profile (ephemeral browser data)
       |-> Waits for dashboard (nginx) to be ready
-      |-> Launches Epiphany in application mode
+      |-> Launches Epiphany in private instance mode
       |
 17s   labwc window rule triggers fullscreen
       |
@@ -177,18 +178,19 @@ systemctl --user restart kiosk-toggle.service
 Description=Kiosk Browser - Dashboard Display
 After=default.target display-boot-check.service
 Wants=display-boot-check.service
+StartLimitBurst=5
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
 ExecStartPre=/bin/sleep 5
-ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888 > /dev/null && exit 0; sleep 2; done; exit 1'
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -sf http://localhost:8888 > /dev/null && exit 0; sleep 2; done; echo "ERROR: Dashboard not responding" >&2; exit 1'
 Environment=WAYLAND_DISPLAY=wayland-0
-# Launch browser (labwc window rule handles fullscreen)
-ExecStart=/usr/bin/epiphany --new-window http://localhost:8888
+ExecStartPre=-/bin/sh -c 'WAYLAND_DISPLAY=wayland-0 /usr/bin/wlr-randr --output HDMI-A-1 --mode 1920x1080@60 --transform 180'
+ExecStartPre=/bin/sh -c 'rm -rf /tmp/kiosk-profile && mkdir -p /tmp/kiosk-profile'
+ExecStart=/usr/bin/epiphany --private-instance --profile=/tmp/kiosk-profile http://localhost:8888
 Restart=on-failure
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=default.target
@@ -197,8 +199,11 @@ WantedBy=default.target
 **Key Features:**
 - Starts 5 seconds after display-boot-check
 - Waits up to 60 seconds for nginx dashboard to respond
-- Uses `--application-mode` for minimal browser chrome
-- Auto-restarts if browser crashes (10s delay)
+- Display config logged on failure (systemd `-` prefix), doesn't block startup
+- Uses `--private-instance` with ephemeral `/tmp/kiosk-profile` (wiped each boot/restart)
+- Auto-restarts on crash (10s delay), max 5 per 5 minutes (prevents infinite loops)
+
+> **Why private instance?** See [Session Accumulation Incident](#session-accumulation-incident-feb-2026) below.
 
 ---
 
@@ -226,7 +231,8 @@ This makes labwc automatically fullscreen any Epiphany window when it opens.
 | Browser | Epiphany (GNOME Web) |
 | Engine | WebKit (same as Safari) |
 | Size | ~2.5 MB (vs 440 MB Chromium) |
-| Mode | `--new-window` (fullscreen via window rule) |
+| Mode | `--private-instance --profile=/tmp/kiosk-profile` |
+| Fullscreen | labwc window rule auto-fullscreens on launch |
 | Why | Lightweight, already default browser |
 
 **Alternative (if issues):** Firefox with `--kiosk` flag
@@ -410,6 +416,62 @@ sudo reboot
 | `configs/kiosk-control/kiosk-control.py` | HTTP API for kiosk control |
 | `configs/labwc/rc.xml` | Window rules for auto-fullscreen |
 | `docs/18-kiosk-browser.md` | This documentation |
+
+---
+
+## Session Accumulation Incident (Feb 2026)
+
+### What Happened
+
+The Pi was running hot (54-59°C) with periodic CPU spikes every ~90 seconds. Investigation revealed **84 WebKit processes** consuming 27% CPU and 50% RAM (4GB).
+
+### Root Cause
+
+Epiphany's session restore combined with `--new-window` created **1 extra window per daily reboot**:
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Day 1:  Reboot → 1 window                          │
+│  Day 2:  Reboot → restore 1 + new 1 = 2 windows     │
+│  Day 3:  Reboot → restore 2 + new 1 = 3 windows     │
+│  ...                                                 │
+│  Day 28: Reboot → restore 27 + new 1 = 28 windows   │
+│          28 windows × ~3 processes each = 84 procs   │
+│          27% CPU, 50% RAM, 59°C                      │
+└──────────────────────────────────────────────────────┘
+```
+
+Each window spawned ~3 processes (WebKit renderer + 2 bwrap sandbox wrappers). The `daily-reboot.timer` (4:30 AM) triggered the accumulation every day.
+
+### Fix: Private Instance with Ephemeral Profile
+
+```
+Old (fragile):      epiphany --new-window → persistent profile dir
+                    ↑ session_state.xml survives reboot, accumulates
+
+New (structural):   epiphany --private-instance --profile=/tmp/kiosk-profile
+                    ↑ /tmp wiped on reboot (tmpfs on Debian Trixie)
+                    ↑ rm -rf + mkdir -p on every start (catches crash loops)
+                    ↑ isolated data, no cross-pollution with main profile
+                    ↑ accumulation is structurally impossible
+```
+
+### Prevention
+
+Three independent barriers prevent recurrence:
+1. **`/tmp` is tmpfs** — kernel wipes it on every reboot
+2. **`rm -rf && mkdir -p`** — ExecStartPre wipes profile on every start (including crash restarts)
+3. **`--private-instance`** — isolated profile, no shared state with default Epiphany data
+
+### Results
+
+| Metric | Before (Day 28) | After |
+|--------|-----------------|-------|
+| WebKit processes | 84 | 3 |
+| CPU (browser) | 27% | ~3% |
+| RAM (browser) | 50% (4GB) | 2.1% (~170MB) |
+| Temperature | 54-59°C | 49-51°C |
+| Load average | 2.14 | 0.24-0.52 |
 
 ---
 

@@ -12,10 +12,11 @@
 +---------------------------------------------------------------+
 |                                                               |
 |  Trigger:    Pi boot (after display-boot-check)              |
-|  Browser:    Epiphany (GNOME Web) in application mode        |
+|  Browser:    Epiphany (GNOME Web) private instance           |
+|  Profile:    /tmp/kiosk-profile (ephemeral, wiped on boot)   |
 |  URL:        http://localhost:8888 (dashboard)               |
 |  Fullscreen: Via labwc window rule                           |
-|  Recovery:   Auto-restart on crash (10s delay)               |
+|  Recovery:   Auto-restart on crash (10s delay, max 5/5min)   |
 |                                                               |
 +---------------------------------------------------------------+
 ```
@@ -111,13 +112,17 @@ systemctl --user stop kiosk-browser.service
    - `kiosk-browser.service` starts (5s after boot-check)
 
 2. **Startup Checks:**
-   - Waits for dashboard to be ready (curl localhost:8888)
-   - Up to 60 seconds timeout
+   - Sets display to 60Hz + 180° rotation (logged if fails, continues)
+   - Waits for dashboard to be ready (curl localhost:8888, up to 60s)
+   - Wipes and recreates `/tmp/kiosk-profile` (ephemeral browser profile)
 
 3. **Browser Launch:**
-   - Epiphany opens with `--application-mode` (no browser chrome)
+   - Epiphany opens with `--private-instance --profile=/tmp/kiosk-profile`
+   - Isolated profile in `/tmp` — wiped on every reboot (tmpfs on Trixie)
    - labwc window rule triggers fullscreen
 
 4. **Crash Recovery:**
    - If browser crashes, systemd restarts it after 10 seconds
+   - Profile is wiped on each restart (prevents corrupted state loops)
+   - Max 5 restarts per 5 minutes — then marked failed (prevents infinite loops)
    - Manual stop (`systemctl stop`) does not trigger restart
