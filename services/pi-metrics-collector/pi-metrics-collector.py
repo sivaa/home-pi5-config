@@ -293,7 +293,22 @@ class MqttPublisher:
 
         try:
             payload = json.dumps(metrics)
-            self.client.publish(self.topic, payload, qos=0)
+            # ┌─────────────────────────────────────────────────────────┐
+            # │ retain=True: New subscribers get last value immediately │
+            # │                                                        │
+            # │ Without retain, the dashboard must wait up to 60s      │
+            # │ (collection interval) after subscribing for the first  │
+            # │ value. Combined with MQTT reconnect bugs, this meant   │
+            # │ data never appeared.                                   │
+            # │                                                        │
+            # │ With retain, the broker stores the last message and    │
+            # │ delivers it instantly to any new subscriber.           │
+            # │                                                        │
+            # │ SAFETY: Dashboard uses payload.timestamp (not          │
+            # │ Date.now()) for staleness detection, so old retained   │
+            # │ messages correctly show as "Data Stale".               │
+            # └─────────────────────────────────────────────────────────┘
+            self.client.publish(self.topic, payload, qos=0, retain=True)
             logger.debug(f'Published to {self.topic}')
         except Exception as e:
             logger.error(f'MQTT publish failed: {e}')

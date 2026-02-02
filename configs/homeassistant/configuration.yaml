@@ -113,6 +113,32 @@ logger:
 media_source:
 
 # =============================================================================
+# LG WEBOS TV
+# ┌─────────────────────────────────────────────────────────────────┐
+# │  Model: LG 65SM8500PLA (webOS 4.5)                             │
+# │  IP: 192.168.0.168 │ MAC: f0:86:20:a6:12:f0                    │
+# │                                                                 │
+# │  How it works:                                                  │
+# │    ┌──────────┐  webOS API   ┌──────┐  WoL magic pkt  ┌──────┐ │
+# │    │   HA     │────────────→ │  TV  │ ←──────────────  │  HA  │ │
+# │    │ (control)│  (off/vol/…) │      │   (wake from     │(turn │ │
+# │    └──────────┘              └──────┘    standby)       │ on)  │ │
+# │                                                        └──────┘ │
+# │  Setup: UI only (Settings → Devices → Add → LG webOS)          │
+# │  First run: Accept pairing prompt on TV screen (one-time)       │
+# │  Voice: "Hey Google, turn on/off the TV"                        │
+# │                                                                 │
+# │  NOTE: webostv integration does NOT support YAML config.        │
+# │  Configure via: Settings → Devices & Services → Add → LG webOS │
+# │  Turn-on via WoL: configure in integration options after adding │
+# └─────────────────────────────────────────────────────────────────┘
+# =============================================================================
+
+# Wake-on-LAN: Required for turning on the TV from standby
+# The webOS integration (added via UI) uses this to send magic packets
+wake_on_lan:
+
+# =============================================================================
 # TEXT-TO-SPEECH (TTS)
 # Purpose: Voice announcements via Google Home speakers
 # Docs: https://www.home-assistant.io/integrations/google_translate/
@@ -137,6 +163,7 @@ google_assistant:
     - sensor
     - climate
     - binary_sensor
+    - media_player
   entity_config:
     # === LIGHTS (Voice controllable) ===
     light.study_ikea_light:
@@ -197,6 +224,20 @@ google_assistant:
       aliases:
         - "Button Pusher"
         - "Robot Button"
+
+    # === LG TV (Voice controllable) ===
+    # Expose the template switch, NOT the raw media_player
+    # media_player goes "unavailable" when TV is off → Google blocks commands
+    # The switch always reports on/off → Google always forwards commands
+    switch.living_room_tv_power:
+      name: "Living Room TV"
+      expose: true
+      room: "Living Room"
+      aliases:
+        - "TV"
+        - "Television"
+    media_player.living_room_tv:
+      expose: false
 
     # === TEMPERATURE SENSORS (Read-only, queryable) ===
     sensor.study_temperature_humidity_temperature:
@@ -797,6 +838,39 @@ template:
             2200
           {% endif %}
 
+  # =========================================================================
+  # TV POWER SWITCH (Google Assistant Workaround)
+  # ┌─────────────────────────────────────────────────────────────────┐
+  # │  PROBLEM: When TV is off, webOS reports "unavailable"          │
+  # │  Google sees "unavailable" → thinks device is offline          │
+  # │  → refuses to forward "turn on" command → deadlock!            │
+  # │                                                                 │
+  # │  media_player.living_room_tv                                   │
+  # │    TV on  → state: "on"          → Google: online  ✓           │
+  # │    TV off → state: "unavailable" → Google: OFFLINE ✗           │
+  # │                                                                 │
+  # │  switch.living_room_tv_power (this template)                   │
+  # │    TV on  → state: "on"  → Google: online ✓ → can turn off    │
+  # │    TV off → state: "off" → Google: online ✓ → can turn on!    │
+  # └─────────────────────────────────────────────────────────────────┘
+  # =========================================================================
+  - switch:
+      - name: "Living Room TV Power"
+        unique_id: living_room_tv_power
+        icon: mdi:television
+        state: >
+          {{ states('media_player.living_room_tv') not in
+             ['unavailable', 'unknown', 'off'] }}
+        turn_on:
+          action: media_player.turn_on
+          target:
+            entity_id: media_player.living_room_tv
+        turn_off:
+          action: media_player.turn_off
+          target:
+            entity_id: media_player.living_room_tv
+
+  - sensor:
       - name: "Circadian Phase"
         unique_id: circadian_phase
         icon: mdi:theme-light-dark

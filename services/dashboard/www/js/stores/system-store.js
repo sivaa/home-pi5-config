@@ -54,6 +54,7 @@ export function initSystemStore(Alpine, CONFIG) {
     _mqttSetup: false,
     _unsubscribeMqtt: null,
     _staleCheckInterval: null,
+    _reconnectWatcher: null,
     _staleTick: 0,  // Touched periodically to force stale getter re-evaluation
     viewActive: false,
 
@@ -122,6 +123,35 @@ export function initSystemStore(Alpine, CONFIG) {
           this._staleTick++;
         }, 30000);
       }
+
+      // ┌─────────────────────────────────────────────────────────────┐
+      // │ MQTT Reconnect Watcher                                     │
+      // │                                                            │
+      // │ When MQTT reconnects (e.g. after visibility pause/resume), │
+      // │ mqtt-store increments connectionCount. We poll this to     │
+      // │ detect reconnects and re-subscribe to our topic.           │
+      // │                                                            │
+      // │ WHY poll instead of $watch?                                │
+      // │ Alpine's $watch is only available on components (x-data),  │
+      // │ not stores. Keeping detection in the store co-locates it   │
+      // │ with the subscription logic.                               │
+      // │                                                            │
+      // │ 3s interval = compromise between detection latency & CPU.  │
+      // │ Watcher persists across view deactivate/activate so        │
+      // │ reconnects during navigation are still caught.             │
+      // └─────────────────────────────────────────────────────────────┘
+      if (!this._reconnectWatcher) {
+        let lastCount = Alpine.store('mqtt')?.connectionCount || 0;
+        this._reconnectWatcher = setInterval(() => {
+          const mqtt = Alpine.store('mqtt');
+          if (mqtt && mqtt.connected && mqtt.connectionCount > lastCount) {
+            lastCount = mqtt.connectionCount;
+            console.log('[system] MQTT reconnected (count=' + lastCount + '), re-subscribing...');
+            this._mqttSetup = false;
+            this.setupMqttListener();
+          }
+        }, 3000);
+      }
     },
 
     deactivateView() {
@@ -139,8 +169,27 @@ export function initSystemStore(Alpine, CONFIG) {
     // MQTT SUBSCRIPTION
     // ========================================
 
+    // ┌─────────────────────────────────────────────────────────────┐
+    // │ MQTT Subscription Setup                                     │
+    // │                                                             │
+    // │ BUG FIX: Previously, _mqttSetup was a permanent guard.      │
+    // │ When the view deactivated, _unsubscribeMqtt() removed the   │
+    // │ handler from mqtt-store's Map. But _mqttSetup stayed true,  │
+    // │ so on re-activate, the handler was never re-registered:     │
+    // │                                                             │
+    // │   activateView() → setupMqttListener()                      │
+    // │     _mqttSetup = true → return (handler gone, no data!)     │
+    // │                                                             │
+    // │ FIX: Always re-register the handler. The guard only         │
+    // │ prevents concurrent retry loops, not re-registration.       │
+    // └─────────────────────────────────────────────────────────────┘
     setupMqttListener() {
       if (this._mqttSetup) return;
+      // Set guard IMMEDIATELY to prevent concurrent retry loops.
+      // If a reconnect fires while checkMqtt is still retrying,
+      // without this, a second loop would start and both would
+      // eventually register duplicate handlers.
+      this._mqttSetup = true;
 
       let retryCount = 0;
       const maxRetries = 30; // Give up after 60 seconds (30 * 2000ms)
@@ -150,22 +199,33 @@ export function initSystemStore(Alpine, CONFIG) {
         if (!mqtt?.client || !mqtt.connected) {
           if (++retryCount > maxRetries) {
             console.warn('[system] MQTT connection timeout after 60s - giving up');
+            this._mqttSetup = false;  // Reset on failure so future attempts can retry
             return;
           }
           setTimeout(checkMqtt, 2000);
           return;
         }
 
-        this._mqttSetup = true;
         const topic = 'pi/system/metrics';
 
-        console.log('[system] Subscribing to:', topic);
-        mqtt.client.subscribe(topic, { qos: 0 });
+        mqtt.client.subscribe(topic, { qos: 0 }, (err) => {
+          if (err) {
+            console.error('[system] Subscribe failed:', topic, err);
+            return;
+          }
+          console.log('[system] Subscribed to:', topic);
+        });
 
-        // Use central dispatcher for efficient message handling
+        // Clean up previous handler if it exists (e.g. from prior activation)
+        if (this._unsubscribeMqtt) {
+          this._unsubscribeMqtt();
+        }
+
+        // Register fresh handler on mqtt-store's topic Map
         this._unsubscribeMqtt = mqtt.registerTopicHandler(topic, (msgTopic, payload) => {
           this._handleMqttMessage(payload);
         });
+        // _mqttSetup already set to true at function entry
       };
 
       checkMqtt();
@@ -184,7 +244,20 @@ export function initSystemStore(Alpine, CONFIG) {
       this.load_1m = payload.load_1m;
       this.load_5m = payload.load_5m;
       this.load_15m = payload.load_15m;
-      this.lastUpdate = Date.now();
+      // ┌────────────────────────────────────────────────────────────┐
+      // │ Use payload timestamp, NOT Date.now()                      │
+      // │                                                            │
+      // │ WHY: With retain=True on MQTT, a subscriber gets the LAST  │
+      // │ published message immediately on connect. If the collector  │
+      // │ has been down for 5 hours, that retained message is stale: │
+      // │                                                            │
+      // │   Date.now()         → "just now" ✗ (lies about freshness) │
+      // │   payload.timestamp  → "5h ago"   ✓ (truth)               │
+      // │                                                            │
+      // │ Falls back to Date.now() for messages without timestamp    │
+      // │ (shouldn't happen, but defensive).                         │
+      // └────────────────────────────────────────────────────────────┘
+      this.lastUpdate = payload.timestamp || Date.now();
 
       console.log(
         `[system] MQTT: CPU=${this.cpu_percent}%, Temp=${this.cpu_temp}°C, ` +
@@ -302,6 +375,10 @@ export function initSystemStore(Alpine, CONFIG) {
       if (this._staleCheckInterval) {
         clearInterval(this._staleCheckInterval);
         this._staleCheckInterval = null;
+      }
+      if (this._reconnectWatcher) {
+        clearInterval(this._reconnectWatcher);
+        this._reconnectWatcher = null;
       }
       this._mqttSetup = false;
     }

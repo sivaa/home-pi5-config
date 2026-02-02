@@ -36,16 +36,30 @@ services:
     restart: unless-stopped
     depends_on:
       - mosquitto
-    ports:
-      - "8123:8123"
+    # ┌──────────────────────────────────────────────────────────────┐
+    # │ HOST NETWORKING - Required for HA to control Docker          │
+    # │                                                              │
+    # │ HA shell_commands use curl + Docker socket API to manage     │
+    # │ containers (e.g. start/stop heater-watchdog). The Docker     │
+    # │ CLI isn't in the HA image, so we mount the socket and use    │
+    # │ curl --unix-socket instead.                                  │
+    # │                                                              │
+    # │ With host network, HA reaches MQTT/InfluxDB via localhost    │
+    # │ instead of Docker DNS. Other bridge-network services must    │
+    # │ use extra_hosts or gateway IP to reach HA (port 8123).       │
+    # │                                                              │
+    # │ ⚠ ports: directive is IGNORED with network_mode: host.      │
+    # │   HA binds directly to host port 8123.                      │
+    # │                                                              │
+    # │ See: CLAUDE.md Section 7 "Home Assistant Container Reqs"    │
+    # └──────────────────────────────────────────────────────────────┘
+    network_mode: host
     volumes:
       - /opt/homeassistant:/config
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TZ=Europe/Berlin
     privileged: true
-    dns:
-      - 192.168.0.1
-      - 8.8.8.8
 
   influxdb:
     image: influxdb:1.8
@@ -110,6 +124,16 @@ services:
     restart: unless-stopped
     depends_on:
       - homeassistant
+    # ┌─────────────────────────────────────────────────────────┐
+    # │ HA runs with --network host (for Docker socket access), │
+    # │ so Docker DNS can't resolve "homeassistant" from bridge │
+    # │ networks. host-gateway maps it to the host IP.          │
+    # │                                                         │
+    # │ Without this: "Name has no usable address" crash-loop   │
+    # │ Incident: Jan 16 2026 - 909 restarts over 15 days      │
+    # └─────────────────────────────────────────────────────────┘
+    extra_hosts:
+      - "homeassistant:host-gateway"
     environment:
       - HA_URL=http://homeassistant:8123
       - HA_TOKEN=${HA_TOKEN}

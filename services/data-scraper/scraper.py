@@ -55,6 +55,24 @@ WRONG_DIRECTIONS = ["teltow", "stahnsdorf", "lankwitz", "andréezeile", "steglit
 # Filter settings for S-Bahn (directions to exclude)
 WRONG_SBAHN_DIRECTIONS = ["wannsee"]
 
+# Cancellation/strike detection pattern (shared by Bus + S-Bahn scrapers)
+#
+#   ┌───────────────────────────────────────────────────────────────┐
+#   │  CANCELLATION KEYWORDS (German + English)                     │
+#   │                                                               │
+#   │  bestreikt .......... "on strike" (BVG strike days)           │
+#   │  streik ............. "strike"                                │
+#   │  cancelled/canceled . English (bahnhof.de uses English UI)    │
+#   │  fällt aus .......... "is cancelled" (standard BVG/DB)        │
+#   │  ausfall ............ "cancellation/failure"                  │
+#   │  entfällt ........... "does not take place" (formal DB)       │
+#   │  verkehrt nicht ..... "does not run" (DB disruption notices)  │
+#   └───────────────────────────────────────────────────────────────┘
+CANCELLATION_PATTERN = re.compile(
+    r'bestreikt|streik|(?:trip\s+)?cancell?ed|fällt\s+aus|ausfall|entfällt|verkehrt\s+nicht',
+    re.IGNORECASE
+)
+
 # Cache results for 60 seconds (matches dashboard refresh interval)
 CACHE_TTL = 60
 
@@ -222,6 +240,26 @@ async def scrape_bvg_departures():
 
                 time_text = await time_el.inner_text()
 
+                # Check full item text for strike/cancellation indicators
+                #
+                #   ┌─────────────────────────────────────────────────────────┐
+                #   │  BVG STRIKE DETECTION (Feb 2026)                        │
+                #   │                                                         │
+                #   │  During strikes, BVG shows per-departure messages:      │
+                #   │  "Die BVG wird heute bestreikt"                         │
+                #   │                                                         │
+                #   │  Without this check:                                    │
+                #   │    Dashboard shows ghost departures as catchable  ✗     │
+                #   │                                                         │
+                #   │  With this check:                                       │
+                #   │    Dashboard shows "✕ Trip cancelled" + red styling ✓   │
+                #   │                                                         │
+                #   │  Uses shared CANCELLATION_PATTERN constant               │
+                #   │  (same regex for Bus + S-Bahn scrapers)                │
+                #   └─────────────────────────────────────────────────────────┘
+                item_text = await item.inner_text()
+                cancelled = bool(CANCELLATION_PATTERN.search(item_text))
+
                 # Parse time (format: "21:26 Uhr" or "21:26 Uhr +3 Minuten")
                 time_match = re.search(r'(\d{2}):(\d{2})', time_text)
                 if not time_match:
@@ -271,7 +309,7 @@ async def scrape_bvg_departures():
                     "time": f"{hour:02d}:{minute:02d}",
                     "delay": delay,
                     "platform": None,
-                    "cancelled": False  # BVG doesn't show cancelled trips in this view
+                    "cancelled": cancelled
                 })
 
             except Exception as e:
@@ -398,8 +436,8 @@ async def scrape_sbahn_departures():
                 if delay_match:
                     delay = int(delay_match.group(1))
 
-                # Check for cancelled trip
-                cancelled = bool(re.search(r'(?:trip\s+)?cancell?ed|fällt\s+aus|ausfall', text, re.IGNORECASE))
+                # Check for cancelled/strike trip (uses shared CANCELLATION_PATTERN)
+                cancelled = bool(CANCELLATION_PATTERN.search(text))
 
                 # Calculate minutes until departure (include delay in comparison)
                 dep_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
