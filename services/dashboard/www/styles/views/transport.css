@@ -234,12 +234,27 @@
 }
 
 /* Row status styling */
+/*
+ * ┌──────────────────────────────────────────────────────────────┐
+ * │  MISSED vs CANCELLED — must look DIFFERENT!                  │
+ * │                                                              │
+ * │  Missed:    Train IS running, you just can't reach it        │
+ * │             → Faded out, dim red time, NO strikethrough      │
+ * │                                                              │
+ * │  Cancelled: Train is NOT running at all                      │
+ * │             → Red background, strikethrough on direction,    │
+ * │               "✕ Trip cancelled" replaces time               │
+ * │                                                              │
+ * │  BUG (Feb 2026): Both used strikethrough + red, so during   │
+ * │  a bus strike, "missed" S-Bahn looked identical to           │
+ * │  "cancelled" buses — very confusing!                         │
+ * └──────────────────────────────────────────────────────────────┘
+ */
 .departure-row.status-missed {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .departure-row.status-missed .departure-time {
-  text-decoration: line-through;
   color: var(--color-transport-missed);
 }
 
