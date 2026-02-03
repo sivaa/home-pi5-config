@@ -3627,8 +3627,10 @@
 #   {"action": "disable"} - Disable circadian
 #   {"action": "clear_override", "room": "study"} - Clear study override
 #   {"action": "clear_override", "room": "living"} - Clear living override
+#   {"action": "clear_override", "room": "bath"} - Clear bath override
 #   {"action": "apply_circadian", "room": "study"} - Apply schedule to study light
 #   {"action": "apply_circadian", "room": "living"} - Apply schedule to living light
+#   {"action": "apply_circadian", "room": "bath"} - Apply schedule to bath light
 # -----------------------------------------------------------------------------
 - id: circadian_mqtt_control
   alias: "Circadian - MQTT Dashboard Control"
@@ -4453,6 +4455,17 @@
 
 # -----------------------------------------------------------------------------
 # BEDROOM - Light OFF when unoccupied
+# ┌────────────────────────────────────────────────────────────────┐
+# │  Dual-trigger pattern (resilient to HA automation reloads):   │
+# │                                                                │
+# │  Trigger 1: state → "off"     (instant response)              │
+# │  Trigger 2: time_pattern /5   (fallback every 5 min)          │
+# │                                                                │
+# │  WHY: HA state triggers only fire on transitions.             │
+# │  If automations reload while sensor is already "off",         │
+# │  the state trigger never fires → lights stay on forever.      │
+# │  The periodic trigger catches this edge case.                  │
+# └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: bed_presence_light_off
   alias: "[Bed] Light Off When Unoccupied"
@@ -4460,9 +4473,24 @@
   mode: single
 
   trigger:
+    # Instant: fires the moment presence sensor transitions to off
     - platform: state
       entity_id: binary_sensor.bed_human_presence_occupancy
       to: "off"
+    # Fallback: catches missed transitions after HA restart/reload
+    - platform: time_pattern
+      minutes: "/5"
+
+  condition:
+    # Light must actually be on (skips no-op turn_off calls)
+    - condition: state
+      entity_id: switch.bed_light_switch
+      state: "on"
+    # Presence must be off for 30s (filters mmWave sensor glitches)
+    - condition: state
+      entity_id: binary_sensor.bed_human_presence_occupancy
+      state: "off"
+      for: "00:00:30"
 
   action:
     - service: switch.turn_off
@@ -4471,6 +4499,14 @@
 
 # -----------------------------------------------------------------------------
 # LIVING - IKEA Light OFF when unoccupied
+# ┌────────────────────────────────────────────────────────────────┐
+# │  Dual-trigger pattern (resilient to HA automation reloads):   │
+# │                                                                │
+# │  Trigger 1: state → "off"     (instant response)              │
+# │  Trigger 2: time_pattern /5   (fallback every 5 min)          │
+# │                                                                │
+# │  See Bedroom automation above for detailed rationale.          │
+# └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: living_presence_ikea_light_off
   alias: "[Living] IKEA Light Off When Unoccupied"
@@ -4478,17 +4514,44 @@
   mode: single
 
   trigger:
+    # Instant: fires the moment presence sensor transitions to off
     - platform: state
       entity_id: binary_sensor.living_human_presence_occupancy
       to: "off"
+    # Fallback: catches missed transitions after HA restart/reload
+    - platform: time_pattern
+      minutes: "/5"
+
+  condition:
+    # Light must actually be on (skips no-op turn_off calls)
+    - condition: state
+      entity_id: light.living_ikea_light
+      state: "on"
+    # Presence must be off for 30s (filters mmWave sensor glitches)
+    - condition: state
+      entity_id: binary_sensor.living_human_presence_occupancy
+      state: "off"
+      for: "00:00:30"
 
   action:
     - service: light.turn_off
       target:
         entity_id: light.living_ikea_light
+    # Clear circadian override so next power-on gets scheduled values
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_living_override
 
 # -----------------------------------------------------------------------------
 # STUDY - IKEA Light OFF when unoccupied
+# ┌────────────────────────────────────────────────────────────────┐
+# │  Dual-trigger pattern (resilient to HA automation reloads):   │
+# │                                                                │
+# │  Trigger 1: state → "off"     (instant response)              │
+# │  Trigger 2: time_pattern /5   (fallback every 5 min)          │
+# │                                                                │
+# │  See Bedroom automation above for detailed rationale.          │
+# └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: study_presence_ikea_light_off
   alias: "[Study] IKEA Light Off When Unoccupied"
@@ -4496,14 +4559,33 @@
   mode: single
 
   trigger:
+    # Instant: fires the moment presence sensor transitions to off
     - platform: state
       entity_id: binary_sensor.study_human_presence_occupancy
       to: "off"
+    # Fallback: catches missed transitions after HA restart/reload
+    - platform: time_pattern
+      minutes: "/5"
+
+  condition:
+    # Light must actually be on (skips no-op turn_off calls)
+    - condition: state
+      entity_id: light.study_ikea_light
+      state: "on"
+    # Presence must be off for 30s (filters mmWave sensor glitches)
+    - condition: state
+      entity_id: binary_sensor.study_human_presence_occupancy
+      state: "off"
+      for: "00:00:30"
 
   action:
     - service: light.turn_off
       target:
         entity_id: light.study_ikea_light
+    # Clear circadian override so next power-on gets scheduled values
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_study_override
 
 # -----------------------------------------------------------------------------
 # KITCHEN - TTS reminder if lights appear on when unoccupied
@@ -4549,9 +4631,13 @@
 # -----------------------------------------------------------------------------
 # BATHROOM - AwoX Light OFF when unoccupied for 3 minutes
 # ┌────────────────────────────────────────────────────────────────┐
-# │  Timeline:                                                     │
+# │  Dual-trigger pattern (resilient to HA automation reloads):   │
 # │                                                                │
-# │  Person leaves ──► Sensor timeout (120s) ──► occupancy: off    │
+# │  Trigger 1: state → "off" for 3 min  (event-driven + grace)  │
+# │  Trigger 2: time_pattern /5          (fallback every 5 min)   │
+# │                                                                │
+# │  Timeline (state trigger):                                     │
+# │  Person leaves ──► Sensor keep_time ──► occupancy: off         │
 # │                                               │                │
 # │                                    ┌──── for: 3 min ────┐     │
 # │                                    │  (someone returns?  │     │
@@ -4560,7 +4646,15 @@
 # │                                               │                │
 # │                                          Light OFF             │
 # │                                                                │
-# │  Total: ~5 min from last movement (2 min sensor + 3 min for)  │
+# │  Total: ~(keep_time + 3 min) from last movement               │
+# │                                                                │
+# │  Condition `for: 00:03:00` on presence check ensures the      │
+# │  periodic trigger also respects the 3-min grace period.        │
+# │  (Redundant for state trigger which already waited 3 min,     │
+# │   essential for periodic trigger which knows no history.)      │
+# │                                                                │
+# │  Note: The trigger's `for:` timer resets on HA reload, which  │
+# │  is exactly why the periodic fallback is needed here.          │
 # └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: bath_presence_light_off
@@ -4569,21 +4663,37 @@
   mode: single
 
   trigger:
+    # Event-driven (with grace): fires after presence off for 3 continuous minutes
     - platform: state
       entity_id: binary_sensor.bath_human_presence_occupancy
       to: "off"
       for: "00:03:00"
+    # Fallback: catches missed transitions after HA restart/reload
+    - platform: time_pattern
+      minutes: "/5"
 
   condition:
-    # Only act if the light is actually on
+    # Light must actually be on
     - condition: state
       entity_id: light.bath_light
       state: "on"
+    # Presence must be off for at least 3 min
+    # (redundant for state trigger which already waited 3 min, essential for periodic)
+    - condition: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      state: "off"
+      for: "00:03:00"
 
   action:
     - service: light.turn_off
       target:
         entity_id: light.bath_light
+    # Clear circadian override so next power-on gets scheduled values
+    # Without this: manual remote adjust → auto-off → next entry
+    # would silently skip circadian schedule for up to 25 minutes
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_bath_override
 
 # -----------------------------------------------------------------------------
 # BATHROOM - TTS reminder (LEGACY - disabled, replaced by bath_presence_light_off)

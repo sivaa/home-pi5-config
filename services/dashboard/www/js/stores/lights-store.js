@@ -14,6 +14,8 @@ export function initLightsStore(Alpine, CONFIG) {
         state: 'OFF',
         brightness: 254,
         colorTemp: 370,
+        colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
+        colorTempMax: 454,
         linkquality: null,
         lastSeen: null,
         syncing: false,
@@ -27,6 +29,8 @@ export function initLightsStore(Alpine, CONFIG) {
         state: 'OFF',
         brightness: 254,
         colorTemp: 370,
+        colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
+        colorTempMax: 454,
         linkquality: null,
         lastSeen: null,
         syncing: false,
@@ -40,6 +44,8 @@ export function initLightsStore(Alpine, CONFIG) {
         state: 'OFF',
         brightness: 254,
         colorTemp: 370,
+        colorTempMin: 153,   // AwoX 33955: 153-370 mired (2703K-6536K)
+        colorTempMax: 370,
         linkquality: null,
         lastSeen: null,
         syncing: false,
