@@ -4749,7 +4749,7 @@
         list: [
           {
             id: 'study_light',
-            name: 'Study Light',
+            name: 'Study Room',
             icon: '📚',
             topic: '[Study] IKEA Light',
             state: 'OFF',
@@ -4762,7 +4762,7 @@
           },
           {
             id: 'living_light',
-            name: 'Living Room Light',
+            name: 'Living Room',
             icon: '🛋️',
             topic: '[Living] IKEA Light',
             state: 'OFF',
@@ -4775,7 +4775,7 @@
           },
           {
             id: 'bath_light',
-            name: 'Bath Light',
+            name: 'Bathroom',
             icon: '🛁',
             topic: '[Bath] Light',
             state: 'OFF',
@@ -4992,11 +4992,13 @@
         },
 
         // Format expiry as countdown
+        // Guard: NaN from new Date("unavailable").getTime() when HA entity missing
         formatExpiry(room) {
           const override = this.overrides[room];
           if (!override?.active || !override?.expires) return '';
           const now = Date.now();
           const remaining = Math.max(0, override.expires - now);
+          if (isNaN(remaining)) return '';
           const minutes = Math.ceil(remaining / 60000);
           return minutes > 0 ? `${minutes} min` : 'Expiring...';
         },

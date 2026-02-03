@@ -166,10 +166,13 @@ All documentation should enable complete system restoration from scratch.
 │     - Zigbee2MQTT: pi:8080                                      │
 │                                                                 │
 │  3. Deploy to Pi after local testing passes:                    │
+│     - MUST be on `main` branch before deploying!                │
 │     - scp files to /opt/dashboard/www/                          │
 │     - Fix permissions: sudo chmod -R 755 /opt/dashboard/www     │
+│     - VERIFY: ssh pi@pi to confirm files are correct            │
 │                                                                 │
 │  WHY: Faster testing & iteration cycles!                        │
+│  WHY main-only: Ensures Pi always runs production code.         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
