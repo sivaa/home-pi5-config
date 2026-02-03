@@ -728,7 +728,8 @@
                         <span x-text="getColorTempLabel(light.colorTemp)"></span>
                       </span>
                     </div>
-                    <input type="range" class="slider colortemp-slider" min="250" max="454"
+                    <input type="range" class="slider colortemp-slider"
+                           :min="light.colorTempMin" :max="light.colorTempMax"
                            x-model="light.colorTemp"
                            :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
                            @input="$store.lights.setColorTemp(light, $event.target.value)">
@@ -4755,6 +4756,8 @@
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
+            colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
+            colorTempMax: 454,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -4768,6 +4771,8 @@
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
+            colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
+            colorTempMax: 454,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -4781,6 +4786,8 @@
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
+            colorTempMin: 153,   // AwoX 33955: 153-370 mired (2703K-6536K)
+            colorTempMax: 370,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -4902,12 +4909,14 @@
         applyPreset(light, presetName) {
           const preset = this.presets[presetName];
           if (preset) {
+            // Clamp color temp to light's hardware range
+            const clampedTemp = Math.min(Math.max(preset.colorTemp, light.colorTempMin), light.colorTempMax);
             this.publishCommand(light, {
               brightness: preset.brightness,
-              color_temp: preset.colorTemp
+              color_temp: clampedTemp
             });
             light.brightness = preset.brightness;
-            light.colorTemp = preset.colorTemp;
+            light.colorTemp = clampedTemp;
           }
         },
 
@@ -4915,10 +4924,18 @@
           const scene = this.scenes[sceneName];
           if (scene) {
             this.list.forEach(light => {
-              this.publishCommand(light, scene);
+              // Clamp scene color temp to each light's hardware range
+              const cmd = { ...scene };
+              if (cmd.colorTemp !== undefined) {
+                cmd.color_temp = Math.min(Math.max(cmd.colorTemp, light.colorTempMin), light.colorTempMax);
+                delete cmd.colorTemp;
+              }
+              this.publishCommand(light, cmd);
               if (scene.state !== undefined) light.state = scene.state;
               if (scene.brightness !== undefined) light.brightness = scene.brightness;
-              if (scene.colorTemp !== undefined) light.colorTemp = scene.colorTemp;
+              if (scene.colorTemp !== undefined) {
+                light.colorTemp = Math.min(Math.max(scene.colorTemp, light.colorTempMin), light.colorTempMax);
+              }
             });
           }
         }

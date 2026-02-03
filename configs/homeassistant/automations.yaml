@@ -3627,8 +3627,10 @@
 #   {"action": "disable"} - Disable circadian
 #   {"action": "clear_override", "room": "study"} - Clear study override
 #   {"action": "clear_override", "room": "living"} - Clear living override
+#   {"action": "clear_override", "room": "bath"} - Clear bath override
 #   {"action": "apply_circadian", "room": "study"} - Apply schedule to study light
 #   {"action": "apply_circadian", "room": "living"} - Apply schedule to living light
+#   {"action": "apply_circadian", "room": "bath"} - Apply schedule to bath light
 # -----------------------------------------------------------------------------
 - id: circadian_mqtt_control
   alias: "Circadian - MQTT Dashboard Control"
@@ -4584,6 +4586,12 @@
     - service: light.turn_off
       target:
         entity_id: light.bath_light
+    # Clear circadian override so next power-on gets scheduled values
+    # Without this: manual remote adjust → auto-off → next entry
+    # would silently skip circadian schedule for up to 25 minutes
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_bath_override
 
 # -----------------------------------------------------------------------------
 # BATHROOM - TTS reminder (LEGACY - disabled, replaced by bath_presence_light_off)
