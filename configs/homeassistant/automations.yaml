@@ -4482,14 +4482,15 @@
       minutes: "/5"
 
   condition:
-    # Light must actually be on (no-op guard for periodic trigger)
+    # Light must actually be on (skips no-op turn_off calls)
     - condition: state
       entity_id: switch.bed_light_switch
       state: "on"
-    # Presence must be off (no-op for state trigger, essential for periodic)
+    # Presence must be off for 30s (filters mmWave sensor glitches)
     - condition: state
       entity_id: binary_sensor.bed_human_presence_occupancy
       state: "off"
+      for: "00:00:30"
 
   action:
     - service: switch.turn_off
@@ -4503,6 +4504,8 @@
 # │                                                                │
 # │  Trigger 1: state → "off"     (instant response)              │
 # │  Trigger 2: time_pattern /5   (fallback every 5 min)          │
+# │                                                                │
+# │  See Bedroom automation above for detailed rationale.          │
 # └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: living_presence_ikea_light_off
@@ -4520,19 +4523,24 @@
       minutes: "/5"
 
   condition:
-    # Light must actually be on
+    # Light must actually be on (skips no-op turn_off calls)
     - condition: state
       entity_id: light.living_ikea_light
       state: "on"
-    # Presence must be off
+    # Presence must be off for 30s (filters mmWave sensor glitches)
     - condition: state
       entity_id: binary_sensor.living_human_presence_occupancy
       state: "off"
+      for: "00:00:30"
 
   action:
     - service: light.turn_off
       target:
         entity_id: light.living_ikea_light
+    # Clear circadian override so next power-on gets scheduled values
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_living_override
 
 # -----------------------------------------------------------------------------
 # STUDY - IKEA Light OFF when unoccupied
@@ -4541,6 +4549,8 @@
 # │                                                                │
 # │  Trigger 1: state → "off"     (instant response)              │
 # │  Trigger 2: time_pattern /5   (fallback every 5 min)          │
+# │                                                                │
+# │  See Bedroom automation above for detailed rationale.          │
 # └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: study_presence_ikea_light_off
@@ -4558,19 +4568,24 @@
       minutes: "/5"
 
   condition:
-    # Light must actually be on
+    # Light must actually be on (skips no-op turn_off calls)
     - condition: state
       entity_id: light.study_ikea_light
       state: "on"
-    # Presence must be off
+    # Presence must be off for 30s (filters mmWave sensor glitches)
     - condition: state
       entity_id: binary_sensor.study_human_presence_occupancy
       state: "off"
+      for: "00:00:30"
 
   action:
     - service: light.turn_off
       target:
         entity_id: light.study_ikea_light
+    # Clear circadian override so next power-on gets scheduled values
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_study_override
 
 # -----------------------------------------------------------------------------
 # KITCHEN - TTS reminder if lights appear on when unoccupied
@@ -4618,11 +4633,11 @@
 # ┌────────────────────────────────────────────────────────────────┐
 # │  Dual-trigger pattern (resilient to HA automation reloads):   │
 # │                                                                │
-# │  Trigger 1: state → "off" for 3 min  (instant + grace)       │
+# │  Trigger 1: state → "off" for 3 min  (event-driven + grace)  │
 # │  Trigger 2: time_pattern /5          (fallback every 5 min)   │
 # │                                                                │
 # │  Timeline (state trigger):                                     │
-# │  Person leaves ──► Sensor timeout (120s) ──► occupancy: off    │
+# │  Person leaves ──► Sensor keep_time ──► occupancy: off         │
 # │                                               │                │
 # │                                    ┌──── for: 3 min ────┐     │
 # │                                    │  (someone returns?  │     │
@@ -4631,10 +4646,15 @@
 # │                                               │                │
 # │                                          Light OFF             │
 # │                                                                │
-# │  Total: ~5 min from last movement (2 min sensor + 3 min for)  │
+# │  Total: ~(keep_time + 3 min) from last movement               │
 # │                                                                │
-# │  Condition uses `for: 00:03:00` so the periodic trigger also  │
-# │  respects the 3-minute grace period before turning off.        │
+# │  Condition `for: 00:03:00` on presence check ensures the      │
+# │  periodic trigger also respects the 3-min grace period.        │
+# │  (Redundant for state trigger which already waited 3 min,     │
+# │   essential for periodic trigger which knows no history.)      │
+# │                                                                │
+# │  Note: The trigger's `for:` timer resets on HA reload, which  │
+# │  is exactly why the periodic fallback is needed here.          │
 # └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: bath_presence_light_off
@@ -4643,7 +4663,7 @@
   mode: single
 
   trigger:
-    # Instant (with grace): fires after presence off for 3 continuous minutes
+    # Event-driven (with grace): fires after presence off for 3 continuous minutes
     - platform: state
       entity_id: binary_sensor.bath_human_presence_occupancy
       to: "off"
@@ -4657,7 +4677,8 @@
     - condition: state
       entity_id: light.bath_light
       state: "on"
-    # Presence must be off for at least 3 min (grace period for both triggers)
+    # Presence must be off for at least 3 min
+    # (redundant for state trigger which already waited 3 min, essential for periodic)
     - condition: state
       entity_id: binary_sensor.bath_human_presence_occupancy
       state: "off"
