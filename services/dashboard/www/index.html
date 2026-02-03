@@ -2864,27 +2864,32 @@
                   <tspan x="45" dy="10" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
               </g>
-              <!-- Light indicators (IKEA FLOALT lights) -->
+              <!-- Light indicators (bulb icon, matching presence icon style) -->
               <g class="floor-plan-lights">
                 <!-- Bathroom (0,0,35,20) - has bath_light -->
                 <g transform="translate(2, 3)" :class="getRoomLightClass('bathroom')">
-                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
                 <!-- Kitchen (0,20,35,20) - no light -->
                 <g transform="translate(2, 23)" :class="getRoomLightClass('kitchen')">
-                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
                 <!-- Study (55,0,37.39,40) - has study_light -->
                 <g transform="translate(57, 3)" :class="getRoomLightClass('study')">
-                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
                 <!-- Bedroom (0,40,45,36.65) - has switch, no smart bulb -->
                 <g transform="translate(2, 43)" :class="getRoomLightClass('bedroom')">
-                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
                 <!-- Living (45,40,47.39,36.65) - has living_light -->
                 <g transform="translate(47, 43)" :class="getRoomLightClass('living')">
-                  <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
               </g>
               <!-- Presence indicators (SNZB-06P sensors) -->
