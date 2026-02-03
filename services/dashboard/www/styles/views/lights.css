@@ -2,7 +2,7 @@
        LIGHTS CONTROL VIEW (Vision 7)
        ======================================== */
     .lights-view {
-      padding: var(--space-lg);
+      padding: var(--space-md) var(--space-lg);
       max-width: 800px;
       margin: 0 auto;
     }
@@ -42,8 +42,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: var(--space-md) var(--space-lg);
-      margin-bottom: var(--space-lg);
+      padding: var(--space-sm) var(--space-lg);
+      margin-bottom: var(--space-md);
       background: var(--color-surface);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow-md);
@@ -111,7 +111,7 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: var(--space-md);
-      margin-bottom: var(--space-xl);
+      margin-bottom: var(--space-md);
     }
 
     .light-card {
@@ -643,10 +643,10 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
   background: var(--color-surface);
   border-radius: var(--radius-xl);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
