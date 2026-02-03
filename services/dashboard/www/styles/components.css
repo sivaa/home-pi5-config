@@ -178,7 +178,7 @@
       border: 2px solid var(--color-text-tertiary);
       border-top-color: var(--color-primary);
       border-radius: 50%;
-      animation: spin 1s linear infinite;
+      animation: spin 1s linear 60;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }

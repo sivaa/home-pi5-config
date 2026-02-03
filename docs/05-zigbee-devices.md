@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** January 19, 2026
-> **Total Devices:** 44 (including coordinator)
+> **Last Updated:** February 3, 2026
+> **Total Devices:** 46 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -26,6 +26,12 @@
 ││Lite│ │Temp │ │ E10 │ │06P  │ │ Mtn │ │ Cnt │ │S60ZB│ │TRVZB│ │Rmte │ │Swtch│ │   ││
 ││(2x)│ │(12x)│ │ CO2 │ │(5x) │ │     │ │(8x) │ │(3x) │ │(4x) │ │(2x) │ │(3x) │ │   ││
 │└────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └───┘│
+│                                                                                       │
+│  ┌─────┐ ┌─────┐                                                                     │
+│  │AwoX │ │EGLO │                                                                     │
+│  │Light│ │Rmte │                                                                     │
+│  │     │ │     │                                                                     │
+│  └─────┘ └─────┘                                                                     │
 │                                                                                       │
 │       Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox            │
 │                                                                                       │
@@ -82,6 +88,8 @@
 | 41 | Kitchen | [Kitchen] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
 | 42 | Bath | [Bath] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
 | 43 | Bed | [Bed] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
+| 44 | Bath | [Bath] Light | 33955 | AwoX | LED Light (Color Temp, Router) |
+| 45 | Bath | [Bath] Light Remote | 99099 | EGLO | 3-Group Remote Controller |
 
 ---
 
@@ -685,6 +693,7 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF ZBM5 Wall Switch Study - router!              │
 │    [ ] SONOFF ZBM5 Wall Switch Bed - router!                │
 │    [ ] SONOFF ZBM5 Wall Switch Living - router!             │
+│    [ ] AwoX 33955 Bath Light - router!                      │
 │                                                             │
 │  Step 3: Pair battery devices (end devices)                 │
 │    [ ] SONOFF SNZB-02WD Balcony                             │
@@ -708,6 +717,7 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF TRVZB Living Thermostat Outer                 │
 │    [ ] IKEA Remote Study                                    │
 │    [ ] IKEA Remote Living                                   │
+│    [ ] EGLO 99099 Bath Light Remote                         │
 │    [ ] HOBEIAN ZG-102ZM Vibration Sensor (optional)         │
 │    [ ] Tuya Fingerbot Plus (TS0001_fingerbot)               │
 │    [ ] SONOFF SNZB-06P Study Human Presence (USB powered)   │
@@ -727,6 +737,9 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] Bind [Living] IKEA Remote → [Living] IKEA Light      │
 │        (genOnOff, genLevelCtrl, genScenes - keep pressing!) │
 │    [ ] Bind [Living] IKEA Remote → Coordinator              │
+│    [ ] Add [Bath] Light to group 32780 (eglo_remote_group1) │
+│        (EGLO remote uses factory group, not direct binding) │
+│    [ ] Verify EGLO remote controls Bath Light directly      │
 │                                                             │
 │  Step 7: Verify bindings work (test toggle/brightness)      │
 │                                                             │
@@ -898,6 +911,9 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2026-02-03 | Added 2 devices: 1x AwoX 33955 Bath Light (router), 1x EGLO 99099 Bath Remote |
+| 2026-02-03 | Set up EGLO remote → Bath Light binding via group 32780 (factory group, works offline) |
+| 2026-02-03 | Updated device count: 44 → 46 devices |
 | 2026-01-19 | Added 5x SONOFF SNZB-06P human presence sensors (Study, Living, Kitchen, Bath, Bed) |
 | 2026-01-19 | Updated device count: 39 → 44 devices |
 | 2026-01-19 | Fixed light switch count: was documented as 4, actually 3 (Study, Bed, Living) |

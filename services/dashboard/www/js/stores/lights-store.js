@@ -8,7 +8,7 @@ export function initLightsStore(Alpine, CONFIG) {
     list: [
       {
         id: 'study_light',
-        name: 'Study Light',
+        name: 'Study Room',
         icon: '📚',
         topic: '[Study] IKEA Light',
         state: 'OFF',
@@ -21,9 +21,22 @@ export function initLightsStore(Alpine, CONFIG) {
       },
       {
         id: 'living_light',
-        name: 'Living Room Light',
+        name: 'Living Room',
         icon: '🛋️',
         topic: '[Living] IKEA Light',
+        state: 'OFF',
+        brightness: 254,
+        colorTemp: 370,
+        linkquality: null,
+        lastSeen: null,
+        syncing: false,
+        available: true
+      },
+      {
+        id: 'bath_light',
+        name: 'Bathroom',
+        icon: '🛁',
+        topic: '[Bath] Light',
         state: 'OFF',
         brightness: 254,
         colorTemp: 370,

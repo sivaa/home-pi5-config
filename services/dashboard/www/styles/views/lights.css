@@ -106,11 +106,11 @@
       /* grayscale removed for CPU efficiency */
     }
 
-    /* Light Cards Grid */
+    /* Light Cards Grid — 3 cards in one row, no scrolling */
     .lights-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-      gap: var(--space-lg);
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-md);
       margin-bottom: var(--space-xl);
     }
 
@@ -420,7 +420,7 @@
     /* Syncing indicator */
     .control-syncing {
       display: inline-block;
-      animation: spin 1s linear infinite;
+      animation: spin 1s linear 60;
       margin-right: var(--space-xs);
       font-size: var(--font-size-sm);
     }

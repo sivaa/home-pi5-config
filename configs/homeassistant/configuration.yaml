@@ -182,6 +182,13 @@ google_assistant:
         - "Lounge Light"
         - "Main Light"
 
+    light.bath_light:
+      name: "Bath Light"
+      expose: true
+      room: "Bathroom"
+      aliases:
+        - "Bathroom Light"
+
     # === SMART PLUG (Voice controllable) ===
     switch.smart_plug_1:
       name: "Smart Plug"
@@ -516,6 +523,9 @@ input_boolean:
   circadian_living_override:
     name: Living Light Override
     icon: mdi:hand-back-right
+  circadian_bath_override:
+    name: Bath Light Override
+    icon: mdi:hand-back-right
 
 # =============================================================================
 # INPUT DATETIMES - Override Expiration Timestamps
@@ -529,6 +539,11 @@ input_datetime:
     icon: mdi:timer-sand
   circadian_living_override_expires:
     name: Living Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  circadian_bath_override_expires:
+    name: Bath Override Expires
     has_date: true
     has_time: true
     icon: mdi:timer-sand
@@ -727,9 +742,11 @@ mqtt_statestream:
       - input_boolean.circadian_enabled
       - input_boolean.circadian_study_override
       - input_boolean.circadian_living_override
+      - input_boolean.circadian_bath_override
       # Override expiration timestamps
       - input_datetime.circadian_study_override_expires
       - input_datetime.circadian_living_override_expires
+      - input_datetime.circadian_bath_override_expires
 
 # History tracking sensors (history_stats)
 sensor:

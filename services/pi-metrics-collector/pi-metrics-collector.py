@@ -239,57 +239,108 @@ class MetricsCollector:
 class MqttPublisher:
     """Publishes metrics to MQTT broker."""
 
+    # ┌─────────────────────────────────────────────────────────────┐
+    # │ HARD RESET: Nuclear option for stuck MQTT connections       │
+    # │                                                             │
+    # │ INCIDENT (Feb 2026): The old code called reconnect()        │
+    # │ manually in publish() while loop_start()'s background       │
+    # │ thread was ALSO trying to reconnect. Two threads fighting   │
+    # │ over one socket = _on_connect callback never fires:         │
+    # │                                                             │
+    # │   Main thread         Background thread (loop_start)        │
+    # │   ┌──────────┐        ┌──────────────────┐                  │
+    # │   │reconnect()│───X───│auto-reconnect    │                  │
+    # │   │poll 5s... │       │manages socket    │                  │
+    # │   │timeout!   │       │confused state    │                  │
+    # │   └──────────┘        └──────────────────┘                  │
+    # │                                                             │
+    # │ Result: 41 hours of "MQTT not connected" while mosquitto    │
+    # │ logs showed connections arriving and immediately dropping.  │
+    # │                                                             │
+    # │ FIX: Let loop_start() handle reconnection exclusively.     │
+    # │ If it fails for >5min, tear everything down and start      │
+    # │ fresh — no conflicting reconnect paths.                    │
+    # └─────────────────────────────────────────────────────────────┘
+    HARD_RESET_AFTER = 300  # seconds (5 minutes)
+
     def __init__(self, host: str, port: int, topic: str):
         self.host = host
         self.port = port
         self.topic = topic
+        self.client = None
+        self._connected = False
+        self._disconnected_at = None
+
+    def _create_client(self):
+        """Create a fresh MQTT client instance."""
         self.client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id='pi-metrics-collector'
         )
-        self._connected = False
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.on_connect = self._on_connect
+        self.client.on_disconnect = self._on_disconnect
 
     def connect(self):
         """Connect to MQTT broker."""
         try:
-            # Set bounded reconnect delay (1-30 seconds) to prevent stuck backoff
-            self.client.reconnect_delay_set(min_delay=1, max_delay=30)
-            self.client.on_connect = self._on_connect
-            self.client.on_disconnect = self._on_disconnect
+            self._create_client()
             self.client.connect(self.host, self.port, keepalive=60)
             self.client.loop_start()
         except Exception as e:
             logger.error(f'MQTT connection failed: {e}')
+            self._disconnected_at = time.time()
 
     def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
         if reason_code.is_failure:
             logger.error(f'MQTT connection failed: {reason_code}')
+            if self._disconnected_at is None:
+                self._disconnected_at = time.time()
         else:
             logger.info('Connected to MQTT broker')
             self._connected = True
+            self._disconnected_at = None
 
     def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         logger.warning(f'Disconnected from MQTT broker (reason={reason_code})')
         self._connected = False
+        if self._disconnected_at is None:
+            self._disconnected_at = time.time()
+
+    def _hard_reset(self):
+        """Tear down and recreate MQTT client from scratch."""
+        logger.warning('Performing MQTT hard reset — creating fresh client')
+        try:
+            if self.client is not None:
+                self.client.loop_stop()
+                self.client.disconnect()
+        except Exception as e:
+            logger.debug(f'Ignoring error during MQTT teardown (expected): {e}')
+        self._connected = False
+        self._disconnected_at = None
+        self.connect()
 
     def publish(self, metrics: dict):
         """Publish metrics to MQTT topic."""
         if not self._connected:
-            logger.warning('MQTT not connected, attempting reconnect...')
-            try:
-                self.client.reconnect()
-                # Wait up to 5 seconds for reconnect (loop_start handles callbacks)
-                for _ in range(10):
-                    time.sleep(0.5)
-                    if self._connected:
-                        logger.info('MQTT reconnected successfully')
-                        break
-                if not self._connected:
-                    logger.error('MQTT reconnect timeout - skipping publish')
-                    return
-            except Exception as e:
-                logger.error(f'MQTT reconnect failed: {e}')
-                return
+            disconnected_at = self._disconnected_at  # snapshot for thread safety
+            if disconnected_at is not None:
+                down_secs = int(time.time() - disconnected_at)
+                if down_secs > self.HARD_RESET_AFTER:
+                    logger.error(
+                        f'MQTT disconnected for {down_secs}s (>{self.HARD_RESET_AFTER}s) '
+                        f'— triggering hard reset'
+                    )
+                    self._hard_reset()
+                else:
+                    logger.warning(
+                        f'MQTT not connected ({down_secs}s), '
+                        f'waiting for auto-reconnect...'
+                    )
+            else:
+                self._disconnected_at = time.time()
+                logger.warning('MQTT not connected, waiting for auto-reconnect...')
+            return
 
         try:
             payload = json.dumps(metrics)
@@ -298,11 +349,8 @@ class MqttPublisher:
             # │                                                        │
             # │ Without retain, the dashboard must wait up to 60s      │
             # │ (collection interval) after subscribing for the first  │
-            # │ value. Combined with MQTT reconnect bugs, this meant   │
-            # │ data never appeared.                                   │
-            # │                                                        │
-            # │ With retain, the broker stores the last message and    │
-            # │ delivers it instantly to any new subscriber.           │
+            # │ value. With retain, the broker stores the last message │
+            # │ and delivers it instantly to any new subscriber.       │
             # │                                                        │
             # │ SAFETY: Dashboard uses payload.timestamp (not          │
             # │ Date.now()) for staleness detection, so old retained   │
@@ -315,8 +363,12 @@ class MqttPublisher:
 
     def disconnect(self):
         """Disconnect from MQTT broker."""
-        self.client.loop_stop()
-        self.client.disconnect()
+        try:
+            if self.client is not None:
+                self.client.loop_stop()
+                self.client.disconnect()
+        except Exception as e:
+            logger.warning(f'Error during MQTT disconnect (ignoring): {e}')
 
 
 class InfluxWriter:

@@ -82,7 +82,7 @@ Don't know which service? Use: `find . -name CLAUDE.md`
 - **Hardware:**
   - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
   - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
-- **Zigbee Devices:** 44 total (including coordinator)
+- **Zigbee Devices:** 46 total (including coordinator)
   - 12x Temperature sensors (SNZB-02P, SNZB-02WD)
   - 8x Window/door contact sensors (SNZB-04P)
   - 5x Human presence sensors (SNZB-06P) - Study, Living, Kitchen, Bath, Bed
@@ -90,6 +90,8 @@ Don't know which service? Use: `find . -name CLAUDE.md`
   - 3x Light switches (SONOFF ZBM5-1C-80/86) - Study, Bed, Living
   - 3x Smart plugs (S60ZBTPF)
   - 2x IKEA FLOALT lights + 2x remotes
+  - 1x AwoX LED light (33955) - Bath
+  - 1x EGLO remote controller (99099) - Bath
   - 1x CO2 sensor (NOUS E10)
   - 1x Motion sensor (SNZB-03P) - Mailbox
   - 1x Vibration sensor (Hot Water tracking)
@@ -132,6 +134,19 @@ All documentation should enable complete system restoration from scratch.
 ---
 
 ## 🚨 Golden Rules (MUST FOLLOW)
+
+### 0. No PRs or Branches
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🚫 NEVER CREATE PULL REQUESTS OR FEATURE BRANCHES              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  This is a solo, one-person home automation project.            │
+│  Commit directly to main. No PRs, no branches, no reviews.     │
+│                                                                 │
+│  WHY: PRs add overhead with zero benefit for a solo project.    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### 1. Dashboard Development Workflow
 ```

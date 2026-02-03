@@ -2,8 +2,8 @@
  * Zigbee Device Configuration
  * Device layout for network visualization
  *
- * Total Devices: 44 (including coordinator)
- * Last Updated: 2026-01-19
+ * Total Devices: 46 (including coordinator)
+ * Last Updated: 2026-02-03
  */
 
 export const ZIGBEE_DEVICES = [
@@ -19,6 +19,9 @@ export const ZIGBEE_DEVICES = [
   // IKEA Lights (mains-powered routers)
   { id: 'study-light', name: '[Study] IKEA Light', type: 'router', icon: '💡', room: 'study', x: 0.85, z: 0.25 },
   { id: 'living-light', name: '[Living] IKEA Light', type: 'router', icon: '💡', room: 'living', x: 0.4, z: 0.35 },
+
+  // AwoX Light (mains-powered router)
+  { id: 'bath-light', name: '[Bath] Light', type: 'router', icon: '💡', room: 'bathroom', x: 0.80, z: 0.05 },
 
   // CO2 Sensor (USB-powered router)
   { id: 'co2', name: '[Hallway] CO2', type: 'router', icon: '🌬️', room: 'hallway', x: 0.5, z: 0.5 },
@@ -66,6 +69,9 @@ export const ZIGBEE_DEVICES = [
   // IKEA Remotes
   { id: 'remote-study', name: '[Study] Light Remote', type: 'end-device', icon: '🎛️', room: 'study', x: 0.82, z: 0.22 },
   { id: 'remote-living', name: '[Living] Light Remote', type: 'end-device', icon: '🎛️', room: 'living', x: 0.38, z: 0.38 },
+
+  // EGLO Remote (battery)
+  { id: 'remote-bath', name: '[Bath] Light Remote', type: 'end-device', icon: '🎛️', room: 'bathroom', x: 0.83, z: 0.03 },
 
   // Vibration Sensor (Hot Water)
   { id: 'vibration', name: 'Vibration Sensor', type: 'end-device', icon: '💧', room: 'bathroom', x: 0.88, z: 0.12 },

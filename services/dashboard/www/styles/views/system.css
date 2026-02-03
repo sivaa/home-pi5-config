@@ -570,7 +570,7 @@ body.sidebar-hidden .main-content {
 
 .sys-footer-status.loading .sys-status-dot {
   background: #f59e0b;
-  animation: pulse 1s infinite;
+  animation: pulse 1s 60;
 }
 
 /* Stale state - amber indicator (no data for 2+ minutes) */
@@ -616,7 +616,7 @@ body.sidebar-hidden .main-content {
 }
 
 .system-view.is-loading .sys-refresh svg {
-  animation: spin 1s linear infinite;
+  animation: spin 1s linear 60;
 }
 
 @keyframes spin {

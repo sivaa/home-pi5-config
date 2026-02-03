@@ -1567,7 +1567,7 @@
   border: 3px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 1s linear 60;
 }
 
 @keyframes spin {

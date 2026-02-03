@@ -58,6 +58,11 @@ devices:
     friendly_name: '[Study] IKEA Light'
   '0xd0cf5efffe24d093':
     friendly_name: '[Living] IKEA Light'
+  # === AWOX / EGLO (Bathroom) ===
+  '0xa4c1384bd2ed5c7e':
+    friendly_name: '[Bath] Light'
+  '0xa4c138963338c36c':
+    friendly_name: '[Bath] Light Remote'
   # === IKEA REMOTES ===
   '0x90fd9ffffef4cebf':
     friendly_name: '[Study] IKEA Remote'
@@ -168,4 +173,7 @@ devices:
     friendly_name: '[Study] Human Presence'
   '0xd44867fffe079897':
     friendly_name: '[Bath] Human Presence'
+groups:
+  '32780':
+    friendly_name: eglo_remote_group1
 version: 4

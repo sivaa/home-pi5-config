@@ -3064,6 +3064,52 @@
                 color_temp_kelvin: "{{ final_color_temp }}"
                 transition: 30
 
+    # Bath light (if on and not overridden)
+    # GOLDEN RULE (Phase-Aware):
+    #   - Sunrise: Allow brightening (light turned on at night can brighten with schedule)
+    #   - Other phases: Only dim/warm, never brighten/cool
+    - if:
+        - condition: state
+          entity_id: light.bath_light
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_bath_override
+          state: "off"
+      then:
+        - variables:
+            # Read current light state
+            current_brightness: "{{ state_attr('light.bath_light', 'brightness') | default(255) | int }}"
+            current_color_temp: "{{ state_attr('light.bath_light', 'color_temp_kelvin') | default(4000) | int }}"
+            # GOLDEN RULE: Phase-aware brightness
+            # During Sunrise: use scheduled values (allow brightening)
+            # Other phases: take minimum (only dim)
+            final_brightness: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int }}
+              {% else %}
+                {{ [brightness_value | int, current_brightness] | min }}
+              {% endif %}
+            # Color temp always uses min (warmer = lower K, always safe to warm up)
+            final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+            # Check if we should apply changes
+            should_apply: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+              {% else %}
+                {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+              {% endif %}
+        # Apply if there's a meaningful change
+        - if:
+            - condition: template
+              value_template: "{{ should_apply }}"
+          then:
+            - service: light.turn_on
+              entity_id: light.bath_light
+              data:
+                brightness: "{{ final_brightness }}"
+                color_temp_kelvin: "{{ final_color_temp }}"
+                transition: 30
+
     # Clear debounce flag after 5 seconds (allows time for light state to update)
     - delay:
         seconds: 5
@@ -3081,13 +3127,14 @@
   alias: "Circadian - Light Power On"
   description: "When light turns on, set to warm color temp with scheduled brightness (min 5%)"
   mode: parallel
-  max: 2
+  max: 3
 
   trigger:
     - platform: state
       entity_id:
         - light.study_ikea_light
         - light.living_ikea_light
+        - light.bath_light
       from: "off"
       to: "on"
 
@@ -3097,9 +3144,15 @@
       state: "on"
 
   variables:
-    room: "{{ 'study' if trigger.entity_id == 'light.study_ikea_light' else 'living' }}"
+    room: >
+      {% if trigger.entity_id == 'light.study_ikea_light' %}study
+      {% elif trigger.entity_id == 'light.bath_light' %}bath
+      {% else %}living{% endif %}
     override_flag: "input_boolean.circadian_{{ room }}_override"
-    light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
+    light_name: >
+      {% if room == 'study' %}Study
+      {% elif room == 'bath' %}Bath
+      {% else %}Living{% endif %}
     brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
     # Power-on floor: minimum 5% brightness so users can see the light turned on
     # At night (1% scheduled), this ensures light is visible on power-on
@@ -3147,7 +3200,7 @@
   alias: "Circadian - Override Detection"
   description: "Detects manual light changes (≥5 units) and sets 30-minute override"
   mode: parallel
-  max: 2
+  max: 3
 
   trigger:
     - platform: state
@@ -3161,6 +3214,12 @@
       attribute: brightness
     - platform: state
       entity_id: light.living_ikea_light
+      attribute: color_temp
+    - platform: state
+      entity_id: light.bath_light
+      attribute: brightness
+    - platform: state
+      entity_id: light.bath_light
       attribute: color_temp
 
   condition:
@@ -3185,10 +3244,16 @@
         {{ change >= 5 }}
 
   variables:
-    room: "{{ 'study' if 'study' in trigger.entity_id else 'living' }}"
+    room: >
+      {% if 'study' in trigger.entity_id %}study
+      {% elif 'bath' in trigger.entity_id %}bath
+      {% else %}living{% endif %}
     override_flag: "input_boolean.circadian_{{ room }}_override"
     expiry_entity: "input_datetime.circadian_{{ room }}_override_expires"
-    light_name: "{{ 'Study' if room == 'study' else 'Living' }}"
+    light_name: >
+      {% if room == 'study' %}Study
+      {% elif room == 'bath' %}Bath
+      {% else %}Living{% endif %}
     # Format expiration time as strings (avoid strftime on variable)
     expiry_datetime: "{{ (now() + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S') }}"
     expiry_time: "{{ (now() + timedelta(minutes=30)).strftime('%H:%M') }}"
@@ -3240,6 +3305,9 @@
           state: "on"
         - condition: state
           entity_id: input_boolean.circadian_living_override
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_bath_override
           state: "on"
 
   variables:
@@ -3385,6 +3453,74 @@
             - service: input_boolean.turn_off
               entity_id: input_boolean.circadian_automation_active
 
+    # Check Bath override expiry
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_bath_override
+          state: "on"
+        - condition: template
+          value_template: >
+            {{ as_timestamp(states('input_datetime.circadian_bath_override_expires'))
+               < as_timestamp(now()) }}
+      then:
+        # Clear override flag
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.circadian_bath_override
+
+        # Restore settings if light is on (GOLDEN RULE: phase-aware)
+        - if:
+            - condition: state
+              entity_id: light.bath_light
+              state: "on"
+          then:
+            - variables:
+                # Read current light state
+                current_brightness: "{{ state_attr('light.bath_light', 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr('light.bath_light', 'color_temp_kelvin') | default(4000) | int }}"
+                # GOLDEN RULE: Phase-aware brightness
+                # During Sunrise: use scheduled values (allow brightening)
+                # Other phases: take minimum (only dim)
+                final_brightness: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int }}
+                  {% else %}
+                    {{ [brightness_value | int, current_brightness] | min }}
+                  {% endif %}
+                final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+                # Check if we should apply changes
+                should_apply: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                  {% else %}
+                    {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+                  {% endif %}
+            - service: input_boolean.turn_on
+              entity_id: input_boolean.circadian_automation_active
+            # Apply if there's a meaningful change
+            - if:
+                - condition: template
+                  value_template: "{{ should_apply }}"
+              then:
+                - service: light.turn_on
+                  entity_id: light.bath_light
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 60
+                # Notification only when light was actually changed
+                - service: notify.all_phones
+                  data:
+                    title: "💡 Bath Light"
+                    message: "Override ended. Adjusted to {{ ((final_brightness | int / 255) * 100) | round(0) }}%."
+                    data:
+                      channel: "Lights"
+                      importance: low
+                      tag: "circadian_override_bath"
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              entity_id: input_boolean.circadian_automation_active
+
 # -----------------------------------------------------------------------------
 # CIRCADIAN PHASE NOTIFICATION
 # Trigger: Phase changes (Night→Sunrise→Day→Sunset→Night)
@@ -3412,6 +3548,9 @@
           state: "on"
         - condition: state
           entity_id: light.living_ikea_light
+          state: "on"
+        - condition: state
+          entity_id: light.bath_light
           state: "on"
 
   action:
@@ -3465,6 +3604,7 @@
         entity_id:
           - input_boolean.circadian_study_override
           - input_boolean.circadian_living_override
+          - input_boolean.circadian_bath_override
 
     # Notification
     - service: notify.all_phones
@@ -3545,7 +3685,10 @@
           sequence:
             - variables:
                 room: "{{ trigger.payload_json.room }}"
-                light_entity: "{{ 'light.study_ikea_light' if room == 'study' else 'light.living_ikea_light' }}"
+                light_entity: >
+                  {% if room == 'study' %}light.study_ikea_light
+                  {% elif room == 'bath' %}light.bath_light
+                  {% else %}light.living_ikea_light{% endif %}
                 brightness_value: "{{ (states('sensor.circadian_brightness') | int(100) / 100 * 255) | round(0) }}"
                 color_temp_kelvin: "{{ states('sensor.circadian_color_temp') | int(3125) }}"
             - service: input_boolean.turn_on
@@ -3590,8 +3733,10 @@
         - input_boolean.circadian_enabled
         - input_boolean.circadian_study_override
         - input_boolean.circadian_living_override
+        - input_boolean.circadian_bath_override
         - input_datetime.circadian_study_override_expires
         - input_datetime.circadian_living_override_expires
+        - input_datetime.circadian_bath_override_expires
 
   action:
     - service: mqtt.publish
@@ -3612,6 +3757,10 @@
               "living": {
                 "active": {{ is_state('input_boolean.circadian_living_override', 'on') | lower }},
                 "expires": "{{ states('input_datetime.circadian_living_override_expires') }}"
+              },
+              "bath": {
+                "active": {{ is_state('input_boolean.circadian_bath_override', 'on') | lower }},
+                "expires": "{{ states('input_datetime.circadian_bath_override_expires') }}"
               }
             },
             "timestamp": "{{ now().isoformat() }}"
@@ -4398,42 +4547,48 @@
         title: "💡 Kitchen Light"
 
 # -----------------------------------------------------------------------------
-# BATHROOM - TTS reminder if lights appear on when unoccupied
-# Uses illumination sensor (no smart lights in bathroom)
-# Repeats every 3 minutes until light is turned off
-# Only during non-quiet hours (07:00-23:00) and after sunset
+# BATHROOM - AwoX Light OFF when unoccupied for 3 minutes
+# ┌────────────────────────────────────────────────────────────────┐
+# │  Timeline:                                                     │
+# │                                                                │
+# │  Person leaves ──► Sensor timeout (120s) ──► occupancy: off    │
+# │                                               │                │
+# │                                    ┌──── for: 3 min ────┐     │
+# │                                    │  (someone returns?  │     │
+# │                                    │   → cancel)         │     │
+# │                                    └─────────────────────┘     │
+# │                                               │                │
+# │                                          Light OFF             │
+# │                                                                │
+# │  Total: ~5 min from last movement (2 min sensor + 3 min for)  │
+# └────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
-- id: bath_presence_light_reminder
-  alias: "[Bath] Light Reminder When Unoccupied"
-  description: "Repeating TTS reminder every 3 min if bathroom light on with no presence"
-  enabled: false
+- id: bath_presence_light_off
+  alias: "[Bath] Light Off When Unoccupied"
+  description: "Turn off Bath AwoX light after 3 min of no human presence"
   mode: single
 
   trigger:
-    # Check every 3 minutes
-    - platform: time_pattern
-      minutes: "/3"
+    - platform: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      to: "off"
+      for: "00:03:00"
 
   condition:
-    # No human presence in bathroom
+    # Only act if the light is actually on
     - condition: state
-      entity_id: binary_sensor.bath_human_presence_occupancy
-      state: "off"
-    # Light is on (illumination sensor reads bright)
-    - condition: state
-      entity_id: sensor.bath_human_presence_illumination
-      state: "bright"
-    # Non-quiet hours (07:00-23:00)
-    - condition: time
-      after: "07:00:00"
-      before: "23:00:00"
-    # After sunset (avoid false positives from sunlight)
-    - condition: state
-      entity_id: sun.sun
-      state: "below_horizon"
+      entity_id: light.bath_light
+      state: "on"
 
   action:
-    - service: script.smart_tts_announce
-      data:
-        message: "Bathroom light is still on"
-        title: "💡 Bathroom Light"
+    - service: light.turn_off
+      target:
+        entity_id: light.bath_light
+
+# -----------------------------------------------------------------------------
+# BATHROOM - TTS reminder (LEGACY - disabled, replaced by bath_presence_light_off)
+# Kept for reference; was used before AwoX smart light was installed
+# -----------------------------------------------------------------------------
+# LEGACY: bath_presence_light_reminder removed
+# Was: TTS reminder every 3 min if bathroom light on with no presence
+# Replaced by: bath_presence_light_off (auto-turns off after 3 min unoccupied)

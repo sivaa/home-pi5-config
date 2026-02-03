@@ -675,27 +675,27 @@
 
                   <!-- Circadian Override Banner -->
                   <div class="override-banner"
-                       x-show="$store.circadian.enabled && $store.circadian.overrides[light.id.includes('study') ? 'study' : 'living']?.active"
+                       x-show="$store.circadian.enabled && $store.circadian.overrides[light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living']?.active"
                        x-cloak>
                     <div class="override-info">
                       <span class="override-icon">✋</span>
                       <div class="override-text">
                         <span class="override-title">Manual Override</span>
                         <span class="override-expiry"
-                              x-text="'Expires in ' + $store.circadian.formatExpiry(light.id.includes('study') ? 'study' : 'living')">
+                              x-text="'Expires in ' + $store.circadian.formatExpiry(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')">
                         </span>
                       </div>
                     </div>
                     <button class="override-clear"
-                            @click="$store.circadian.clearOverride(light.id.includes('study') ? 'study' : 'living')"
+                            @click="$store.circadian.clearOverride(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')"
                             title="Resume circadian schedule">
                       Clear
                     </button>
                   </div>
 
                   <!-- Brightness Slider -->
-                  <div class="light-control" x-show="light.state === 'ON' && light.available" x-transition
-                       :class="{ 'control-disabled': !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
+                  <div class="light-control"
+                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
                     <div class="control-row">
                       <label class="control-label">
                         <span class="control-icon">🔆</span>
@@ -708,7 +708,7 @@
                     <div class="slider-wrapper">
                       <input type="range" class="slider brightness-slider" min="1" max="254"
                              x-model="light.brightness"
-                             :disabled="!$store.mqtt.connected || $store.lights.initializing"
+                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
                              @input="$store.lights.setBrightness(light, $event.target.value)"
                              :style="'background: linear-gradient(90deg, rgba(255,220,180,0.8) 0%, rgba(255,240,210,0.6) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) 100%)'">
                       <span class="slider-percent" x-text="Math.round(light.brightness / 254 * 100) + '%'"></span>
@@ -716,8 +716,8 @@
                   </div>
 
                   <!-- Color Temperature Slider -->
-                  <div class="light-control" x-show="light.state === 'ON' && light.available" x-transition
-                       :class="{ 'control-disabled': !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
+                  <div class="light-control"
+                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
                     <div class="control-row">
                       <label class="control-label">
                         <span class="control-icon">🌡️</span>
@@ -730,7 +730,7 @@
                     </div>
                     <input type="range" class="slider colortemp-slider" min="250" max="454"
                            x-model="light.colorTemp"
-                           :disabled="!$store.mqtt.connected || $store.lights.initializing"
+                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
                            @input="$store.lights.setColorTemp(light, $event.target.value)">
                     <div class="colortemp-labels">
                       <span>Cool</span>
@@ -739,14 +739,14 @@
                   </div>
 
                   <!-- Quick Presets -->
-                  <div class="light-presets" x-show="light.state === 'ON' && light.available" x-transition>
+                  <div class="light-presets" :class="{ 'control-disabled': light.state !== 'ON' || !light.available }">
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'reading')" title="Reading">📖</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
                     <button class="preset-btn circadian-preset"
                             x-show="$store.circadian.enabled"
-                            @click="$store.circadian.applySchedule(light.id.includes('study') ? 'study' : 'living')"
+                            @click="$store.circadian.applySchedule(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')"
                             title="Follow Circadian Schedule">🔄</button>
                   </div>
 
@@ -2865,7 +2865,7 @@
               </g>
               <!-- Light indicators (IKEA FLOALT lights) -->
               <g class="floor-plan-lights">
-                <!-- Bathroom (0,0,35,20) - no light -->
+                <!-- Bathroom (0,0,35,20) - has bath_light -->
                 <g transform="translate(2, 3)" :class="getRoomLightClass('bathroom')">
                   <circle class="floor-light-icon" r="2" cx="2" cy="2"/>
                 </g>
@@ -4772,6 +4772,19 @@
             lastSeen: null,
             syncing: false,
             available: true
+          },
+          {
+            id: 'bath_light',
+            name: 'Bath Light',
+            icon: '🛁',
+            topic: '[Bath] Light',
+            state: 'OFF',
+            brightness: 254,
+            colorTemp: 370,
+            linkquality: null,
+            lastSeen: null,
+            syncing: false,
+            available: true
           }
         ],
         syncing: false,
@@ -4962,7 +4975,8 @@
         // Per-light override status
         overrides: {
           study: { active: false, expires: null },
-          living: { active: false, expires: null }
+          living: { active: false, expires: null },
+          bath: { active: false, expires: null }
         },
 
         // Computed helpers
@@ -5010,6 +5024,11 @@
                   this.overrides.living.expires = data.overrides.living.expires ?
                     new Date(data.overrides.living.expires).getTime() : null;
                 }
+                if (data.overrides.bath) {
+                  this.overrides.bath.active = data.overrides.bath.active === true;
+                  this.overrides.bath.expires = data.overrides.bath.expires ?
+                    new Date(data.overrides.bath.expires).getTime() : null;
+                }
               }
 
               console.log('[circadian] State updated:', {
@@ -5039,10 +5058,14 @@
             this.overrides.study.active = state === 'on';
           } else if (topic.includes('circadian_living_override/state')) {
             this.overrides.living.active = state === 'on';
+          } else if (topic.includes('circadian_bath_override/state')) {
+            this.overrides.bath.active = state === 'on';
           } else if (topic.includes('circadian_study_override_expires/state')) {
             this.overrides.study.expires = new Date(state).getTime();
           } else if (topic.includes('circadian_living_override_expires/state')) {
             this.overrides.living.expires = new Date(state).getTime();
+          } else if (topic.includes('circadian_bath_override_expires/state')) {
+            this.overrides.bath.expires = new Date(state).getTime();
           }
         },
 
@@ -5880,7 +5903,8 @@
           // Map room IDs to light IDs (rooms with smart lights)
           const roomLightMap = {
             'study': 'study_light',
-            'living': 'living_light'
+            'living': 'living_light',
+            'bathroom': 'bath_light'
           };
 
           // Priority 1: Check smart light state if room has one
