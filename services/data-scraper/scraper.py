@@ -101,7 +101,30 @@ def log(msg):
 
 
 def update_activity():
-    """Write activity timestamp for cleanup service."""
+    """Write activity timestamp ONCE for cleanup service.
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │  WRITE-ONCE ACTIVITY STAMP                                   │
+    │                                                              │
+    │  OLD: Every request resets timestamp → container alive       │
+    │       forever while dashboard polls every 60s                │
+    │                                                              │
+    │  NEW: Write only on FIRST request after startup              │
+    │       → 30-min countdown starts from first use               │
+    │       → container auto-stops regardless of polling           │
+    │       → dashboard must explicitly restart via HA             │
+    │                                                              │
+    │  Timeline:                                                   │
+    │  Container starts ─── 1st request (stamp written) ──────┐   │
+    │                       ↓ polling continues...             │   │
+    │                       ↓ (stamp NOT updated)         30 min  │
+    │                       ↓                                  │   │
+    │                       cleanup stops container ──────────┘   │
+    │                       dashboard shows restart prompt         │
+    └──────────────────────────────────────────────────────────────┘
+    """
+    if os.path.exists(ACTIVITY_FILE):
+        return  # Already stamped this session, don't reset countdown
     try:
         with open(ACTIVITY_FILE, 'w') as f:
             f.write(str(time.time()))
