@@ -508,10 +508,25 @@ async def scrape_sbahn_departures():
 
                     # Extract platform from nearby text
                     platform = None
-                    plat_search = all_text[match.start():match.start()+200]
-                    plat_match = re.search(r'Platform\s+(\d+)', plat_search)
+                    nearby_text = all_text[match.start():match.start()+200]
+                    plat_match = re.search(r'Platform\s+(\d+)', nearby_text)
                     if plat_match:
                         platform = plat_match.group(1)
+
+                    # Check for cancellation in nearby text
+                    #
+                    #   ┌──────────────────────────────────────────────────┐
+                    #   │  BUG FIX (Feb 4, 2026)                          │
+                    #   │                                                  │
+                    #   │  Fallback parser hardcoded cancelled=False       │
+                    #   │  while structured parser checked properly.       │
+                    #   │                                                  │
+                    #   │  bahnhof.de changed selectors → structured       │
+                    #   │  parsing fails → fallback used → cancellations   │
+                    #   │  invisible! "Trip cancelled" S1 12:33 shown      │
+                    #   │  as catchable on dashboard.                      │
+                    #   └──────────────────────────────────────────────────┘
+                    cancelled = bool(CANCELLATION_PATTERN.search(nearby_text))
 
                     departures.append({
                         "line": line,
@@ -520,7 +535,7 @@ async def scrape_sbahn_departures():
                         "time": f"{hour:02d}:{minute:02d}",
                         "delay": 0,
                         "platform": platform,
-                        "cancelled": False
+                        "cancelled": cancelled
                     })
                 except Exception:
                     continue
