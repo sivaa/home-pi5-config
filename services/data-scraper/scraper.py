@@ -100,6 +100,8 @@ def log(msg):
     print(f"{datetime.now().isoformat()} {msg}", flush=True)
 
 
+_process_start_time = time.time()
+
 def update_activity():
     """Write activity timestamp ONCE for cleanup service.
 
@@ -114,17 +116,25 @@ def update_activity():
     │       → container auto-stops regardless of polling           │
     │       → dashboard must explicitly restart via HA             │
     │                                                              │
-    │  Timeline:                                                   │
-    │  Container starts ─── 1st request (stamp written) ──────┐   │
-    │                       ↓ polling continues...             │   │
-    │                       ↓ (stamp NOT updated)         30 min  │
-    │                       ↓                                  │   │
-    │                       cleanup stops container ──────────┘   │
-    │                       dashboard shows restart prompt         │
+    │  STALE FILE GUARD:                                           │
+    │  If container crashes (not clean docker stop), cleanup       │
+    │  never runs rm -f, so stale file persists on host /tmp.     │
+    │  On restart, we'd skip writing → cleanup sees old stamp     │
+    │  → immediate stop → restart loop!                           │
+    │                                                              │
+    │  Fix: Compare file stamp against process start time.        │
+    │  If stamp predates this process, it's stale → overwrite.    │
     └──────────────────────────────────────────────────────────────┘
     """
     if os.path.exists(ACTIVITY_FILE):
-        return  # Already stamped this session, don't reset countdown
+        try:
+            with open(ACTIVITY_FILE, 'r') as f:
+                stamp = float(f.read().strip())
+            if stamp >= _process_start_time:
+                return  # Written by this session, don't reset countdown
+            log(f"Stale activity file detected (age: {_process_start_time - stamp:.0f}s), overwriting")
+        except (ValueError, IOError):
+            log("Corrupt activity file, overwriting")
     try:
         with open(ACTIVITY_FILE, 'w') as f:
             f.write(str(time.time()))
@@ -529,26 +539,26 @@ async def scrape_sbahn_departures():
                     if minutes < 0 or minutes > 120:
                         continue
 
-                    # Extract platform from nearby text
+                    # Extract platform and cancellation from nearby text
+                    #
+                    #   ┌──────────────────────────────────────────────────┐
+                    #   │  BIDIRECTIONAL WINDOW (100 before + 200 after)  │
+                    #   │                                                  │
+                    #   │  Why not forward-only? Cancellation badges      │
+                    #   │  can appear BEFORE the departure entry on       │
+                    #   │  bahnhof.de (e.g. status label above the row). │
+                    #   │                                                  │
+                    #   │  ◄─100─► match.start() ◄──────200──────►       │
+                    #   │  [cancel] S1 to Frohnau. Trip cancelled. 12:33  │
+                    #   └──────────────────────────────────────────────────┘
+                    window_start = max(0, match.start() - 100)
+                    nearby_text = all_text[window_start:match.start() + 200]
+
                     platform = None
-                    nearby_text = all_text[match.start():match.start()+200]
                     plat_match = re.search(r'Platform\s+(\d+)', nearby_text)
                     if plat_match:
                         platform = plat_match.group(1)
 
-                    # Check for cancellation in nearby text
-                    #
-                    #   ┌──────────────────────────────────────────────────┐
-                    #   │  BUG FIX (Feb 4, 2026)                          │
-                    #   │                                                  │
-                    #   │  Fallback parser hardcoded cancelled=False       │
-                    #   │  while structured parser checked properly.       │
-                    #   │                                                  │
-                    #   │  bahnhof.de changed selectors → structured       │
-                    #   │  parsing fails → fallback used → cancellations   │
-                    #   │  invisible! "Trip cancelled" S1 12:33 shown      │
-                    #   │  as catchable on dashboard.                      │
-                    #   └──────────────────────────────────────────────────┘
                     cancelled = bool(CANCELLATION_PATTERN.search(nearby_text))
 
                     departures.append({
