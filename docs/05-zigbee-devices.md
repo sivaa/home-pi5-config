@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
-> **Last Updated:** February 3, 2026
-> **Total Devices:** 46 (including coordinator)
+> **Last Updated:** February 4, 2026
+> **Total Devices:** 47 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -27,11 +27,11 @@
 ││(2x)│ │(12x)│ │ CO2 │ │(5x) │ │     │ │(8x) │ │(3x) │ │(4x) │ │(2x) │ │(3x) │ │   ││
 │└────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └───┘│
 │                                                                                       │
-│  ┌─────┐ ┌─────┐                                                                     │
-│  │AwoX │ │EGLO │                                                                     │
-│  │Light│ │Rmte │                                                                     │
-│  │     │ │     │                                                                     │
-│  └─────┘ └─────┘                                                                     │
+│  ┌─────┐ ┌─────┐ ┌─────┐                                                             │
+│  │AwoX │ │EGLO │ │Moes │                                                             │
+│  │Light│ │Rmte │ │ Lux │                                                             │
+│  │     │ │     │ │     │                                                             │
+│  └─────┘ └─────┘ └─────┘                                                             │
 │                                                                                       │
 │       Rooms: Balcony, Hallway, Study, Living, Kitchen, Bath, Bed, Mailbox            │
 │                                                                                       │
@@ -90,6 +90,7 @@
 | 43 | Bed | [Bed] Human Presence | SNZB-06P | SONOFF | Presence Sensor (mmWave) |
 | 44 | Bath | [Bath] Light | 33955 | AwoX | LED Light (Color Temp, Router) |
 | 45 | Bath | [Bath] Light Remote | 99099 | EGLO | 3-Group Remote Controller |
+| 46 | Kitchen | [Kitchen] Light Sensor | ZSS-QT-LS-C | Moes | Light Sensor (Battery) |
 
 ---
 
@@ -672,6 +673,49 @@
 
 ---
 
+### Moes ZSS-QT-LS-C - Light Sensor
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│               MOES ZSS-QT-LS-C LIGHT SENSOR                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Manufacturer: Moes (Tuya)                                       │
+│  Model: ZSS-QT-LS-C (TS0222)                                    │
+│  Protocol: Zigbee 3.0                                            │
+│  Power: CR2032 Battery                                           │
+│  Type: End Device                                                │
+│  IEEE: 0xa4c138dad83a328f                                        │
+├─────────────────────────────────────────────────────────────────┤
+│  Sensors:                                                        │
+│    - Illuminance (lux) — ambient light level                    │
+│    - Battery (%) — CR2032, reports every ~24h                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Reporting:                                                      │
+│    - Cluster: msIlluminanceMeasurement                           │
+│    - Min interval: 10 seconds                                   │
+│    - Max interval: 3600 seconds (1 hour)                        │
+│    - Reportable change: 5 lux                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Calibration:                                                    │
+│    Z2M option: illuminance_calibration (% offset)                │
+│    Z2M option: illuminance_raw (expose raw value)                │
+├─────────────────────────────────────────────────────────────────┤
+│  Location: Kitchen                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example MQTT Payload:**
+```json
+{
+  "illuminance": 156,
+  "battery": 85,
+  "voltage": 2900,
+  "linkquality": 255
+}
+```
+
+---
+
 ## Disaster Recovery Checklist
 
 If rebuilding the Zigbee network from scratch:
@@ -725,6 +769,7 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF SNZB-06P Kitchen Human Presence (USB powered) │
 │    [ ] SONOFF SNZB-06P Bath Human Presence (USB powered)    │
 │    [ ] SONOFF SNZB-06P Bed Human Presence (USB powered)     │
+│    [ ] Moes ZSS-QT-LS-C Kitchen Light Sensor (battery)      │
 │                                                             │
 │  Step 4: Rename all devices with [Room] prefix              │
 │                                                             │
@@ -911,6 +956,8 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2026-02-04 | Added 1x Moes ZSS-QT-LS-C light sensor in Kitchen (battery-powered illuminance) |
+| 2026-02-04 | Updated device count: 46 → 47 devices |
 | 2026-02-03 | Added 2 devices: 1x AwoX 33955 Bath Light (router), 1x EGLO 99099 Bath Remote |
 | 2026-02-03 | Set up EGLO remote → Bath Light binding via group 32780 (factory group, works offline) |
 | 2026-02-03 | Updated device count: 44 → 46 devices |

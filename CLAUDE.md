@@ -82,7 +82,7 @@ Don't know which service? Use: `find . -name CLAUDE.md`
 - **Hardware:**
   - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
   - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
-- **Zigbee Devices:** 46 total (including coordinator)
+- **Zigbee Devices:** 47 total (including coordinator)
   - 12x Temperature sensors (SNZB-02P, SNZB-02WD)
   - 8x Window/door contact sensors (SNZB-04P)
   - 5x Human presence sensors (SNZB-06P) - Study, Living, Kitchen, Bath, Bed
@@ -93,6 +93,7 @@ Don't know which service? Use: `find . -name CLAUDE.md`
   - 1x AwoX LED light (33955) - Bath
   - 1x EGLO remote controller (99099) - Bath
   - 1x CO2 sensor (NOUS E10)
+  - 1x Light sensor (Moes ZSS-QT-LS-C) - Kitchen
   - 1x Motion sensor (SNZB-03P) - Mailbox
   - 1x Vibration sensor (Hot Water tracking)
   - 1x Fingerbot (Tuya TS0001_fingerbot)

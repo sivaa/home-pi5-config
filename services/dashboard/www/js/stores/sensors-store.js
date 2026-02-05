@@ -24,6 +24,7 @@ function getSensorType(device) {
   if (featureNames.includes('occupancy')) return 'motion';
   if (featureNames.includes('contact')) return 'contact';
   if (featureNames.includes('temperature') || featureNames.includes('humidity')) return 'climate';
+  if (featureNames.includes('illuminance')) return 'illuminance';
 
   return null; // Not a sensor we handle
 }
@@ -347,7 +348,8 @@ export function initSensorsStore(Alpine, CONFIG) {
         climate: [],
         co2: [],
         motion: [],
-        contact: []
+        contact: [],
+        illuminance: []
       };
 
       this.devices.forEach(sensor => {

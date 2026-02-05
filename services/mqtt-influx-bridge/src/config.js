@@ -33,7 +33,10 @@ export const DEVICE_ROOMS = {
   '[Study] Thermostat': 'study',
   '[Living] Thermostat Inner': 'living',
   '[Living] Thermostat Outer': 'living',
-  '[Bed] Thermostat': 'bedroom'
+  '[Bed] Thermostat': 'bedroom',
+
+  // Light sensor (Moes ZSS-QT-LS-C)
+  '[Kitchen] Light Sensor': 'kitchen'
 };
 
 // Device type detection based on payload properties
@@ -44,6 +47,7 @@ export const DEVICE_TYPE_DETECTORS = {
   state: 'switch',  // Could be light or plug
   brightness: 'light',
   color_temp: 'light',
+  illuminance: 'illuminance',
   temperature: 'climate',
   humidity: 'climate',
   action: 'remote',
@@ -77,6 +81,24 @@ export const EVENT_MAPPINGS = {
   air_quality: {
     getEvent: (value) => `air_quality_${value}`,
     deviceType: 'co2'
+  },
+
+  // Light sensor - illuminance readings
+  //
+  // ┌──────────────────────────────────────────────────────────┐
+  // │  Moes ZSS-QT-LS-C (battery-powered lux sensor)          │
+  // │                                                          │
+  // │  Reports: illuminance (lux), battery (%), linkquality    │
+  // │  minChange: 10 lx — avoids flooding InfluxDB with tiny  │
+  // │  fluctuations from cloud shadows, curtain movements etc  │
+  // │                                                          │
+  // │  WITHOUT minChange:  ░░▓▓░▓░▓▓░░▓░░▓▓▓░  (noisy)       │
+  // │  WITH minChange 10:  ░░▓▓▓▓▓▓▓▓░░░░▓▓▓▓  (clean trend) │
+  // └──────────────────────────────────────────────────────────┘
+  illuminance: {
+    getEvent: () => 'illuminance_reading',
+    deviceType: 'illuminance',
+    minChange: 10  // Only log if lux changes by 10 or more
   },
 
   // Thermostat - heating state (most important)
@@ -115,6 +137,7 @@ export const DEBOUNCE_MS = {
   contact: 1000,     // 1 second between door events
   co2: 60000,        // 1 minute between CO2 readings
   climate: 60000,    // 1 minute between temp/humidity readings
+  illuminance: 60000, // 1 minute between lux readings
   light: 500,        // 500ms between light events
   plug: 500,         // 500ms between plug events
   remote: 100,       // 100ms between remote button presses

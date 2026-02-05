@@ -500,10 +500,10 @@
                   </div>
 
                   <!-- Sensor List - show if multiple sensors OR has CO2/special sensors -->
-                  <div class="sensor-list" x-show="room.sensors && (room.sensors.length > 1 || room.sensors.some(s => s.type === 'co2'))">
+                  <div class="sensor-list" x-show="room.sensors && (room.sensors.length > 1 || room.sensors.some(s => s.type === 'co2' || s.type === 'illuminance'))">
                     <template x-for="sensor in (room.sensors || [])" :key="sensor.name + '-' + sensor.type">
-                      <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null }">
-                        <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : '')"></span>
+                      <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null }">
+                        <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : (sensor.type === 'illuminance' ? '☀️' : ''))"></span>
                         <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
                         <template x-if="sensor.type === 'climate' || !sensor.type">
                           <div class="sensor-values">
@@ -521,7 +521,12 @@
                             <span class="sensor-co2" x-text="sensor.co2 != null ? sensor.co2 + ' ppm' : '-- ppm'"></span>
                           </div>
                         </template>
-                        <span class="sensor-status" :class="{ 'fresh': sensor.lastSeen && (Date.now() - sensor.lastSeen <= 300000) && (sensor.temperature != null || sensor.co2 != null), 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000) || (sensor.temperature == null && sensor.co2 == null) }"></span>
+                        <template x-if="sensor.type === 'illuminance'">
+                          <div class="sensor-values">
+                            <span class="sensor-lux" x-text="sensor.illuminance != null ? sensor.illuminance + ' lx' : '-- lx'"></span>
+                          </div>
+                        </template>
+                        <span class="sensor-status" :class="{ 'fresh': sensor.lastSeen && (Date.now() - sensor.lastSeen <= 300000) && (sensor.temperature != null || sensor.co2 != null || sensor.illuminance != null), 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000) || (sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null) }"></span>
                       </div>
                     </template>
                   </div>
@@ -4191,6 +4196,9 @@
           { name: '[Kitchen] Temperature & Humidity', label: 'East', isPrimary: true },
           { name: '[Kitchen] Temperature & Humidity 10', label: 'Inner' }
         ],
+        illuminance: [
+          { name: '[Kitchen] Light Sensor', label: 'Light' }
+        ],
         presence: { name: '[Kitchen] Human Presence' }
       },
       bathroom: {
@@ -4499,7 +4507,8 @@
             ...(roomSensorConfig.co2 || []).map(s => ({ ...s, type: 'co2' })),
             ...(roomSensorConfig.thermostat || []).map(s => ({ ...s, type: 'thermostat' })),
             ...(roomSensorConfig.motion || []).map(s => ({ ...s, type: 'motion' })),
-            ...(roomSensorConfig.contact || []).map(s => ({ ...s, type: 'contact' }))
+            ...(roomSensorConfig.contact || []).map(s => ({ ...s, type: 'contact' })),
+            ...(roomSensorConfig.illuminance || []).map(s => ({ ...s, type: 'illuminance' }))
           ];
 
           return {
@@ -4516,6 +4525,7 @@
               temperature: null,
               humidity: null,
               co2: null,
+              illuminance: null,
               battery: null,
               lastSeen: null,
               stale: false
@@ -4622,6 +4632,7 @@
                 if (data.local_temperature !== undefined) sensor.temperature = data.local_temperature;
                 if (data.humidity !== undefined) sensor.humidity = data.humidity;
                 if (data.co2 !== undefined) sensor.co2 = data.co2;
+                if (data.illuminance !== undefined) sensor.illuminance = data.illuminance;
                 if (data.battery !== undefined) sensor.battery = data.battery;
 
                 sensor.lastSeen = sensorTime;

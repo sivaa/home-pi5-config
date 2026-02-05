@@ -498,6 +498,10 @@ The scraper calculates "minutes until departure" considering delays:
 
 ## History
 
+- **Feb 4, 2026**: Fixed cancellation detection in S-Bahn fallback text parser (was hardcoded `cancelled: False`)
+  - Root cause: bahnhof.de changed selectors → structured parsing fails → fallback used → cancellations invisible
+  - Fix: Check `CANCELLATION_PATTERN` against 200-char window around each match in fallback parser
+- **Feb 2, 2026**: Added shared `CANCELLATION_PATTERN` for bus + S-Bahn (strike keywords: bestreikt, Streik, etc.)
 - **Jan 16, 2026**: **Major fix** - Launch→Scrape→Kill architecture
   - Root cause: Timer reset bug kept browser warm forever (83% CPU)
   - Fix: Kill browser immediately after each scrape, no warm browser

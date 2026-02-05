@@ -173,6 +173,9 @@ devices:
     friendly_name: '[Study] Human Presence'
   '0xd44867fffe079897':
     friendly_name: '[Bath] Human Presence'
+  # === LIGHT SENSOR (Moes ZSS-QT-LS-C) ===
+  '0xa4c138dad83a328f':
+    friendly_name: '[Kitchen] Light Sensor'
 groups:
   '32780':
     friendly_name: eglo_remote_group1

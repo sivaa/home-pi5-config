@@ -128,6 +128,9 @@
 - `air_quality_moderate` - 600-1000 ppm
 - `air_quality_poor` - Above 1000 ppm
 
+### Light Sensor
+- `illuminance_reading` - Ambient light level update (lux)
+
 ### Device Status
 - `device_online` - Device reconnected
 - `device_offline` - Device disconnected

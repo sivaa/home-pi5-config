@@ -391,6 +391,12 @@
       color: var(--color-text-tertiary);
     }
 
+    .sensor-lux {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-warning, #f59e0b);
+    }
+
     .sensor-status {
       width: 6px;
       height: 6px;

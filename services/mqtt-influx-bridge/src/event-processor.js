@@ -316,6 +316,7 @@ export class EventProcessor {
     if (payload.contact !== undefined) return 'contact';
     if (payload.vibration !== undefined) return 'vibration';
     if (payload.co2 !== undefined) return 'co2';
+    if (payload.illuminance !== undefined && payload.brightness === undefined) return 'illuminance';
     if (payload.brightness !== undefined) return 'light';
     if (payload.state !== undefined) return 'switch';
     if (payload.temperature !== undefined) return 'climate';

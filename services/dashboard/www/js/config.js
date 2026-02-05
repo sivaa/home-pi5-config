@@ -417,5 +417,15 @@ export const SENSOR_VISUALS = {
     // Magnet piece (second part of contact sensor)
     magnetSize: { width: 0.012, height: 0.025, depth: 0.008 },
     magnetOffset: 0.03      // Gap between sensor and magnet when closed
+  },
+  illuminance: {
+    shape: 'sphere',
+    size: { radius: 0.04 },
+    color: 0xfbbf24,        // Amber/sunshine yellow
+    emissive: 0xfbbf24,
+    emissiveIntensity: 0.3,
+    icon: '☀️',
+    label: 'Light',
+    heightAboveFloor: 1.2   // Wall-mounted or shelf height
   }
 };

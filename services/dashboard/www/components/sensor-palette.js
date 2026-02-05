@@ -32,7 +32,8 @@ export function sensorPaletteComponent() {
         climate: [],
         co2: [],
         motion: [],
-        contact: []
+        contact: [],
+        illuminance: []
       };
 
       store.devices.forEach(sensor => {
@@ -123,6 +124,9 @@ export function sensorPaletteComponent() {
         case 'contact':
           if (data.contact === undefined) return '--';
           return data.contact ? 'Closed' : 'Open';
+
+        case 'illuminance':
+          return data.illuminance !== undefined ? `${data.illuminance} lx` : '--';
 
         default:
           return '--';
