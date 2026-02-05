@@ -27,6 +27,36 @@ notify:
       - action: mobile_app_22111317pg
       - action: mobile_app_nithya_mobile
 
+  # =========================================================================
+  # EMAIL NOTIFICATIONS (Gmail SMTP)
+  # ┌─────────────────────────────────────────────────────────────────────┐
+  # │  PURPOSE: Send email alerts for critical events                     │
+  # │                                                                     │
+  # │  Automation ──► notify.all_phones  (instant mobile push)           │
+  # │              └► notify.email       (email paper trail)             │
+  # │                                                                     │
+  # │  WHY EMAIL + PHONE?                                                │
+  # │  Phone notifications vanish when dismissed. Emails persist.         │
+  # │  If your phone dies at 3 AM and CO2 hits critical,                 │
+  # │  the email is waiting when you wake up.                            │
+  # │                                                                     │
+  # │  SETUP: zoobave@gmail.com needs an App Password                    │
+  # │         (Google Account → Security → App Passwords)                │
+  # │  CREDS: !secret gmail_app_password in secrets.yaml                 │
+  # └─────────────────────────────────────────────────────────────────────┘
+  # =========================================================================
+  - platform: smtp
+    name: email
+    server: smtp.gmail.com
+    port: 587
+    encryption: starttls
+    sender: zoobave@gmail.com
+    username: zoobave@gmail.com
+    password: !secret gmail_app_password
+    recipient:
+      - siva@sivaa.net
+    sender_name: "Pi Home Assistant"
+
 http:
   server_port: 8123
   use_x_forwarded_for: true

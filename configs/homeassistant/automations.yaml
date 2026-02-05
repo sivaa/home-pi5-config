@@ -3825,6 +3825,19 @@
           channel: "Alerts"
           importance: high
           tag: "sensor_offline_{{ trigger.entity_id }}"
+    - service: script.send_alert_email
+      data:
+        severity: "WARNING"
+        title: "Contact Sensor Offline"
+        subtitle: "{{ sensor_name }}"
+        description: >-
+          {{ sensor_name }} contact sensor went offline. This affects the heater safety
+          system — heaters may not resume automatically when windows close because the
+          sensor state reads "unavailable" instead of "closed".
+        actions: "Open and close the physical window to wake the sensor|If sensor doesn't recover, check battery (CR2032)"
+        plain_text: >-
+          {{ sensor_name }} contact sensor went offline at {{ now().strftime('%H:%M on %b %d') }}.
+          This affects the heater safety system. Recovery: Open/close the window to wake the sensor.
     - service: system_log.write
       data:
         message: "ALERT: {{ sensor_name }} contact sensor went offline"
@@ -3975,6 +3988,78 @@
         level: info
 
 # -----------------------------------------------------------------------------
+# ZIGBEE DEVICE LEFT NETWORK
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  "Offline" vs "Left" - they are NOT the same thing!                    │
+# │                                                                         │
+# │  OFFLINE (unavailable):                                                │
+# │    Device lost contact. Battery died, out of range, router down.       │
+# │    Still paired. Will reconnect automatically when reachable again.    │
+# │                                                                         │
+# │  LEFT NETWORK (device_leave):                                          │
+# │    Device actively de-paired itself from the coordinator.              │
+# │    Gone from the network. Must be re-paired manually.                  │
+# │    Causes: firmware reset, power cycle during pairing window,          │
+# │            or the Jan 4 incident where rapid restarts orphaned all 35. │
+# │                                                                         │
+# │  This is the WORSE event. Offline devices come back. Left devices     │
+# │  need manual intervention to re-pair.                                  │
+# └─────────────────────────────────────────────────────────────────────────┘
+# Trigger: zigbee2mqtt/bridge/event with type "device_leave"
+# Action: Phone + Email (this is serious)
+# -----------------------------------------------------------------------------
+- id: zigbee_device_left_alert
+  alias: "Zigbee Device Left Network"
+  description: "Alerts when a device leaves the Zigbee network (de-paired, needs manual re-pairing)"
+  mode: parallel
+  max: 10
+
+  trigger:
+    - platform: mqtt
+      topic: "zigbee2mqtt/bridge/event"
+
+  condition:
+    - condition: template
+      value_template: "{{ trigger.payload_json.type == 'device_leave' }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "🚨 DEVICE LEFT ZIGBEE NETWORK"
+        message: >
+          {{ trigger.payload_json.data.friendly_name | default(trigger.payload_json.data.ieee_address) }}
+          has LEFT the network! It must be re-paired manually.
+        data:
+          channel: "Critical"
+          importance: max
+          vibrationPattern: "100, 1000, 100, 1000, 100"
+          tag: "zigbee_leave_{{ trigger.payload_json.data.ieee_address }}"
+    - service: script.send_alert_email
+      data:
+        severity: "CRITICAL"
+        title: "Device Left Zigbee Network"
+        subtitle: "{{ trigger.payload_json.data.friendly_name | default('Unknown Device') }}"
+        description: >-
+          This is NOT the same as going offline. The device has actively de-paired itself
+          from the coordinator and will NOT reconnect automatically. Manual re-pairing is required.
+        actions: "Put Zigbee2MQTT in pairing mode (Settings → Permit Join)|Reset the device (hold pairing button 5–10 seconds)|Wait for it to rejoin — you'll get a 'Device Joined' notification"
+        details: >-
+          Device: {{ trigger.payload_json.data.friendly_name | default('Unknown') }}
+          IEEE:   {{ trigger.payload_json.data.ieee_address | default('Unknown') }}
+
+          If multiple devices are leaving, check coordinator:
+          ssh pi@pi "sudo systemctl status zigbee2mqtt"
+        plain_text: >-
+          {{ trigger.payload_json.data.friendly_name | default('Unknown') }} has LEFT the Zigbee network
+          ({{ trigger.payload_json.data.ieee_address | default('Unknown') }}). Re-pair required.
+    - service: system_log.write
+      data:
+        message: >
+          ZIGBEE LEAVE: {{ trigger.payload_json.data.friendly_name | default('Unknown') }}
+          ({{ trigger.payload_json.data.ieee_address | default('Unknown') }}) left the network
+        level: error
+
+# -----------------------------------------------------------------------------
 # ZIGBEE ROUTER OFFLINE ALERT
 # Trigger: Any router device goes offline (unavailable)
 # Devices: Smart Plugs, IKEA Lights, CO2 Sensor, Light Switch
@@ -4051,6 +4136,18 @@
           importance: max
           tag: "router_offline_{{ trigger.entity_id }}"
           vibrationPattern: "100, 500, 100, 500"
+    - service: script.send_alert_email
+      data:
+        severity: "CRITICAL"
+        title: "Zigbee Router Offline"
+        subtitle: "{{ device_name }}"
+        description: >-
+          Router devices form the Zigbee mesh backbone. When one goes offline,
+          nearby battery-powered sensors may lose their relay path and go offline too.
+        actions: "Check if the device is physically powered on|Verify the outlet or switch hasn't been turned off|If powered, try unplugging for 10 seconds and re-plugging"
+        plain_text: >-
+          {{ device_name }} went offline at {{ now().strftime('%H:%M on %b %d') }}.
+          Router devices form the mesh backbone. Check if device is powered on.
     - service: system_log.write
       data:
         message: "ROUTER OFFLINE: {{ device_name }} ({{ trigger.entity_id }}) went unavailable"
@@ -4702,3 +4799,90 @@
 # LEGACY: bath_presence_light_reminder removed
 # Was: TTS reminder every 3 min if bathroom light on with no presence
 # Replaced by: bath_presence_light_off (auto-turns off after 3 min unoccupied)
+
+# =============================================================================
+# THERMOSTAT LOW BATTERY ALERT
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  PURPOSE: Email + phone alert when radiator valve battery drops < 30%  │
+# │                                                                         │
+# │  WHY 30%?                                                               │
+# │  TRVZB valves report battery in 1% steps. At 20% the valve may fail   │
+# │  to actuate in cold weather (motor needs more current). 30% gives      │
+# │  ~2 weeks warning to order CR2450 replacements.                        │
+# │                                                                         │
+# │  COOLDOWN: 24 hours per thermostat (once/day is enough nagging)        │
+# │                                                                         │
+# │  Battery levels as of Feb 2026:                                        │
+# │    Study: 91%  │  Bed: 100%  │  Living Inner: 67%  │  Living Outer: 81%│
+# └─────────────────────────────────────────────────────────────────────────┘
+# =============================================================================
+
+- id: thermostat_low_battery_alert
+  alias: "Thermostat Low Battery Alert"
+  description: "Alert when any thermostat battery drops below 30%"
+  mode: parallel
+  max: 4
+
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.study_thermostat_battery
+      below: 30
+    - platform: numeric_state
+      entity_id: sensor.bed_thermostat_battery
+      below: 30
+    - platform: numeric_state
+      entity_id: sensor.living_thermostat_inner_battery
+      below: 30
+    - platform: numeric_state
+      entity_id: sensor.living_thermostat_outer_battery
+      below: 30
+
+  variables:
+    thermostat_names:
+      sensor.study_thermostat_battery: "Study"
+      sensor.bed_thermostat_battery: "Bedroom"
+      sensor.living_thermostat_inner_battery: "Living Inner"
+      sensor.living_thermostat_outer_battery: "Living Outer"
+    thermostat_name: "{{ thermostat_names.get(trigger.entity_id, trigger.entity_id) }}"
+    battery_level: "{{ trigger.to_state.state }}"
+
+  # No cooldown needed: numeric_state trigger only fires once when crossing 30%.
+  # Won't re-trigger until battery recovers above 30% and drops again (never
+  # happens in practice - battery drain is one-directional on TRVZB valves).
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "🪫 {{ thermostat_name }} Thermostat - Low Battery"
+        message: >
+          {{ thermostat_name }} thermostat battery is at {{ battery_level }}%.
+          Replace CR2450 battery soon.
+        data:
+          channel: "Alerts"
+          importance: high
+          tag: "battery_low_{{ trigger.entity_id }}"
+    - service: script.send_alert_email
+      data:
+        severity: "WARNING"
+        title: "Thermostat Low Battery"
+        subtitle: "{{ thermostat_name }} — {{ battery_level }}%"
+        description: >-
+          {{ thermostat_name }} thermostat battery has dropped below 30%. The TRVZB radiator
+          valve may fail to actuate in cold weather when battery is low. Replace soon.
+        actions: "Order CR2450 replacement battery|Replace battery before it drops below 15%"
+        details: >-
+          Battery type: CR2450
+          Threshold:    30%
+
+          All thermostat levels:
+            Study:        {{ states('sensor.study_thermostat_battery') | replace('unavailable', 'OFFLINE') | replace('unknown', '??') }}%
+            Bedroom:      {{ states('sensor.bed_thermostat_battery') | replace('unavailable', 'OFFLINE') | replace('unknown', '??') }}%
+            Living Inner: {{ states('sensor.living_thermostat_inner_battery') | replace('unavailable', 'OFFLINE') | replace('unknown', '??') }}%
+            Living Outer: {{ states('sensor.living_thermostat_outer_battery') | replace('unavailable', 'OFFLINE') | replace('unknown', '??') }}%
+        plain_text: >-
+          {{ thermostat_name }} thermostat battery at {{ battery_level }}%. Battery type: CR2450.
+          Order replacement before valve stops actuating.
+    - service: system_log.write
+      data:
+        message: "LOW BATTERY: {{ thermostat_name }} thermostat at {{ battery_level }}%"
+        level: warning

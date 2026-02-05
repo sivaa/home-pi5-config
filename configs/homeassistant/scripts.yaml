@@ -920,3 +920,147 @@ co2_override_cancel:
           channel: "{% if co2_is_high %}Warning{% else %}Info{% endif %}"
           importance: "{% if co2_is_high %}default{% else %}low{% endif %}"
           tag: "co2_override"
+
+# =============================================================================
+# HTML ALERT EMAIL
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  PURPOSE: Professional HTML email template for all alert notifications │
+# │                                                                         │
+# │  Design: Enterprise monitoring style (PagerDuty / Datadog inspired)    │
+# │    - Dark header with severity badge (CRITICAL / WARNING / INFO)       │
+# │    - Clean typography with clear hierarchy                             │
+# │    - Colored action box matching severity                              │
+# │    - Optional details section for technical data                       │
+# │    - Responsive, inline CSS for maximum email client compatibility     │
+# │                                                                         │
+# │  USAGE:                                                                │
+# │    service: script.send_alert_email                                    │
+# │    data:                                                               │
+# │      severity: "CRITICAL"                                              │
+# │      title: "Device Left Zigbee Network"                               │
+# │      subtitle: "[Study] Thermostat"                                    │
+# │      description: "The device has de-paired itself..."                 │
+# │      actions: "Step one|Step two|Step three"                           │
+# │      details: "IEEE: 0xDEAD  (optional)"                              │
+# │      plain_text: "Fallback for non-HTML clients"                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+# =============================================================================
+send_alert_email:
+  alias: "Send HTML Alert Email"
+  description: "Sends a professional HTML email via notify.email with severity-colored template"
+  mode: queued
+  max: 10
+
+  fields:
+    severity:
+      description: "CRITICAL, WARNING, or INFO"
+      example: "CRITICAL"
+    title:
+      description: "Alert title (e.g. Device Left Zigbee Network)"
+      example: "Device Left Zigbee Network"
+    subtitle:
+      description: "Device or context line below title"
+      example: "[Study] Thermostat"
+    description:
+      description: "What happened - main body text"
+      example: "The device has de-paired itself from the coordinator."
+    actions:
+      description: "Pipe-separated action items (e.g. 'Do X|Do Y|Do Z')"
+      example: "Check power|Reset device|Wait for rejoin"
+    details:
+      description: "Optional technical details block (rendered in monospace)"
+      example: "IEEE: 0xc4d8c8fffe02cef8"
+      default: ""
+    plain_text:
+      description: "Plain-text fallback for non-HTML email clients"
+      example: "Device left network. Re-pair required."
+
+  sequence:
+    - service: notify.email
+      data:
+        title: >-
+          {% if severity == 'CRITICAL' %}🚨{% elif severity == 'WARNING' %}⚠️{% else %}ℹ️{% endif %} {{ title }}
+        message: "{{ plain_text }}"
+        data:
+          html: >-
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;padding:32px 16px;">
+            <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1),0 1px 2px rgba(0,0,0,0.06);">
+
+            <!-- HEADER -->
+            <tr><td style="background-color:#0f172a;padding:20px 28px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+            <td style="vertical-align:middle;">
+            <span style="display:inline-block;background-color:{% if severity == 'CRITICAL' %}#dc2626{% elif severity == 'WARNING' %}#d97706{% else %}#2563eb{% endif %};color:#ffffff;padding:4px 14px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{{ severity }}</span>
+            </td>
+            <td style="text-align:right;vertical-align:middle;">
+            <span style="color:#94a3b8;font-size:13px;font-weight:500;">Pi Home Assistant</span>
+            </td>
+            </tr>
+            </table>
+            </td></tr>
+
+            <!-- TITLE -->
+            <tr><td style="padding:28px 28px 8px;">
+            <h1 style="margin:0;font-size:20px;font-weight:600;color:#0f172a;line-height:1.3;">{{ title }}</h1>
+            {% if subtitle | default('') | length > 0 %}
+            <p style="margin:8px 0 0;font-size:14px;color:#64748b;line-height:1.4;">{{ subtitle }}</p>
+            {% endif %}
+            </td></tr>
+
+            <!-- DIVIDER -->
+            <tr><td style="padding:16px 28px 0;">
+            <div style="border-top:1px solid #e2e8f0;"></div>
+            </td></tr>
+
+            <!-- DESCRIPTION -->
+            <tr><td style="padding:20px 28px;">
+            <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;">{{ description | replace('\n', '<br>') }}</p>
+            </td></tr>
+
+            <!-- ACTION BOX -->
+            {% if actions | default('') | length > 0 %}
+            <tr><td style="padding:0 28px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{% if severity == 'CRITICAL' %}#fef2f2{% elif severity == 'WARNING' %}#fffbeb{% else %}#eff6ff{% endif %};border-left:4px solid {% if severity == 'CRITICAL' %}#dc2626{% elif severity == 'WARNING' %}#d97706{% else %}#2563eb{% endif %};border-radius:0 6px 6px 0;">
+            <tr><td style="padding:18px 20px;">
+            <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:{% if severity == 'CRITICAL' %}#991b1b{% elif severity == 'WARNING' %}#92400e{% else %}#1e40af{% endif %};">Action Required</p>
+            <ol style="margin:0;padding-left:20px;color:#334155;font-size:14px;line-height:2.0;">
+            {% for item in actions.split('|') %}
+            <li style="padding-left:4px;">{{ item | trim }}</li>
+            {% endfor %}
+            </ol>
+            </td></tr>
+            </table>
+            </td></tr>
+            {% endif %}
+
+            <!-- DETAILS (optional) -->
+            {% if details | default('') | length > 0 %}
+            <tr><td style="padding:0 28px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+            <tr><td style="padding:16px 20px;">
+            <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#64748b;">Details</p>
+            <pre style="margin:0;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:13px;color:#334155;line-height:1.6;white-space:pre-wrap;word-break:break-all;">{{ details }}</pre>
+            </td></tr>
+            </table>
+            </td></tr>
+            {% endif %}
+
+            <!-- FOOTER -->
+            <tr><td style="background-color:#f8fafc;padding:18px 28px;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+            {{ now().strftime('%b %d, %Y at %H:%M CET') }}<br>
+            Pi Home Assistant &middot; Zehlendorf, Berlin
+            </p>
+            </td></tr>
+
+            </table>
+            </td></tr>
+            </table>
+            </body>
+            </html>

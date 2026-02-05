@@ -345,8 +345,70 @@ Host Network (--network host):
 
 ---
 
+## Email Notifications (Gmail SMTP)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  EMAIL NOTIFICATION SETUP                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  SERVICE:   notify.email                                                     │
+│  PROVIDER:  Gmail SMTP (smtp.gmail.com:587, STARTTLS)                       │
+│  SENDER:    zoobave@gmail.com                                                │
+│  RECIPIENT: siva@sivaa.net                                                   │
+│  AUTH:      Gmail App Password stored in secrets.yaml                        │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│  USAGE IN AUTOMATIONS:                                                       │
+│                                                                              │
+│  - service: notify.email                                                     │
+│    data:                                                                     │
+│      title: "Alert Title"                                                    │
+│      message: "Alert details here"                                           │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────── │
+│                                                                              │
+│  CREDENTIALS:                                                                │
+│  secrets.yaml is NOT in git (gitignored).                                    │
+│  If recreating from scratch:                                                 │
+│    1. Log into zoobave@gmail.com                                             │
+│    2. Enable 2FA → Create App Password → name "Pi Home Assistant"            │
+│    3. Create /opt/homeassistant/secrets.yaml:                                │
+│       gmail_app_password: "xxxx xxxx xxxx xxxx"                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Testing Email
+
+```bash
+# Via HA API
+ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{\"title\": \"Test\", \"message\": \"Email works!\"}'"
+
+# Or use HA Developer Tools → Services → notify.email
+```
+
+### Troubleshooting
+
+| Problem | Check |
+|---------|-------|
+| HA won't start after adding SMTP | `docker logs homeassistant \| grep -i smtp` - likely secrets.yaml missing |
+| Email not arriving | Check spam folder. Gmail may block first send from new App Password |
+| Authentication error | Regenerate App Password. Ensure 2FA is still enabled on zoobave@gmail.com |
+| `secrets.yaml` not found | File must be at `/opt/homeassistant/secrets.yaml` (same dir as configuration.yaml) |
+
+---
+
 ## History
 
+- **Feb 5, 2026**: Added email notifications via Gmail SMTP
+  - Service: `notify.email` using `zoobave@gmail.com` → `siva@sivaa.net`
+  - Credentials: `secrets.yaml` (gitignored) with Gmail App Password
+  - Purpose: Paper trail for critical safety events (CO2, watchdog, device offline)
 - **Jan 23, 2026**: Added CO2 episode tracking for accurate ventilation time announcements
   - Problem: `last_triggered` reset by 30-min reminders, showed wrong time in TTS
   - Solution: Sentinel-based `input_datetime` helpers + 3 new automations

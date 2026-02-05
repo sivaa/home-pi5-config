@@ -15,6 +15,7 @@ backups/configs/zigbee2mqtt/network_key.txt
 # Environment files with secrets
 scripts/.env
 configs/**/.env
+configs/**/secrets.yaml
 node_modules/
 .playwright-mcp/
 
