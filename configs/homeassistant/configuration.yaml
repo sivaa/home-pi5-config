@@ -15,16 +15,15 @@ sun:  # Required for sun.sun entity (sunrise/sunset tracking)
 
 # =============================================================================
 # NOTIFICATION GROUPS
-# Purpose: Send notifications to multiple phones simultaneously
+# Purpose: Send mobile push notifications
 # Phones:
-#   - mobile_app_22111317pg (Siva)
 #   - mobile_app_nithya_mobile (Nithya)
+#   Siva removed Feb 2026 — prefers email-only (siva@sivaa.net)
 # =============================================================================
 notify:
   - platform: group
     name: all_phones
     services:
-      - action: mobile_app_22111317pg
       - action: mobile_app_nithya_mobile
 
   # =========================================================================
@@ -32,8 +31,8 @@ notify:
   # ┌─────────────────────────────────────────────────────────────────────┐
   # │  PURPOSE: Send email alerts for critical events                     │
   # │                                                                     │
-  # │  Automation ──► notify.all_phones  (instant mobile push)           │
-  # │              └► notify.email       (email paper trail)             │
+  # │  Automation ──► notify.all_phones  (Nithya mobile push)            │
+  # │              └► notify.email       (Siva email paper trail)        │
   # │                                                                     │
   # │  WHY EMAIL + PHONE?                                                │
   # │  Phone notifications vanish when dismissed. Emails persist.         │

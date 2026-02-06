@@ -403,12 +403,134 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 
 ---
 
+## Bathroom Presence Lighting (Feb 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BATHROOM LIGHT LIFECYCLE                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  WHY BATHROOM IS DIFFERENT FROM OTHER ROOMS:                                 │
+│  ┌───────────────────────────────────────────────────────────────────────┐   │
+│  │  Study/Living/Bed: SONOFF relay switch CUTS POWER to IKEA bulb       │   │
+│  │  → Power restored = IKEA defaults to ON (hardware behavior)          │   │
+│  │                                                                       │   │
+│  │  Bathroom: AwoX smart bulb has NO relay switch                        │   │
+│  │  → Zigbee turn_off = software off (bulb still powered)               │   │
+│  │  → Needs explicit Zigbee turn_on to light up again                    │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  FLOW:                                                                       │
+│  ① Person enters → SNZB-06P occupancy: ON                                   │
+│  ② bath_presence_light_on → light.turn_on                                   │
+│  ③ circadian_power_on → sets brightness + 2200K (already existed)           │
+│  ④ Person leaves → 3 min grace → bath_presence_light_off                    │
+│  ⑤ Light OFF + circadian override cleared → ready for next visit            │
+│                                                                              │
+│  DUAL-TRIGGER PATTERN (both ON and OFF):                                     │
+│  • State trigger: instant response to presence change                        │
+│  • time_pattern /5: fallback catches HA restarts mid-visit                   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Automations
+
+| Automation | ID | Trigger | Action |
+|------------|-----|---------|--------|
+| [Bath] Light On When Occupied | `bath_presence_light_on` | Presence ON | `light.turn_on` (circadian handles brightness) |
+| [Bath] Light Off When Unoccupied | `bath_presence_light_off` | Presence OFF for 3 min | `light.turn_off` + clear circadian override |
+
+### Key Entities
+
+| Entity | Purpose |
+|--------|---------|
+| `light.bath_light` | AwoX 33955 smart light (primary control) |
+| `binary_sensor.bath_human_presence_occupancy` | SNZB-06P mmWave presence sensor |
+| `input_boolean.circadian_bath_override` | Manual brightness override (cleared on auto-off) |
+
+---
+
+## Alert Automations
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ALERT NOTIFICATION SYSTEM                                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  CHANNELS:                                                                   │
+│    Phone → notify.all_phones → Nithya only                                   │
+│    Email → notify.email      → siva@sivaa.net only                           │
+│                                                                              │
+│  ┌──────────────────────────────┬──────────┬─────────┬───────┬────────────┐ │
+│  │  Automation                  │ Severity │ Nithya  │ Siva  │ Trigger    │ │
+│  │                              │          │ (phone) │(email)│            │ │
+│  ├──────────────────────────────┼──────────┼─────────┼───────┼────────────┤ │
+│  │  zigbee_device_left_alert    │ CRITICAL │   ✓     │   ✓   │ MQTT leave │ │
+│  │  contact_sensor_offline_alert│ WARNING  │   ✓     │   ✓   │ Unavail    │ │
+│  │  zigbee_router_offline_alert │ CRITICAL │         │   ✓   │ Unavail 2m │ │
+│  │  thermostat_low_battery_alert│ WARNING  │         │   ✓   │ Batt < 30% │ │
+│  │  zigbee_router_online_alert  │ INFO     │         │   ✓   │ Recovery   │ │
+│  └──────────────────────────────┴──────────┴─────────┴───────┴────────────┘ │
+│                                                                              │
+│  Siva: email-only (removed from phone group Feb 2026).                       │
+│  Nithya: phone push for critical events needing immediate action.            │
+│  Router alerts: email-only (12 devices, phone too noisy).                    │
+│  Router recovery: INFO email (resolves offline alert in inbox).               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Zigbee Router Monitoring
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  MONITORED ROUTERS (always-powered — offline = real problem)                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Smart Plug [1], [2], [3]          mains-powered                            │
+│  [Study] Light Switch              hardwired SONOFF                          │
+│  [Bed] Light Switch                hardwired SONOFF                          │
+│  [Living] Light Switch             hardwired SONOFF                          │
+│  [Hallway] CO2 Sensor              USB-powered (NOUS E10, router)            │
+│  [Study] Human Presence            USB-powered (SNZB-06P, router)            │
+│  [Living] Human Presence           USB-powered (SNZB-06P, router)            │
+│  [Kitchen] Human Presence          USB-powered (SNZB-06P, router)            │
+│  [Bath] Human Presence             USB-powered (SNZB-06P, router)            │
+│  [Bed] Human Presence              USB-powered (SNZB-06P, router)            │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  EXCLUDED (manually powered off via wall switch — false positives)           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [Study] IKEA Light                wall switch                               │
+│  [Living] IKEA Light               wall switch                               │
+│  [Bath] Light (AwoX)               wall switch                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**If adding a new always-powered device**, add it to BOTH automations:
+- `zigbee_router_offline_alert` (trigger + device_names)
+- `zigbee_router_online_alert` (trigger + device_names)
+
+---
+
 ## History
 
+- **Feb 6, 2026**: Added bathroom auto-ON light when presence detected
+  - Problem: AwoX bath light has no physical switch — unlike IKEA rooms with SONOFF relays
+  - After auto-off, light stayed dark until manually turned on via dashboard
+  - Solution: `bath_presence_light_on` automation with dual-trigger pattern
+  - Circadian integration: `circadian_power_on` handles brightness/color_temp on turn-on
 - **Feb 5, 2026**: Added email notifications via Gmail SMTP
   - Service: `notify.email` using `zoobave@gmail.com` → `siva@sivaa.net`
   - Credentials: `secrets.yaml` (gitignored) with Gmail App Password
   - Purpose: Paper trail for critical safety events (CO2, watchdog, device offline)
+- **Feb 5, 2026**: Expanded router offline monitoring
+  - Added: Bed + Living light switches, all 5 human presence sensors
+  - Removed: IKEA lights + AwoX bath light (manually powered off, false positives)
+  - Total: 12 routers monitored, 3 excluded
 - **Jan 23, 2026**: Added CO2 episode tracking for accurate ventilation time announcements
   - Problem: `last_triggered` reset by 30-min reminders, showed wrong time in TTS
   - Solution: Sentinel-based `input_datetime` helpers + 3 new automations

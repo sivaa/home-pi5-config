@@ -4061,10 +4061,23 @@
 
 # -----------------------------------------------------------------------------
 # ZIGBEE ROUTER OFFLINE ALERT
-# Trigger: Any router device goes offline (unavailable)
-# Devices: Smart Plugs, IKEA Lights, CO2 Sensor, Light Switch
-# Action: Mobile notification with device name
-# Cooldown: 5 minutes per device (prevents spam during network issues)
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  Routers form the Zigbee mesh backbone. When one goes offline,         │
+# │  nearby battery sensors lose their relay path and may go offline too.  │
+# │                                                                         │
+# │  MONITORED (always-powered — offline means real problem):              │
+# │    3x Smart Plugs           (mains)                                    │
+# │    3x Light Switches        (hardwired SONOFF — Study, Bed, Living)    │
+# │    1x CO2 Sensor            (USB-powered)                              │
+# │    5x Human Presence        (USB-powered SNZB-06P — all rooms)         │
+# │                                                                         │
+# │  EXCLUDED (manually powered off — would cause false alerts):           │
+# │    2x IKEA Lights           (Study, Living — wall switch)              │
+# │    1x AwoX Bath Light       (wall switch)                              │
+# │                                                                         │
+# │  Trigger: state → "unavailable" for 2 minutes                         │
+# │  Action: HTML email only (12 devices — phone push too noisy)            │
+# └─────────────────────────────────────────────────────────────────────────┘
 # -----------------------------------------------------------------------------
 - id: zigbee_router_offline_alert
   alias: "Zigbee Router Offline Alert"
@@ -4089,26 +4102,53 @@
       to: "unavailable"
       for:
         minutes: 2
-    # IKEA Lights
+    # IKEA Lights + Bath Light excluded — manually powered off via wall switch,
+    # would trigger false alerts constantly.
+    # Light Switches (SONOFF, hardwired — always powered)
     - platform: state
-      entity_id: light.study_ikea_light
+      entity_id: switch.study_light_switch
       to: "unavailable"
       for:
         minutes: 2
     - platform: state
-      entity_id: light.living_ikea_light
+      entity_id: switch.bed_light_switch
       to: "unavailable"
       for:
         minutes: 2
-    # CO2 Sensor (router device)
+    - platform: state
+      entity_id: switch.living_light_switch
+      to: "unavailable"
+      for:
+        minutes: 2
+    # CO2 Sensor (router device, USB-powered)
     - platform: state
       entity_id: sensor.hallway_co2_co2
       to: "unavailable"
       for:
         minutes: 2
-    # Light Switch
+    # Human Presence Sensors (SNZB-06P, USB-powered routers)
     - platform: state
-      entity_id: switch.study_light_switch
+      entity_id: binary_sensor.study_human_presence_occupancy
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: binary_sensor.living_human_presence_occupancy
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: binary_sensor.kitchen_human_presence_occupancy
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      to: "unavailable"
+      for:
+        minutes: 2
+    - platform: state
+      entity_id: binary_sensor.bed_human_presence_occupancy
       to: "unavailable"
       for:
         minutes: 2
@@ -4118,24 +4158,19 @@
       switch.smart_plug_1: "Smart Plug [1]"
       switch.smart_plug_2: "Smart Plug [2]"
       switch.smart_plug_3: "Smart Plug [3]"
-      light.study_ikea_light: "[Study] IKEA Light"
-      light.living_ikea_light: "[Living] IKEA Light"
-      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
       switch.study_light_switch: "[Study] Light Switch"
+      switch.bed_light_switch: "[Bed] Light Switch"
+      switch.living_light_switch: "[Living] Light Switch"
+      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
+      binary_sensor.study_human_presence_occupancy: "[Study] Human Presence"
+      binary_sensor.living_human_presence_occupancy: "[Living] Human Presence"
+      binary_sensor.kitchen_human_presence_occupancy: "[Kitchen] Human Presence"
+      binary_sensor.bath_human_presence_occupancy: "[Bath] Human Presence"
+      binary_sensor.bed_human_presence_occupancy: "[Bed] Human Presence"
     device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
 
   action:
-    - service: notify.all_phones
-      data:
-        title: "⚠️ Zigbee Router OFFLINE"
-        message: >
-          {{ device_name }} is offline! This may affect mesh network.
-          Check if device is powered on.
-        data:
-          channel: "Critical"
-          importance: max
-          tag: "router_offline_{{ trigger.entity_id }}"
-          vibrationPattern: "100, 500, 100, 500"
+    # Email only — no phone push. 12 routers monitored, would be noisy.
     - service: script.send_alert_email
       data:
         severity: "CRITICAL"
@@ -4156,7 +4191,7 @@
 # -----------------------------------------------------------------------------
 # ZIGBEE ROUTER BACK ONLINE ALERT
 # Trigger: Any router device comes back online
-# Action: Mobile notification (clears offline alert)
+# Action: INFO email (resolves offline alert in inbox) + system log
 # -----------------------------------------------------------------------------
 - id: zigbee_router_online_alert
   alias: "Zigbee Router Back Online Alert"
@@ -4175,20 +4210,36 @@
     - platform: state
       entity_id: switch.smart_plug_3
       from: "unavailable"
-    # IKEA Lights
+    # IKEA Lights + Bath Light excluded — powered off manually, see offline alert comment
+    # Light Switches (SONOFF, hardwired — always powered)
     - platform: state
-      entity_id: light.study_ikea_light
+      entity_id: switch.study_light_switch
       from: "unavailable"
     - platform: state
-      entity_id: light.living_ikea_light
+      entity_id: switch.bed_light_switch
       from: "unavailable"
-    # CO2 Sensor
+    - platform: state
+      entity_id: switch.living_light_switch
+      from: "unavailable"
+    # CO2 Sensor (router device, USB-powered)
     - platform: state
       entity_id: sensor.hallway_co2_co2
       from: "unavailable"
-    # Light Switch
+    # Human Presence Sensors (SNZB-06P, USB-powered routers)
     - platform: state
-      entity_id: switch.study_light_switch
+      entity_id: binary_sensor.study_human_presence_occupancy
+      from: "unavailable"
+    - platform: state
+      entity_id: binary_sensor.living_human_presence_occupancy
+      from: "unavailable"
+    - platform: state
+      entity_id: binary_sensor.kitchen_human_presence_occupancy
+      from: "unavailable"
+    - platform: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      from: "unavailable"
+    - platform: state
+      entity_id: binary_sensor.bed_human_presence_occupancy
       from: "unavailable"
 
   variables:
@@ -4196,21 +4247,29 @@
       switch.smart_plug_1: "Smart Plug [1]"
       switch.smart_plug_2: "Smart Plug [2]"
       switch.smart_plug_3: "Smart Plug [3]"
-      light.study_ikea_light: "[Study] IKEA Light"
-      light.living_ikea_light: "[Living] IKEA Light"
-      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
       switch.study_light_switch: "[Study] Light Switch"
+      switch.bed_light_switch: "[Bed] Light Switch"
+      switch.living_light_switch: "[Living] Light Switch"
+      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
+      binary_sensor.study_human_presence_occupancy: "[Study] Human Presence"
+      binary_sensor.living_human_presence_occupancy: "[Living] Human Presence"
+      binary_sensor.kitchen_human_presence_occupancy: "[Kitchen] Human Presence"
+      binary_sensor.bath_human_presence_occupancy: "[Bath] Human Presence"
+      binary_sensor.bed_human_presence_occupancy: "[Bed] Human Presence"
     device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
 
   action:
-    - service: notify.all_phones
+    # Recovery email so offline alert in Siva's inbox gets a resolution signal
+    - service: script.send_alert_email
       data:
-        title: "✅ Zigbee Router ONLINE"
-        message: "{{ device_name }} is back online!"
-        data:
-          channel: "Zigbee"
-          importance: high
-          tag: "router_offline_{{ trigger.entity_id }}"
+        severity: "INFO"
+        title: "Zigbee Router Back Online"
+        subtitle: "{{ device_name }}"
+        description: >-
+          {{ device_name }} has recovered and is back online. No action needed.
+        actions: ""
+        plain_text: >-
+          {{ device_name }} is back online at {{ now().strftime('%H:%M on %b %d') }}.
     - service: system_log.write
       data:
         message: "ROUTER ONLINE: {{ device_name }} ({{ trigger.entity_id }}) is back"
@@ -4726,6 +4785,54 @@
         title: "💡 Kitchen Light"
 
 # -----------------------------------------------------------------------------
+# BATHROOM - AwoX Light ON when occupied (presence detected)
+# ┌────────────────────────────────────────────────────────────────┐
+# │  WHY THIS EXISTS:                                              │
+# │  AwoX bath light has NO physical switch (unlike IKEA rooms    │
+# │  which use SONOFF relay switches that cut/restore power).      │
+# │  When bath_presence_light_off turns it off via Zigbee,         │
+# │  the bulb stays powered but dark — needs a turn_on command.    │
+# │                                                                │
+# │  CIRCADIAN: We only call light.turn_on — the existing          │
+# │  circadian_power_on detects the off→on transition and sets     │
+# │  brightness + 2200K automatically. At 3 AM = ~5%. Noon = 100%.│
+# │                                                                │
+# │  Dual-trigger pattern (same as light_off):                     │
+# │  Trigger 1: state → "on"      (instant: person enters)        │
+# │  Trigger 2: time_pattern /5   (fallback for HA restarts)       │
+# └────────────────────────────────────────────────────────────────┘
+# -----------------------------------------------------------------------------
+- id: bath_presence_light_on
+  alias: "[Bath] Light On When Occupied"
+  description: "Turn on Bath AwoX light when human presence detected"
+  mode: single
+
+  trigger:
+    # Instant: fires the moment presence sensor transitions to on
+    - platform: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      to: "on"
+    # Fallback: catches HA restart while person is in dark bathroom
+    - platform: time_pattern
+      minutes: "/5"
+
+  condition:
+    # Light must be OFF (don't re-trigger if already on)
+    - condition: state
+      entity_id: light.bath_light
+      state: "off"
+    # Presence must be ON (essential for the periodic fallback)
+    - condition: state
+      entity_id: binary_sensor.bath_human_presence_occupancy
+      state: "on"
+
+  action:
+    # Just turn on — circadian_power_on handles brightness & color temp
+    - service: light.turn_on
+      target:
+        entity_id: light.bath_light
+
+# -----------------------------------------------------------------------------
 # BATHROOM - AwoX Light OFF when unoccupied for 3 minutes
 # ┌────────────────────────────────────────────────────────────────┐
 # │  Dual-trigger pattern (resilient to HA automation reloads):   │
@@ -4803,7 +4910,7 @@
 # =============================================================================
 # THERMOSTAT LOW BATTERY ALERT
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │  PURPOSE: Email + phone alert when radiator valve battery drops < 30%  │
+# │  PURPOSE: Email alert when radiator valve battery drops < 30%           │
 # │                                                                         │
 # │  WHY 30%?                                                               │
 # │  TRVZB valves report battery in 1% steps. At 20% the valve may fail   │
@@ -4851,16 +4958,7 @@
   # happens in practice - battery drain is one-directional on TRVZB valves).
 
   action:
-    - service: notify.all_phones
-      data:
-        title: "🪫 {{ thermostat_name }} Thermostat - Low Battery"
-        message: >
-          {{ thermostat_name }} thermostat battery is at {{ battery_level }}%.
-          Replace CR2450 battery soon.
-        data:
-          channel: "Alerts"
-          importance: high
-          tag: "battery_low_{{ trigger.entity_id }}"
+    # Email only — not urgent, 2 weeks to order CR2450 replacement.
     - service: script.send_alert_email
       data:
         severity: "WARNING"

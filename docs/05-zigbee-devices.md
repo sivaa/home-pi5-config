@@ -630,7 +630,7 @@
 │  Model: SNZB-06P                                                 │
 │  Protocol: Zigbee 3.0                                            │
 │  Power: USB-C (5V)                                               │
-│  Type: End Device (requires mains power but not a router)        │
+│  Type: Router (USB-powered, relays traffic for the mesh)         │
 ├─────────────────────────────────────────────────────────────────┤
 │  Sensors:                                                        │
 │    - Occupancy (human presence via mmWave radar)                │
