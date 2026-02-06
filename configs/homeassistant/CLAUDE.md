@@ -516,8 +516,60 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 
 ---
 
+## Temperature-Reached Energy Cap (Feb 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ENERGY CAP — PER-ROOM AUTO-LOWER WHEN WARM ENOUGH                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PROBLEM: User sets thermostat to 22°C, forgets to lower it.                │
+│  Room stays at 22°C cycling the heater endlessly.                            │
+│                                                                              │
+│  FIX: When a room's actual temp reaches 21°C → lower THAT ROOM             │
+│  to 19°C. Other rooms untouched.                                             │
+│                                                                              │
+│  Study hits 21°C      Living still 18°C    Bedroom still 17°C               │
+│  ────────────────      ────────────────     ──────────────────               │
+│  22°C → 19°C (cap!)   22°C (untouched)     22°C (untouched)                 │
+│                                                                              │
+│  CONSTANTS:                                                                  │
+│    ROOM_TEMP_THRESHOLD: 21°C                                                 │
+│    ENERGY_CAP_SETPOINT: 19°C                                                 │
+│                                                                              │
+│  DUAL TRIGGER (complete coverage):                                           │
+│    A) numeric_state: room temp crosses above 21°C                            │
+│    B) state/attribute: setpoint changes while room already >21°C             │
+│                                                                              │
+│  LOOP PREVENTION: setpoint > 19 condition stops self-triggered re-fires     │
+│                                                                              │
+│  EXCLUSIONS:                                                                 │
+│    - Window/CO2 guard active → heaters already off                           │
+│    - hvac_mode = off → not heating                                           │
+│                                                                              │
+│  STARTUP CHECK: Companion automation runs 30s after HA start                 │
+│                 (numeric_state only fires on crossing, not while above)       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Automations
+
+| Automation | ID | Trigger | Action |
+|------------|-----|---------|--------|
+| Energy Cap | `temperature_reached_energy_cap` | Room >21°C OR setpoint change | Lower that room to 19°C |
+| Energy Cap Startup | `temperature_reached_energy_cap_startup` | HA start | Cap warm rooms with high setpoints |
+
+---
+
 ## History
 
+- **Feb 6, 2026**: Added temperature-reached energy cap
+  - Problem: Users set thermostats to 22°C and forget to lower them
+  - Solution: When room temp reaches 21°C, auto-lower THAT room to 19°C (per-room, not all)
+  - Dual-trigger pattern: numeric_state (crossing) + state/attribute (re-raise catch)
+  - Loop prevention via `setpoint > 19` condition gate
+  - Startup check companion catches HA restarts while room already warm
 - **Feb 6, 2026**: Added bathroom auto-ON light when presence detected
   - Problem: AwoX bath light has no physical switch — unlike IKEA rooms with SONOFF relays
   - After auto-off, light stayed dark until manually turned on via dashboard

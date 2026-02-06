@@ -2477,6 +2477,234 @@
               tag: "heater_safety_cap"
 
 # -----------------------------------------------------------------------------
+# TEMPERATURE-REACHED ENERGY CAP
+# Room temp reaches 21°C → lower THAT room's setpoint to 19°C
+# (numeric_state above: 20.99 — strict >, so first reading >= 21.0 fires)
+# Dual trigger: numeric_state (crossing) + state (setpoint re-raise catch)
+#
+# Safeguards:
+#   Loop prevention: setpoint > 19 (our set_temperature(19) re-fires, but 19 > 19 = false)
+#   No-change filter: Trigger B skips entity refreshes where setpoint didn't change
+#                     (same pattern as thermostat_setpoint_changed_audit)
+#   Guard grace period: 30s cooldown after window/CO2 guard clears, so
+#                       resume-then-immediately-cap doesn't confuse users
+# See: configs/homeassistant/CLAUDE.md "Temperature-Reached Energy Cap"
+# -----------------------------------------------------------------------------
+- id: temperature_reached_energy_cap
+  alias: "Temperature Reached - Energy Cap (21°C room → 19°C setpoint)"
+  description: >
+    When a room's actual temperature reaches 21°C and the setpoint is above 19°C,
+    automatically lower ONLY THAT ROOM's setpoint to 19°C to save energy.
+    Uses dual triggers for complete coverage with loop prevention.
+  mode: parallel
+  max: 4
+
+  trigger:
+    # Trigger A: room temp reaches 21°C (above: 20.99 so first reading >= 21.0 fires)
+    #   Why 20.99 not 21? HA numeric_state is strict >, and thermostats report
+    #   at variable precision (0.1°C seen). above: 20.99 fires at 21.0+ without
+    #   creating a dead zone where trigger fires at 20.6 but condition blocks.
+    - platform: numeric_state
+      entity_id: climate.study_thermostat
+      attribute: current_temperature
+      above: 20.99
+      id: room_temp
+    - platform: numeric_state
+      entity_id: climate.living_thermostat_inner
+      attribute: current_temperature
+      above: 20.99
+      id: room_temp
+    - platform: numeric_state
+      entity_id: climate.living_thermostat_outer
+      attribute: current_temperature
+      above: 20.99
+      id: room_temp
+    - platform: numeric_state
+      entity_id: climate.bed_thermostat
+      attribute: current_temperature
+      above: 20.99
+      id: room_temp
+
+    # Trigger B: setpoint changes while room already >=21°C (re-raise catch)
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: temperature
+      id: setpoint_change
+
+  variables:
+    energy_cap_setpoint: 19
+    room_temp_threshold: 21
+    heater_name: >
+      {% set names = {
+        'climate.study_thermostat': 'Study',
+        'climate.living_thermostat_inner': 'Living Inner',
+        'climate.living_thermostat_outer': 'Living Outer',
+        'climate.bed_thermostat': 'Bedroom'
+      } %}
+      {{ names.get(trigger.entity_id, trigger.entity_id) }}
+    current_setpoint: "{{ state_attr(trigger.entity_id, 'temperature') | float(0) }}"
+    room_temp: "{{ state_attr(trigger.entity_id, 'current_temperature') | float(0) }}"
+
+  action:
+    - if:
+        - condition: template
+          value_template: >
+            {{ current_setpoint > energy_cap_setpoint
+               and room_temp >= room_temp_threshold
+               and states(trigger.entity_id) == 'heat'
+               and not is_state('input_boolean.heaters_off_due_to_window', 'on')
+               and not is_state('input_boolean.heaters_off_due_to_co2', 'on')
+               and (trigger.id == 'room_temp'
+                    or (trigger.from_state.attributes.temperature is defined
+                        and trigger.to_state.attributes.temperature is defined
+                        and trigger.from_state.attributes.temperature != trigger.to_state.attributes.temperature))
+               and (as_timestamp(now()) - (as_timestamp(states.input_boolean.heaters_off_due_to_window.last_changed) | default(as_timestamp(now())))) > 30
+               and (as_timestamp(now()) - (as_timestamp(states.input_boolean.heaters_off_due_to_co2.last_changed) | default(as_timestamp(now())))) > 30 }}
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: "{{ trigger.entity_id }}"
+          data:
+            temperature: "{{ energy_cap_setpoint }}"
+
+        - service: notify.all_phones
+          data:
+            title: "⚡ {{ heater_name }} Energy Cap"
+            message: >
+              Room reached {{ room_temp | int }}°C.
+              Setpoint lowered: {{ current_setpoint | int }}°C → {{ energy_cap_setpoint }}°C
+              to save energy. Raise manually if needed.
+            data:
+              channel: "Energy"
+              importance: default
+              tag: "energy_cap_{{ heater_name | lower | replace(' ', '_') }}"
+
+        # TTS (quiet hours 23:00-07:00)
+        - if:
+            - condition: template
+              value_template: "{{ now().hour >= 7 and now().hour < 23 }}"
+          then:
+            - service: script.smart_tts_announce
+              data:
+                message: >
+                  {{ heater_name }} room is warm at {{ room_temp | int }} degrees.
+                  Lowering to {{ energy_cap_setpoint }} to save energy.
+                title: "⚡ Energy Cap"
+
+# -----------------------------------------------------------------------------
+# TEMPERATURE-REACHED ENERGY CAP - STARTUP CHECK
+# Purpose: On HA startup, check if any room is already warm with high setpoint
+# Why: numeric_state triggers only fire on CROSSING. If HA restarts while
+#      room is already >21°C, the crossing event was missed.
+# Pattern: Same as heater_safety_22c_startup_check
+# -----------------------------------------------------------------------------
+- id: temperature_reached_energy_cap_startup
+  alias: "Temperature Reached Energy Cap - Startup Check"
+  description: "On HA startup, apply energy cap to any warm rooms with high setpoints"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  action:
+    - delay:
+        seconds: 30
+
+    - variables:
+        energy_cap_setpoint: 19
+        room_temp_threshold: 21
+        guards_active: >
+          {{ is_state('input_boolean.heaters_off_due_to_window', 'on')
+             or is_state('input_boolean.heaters_off_due_to_co2', 'on')
+             or (as_timestamp(now()) - (as_timestamp(states.input_boolean.heaters_off_due_to_window.last_changed) | default(as_timestamp(now())))) < 30
+             or (as_timestamp(now()) - (as_timestamp(states.input_boolean.heaters_off_due_to_co2.last_changed) | default(as_timestamp(now())))) < 30 }}
+        study_needs_cap: >
+          {{ states('climate.study_thermostat') == 'heat'
+             and (state_attr('climate.study_thermostat', 'current_temperature') | float(0)) >= room_temp_threshold
+             and (state_attr('climate.study_thermostat', 'temperature') | float(0)) > energy_cap_setpoint }}
+        living_inner_needs_cap: >
+          {{ states('climate.living_thermostat_inner') == 'heat'
+             and (state_attr('climate.living_thermostat_inner', 'current_temperature') | float(0)) >= room_temp_threshold
+             and (state_attr('climate.living_thermostat_inner', 'temperature') | float(0)) > energy_cap_setpoint }}
+        living_outer_needs_cap: >
+          {{ states('climate.living_thermostat_outer') == 'heat'
+             and (state_attr('climate.living_thermostat_outer', 'current_temperature') | float(0)) >= room_temp_threshold
+             and (state_attr('climate.living_thermostat_outer', 'temperature') | float(0)) > energy_cap_setpoint }}
+        bedroom_needs_cap: >
+          {{ states('climate.bed_thermostat') == 'heat'
+             and (state_attr('climate.bed_thermostat', 'current_temperature') | float(0)) >= room_temp_threshold
+             and (state_attr('climate.bed_thermostat', 'temperature') | float(0)) > energy_cap_setpoint }}
+        any_needs_cap: >
+          {{ not guards_active
+             and (study_needs_cap or living_inner_needs_cap
+                  or living_outer_needs_cap or bedroom_needs_cap) }}
+
+    - condition: template
+      value_template: "{{ any_needs_cap }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ study_needs_cap }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.study_thermostat
+          data:
+            temperature: "{{ energy_cap_setpoint }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ living_inner_needs_cap }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_inner
+          data:
+            temperature: "{{ energy_cap_setpoint }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ living_outer_needs_cap }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.living_thermostat_outer
+          data:
+            temperature: "{{ energy_cap_setpoint }}"
+
+    - if:
+        - condition: template
+          value_template: "{{ bedroom_needs_cap }}"
+      then:
+        - service: climate.set_temperature
+          target:
+            entity_id: climate.bed_thermostat
+          data:
+            temperature: "{{ energy_cap_setpoint }}"
+
+    - service: notify.all_phones
+      data:
+        title: "⚡ Energy Cap (Startup)"
+        message: >
+          HA startup energy cap applied:
+          {%- set capped = [] %}
+          {%- if study_needs_cap %}{% set capped = capped + ['Study'] %}{% endif %}
+          {%- if living_inner_needs_cap %}{% set capped = capped + ['Living Inner'] %}{% endif %}
+          {%- if living_outer_needs_cap %}{% set capped = capped + ['Living Outer'] %}{% endif %}
+          {%- if bedroom_needs_cap %}{% set capped = capped + ['Bedroom'] %}{% endif %}
+          {{ capped | join(', ') }} → setpoint lowered to {{ energy_cap_setpoint }}°C
+          (rooms already above {{ room_temp_threshold }}°C)
+        data:
+          channel: "Energy"
+          importance: default
+          tag: "energy_cap_startup"
+
+# -----------------------------------------------------------------------------
 # BEDROOM NIGHT MODE - START (23:00)
 # Trigger: Time reaches 23:00
 # Action: Save current setpoint, cap to 17°C if above
