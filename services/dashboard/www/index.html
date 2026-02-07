@@ -11,10 +11,10 @@
   <script>
     (function() {
       const stored = localStorage.getItem('dashboard-theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      let theme = 'light';
-      if (stored === 'dark' || (stored === 'system' && prefersDark) || (!stored && prefersDark)) {
-        theme = 'dark';
+      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+      let theme = 'dark';
+      if (stored === 'light' || (stored === 'system' && prefersLight)) {
+        theme = 'light';
       }
       document.documentElement.setAttribute('data-theme', theme);
       document.documentElement.setAttribute('data-theme-preference', stored || 'system');
@@ -27,11 +27,11 @@
 
   <!-- Modularized CSS -->
   <link rel="stylesheet" href="styles/base.css">
-  <link rel="stylesheet" href="styles/layout.css?v=3">
+  <link rel="stylesheet" href="styles/layout.css?v=4">
   <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
-  <link rel="stylesheet" href="styles/views/classic.css">
+  <link rel="stylesheet" href="styles/views/classic.css?v=4">
   <link rel="stylesheet" href="styles/views/lights.css">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
@@ -458,7 +458,7 @@
         </div>
 
         <!-- Vision 6: Classic Cards View - Multi-Sensor -->
-        <div x-show="currentView === 'classic'" x-cloak x-data="classicView()">
+        <div x-show="currentView === 'classic'" x-cloak x-data="classicView()" style="height: 100%;">
           <div class="classic-view">
             <!-- Room Grid -->
             <div class="classic-grid">
@@ -466,7 +466,8 @@
                 <div class="classic-card-v2"
                      :class="{
                        'has-co2': room.sensors && room.sensors.some(s => s.type === 'co2')
-                     }">
+                     }"
+                     :style="{ gridArea: room.id }">
 
                   <!-- Comfort indicator strip -->
                   <div class="classic-comfort-strip" :class="{
@@ -477,31 +478,21 @@
                     'hot': (room.avgTemperature || room.temperature) > 28
                   }"></div>
 
-                  <!-- Card Header -->
+                  <!-- Card Header with inline averages -->
                   <div class="classic-header-v2">
                     <div class="room-title">
                       <span class="room-icon" x-text="room.icon"></span>
                       <span class="room-name" x-text="room.name"></span>
                     </div>
-                  </div>
-
-                  <!-- Average Values - Prominent Display -->
-                  <div class="room-averages-section">
-                    <div class="avg-temp-display">
-                      <span x-html="formatTempStyled(room.avgTemperature ?? room.temperature, false)"></span>
-                      <span class="avg-unit">°C</span>
-                      <span class="trend-indicator" :class="'trend-' + $store.rooms.getTempTrend(room)" x-text="$store.rooms.getTempTrend(room) === 'rising' ? '▲' : ($store.rooms.getTempTrend(room) === 'falling' ? '▼' : '')"></span>
-                    </div>
-                    <div class="avg-humid-display">
-                      <span class="humid-icon">💧</span>
-                      <span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '--%')"></span>
-                      <span class="trend-indicator" :class="'trend-' + $store.rooms.getHumidTrend(room)" x-text="$store.rooms.getHumidTrend(room) === 'rising' ? '▲' : ($store.rooms.getHumidTrend(room) === 'falling' ? '▼' : '')"></span>
+                    <div class="header-readings">
+                      <span class="header-temp" x-text="(room.avgTemperature ?? room.temperature) != null ? (room.avgTemperature ?? room.temperature).toFixed(1) + '°' : '--'"></span>
+                      <span class="header-humid">💧<span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '')"></span></span>
                     </div>
                   </div>
 
-                  <!-- Sensor List - show if multiple sensors OR has CO2/special sensors -->
-                  <div class="sensor-list" x-show="room.sensors && (room.sensors.length > 1 || room.sensors.some(s => s.type === 'co2' || s.type === 'illuminance'))">
-                    <template x-for="sensor in (room.sensors || [])" :key="sensor.name + '-' + sensor.type">
+                  <!-- Sensor List - show if multiple sensors OR has CO2 -->
+                  <div class="sensor-list" x-show="room.sensors && (room.sensors.filter(s => s.type !== 'illuminance').length > 1 || room.sensors.some(s => s.type === 'co2'))">
+                    <template x-for="sensor in (room.sensors || []).filter(s => s.type !== 'illuminance')" :key="sensor.name + '-' + sensor.type">
                       <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null }">
                         <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : (sensor.type === 'illuminance' ? '☀️' : ''))"></span>
                         <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
@@ -531,8 +522,8 @@
                     </template>
                   </div>
 
-                  <!-- Sparkline -->
-                  <div class="classic-sparkline">
+                  <!-- Sparkline - only show when data exists -->
+                  <div class="classic-sparkline" x-show="room.tempHistory && room.tempHistory.length > 1">
                     <svg :id="'classic-spark-' + room.id" class="sparkline-svg" preserveAspectRatio="none"></svg>
                   </div>
 
@@ -545,38 +536,35 @@
                   </div>
                 </div>
               </template>
+
+              <!-- Home Average - compact vertical -->
+              <div class="classic-average" style="grid-area: avg;">
+                <div class="avg-section">
+                  <div class="avg-label">Avg Temp</div>
+                  <div class="avg-value">
+                    <template x-if="avgTemperature !== null">
+                      <span><span x-text="avgTemperature.toFixed(1)"></span><span class="avg-unit">°</span></span>
+                    </template>
+                    <template x-if="avgTemperature === null">
+                      <span class="no-data">--</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="avg-divider-h"></div>
+                <div class="avg-section">
+                  <div class="avg-label">Avg Humid</div>
+                  <div class="avg-value">
+                    <template x-if="avgHumidity !== null">
+                      <span><span x-text="avgHumidity.toFixed(0)"></span><span class="avg-unit">%</span></span>
+                    </template>
+                    <template x-if="avgHumidity === null">
+                      <span class="no-data">--</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <!-- Average Card -->
-            <div class="classic-average">
-              <div class="avg-section">
-                <div class="avg-label">Home Average Temperature</div>
-                <div class="avg-value">
-                  <template x-if="avgTemperature !== null">
-                    <span><span x-text="avgTemperature.toFixed(1)"></span><span class="avg-unit">°C</span></span>
-                  </template>
-                  <template x-if="avgTemperature === null">
-                    <span class="no-data">--</span>
-                  </template>
-                </div>
-              </div>
-              <div class="avg-divider"></div>
-              <div class="avg-section">
-                <div class="avg-label">Home Average Humidity</div>
-                <div class="avg-value">
-                  <template x-if="avgHumidity !== null">
-                    <span><span x-text="avgHumidity.toFixed(0)"></span><span class="avg-unit">%</span></span>
-                  </template>
-                  <template x-if="avgHumidity === null">
-                    <span class="no-data">--</span>
-                  </template>
-                </div>
-              </div>
-              <div class="avg-divider hidden-mobile"></div>
-              <div class="avg-chart">
-                <svg id="classic-spark-avg" class="sparkline-svg" preserveAspectRatio="none"></svg>
-              </div>
-            </div>
           </div>
         </div>
 

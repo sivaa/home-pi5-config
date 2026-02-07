@@ -9,12 +9,12 @@
 export function initThemeStore(Alpine) {
   Alpine.store('theme', {
     preference: 'system',  // 'light' | 'dark' | 'system'
-    resolved: 'light',     // actual applied theme: 'light' | 'dark'
+    resolved: 'dark',      // actual applied theme: 'light' | 'dark'
 
     init() {
       // Read from DOM attributes (set by FOIT prevention script)
       this.preference = document.documentElement.getAttribute('data-theme-preference') || 'system';
-      this.resolved = document.documentElement.getAttribute('data-theme') || 'light';
+      this.resolved = document.documentElement.getAttribute('data-theme') || 'dark';
 
       // Listen for system preference changes (when OS theme changes)
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
