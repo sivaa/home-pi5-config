@@ -31,7 +31,7 @@
       align-items: center;
       gap: 12px;
     }
-    .weather-hero-emoji { font-size: 36px; }
+    .weather-hero-emoji { font-size: 44px; }
     .weather-hero-info { flex: 1; }
     .weather-hero-temp-line {
       display: flex;
@@ -39,25 +39,25 @@
       gap: 10px;
     }
     .weather-hero-temp {
-      font-size: 40px;
+      font-size: 48px;
       font-weight: 200;
       letter-spacing: -2px;
       line-height: 1;
       color: var(--color-text);
     }
     .weather-hero-temp .unit {
-      font-size: 20px;
+      font-size: 24px;
       opacity: 0.4;
       vertical-align: super;
     }
     .weather-hero-desc {
-      font-size: 15px;
+      font-size: 17px;
       color: var(--color-text-secondary);
       font-weight: var(--font-weight-medium);
     }
     .weather-hero-sub {
       margin-top: 4px;
-      font-size: 12px;
+      font-size: 13px;
       color: var(--color-text-tertiary);
     }
 
@@ -86,9 +86,9 @@
       background: rgba(48, 209, 88, 0.06);
       border: 1px solid rgba(48, 209, 88, 0.15);
     }
-    .weather-alert-icon { font-size: 22px; }
+    .weather-alert-icon { font-size: 28px; }
     .weather-alert-title {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: var(--font-weight-semibold);
     }
     .weather-alert-card.cold .weather-alert-title { color: #64d2ff; }
@@ -96,7 +96,7 @@
     .weather-alert-card.heat .weather-alert-title { color: #ff453a; }
     .weather-alert-card.clear .weather-alert-title { color: #30d158; }
     .weather-alert-desc {
-      font-size: 12px;
+      font-size: 14px;
       color: var(--color-text-secondary);
       line-height: 1.3;
     }
@@ -140,7 +140,7 @@
       background: rgba(255, 255, 255, 0.06);
     }
     .weather-hourly-time {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--color-text-tertiary);
       font-weight: var(--font-weight-medium);
     }
@@ -148,15 +148,15 @@
       color: var(--color-text);
       font-weight: var(--font-weight-semibold);
     }
-    .weather-hourly-emoji { font-size: 17px; line-height: 1.2; }
+    .weather-hourly-emoji { font-size: 22px; line-height: 1.2; }
     .weather-hourly-temp {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: var(--font-weight-semibold);
       color: var(--color-text);
       font-variant-numeric: tabular-nums;
     }
     .weather-hourly-precip {
-      font-size: 10px;
+      font-size: 12px;
       color: var(--color-primary);
       font-weight: var(--font-weight-medium);
       min-height: 12px;
@@ -167,12 +167,22 @@
       flex: 1;
       min-height: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Rows wrapper fills remaining card height, distributes rows evenly */
+    .weather-daily-rows {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
 
     /* Ruler scale header */
     .weather-ruler-header {
       display: grid;
-      grid-template-columns: 72px 36px 1fr 56px;
+      grid-template-columns: 80px 40px 1fr 62px;
       gap: 8px;
       align-items: center;
       padding: 0 4px 4px 4px;
@@ -213,7 +223,7 @@
     /* Daily rows */
     .weather-daily-row {
       display: grid;
-      grid-template-columns: 72px 36px 1fr 56px;
+      grid-template-columns: 80px 40px 1fr 62px;
       align-items: center;
       gap: 8px;
       padding: 5px 4px;
@@ -240,7 +250,7 @@
     }
 
     .weather-day-name {
-      font-size: 13px;
+      font-size: 15px;
       font-weight: var(--font-weight-medium);
       color: var(--color-text);
     }
@@ -251,19 +261,19 @@
       font-weight: var(--font-weight-normal);
       line-height: 1;
     }
-    .weather-day-emoji { font-size: 19px; text-align: center; }
+    .weather-day-emoji { font-size: 24px; text-align: center; }
 
     /* Ruler bar track + fill */
     .weather-ruler-bar {
       position: relative;
-      height: 18px;
+      height: 24px;
       display: flex;
       align-items: center;
       overflow: visible;
     }
     .weather-ruler-track {
       width: 100%;
-      height: 5px;
+      height: 6px;
       border-radius: 3px;
       position: relative;
       overflow: visible;
@@ -289,7 +299,7 @@
       top: -1px;
       left: 0;
       transform: translateX(-100%) translateX(-5px);
-      font-size: 11px;
+      font-size: 13px;
       color: var(--color-text-tertiary);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -300,7 +310,7 @@
       top: -1px;
       right: 0;
       transform: translateX(100%) translateX(5px);
-      font-size: 11px;
+      font-size: 13px;
       font-weight: var(--font-weight-semibold);
       color: var(--color-text);
       font-variant-numeric: tabular-nums;
@@ -309,7 +319,7 @@
 
     /* Precipitation column */
     .weather-day-precip {
-      font-size: 12px;
+      font-size: 14px;
       color: var(--color-text-tertiary);
       text-align: right;
       font-variant-numeric: tabular-nums;

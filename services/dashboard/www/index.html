@@ -2876,27 +2876,29 @@
                 <span class="weather-ruler-label">Rain</span>
               </div>
 
-              <!-- Daily rows -->
-              <template x-for="(day, i) in daily" :key="day.dateStr + '-' + i">
-                <div class="weather-daily-row" :class="{ 'today': i === 0 }">
-                  <div class="weather-day-name">
-                    <span x-text="day.dayName"></span>
-                    <span class="date-sub" x-text="day.dateStr" x-show="i > 1"></span>
-                  </div>
-                  <div class="weather-day-emoji" x-text="day.emoji"></div>
-                  <div class="weather-ruler-bar">
-                    <div class="weather-ruler-track">
-                      <div class="weather-ruler-fill" :style="getTempBarStyle(day)">
-                        <span class="weather-ruler-lo" x-text="day.tempMin + '\u00B0'"></span>
-                        <span class="weather-ruler-hi" x-text="day.tempMax + '\u00B0'"></span>
+              <!-- Daily rows (flex-distributed to fill height) -->
+              <div class="weather-daily-rows">
+                <template x-for="(day, i) in daily" :key="day.dateStr + '-' + i">
+                  <div class="weather-daily-row" :class="{ 'today': i === 0 }">
+                    <div class="weather-day-name">
+                      <span x-text="day.dayName"></span>
+                      <span class="date-sub" x-text="day.dateStr" x-show="i > 1"></span>
+                    </div>
+                    <div class="weather-day-emoji" x-text="day.emoji"></div>
+                    <div class="weather-ruler-bar">
+                      <div class="weather-ruler-track">
+                        <div class="weather-ruler-fill" :style="getTempBarStyle(day)">
+                          <span class="weather-ruler-lo" x-text="day.tempMin + '\u00B0'"></span>
+                          <span class="weather-ruler-hi" x-text="day.tempMax + '\u00B0'"></span>
+                        </div>
                       </div>
                     </div>
+                    <div class="weather-day-precip"
+                         :class="{ 'rainy': isPrecipRainy(day) }"
+                         x-text="getPrecipText(day)"></div>
                   </div>
-                  <div class="weather-day-precip"
-                       :class="{ 'rainy': isPrecipRainy(day) }"
-                       x-text="getPrecipText(day)"></div>
-                </div>
-              </template>
+                </template>
+              </div>
             </div>
           </template>
 
