@@ -23,6 +23,7 @@ import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
+from collections import defaultdict
 
 # =============================================================================
 # CONFIGURATION
@@ -110,8 +111,31 @@ THERMOSTAT_HELPERS = {
     ),
 }
 
-# Guard flag entity
+# MQTT topics for TRVZB open_window reset (used in stuck-idle recovery)
+THERMOSTAT_MQTT_TOPICS = {
+    "climate.study_thermostat": "zigbee2mqtt/[Study] Thermostat/set",
+    "climate.living_thermostat_inner": "zigbee2mqtt/[Living] Thermostat Inner/set",
+    "climate.living_thermostat_outer": "zigbee2mqtt/[Living] Thermostat Outer/set",
+    "climate.bed_thermostat": "zigbee2mqtt/[Bed] Thermostat/set",
+}
+
+# Guard flag entities
 GUARD_FLAG_ENTITY = "input_boolean.heaters_off_due_to_window"
+CO2_GUARD_FLAG = "input_boolean.heaters_off_due_to_co2"
+
+# =============================================================================
+# STUCK-IDLE DETECTION CONFIG
+# =============================================================================
+# ┌────────────────────────────────────────────────────────────────────┐
+# │  Layer 2 backup for HA automation (thermostat_stuck_idle_recovery) │
+# │  HA checks every 15min with 60min threshold → effective ~75min    │
+# │  Watchdog uses 45min threshold to avoid conflict with HA          │
+# │  Only fires when no windows are open (window safety takes priority)│
+# └────────────────────────────────────────────────────────────────────┘
+STUCK_IDLE_THRESHOLD = 45 * 60  # 45 minutes before attempting recovery
+STUCK_IDLE_DEFICIT = 2.0  # Minimum °C deficit to consider "stuck"
+STUCK_IDLE_MAX_RECOVERIES = 2  # Max recoveries per thermostat per hour
+STUCK_IDLE_SETPOINT_FLOOR = 18  # Min setpoint for race condition guard
 
 # State save timeout (seconds) - don't block core safety action
 STATE_SAVE_TIMEOUT = 5
@@ -134,6 +158,7 @@ def log_banner():
 ================================================================================
        HEATER SAFETY WATCHDOG
        Independent safety monitor for heater-window violations
+       + Stuck-idle TRV detection and auto-recovery (Layer 2 backup)
        Runs every 5 minutes as defense-in-depth layer
 ================================================================================
 """,
@@ -384,6 +409,264 @@ def send_notification(title, message, importance="max"):
         return False
 
 
+# =============================================================================
+# STUCK-IDLE DETECTION & RECOVERY (Layer 2 Backup)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 7, 2026 — Living Inner TRV stuck idle for 10+ hours    │
+# │  Valve motor seized after prolonged OFF mode. TRV accepted mode=heat   │
+# │  but valve physically wouldn't open. All 3 safety nets missed it.      │
+# │                                                                         │
+# │  This is the Layer 2 backup — HA automation is Layer 1 (every 15min).  │
+# │  Watchdog fires only if HA automation fails (HA restart, disabled, etc) │
+# │                                                                         │
+# │  TWO-PHASE RECOVERY:                                                    │
+# │    Phase 1: MQTT open_window OFF + re-poke setpoint (gentle)           │
+# │    Phase 2: off → heat → MQTT reset → setpoint (aggressive)           │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# In-memory tracking (reset on container restart — acceptable for Layer 2)
+stuck_idle_tracker = {}  # {entity_id: first_seen_timestamp}
+recovery_tracker = defaultdict(list)  # {entity_id: [timestamp, ...]}
+
+
+def is_guard_flag_active():
+    """Check if any guard flag is active (heaters intentionally off)."""
+    for flag in [GUARD_FLAG_ENTITY, CO2_GUARD_FLAG]:
+        try:
+            state = get_entity_state(flag)
+            if state.get("state") == "on":
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def get_stuck_idle_thermostats():
+    """Find thermostats stuck in heat+idle with significant temperature deficit.
+
+    Returns list of dicts: [{entity_id, name, setpoint, current_temp, deficit}]
+    """
+    stuck = []
+    for entity_id in THERMOSTATS:
+        try:
+            state = get_entity_state(entity_id)
+            attrs = state.get("attributes", {})
+            hvac_mode = state.get("state")  # 'heat', 'off', etc.
+            hvac_action = attrs.get("hvac_action")  # 'idle', 'heating', etc.
+            setpoint = attrs.get("temperature", 0)
+            current_temp = attrs.get("current_temperature", 0)
+            name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+
+            if (
+                hvac_mode == "heat"
+                and hvac_action == "idle"
+                and setpoint is not None
+                and current_temp is not None
+            ):
+                deficit = float(setpoint) - float(current_temp)
+                if deficit >= STUCK_IDLE_DEFICIT:
+                    stuck.append(
+                        {
+                            "entity_id": entity_id,
+                            "name": name,
+                            "setpoint": float(setpoint),
+                            "current_temp": float(current_temp),
+                            "deficit": deficit,
+                        }
+                    )
+        except Exception as e:
+            log(f"Error checking stuck-idle for {entity_id}: {e}", "WARN")
+    return stuck
+
+
+def can_recover(entity_id):
+    """Check if we haven't exceeded rate limit for this thermostat."""
+    now = time.time()
+    # Clean old entries (>1 hour)
+    recovery_tracker[entity_id] = [
+        ts for ts in recovery_tracker[entity_id] if now - ts < 3600
+    ]
+    return len(recovery_tracker[entity_id]) < STUCK_IDLE_MAX_RECOVERIES
+
+
+def publish_mqtt_via_ha(topic, payload):
+    """Publish MQTT message via HA REST API (mqtt.publish service)."""
+    try:
+        call_service("mqtt", "publish", {"topic": topic, "payload": payload})
+        return True
+    except Exception as e:
+        log(f"Failed to publish MQTT via HA: {e}", "WARN")
+        return False
+
+
+def recover_stuck_idle_thermostat(entity_id):
+    """Two-phase recovery for a stuck-idle thermostat.
+
+    Phase 1: Reset open_window flag + re-poke setpoint (gentle)
+    Phase 2: Full off/heat cycle (aggressive, only if Phase 1 fails)
+
+    Returns: 'phase1' | 'phase2' | 'failed'
+    """
+    name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+    mqtt_topic = THERMOSTAT_MQTT_TOPICS.get(entity_id)
+
+    # Get current setpoint before any changes
+    try:
+        state = get_entity_state(entity_id)
+        attrs = state.get("attributes", {})
+        setpoint = max(float(attrs.get("temperature", 18)), STUCK_IDLE_SETPOINT_FLOOR)
+    except Exception:
+        setpoint = STUCK_IDLE_SETPOINT_FLOOR
+
+    # ─── Phase 1: Gentle (MQTT reset + re-poke setpoint) ───
+    log(f"  Phase 1 (gentle): Resetting open_window + re-poking setpoint for {name}", "INFO")
+    if mqtt_topic:
+        if not publish_mqtt_via_ha(mqtt_topic, json.dumps({"open_window": "OFF"})):
+            log(f"  WARNING: MQTT reset failed for {name}, Phase 1 may not work", "WARN")
+
+    try:
+        call_service(
+            "climate",
+            "set_temperature",
+            {"entity_id": entity_id, "temperature": setpoint},
+        )
+    except Exception as e:
+        log(f"  Phase 1 setpoint re-poke failed for {name}: {e}", "WARN")
+
+    # Wait for Phase 1 to take effect
+    log(f"  Waiting 60s for Phase 1 to take effect on {name}...", "INFO")
+    time.sleep(60)
+
+    # Re-check
+    try:
+        state = get_entity_state(entity_id)
+        attrs = state.get("attributes", {})
+        if attrs.get("hvac_action") != "idle":
+            recovery_tracker[entity_id].append(time.time())
+            log(f"  Phase 1 SUCCESS: {name} is now {attrs.get('hvac_action')}", "INFO")
+            return "phase1"
+    except Exception:
+        pass
+
+    # ─── Phase 2: Aggressive (off → heat → MQTT reset → setpoint) ───
+    log(f"  Phase 2 (aggressive): Off→heat cycle for {name}", "WARN")
+
+    try:
+        # Off
+        call_service(
+            "climate",
+            "set_hvac_mode",
+            {"entity_id": entity_id, "hvac_mode": "off"},
+        )
+        time.sleep(5)
+
+        # Heat
+        call_service(
+            "climate",
+            "set_hvac_mode",
+            {"entity_id": entity_id, "hvac_mode": "heat"},
+        )
+
+        # Reset open_window flag (TRVZB sets this when mode=off)
+        if mqtt_topic:
+            if not publish_mqtt_via_ha(mqtt_topic, json.dumps({"open_window": "OFF"})):
+                log(f"  WARNING: MQTT reset failed for {name} in Phase 2", "WARN")
+        time.sleep(5)
+
+        # Restore setpoint
+        call_service(
+            "climate",
+            "set_temperature",
+            {"entity_id": entity_id, "temperature": setpoint},
+        )
+
+        # Track recovery for rate limiting
+        recovery_tracker[entity_id].append(time.time())
+
+        log(f"  Phase 2 complete for {name} (setpoint={setpoint}°C)", "INFO")
+        return "phase2"
+
+    except Exception as e:
+        log(f"  Phase 2 FAILED for {name}: {e}", "ERROR")
+        return "failed"
+
+
+def check_stuck_idle():
+    """Check for and recover stuck-idle thermostats (Layer 2 backup).
+
+    Only runs when no guard flags are active and no windows are open.
+    Uses 45-min threshold (longer than HA's 60+15=75min to avoid conflict).
+    """
+    # Don't interfere with intentional shutoffs
+    if is_guard_flag_active():
+        return
+
+    stuck = get_stuck_idle_thermostats()
+    now = time.time()
+
+    # Update tracker: add newly stuck, remove recovered
+    current_stuck_ids = {s["entity_id"] for s in stuck}
+    for entity_id in list(stuck_idle_tracker.keys()):
+        if entity_id not in current_stuck_ids:
+            name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+            log(f"  Stuck-idle cleared: {name} (no longer stuck)", "INFO")
+            del stuck_idle_tracker[entity_id]
+
+    for s in stuck:
+        if s["entity_id"] not in stuck_idle_tracker:
+            stuck_idle_tracker[s["entity_id"]] = now
+            log(
+                f"  Stuck-idle detected: {s['name']} "
+                f"({s['current_temp']}°C / {s['setpoint']}°C target, "
+                f"deficit={s['deficit']:.1f}°C) — tracking started",
+                "WARN",
+            )
+
+    # Check which ones have exceeded threshold
+    for s in stuck:
+        entity_id = s["entity_id"]
+        first_seen = stuck_idle_tracker.get(entity_id, now)
+        duration = now - first_seen
+
+        if duration >= STUCK_IDLE_THRESHOLD:
+            name = s["name"]
+            log(
+                f"  Stuck-idle THRESHOLD reached: {name} "
+                f"({duration / 60:.0f}min, deficit={s['deficit']:.1f}°C)",
+                "WARN",
+            )
+
+            if not can_recover(entity_id):
+                log(
+                    f"  Rate limit hit for {name} "
+                    f"({STUCK_IDLE_MAX_RECOVERIES} recoveries/hour) — skipping",
+                    "WARN",
+                )
+                continue
+
+            # Attempt recovery
+            result = recover_stuck_idle_thermostat(entity_id)
+
+            if result in ("phase1", "phase2"):
+                # Clear tracker on successful recovery
+                stuck_idle_tracker.pop(entity_id, None)
+
+                # Notify
+                phase_desc = "MQTT reset" if result == "phase1" else "off/heat cycle"
+                send_notification(
+                    title=f"WATCHDOG: Stuck-Idle Recovery ({name})",
+                    message=(
+                        f"Recovered {name} via {phase_desc}.\n"
+                        f"Was: {s['current_temp']}°C (target {s['setpoint']}°C)\n"
+                        f"Stuck for {duration / 60:.0f} minutes."
+                    ),
+                    importance="high",
+                )
+            else:
+                log(f"  Recovery FAILED for {name} — will retry next cycle", "ERROR")
+
+
 def perform_safety_check():
     """
     Main safety check logic with HYBRID APPROACH:
@@ -468,7 +751,16 @@ def perform_safety_check():
         )
         return "VIOLATION"
     else:
-        log("Safety check: OK", "INFO")
+        log("Safety check: OK (no window+heating violation)", "INFO")
+
+        # ─── Stuck-Idle Check (Layer 2 backup) ───
+        # Only runs when no windows are open (window safety takes priority)
+        log("Checking for stuck-idle thermostats...")
+        try:
+            check_stuck_idle()
+        except Exception as e:
+            log(f"Error during stuck-idle check: {e}", "ERROR")
+
         return "OK"
 
 
@@ -513,6 +805,9 @@ def main():
     log(f"  Monitoring {len(DOOR_SENSORS)} door sensors ({DOOR_OPEN_DELAY}s delay)")
     log(f"  Monitoring {len(THERMOSTATS)} thermostats")
     log(f"  Worst-case response time for doors: {CHECK_INTERVAL + DOOR_OPEN_DELAY}s ({(CHECK_INTERVAL + DOOR_OPEN_DELAY) // 60}min)")
+    log(f"  Stuck-idle threshold: {STUCK_IDLE_THRESHOLD}s ({STUCK_IDLE_THRESHOLD // 60}min)")
+    log(f"  Stuck-idle deficit: {STUCK_IDLE_DEFICIT}°C")
+    log(f"  Stuck-idle max recoveries/hour: {STUCK_IDLE_MAX_RECOVERIES}")
     log("")
 
     # Validate configuration

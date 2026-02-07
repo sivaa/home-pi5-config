@@ -562,8 +562,68 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 
 ---
 
+## Stuck-Idle TRV Recovery (Feb 7, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  STUCK-IDLE RECOVERY — Defense-in-Depth                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  INCIDENT: Living Inner TRV stuck idle 10+ hours (valve motor seized)        │
+│  mode=heat, setpoint=19°C, temp=17.2°C, running_state=idle                  │
+│  Valve voltage dropped 1770→1145 mV after 10h in OFF mode                   │
+│                                                                              │
+│  DETECTION (per-TRV, avoids room masking):                                   │
+│    state=heat AND hvac_action=idle AND deficit≥2°C AND stuck>60min           │
+│                                                                              │
+│  TWO-PHASE RECOVERY:                                                         │
+│    Phase 1 (gentle): MQTT open_window OFF + re-poke setpoint                │
+│    Phase 2 (aggressive): off→heat→MQTT reset→setpoint (if Phase 1 fails)   │
+│                                                                              │
+│  RATE LIMIT: 3 attempts/hour per TRV (input_number + input_datetime)         │
+│  ESCALATION: CRITICAL alert after 3 failures → manual fix needed             │
+│  BATTERY: Skip auto-recovery if battery < 40% (alert only)                  │
+│                                                                              │
+│  Layer 1: HA Automation (15min poll, 60min threshold)                        │
+│  Layer 2: Heater Watchdog (5min poll, 45min threshold)                      │
+│  Layer 3: Zombie Recovery (OFF+7°C detection, now with last_changed>60min)  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Automations
+
+| Automation | ID | Trigger | Action |
+|------------|-----|---------|--------|
+| Stuck-Idle Recovery | `thermostat_stuck_idle_recovery` | time_pattern /15 + HA start | Two-phase recovery per TRV |
+| Stuck-Idle Max Attempts | `thermostat_stuck_idle_max_attempts` | time_pattern /15 | CRITICAL alert when 3 attempts fail |
+
+### Rate Limiting Helpers
+
+| Entity | Purpose |
+|--------|---------|
+| `input_number.{room}_idle_recovery_count` | Recovery attempts in current window (0-10) |
+| `input_datetime.{room}_idle_recovery_window_start` | When current 1-hour window started |
+
+Rooms: `study`, `living_inner`, `living_outer`, `bedroom`
+
+### Zombie Recovery Fix (Same Incident)
+
+**Bug**: `temp < 17` guard in zombie recovery was masked when another TRV heated the same room.
+**Fix**: Replaced with `last_changed > 60 min` — catches zombies regardless of room temperature.
+
+---
+
 ## History
 
+- **Feb 7, 2026**: Added stuck-idle TRV recovery + fixed zombie recovery masking
+  - Incident: Living Inner TRV stuck idle 10+ hours, valve motor seized
+  - Root cause: 10h in OFF mode → valve voltage degraded 1770→1145 mV
+  - New: `thermostat_stuck_idle_recovery` automation (two-phase recovery)
+  - New: `thermostat_stuck_idle_max_attempts` automation (escalation alert)
+  - New: 8 HA helpers for rate limiting (4 counters + 4 datetime windows)
+  - Fix: Zombie recovery `temp<17` → `last_changed>60min` (room masking bug)
+  - Extended: Heater watchdog with backup stuck-idle detection (45min threshold)
 - **Feb 6, 2026**: Added temperature-reached energy cap
   - Problem: Users set thermostats to 22°C and forget to lower them
   - Solution: When room temp reaches 21°C, auto-lower THAT room to 19°C (per-room, not all)

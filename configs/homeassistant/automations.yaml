@@ -4699,27 +4699,37 @@
       state: "off"
 
   variables:
-    # Detect zombie thermostats: OFF mode + setpoint ≤ 7°C + room temp < 17°C
+    # Detect zombie thermostats: OFF mode + setpoint ≤ 7°C + stuck > 60 min
+    # ┌─────────────────────────────────────────────────────────────────┐
+    # │  FIX (Feb 7, 2026): Replaced temp<17 with last_changed > 60min │
+    # │                                                                 │
+    # │  OLD: temp<17 guard → MASKED by other TRV heating same room    │
+    # │  Living Outer kept room at 18°C → Living Inner zombie missed!  │
+    # │                                                                 │
+    # │  NEW: last_changed > 60min → catches zombies regardless of     │
+    # │  room temperature. Protects against user-intentional OFF       │
+    # │  (recent last_changed = user did it on purpose).               │
+    # └─────────────────────────────────────────────────────────────────┘
     zombie_thermostats: >
       {% set zombies = [] %}
       {% if states('climate.study_thermostat') == 'off'
             and (state_attr('climate.study_thermostat', 'temperature') | float(20)) <= 7
-            and (state_attr('climate.study_thermostat', 'current_temperature') | float(20)) < 17 %}
+            and ((as_timestamp(now()) - as_timestamp(states.climate.study_thermostat.last_changed)) > 3600) %}
         {% set zombies = zombies + ['study'] %}
       {% endif %}
       {% if states('climate.living_thermostat_inner') == 'off'
             and (state_attr('climate.living_thermostat_inner', 'temperature') | float(20)) <= 7
-            and (state_attr('climate.living_thermostat_inner', 'current_temperature') | float(20)) < 17 %}
+            and ((as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_inner.last_changed)) > 3600) %}
         {% set zombies = zombies + ['living_inner'] %}
       {% endif %}
       {% if states('climate.living_thermostat_outer') == 'off'
             and (state_attr('climate.living_thermostat_outer', 'temperature') | float(20)) <= 7
-            and (state_attr('climate.living_thermostat_outer', 'current_temperature') | float(20)) < 17 %}
+            and ((as_timestamp(now()) - as_timestamp(states.climate.living_thermostat_outer.last_changed)) > 3600) %}
         {% set zombies = zombies + ['living_outer'] %}
       {% endif %}
       {% if states('climate.bed_thermostat') == 'off'
             and (state_attr('climate.bed_thermostat', 'temperature') | float(20)) <= 7
-            and (state_attr('climate.bed_thermostat', 'current_temperature') | float(20)) < 17 %}
+            and ((as_timestamp(now()) - as_timestamp(states.climate.bed_thermostat.last_changed)) > 3600) %}
         {% set zombies = zombies + ['bedroom'] %}
       {% endif %}
       {{ zombies }}
@@ -4827,6 +4837,461 @@
             entity_id: climate.bed_thermostat
           data:
             temperature: 18
+
+# =============================================================================
+# STUCK-IDLE RECOVERY (Feb 7, 2026)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 7, 2026 — Living Inner TRV stuck idle for 10+ hours        │
+# │                                                                             │
+# │  mode=heat, setpoint=19°C, temp=17.2°C, but running_state=idle             │
+# │  Valve motor seized after 10h in OFF mode (voltage 1770→1145 mV)           │
+# │  TRV accepted mode=heat but valve physically wouldn't open                 │
+# │                                                                             │
+# │  All 3 safety nets missed it:                                               │
+# │    1. Heater Watchdog: only checks window+heating violations               │
+# │    2. Zombie Recovery: temp<17 guard masked by Living Outer (18°C)         │
+# │    3. Window Resume: fired correctly but no follow-up check                │
+# │                                                                             │
+# │  DETECTION (per-TRV, avoids room masking):                                 │
+# │    state=heat AND hvac_action=idle AND deficit≥2°C AND stuck>60min         │
+# │                                                                             │
+# │  TWO-PHASE RECOVERY:                                                       │
+# │    Phase 1 (gentle): MQTT open_window OFF + re-poke setpoint               │
+# │    Phase 2 (aggressive): off→heat→MQTT reset→setpoint (if Phase 1 fails)  │
+# │                                                                             │
+# │  RATE LIMIT: 3 attempts/hour per TRV via input_number + input_datetime     │
+# └─────────────────────────────────────────────────────────────────────────────┘
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# STUCK-IDLE RECOVERY — Detect + auto-recover TRVs stuck in idle with temp deficit
+# -----------------------------------------------------------------------------
+- id: thermostat_stuck_idle_recovery
+  alias: "Thermostat Stuck-Idle Recovery"
+  description: >
+    Detects TRVs in heat mode with hvac_action=idle for >60min despite ≥2°C deficit.
+    Two-phase recovery: gentle MQTT reset first, then aggressive off/heat cycle.
+  mode: single
+
+  trigger:
+    # Poll every 15 minutes (primary detection)
+    - platform: time_pattern
+      minutes: "/15"
+    # Also check 5 minutes after HA startup (catch stuck state from before restart)
+    - platform: homeassistant
+      event: start
+
+  condition:
+    # Don't interfere with intentional shutoffs
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+
+  action:
+    # Delay 5 minutes on HA startup to let entities settle
+    - if:
+        - condition: template
+          value_template: "{{ trigger.platform == 'homeassistant' }}"
+      then:
+        - delay:
+            minutes: 5
+
+    # ─── Build list of stuck-idle thermostats ───
+    # Per-TRV detection avoids room masking (Living Inner masked by Living Outer)
+    - variables:
+        stuck_thermostats: >
+          {% set stuck = [] %}
+          {% set now_ts = as_timestamp(now()) %}
+
+          {# === Study === #}
+          {% set e = 'climate.study_thermostat' %}
+          {% set window_start_ts = as_timestamp(states('input_datetime.study_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.study_idle_recovery_count') | int(0) %}
+          {% set count = 0 if (now_ts - window_start_ts) > 3600 else count %}
+          {% if states(e) == 'heat'
+                and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0
+                and (now_ts - as_timestamp(states[e].last_changed)) > 3600
+                and count < 3 %}
+            {% set stuck = stuck + [{'name': 'study', 'entity': e,
+                                      'setpoint': state_attr(e, 'temperature') | float(19),
+                                      'current': state_attr(e, 'current_temperature') | float(0),
+                                      'battery': states('sensor.study_thermostat_battery') | int(100),
+                                      'mqtt_topic': 'zigbee2mqtt/[Study] Thermostat/set',
+                                      'count_entity': 'input_number.study_idle_recovery_count',
+                                      'window_entity': 'input_datetime.study_idle_recovery_window_start'}] %}
+          {% endif %}
+
+          {# === Living Inner === #}
+          {% set e = 'climate.living_thermostat_inner' %}
+          {% set window_start_ts = as_timestamp(states('input_datetime.living_inner_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.living_inner_idle_recovery_count') | int(0) %}
+          {% set count = 0 if (now_ts - window_start_ts) > 3600 else count %}
+          {% if states(e) == 'heat'
+                and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0
+                and (now_ts - as_timestamp(states[e].last_changed)) > 3600
+                and count < 3 %}
+            {% set stuck = stuck + [{'name': 'living_inner', 'entity': e,
+                                      'setpoint': state_attr(e, 'temperature') | float(19),
+                                      'current': state_attr(e, 'current_temperature') | float(0),
+                                      'battery': states('sensor.living_thermostat_inner_battery') | int(100),
+                                      'mqtt_topic': 'zigbee2mqtt/[Living] Thermostat Inner/set',
+                                      'count_entity': 'input_number.living_inner_idle_recovery_count',
+                                      'window_entity': 'input_datetime.living_inner_idle_recovery_window_start'}] %}
+          {% endif %}
+
+          {# === Living Outer === #}
+          {% set e = 'climate.living_thermostat_outer' %}
+          {% set window_start_ts = as_timestamp(states('input_datetime.living_outer_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.living_outer_idle_recovery_count') | int(0) %}
+          {% set count = 0 if (now_ts - window_start_ts) > 3600 else count %}
+          {% if states(e) == 'heat'
+                and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0
+                and (now_ts - as_timestamp(states[e].last_changed)) > 3600
+                and count < 3 %}
+            {% set stuck = stuck + [{'name': 'living_outer', 'entity': e,
+                                      'setpoint': state_attr(e, 'temperature') | float(19),
+                                      'current': state_attr(e, 'current_temperature') | float(0),
+                                      'battery': states('sensor.living_thermostat_outer_battery') | int(100),
+                                      'mqtt_topic': 'zigbee2mqtt/[Living] Thermostat Outer/set',
+                                      'count_entity': 'input_number.living_outer_idle_recovery_count',
+                                      'window_entity': 'input_datetime.living_outer_idle_recovery_window_start'}] %}
+          {% endif %}
+
+          {# === Bedroom === #}
+          {% set e = 'climate.bed_thermostat' %}
+          {% set window_start_ts = as_timestamp(states('input_datetime.bedroom_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.bedroom_idle_recovery_count') | int(0) %}
+          {% set count = 0 if (now_ts - window_start_ts) > 3600 else count %}
+          {% if states(e) == 'heat'
+                and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0
+                and (now_ts - as_timestamp(states[e].last_changed)) > 3600
+                and count < 3 %}
+            {% set stuck = stuck + [{'name': 'bedroom', 'entity': e,
+                                      'setpoint': state_attr(e, 'temperature') | float(19),
+                                      'current': state_attr(e, 'current_temperature') | float(0),
+                                      'battery': states('sensor.bed_thermostat_battery') | int(100),
+                                      'mqtt_topic': 'zigbee2mqtt/[Bed] Thermostat/set',
+                                      'count_entity': 'input_number.bedroom_idle_recovery_count',
+                                      'window_entity': 'input_datetime.bedroom_idle_recovery_window_start'}] %}
+          {% endif %}
+
+          {{ stuck }}
+
+    # Only proceed if we found stuck thermostats
+    - condition: template
+      value_template: "{{ stuck_thermostats | length > 0 }}"
+
+    # Log to InfluxDB
+    - service: influxdb.write
+      data:
+        measurement: thermostat_events
+        tags:
+          event_type: stuck_idle_detected
+        fields:
+          thermostats: "{{ stuck_thermostats | map(attribute='name') | join(',') }}"
+          count: "{{ stuck_thermostats | length }}"
+
+    # ─── Phase 1: Gentle recovery (MQTT reset + re-poke setpoint) ───
+    # Fixes the common case: open_window flag stuck from previous off cycle
+    - repeat:
+        for_each: "{{ stuck_thermostats }}"
+        sequence:
+          # Skip low-battery TRVs (alert only, no auto-recovery)
+          - if:
+              - condition: template
+                value_template: "{{ repeat.item.battery < 40 }}"
+            then:
+              - service: notify.all_phones
+                data:
+                  title: "🔋 TRV Low Battery — Skipping Recovery"
+                  message: >
+                    {{ repeat.item.name | replace('_', ' ') | title }} stuck idle
+                    ({{ repeat.item.current }}°C / {{ repeat.item.setpoint }}°C target)
+                    but battery at {{ repeat.item.battery }}%. Manual fix needed.
+                  data:
+                    channel: "Warning"
+                    importance: high
+                    tag: "stuck_idle_battery_{{ repeat.item.name }}"
+            else:
+              # Phase 1: Reset open_window flag via MQTT (retain=true in case TRV is offline)
+              - service: mqtt.publish
+                data:
+                  topic: "{{ repeat.item.mqtt_topic }}"
+                  payload: '{"open_window": "OFF"}'
+                  retain: true
+              # Re-poke setpoint to wake up TRV controller
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ repeat.item.entity }}"
+                data:
+                  temperature: "{{ repeat.item.setpoint }}"
+              - delay:
+                  seconds: 3
+
+    # Wait for Phase 1 to take effect
+    - delay:
+        seconds: 60
+
+    # ─── Re-check: which TRVs are still stuck after Phase 1? ───
+    - variables:
+        still_stuck: >
+          {% set stuck = [] %}
+          {% for trv in stuck_thermostats %}
+            {% if trv.battery >= 40
+                  and states(trv.entity) == 'heat'
+                  and state_attr(trv.entity, 'hvac_action') == 'idle'
+                  and (state_attr(trv.entity, 'temperature') | float(20)) - (state_attr(trv.entity, 'current_temperature') | float(20)) >= 2.0 %}
+              {% set stuck = stuck + [trv] %}
+            {% endif %}
+          {% endfor %}
+          {{ stuck }}
+
+    # ─── Phase 2: Aggressive recovery (off→heat cycle) for still-stuck TRVs ───
+    - if:
+        - condition: template
+          value_template: "{{ still_stuck | length > 0 }}"
+      then:
+        - repeat:
+            for_each: "{{ still_stuck }}"
+            sequence:
+              # Save setpoint with floor guard (race condition protection)
+              - variables:
+                  safe_setpoint: "{{ [repeat.item.setpoint, 18] | max }}"
+
+              # Off → 5s → Heat → MQTT reset → 5s → Setpoint
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: "{{ repeat.item.entity }}"
+                data:
+                  hvac_mode: "off"
+              - delay:
+                  seconds: 5
+              - service: climate.set_hvac_mode
+                target:
+                  entity_id: "{{ repeat.item.entity }}"
+                data:
+                  hvac_mode: "heat"
+              - service: mqtt.publish
+                data:
+                  topic: "{{ repeat.item.mqtt_topic }}"
+                  payload: '{"open_window": "OFF"}'
+                  retain: true
+              - delay:
+                  seconds: 5
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ repeat.item.entity }}"
+                data:
+                  temperature: "{{ safe_setpoint }}"
+
+              # Update rate limit counter
+              # IMPORTANT: Reset window FIRST, then set count, then increment
+              # (prevents race where expired window allows >3 attempts)
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: "{{ repeat.item.window_entity }}"
+                data:
+                  datetime: >
+                    {% set window_ts = as_timestamp(states(repeat.item.window_entity)) | default(0) %}
+                    {% if (as_timestamp(now()) - window_ts) > 3600 %}
+                      {{ now().strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% else %}
+                      {{ states(repeat.item.window_entity) }}
+                    {% endif %}
+              - service: input_number.set_value
+                target:
+                  entity_id: "{{ repeat.item.count_entity }}"
+                data:
+                  value: >
+                    {% set window_ts = as_timestamp(states(repeat.item.window_entity)) | default(0) %}
+                    {% set count = states(repeat.item.count_entity) | int(0) %}
+                    {% if (as_timestamp(now()) - window_ts) > 3600 %}0{% else %}{{ count }}{% endif %}
+              - service: input_number.increment
+                target:
+                  entity_id: "{{ repeat.item.count_entity }}"
+
+              - delay:
+                  seconds: 3
+
+        # Notify about Phase 2 recovery
+        - service: notify.all_phones
+          data:
+            title: "🔧 TRV Stuck-Idle Recovery (Phase 2)"
+            message: >
+              Auto-recovering: {{ still_stuck | map(attribute='name') | join(', ') | replace('_', ' ') | title }}.
+              Off→heat cycle performed. Check if heating resumes.
+            data:
+              channel: "Warning"
+              importance: high
+              tag: "stuck_idle_recovery"
+
+        # TTS (respect quiet hours)
+        - if:
+            - condition: template
+              value_template: "{{ now().hour >= 7 and now().hour < 23 }}"
+          then:
+            - service: script.smart_tts_announce
+              data:
+                message: >
+                  Recovering stuck thermostat.
+                  {{ still_stuck | map(attribute='name') | join(' and ') | replace('_', ' ') }}.
+                title: "🔧 Stuck-Idle Recovery"
+
+        # Email alert
+        - service: script.send_alert_email
+          data:
+            severity: "WARNING"
+            title: "TRV Stuck-Idle Recovery"
+            subtitle: "{{ still_stuck | map(attribute='name') | join(', ') | replace('_', ' ') | title }}"
+            description: >
+              Phase 2 recovery (off→heat cycle) performed for stuck TRV(s).
+              Detection: mode=heat, action=idle, deficit ≥ 2°C for > 60 minutes.
+            actions: "Check HA dashboard for heating status|Verify TRV valve is opening|Check battery level"
+            details: >
+              {% for trv in still_stuck %}
+              {{ trv.name | replace('_', ' ') | title }}: {{ trv.current }}°C / {{ trv.setpoint }}°C target, battery {{ trv.battery }}%
+              {% endfor %}
+
+        # Log to InfluxDB
+        - service: influxdb.write
+          data:
+            measurement: thermostat_events
+            tags:
+              event_type: stuck_idle_phase2_recovery
+            fields:
+              thermostats: "{{ still_stuck | map(attribute='name') | join(',') }}"
+              count: "{{ still_stuck | length }}"
+
+      else:
+        # Phase 1 was enough — log success quietly
+        - service: influxdb.write
+          data:
+            measurement: thermostat_events
+            tags:
+              event_type: stuck_idle_phase1_success
+            fields:
+              thermostats: "{{ stuck_thermostats | map(attribute='name') | join(',') }}"
+
+# -----------------------------------------------------------------------------
+# STUCK-IDLE MAX ATTEMPTS — Escalation alert when recovery fails
+# -----------------------------------------------------------------------------
+- id: thermostat_stuck_idle_max_attempts
+  alias: "Thermostat Stuck-Idle Max Attempts Alert"
+  description: >
+    CRITICAL alert when a TRV has had 3+ recovery attempts in 1 hour and is still stuck.
+    Manual intervention required — likely hardware issue (valve motor, battery).
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      minutes: "/15"
+
+  condition:
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+
+  action:
+    - variables:
+        maxed_out: >
+          {% set maxed = [] %}
+          {% set now_ts = as_timestamp(now()) %}
+
+          {% set e = 'climate.study_thermostat' %}
+          {% set window_ts = as_timestamp(states('input_datetime.study_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.study_idle_recovery_count') | int(0) %}
+          {% if count >= 3 and (now_ts - window_ts) <= 3600
+                and states(e) == 'heat' and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0 %}
+            {% set maxed = maxed + [{'name': 'Study', 'current': state_attr(e, 'current_temperature') | float(0),
+                                      'setpoint': state_attr(e, 'temperature') | float(0),
+                                      'battery': states('sensor.study_thermostat_battery') | int(0)}] %}
+          {% endif %}
+
+          {% set e = 'climate.living_thermostat_inner' %}
+          {% set window_ts = as_timestamp(states('input_datetime.living_inner_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.living_inner_idle_recovery_count') | int(0) %}
+          {% if count >= 3 and (now_ts - window_ts) <= 3600
+                and states(e) == 'heat' and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0 %}
+            {% set maxed = maxed + [{'name': 'Living Inner', 'current': state_attr(e, 'current_temperature') | float(0),
+                                      'setpoint': state_attr(e, 'temperature') | float(0),
+                                      'battery': states('sensor.living_thermostat_inner_battery') | int(0)}] %}
+          {% endif %}
+
+          {% set e = 'climate.living_thermostat_outer' %}
+          {% set window_ts = as_timestamp(states('input_datetime.living_outer_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.living_outer_idle_recovery_count') | int(0) %}
+          {% if count >= 3 and (now_ts - window_ts) <= 3600
+                and states(e) == 'heat' and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0 %}
+            {% set maxed = maxed + [{'name': 'Living Outer', 'current': state_attr(e, 'current_temperature') | float(0),
+                                      'setpoint': state_attr(e, 'temperature') | float(0),
+                                      'battery': states('sensor.living_thermostat_outer_battery') | int(0)}] %}
+          {% endif %}
+
+          {% set e = 'climate.bed_thermostat' %}
+          {% set window_ts = as_timestamp(states('input_datetime.bedroom_idle_recovery_window_start')) | default(0) %}
+          {% set count = states('input_number.bedroom_idle_recovery_count') | int(0) %}
+          {% if count >= 3 and (now_ts - window_ts) <= 3600
+                and states(e) == 'heat' and state_attr(e, 'hvac_action') == 'idle'
+                and (state_attr(e, 'temperature') | float(20)) - (state_attr(e, 'current_temperature') | float(20)) >= 2.0 %}
+            {% set maxed = maxed + [{'name': 'Bedroom', 'current': state_attr(e, 'current_temperature') | float(0),
+                                      'setpoint': state_attr(e, 'temperature') | float(0),
+                                      'battery': states('sensor.bed_thermostat_battery') | int(0)}] %}
+          {% endif %}
+
+          {{ maxed }}
+
+    - condition: template
+      value_template: "{{ maxed_out | length > 0 }}"
+
+    - service: notify.all_phones
+      data:
+        title: "🚨 CRITICAL: TRV Recovery Failed"
+        message: >
+          {{ maxed_out | length }} thermostat(s) still stuck after 3 recovery attempts!
+          {% for trv in maxed_out %}
+          {{ trv.name }}: {{ trv.current }}°C (target {{ trv.setpoint }}°C), battery {{ trv.battery }}%
+          {% endfor %}
+          Manual fix needed: check battery and valve motor.
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "stuck_idle_critical"
+
+    - service: script.send_alert_email
+      data:
+        severity: "CRITICAL"
+        title: "TRV Recovery Failed — Manual Fix Required"
+        subtitle: "{{ maxed_out | map(attribute='name') | join(', ') }}"
+        description: >
+          3 auto-recovery attempts failed in the last hour. The TRV valve motor may be
+          seized or the battery too low to drive the motor. Physical intervention required.
+        actions: "Remove TRV and manually open valve|Replace battery|Reset TRV via Z2M re-pair"
+        details: >
+          {% for trv in maxed_out %}
+          {{ trv.name }}: {{ trv.current }}°C / {{ trv.setpoint }}°C, battery {{ trv.battery }}%
+          {% endfor %}
+
+    - service: influxdb.write
+      data:
+        measurement: thermostat_events
+        tags:
+          event_type: stuck_idle_max_attempts
+        fields:
+          thermostats: "{{ maxed_out | map(attribute='name') | join(',') }}"
 
 # =============================================================================
 # PRESENCE-BASED LIGHTING (AUTO-OFF)

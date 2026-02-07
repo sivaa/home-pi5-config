@@ -122,10 +122,43 @@ docker logs heater-watchdog --tail 100
 |  +- watchdog_recovery_resume_check (1min periodic safety)  |
 |                                                             |
 |  Layer 2: Heater Watchdog (Poll-Based, 5min intervals)      |
-|  +- This service - catches anything Layer 1 might miss     |
+|  +- Window safety check - catches anything L1 might miss   |
+|  +- Stuck-idle detection (45min threshold, 2-phase recovery)|
 |  +- Sets guard flag with retry (3 attempts) for resume     |
 +------------------------------------------------------------+
 ```
+
+## Stuck-Idle Detection (Feb 7, 2026)
+
+**Layer 2 backup** for HA automation `thermostat_stuck_idle_recovery`.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  DETECTION: mode=heat + action=idle + deficit ≥ 2°C            │
+│  THRESHOLD: 45 minutes (longer than HA's 60+15=75min)          │
+│  RATE LIMIT: 2 recoveries/thermostat/hour (in-memory)          │
+│                                                                 │
+│  TWO-PHASE RECOVERY (same as HA automation):                   │
+│    Phase 1 (gentle): MQTT open_window OFF + re-poke setpoint   │
+│    Phase 2 (aggressive): off → heat → MQTT reset → setpoint    │
+│                                                                 │
+│  GUARDS:                                                       │
+│    - Only when no windows are open (window safety priority)    │
+│    - Only when no guard flags active (window/CO2 shutoff)      │
+│    - Setpoint floor: max(current_setpoint, 18°C)               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key functions:**
+- `get_stuck_idle_thermostats()` — queries HA API for stuck TRVs
+- `recover_stuck_idle_thermostat()` — two-phase recovery via HA REST API
+- `check_stuck_idle()` — orchestrator called from `perform_safety_check()`
+
+**When this fires vs HA automation:**
+- HA automation: every 15min, 60min stuck threshold → catches most cases
+- Watchdog: every 5min poll, 45min stuck tracking → fires only if HA missed it
+- The 45min watchdog threshold + 5min polling means watchdog fires ~50min in practice,
+  which is earlier than HA's effective 75min (60min stuck + 15min poll alignment)
 
 ## Auto-Resume Flow
 

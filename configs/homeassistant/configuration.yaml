@@ -629,6 +629,33 @@ input_datetime:
     has_time: true
     icon: mdi:window-open
 
+  # =========================================================================
+  # STUCK-IDLE RECOVERY — Rate Limiting Windows
+  # Purpose: Track when the sliding 1-hour recovery window started per TRV
+  # Used by: thermostat_stuck_idle_recovery automation
+  # Sentinel "1970-01-01 00:00:00" = no active window (same pattern as CO2)
+  # =========================================================================
+  study_idle_recovery_window_start:
+    name: "Study Idle Recovery Window Start"
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  living_inner_idle_recovery_window_start:
+    name: "Living Inner Idle Recovery Window Start"
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  living_outer_idle_recovery_window_start:
+    name: "Living Outer Idle Recovery Window Start"
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  bedroom_idle_recovery_window_start:
+    name: "Bedroom Idle Recovery Window Start"
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
 # Purpose: Save thermostat setpoints before window-triggered shutoff
@@ -735,6 +762,36 @@ input_number:
     unit_of_measurement: "°C"
     mode: box
     icon: mdi:fire-alert
+  # =========================================================================
+  # STUCK-IDLE RECOVERY — Attempt Counters
+  # Purpose: Count recovery attempts per TRV in sliding 1-hour window
+  # Used by: thermostat_stuck_idle_recovery + thermostat_stuck_idle_max_attempts
+  # Reset to 0 when window expires (>1 hour since window_start)
+  # =========================================================================
+  study_idle_recovery_count:
+    name: Study Idle Recovery Count
+    min: 0
+    max: 10
+    step: 1
+    icon: mdi:counter
+  living_inner_idle_recovery_count:
+    name: Living Inner Idle Recovery Count
+    min: 0
+    max: 10
+    step: 1
+    icon: mdi:counter
+  living_outer_idle_recovery_count:
+    name: Living Outer Idle Recovery Count
+    min: 0
+    max: 10
+    step: 1
+    icon: mdi:counter
+  bedroom_idle_recovery_count:
+    name: Bedroom Idle Recovery Count
+    min: 0
+    max: 10
+    step: 1
+    icon: mdi:counter
 
 # =============================================================================
 # HOT WATER USAGE TRACKING
