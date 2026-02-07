@@ -6,12 +6,13 @@
       height: 100%;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .classic-grid {
       display: grid;
-      grid-template-columns: 2fr 1.3fr 2.5fr 1.3fr;
-      grid-template-rows: 1fr 1fr 1fr;
+      grid-template-columns: 2fr 1.6fr 2.5fr 1.1fr;
+      grid-template-rows: 0.85fr 0.85fr 1.3fr;
       grid-template-areas:
         "bathroom hallway study   avg"
         "kitchen  hallway study   avg"
@@ -229,6 +230,121 @@
       min-height: 0;
     }
 
+    /* ========================================
+       CO2-HERO CARD
+       For rooms with only CO2 sensor (no temp)
+       ┌──────────────────┐
+       │ 🚶 Hallway       │
+       │ ────────────────  │
+       │       💨          │
+       │      652          │  ← 48px hero
+       │      ppm          │
+       │    ● Good         │  ← quality badge
+       │ 🔋 95%    Details │
+       └──────────────────┘
+       ======================================== */
+
+    .co2-hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .co2-hero-content .classic-header-v2 {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .co2-hero-display {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: var(--space-sm) 0;
+    }
+
+    .co2-hero-icon {
+      font-size: 28px;
+      margin-bottom: var(--space-xs);
+      opacity: 0.7;
+    }
+
+    .co2-hero-value {
+      font-size: 48px;
+      font-weight: var(--font-weight-bold);
+      line-height: 1;
+      transition: color 0.3s ease;
+    }
+
+    .co2-hero-unit {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    .co2-quality-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      margin-bottom: var(--space-sm);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .co2-badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: currentColor;
+    }
+
+    .co2-hero-content .card-footer-v2 {
+      width: 100%;
+    }
+
+    /* Standard card content wrapper (preserves flex layout) */
+    .standard-card-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* CO2 comfort strip colors (by air quality level)
+       Note: .good overlaps with temperature comfort strip (both green),
+       but CO2 hero uses x-if branching so they never render on same card */
+    .classic-comfort-strip.excellent { background: var(--color-co2-excellent); }
+    .co2-hero-content .classic-comfort-strip.good { background: var(--color-co2-good); }
+    .classic-comfort-strip.moderate  { background: var(--color-co2-moderate); }
+    .classic-comfort-strip.poor      { background: var(--color-co2-poor); }
+    .classic-comfort-strip.bad       { background: var(--color-co2-bad); }
+    .classic-comfort-strip.unknown   { background: var(--color-text-tertiary); }
+
+    /* Hero value color by CO2 quality */
+    .co2-hero-value.excellent { color: var(--color-co2-excellent); }
+    .co2-hero-value.good      { color: var(--color-co2-good); }
+    .co2-hero-value.moderate  { color: var(--color-co2-moderate); }
+    .co2-hero-value.poor      { color: var(--color-co2-poor); }
+    .co2-hero-value.bad       { color: var(--color-co2-bad); }
+
+    /* Quality badge colors */
+    .co2-quality-badge.excellent { background: rgba(52, 199, 89, 0.12); color: var(--color-co2-excellent); }
+    .co2-quality-badge.good      { background: rgba(48, 209, 88, 0.12); color: var(--color-co2-good); }
+    .co2-quality-badge.moderate  { background: rgba(255, 214, 10, 0.12); color: var(--color-co2-moderate); }
+    .co2-quality-badge.poor      { background: rgba(255, 149, 0, 0.12); color: var(--color-co2-poor); }
+    .co2-quality-badge.bad       { background: rgba(255, 59, 48, 0.12); color: var(--color-co2-bad); }
+    .co2-quality-badge.unknown   { background: rgba(174, 174, 178, 0.12); color: var(--color-text-tertiary); }
+
     /* Comfort Strip */
     .classic-comfort-strip {
       position: absolute;
@@ -312,8 +428,14 @@
 
     /* Sensor List */
     .sensor-list {
-      flex: 0 0 auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
       margin-bottom: 2px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .sensor-row {
@@ -410,7 +532,7 @@
       justify-content: space-between;
       align-items: center;
       padding-top: 2px;
-      margin-top: 2px;
+      margin-top: auto;
       border-top: 1px solid var(--color-border);
       font-size: var(--font-size-xs);
       color: var(--color-text-tertiary);
@@ -458,6 +580,14 @@
         padding: var(--space-sm);
       }
 
+      .co2-hero-value {
+        font-size: 36px;
+      }
+
+      .co2-hero-icon {
+        font-size: 22px;
+      }
+
       .avg-temp-display {
         font-size: 28px;
       }
@@ -488,6 +618,14 @@
     }
 
     @media (max-width: 480px) {
+      .co2-hero-value {
+        font-size: 32px;
+      }
+
+      .co2-hero-display {
+        padding: var(--space-xs) 0;
+      }
+
       .classic-grid {
         grid-template-columns: 1fr;
         grid-template-rows: auto;
@@ -547,3 +685,10 @@
     [data-theme="dark"] .battery-status.low {
       color: var(--color-warning);
     }
+
+    /* CO2-hero dark mode: slightly brighter badge backgrounds */
+    [data-theme="dark"] .co2-quality-badge.excellent { background: rgba(52, 199, 89, 0.18); }
+    [data-theme="dark"] .co2-quality-badge.good      { background: rgba(48, 209, 88, 0.18); }
+    [data-theme="dark"] .co2-quality-badge.moderate  { background: rgba(255, 214, 10, 0.18); }
+    [data-theme="dark"] .co2-quality-badge.poor      { background: rgba(255, 149, 0, 0.18); }
+    [data-theme="dark"] .co2-quality-badge.bad       { background: rgba(255, 59, 48, 0.18); }

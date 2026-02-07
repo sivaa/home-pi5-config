@@ -27,11 +27,11 @@
 
   <!-- Modularized CSS -->
   <link rel="stylesheet" href="styles/base.css">
-  <link rel="stylesheet" href="styles/layout.css?v=4">
+  <link rel="stylesheet" href="styles/layout.css?v=5">
   <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
-  <link rel="stylesheet" href="styles/views/classic.css?v=4">
+  <link rel="stylesheet" href="styles/views/classic.css?v=10">
   <link rel="stylesheet" href="styles/views/lights.css">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
@@ -458,82 +458,126 @@
         </div>
 
         <!-- Vision 6: Classic Cards View - Multi-Sensor -->
-        <div x-show="currentView === 'classic'" x-cloak x-data="classicView()" style="height: 100%;">
+        <div x-show="currentView === 'classic'" x-cloak x-data="classicView()" style="height: 100%; min-height: 0;">
           <div class="classic-view">
             <!-- Room Grid -->
             <div class="classic-grid">
               <template x-for="room in rooms" :key="room.id">
                 <div class="classic-card-v2"
                      :class="{
-                       'has-co2': room.sensors && room.sensors.some(s => s.type === 'co2')
+                       'has-co2': room.sensors && room.sensors.some(s => s.type === 'co2'),
+                       'co2-hero': isCo2HeroRoom(room)
                      }"
                      :style="{ gridArea: room.id }">
 
-                  <!-- Comfort indicator strip -->
-                  <div class="classic-comfort-strip" :class="{
-                    'cold': (room.avgTemperature || room.temperature) < 20,
-                    'cool': (room.avgTemperature || room.temperature) >= 20 && (room.avgTemperature || room.temperature) < 23,
-                    'good': (room.avgTemperature || room.temperature) >= 23 && (room.avgTemperature || room.temperature) <= 26,
-                    'warm': (room.avgTemperature || room.temperature) > 26 && (room.avgTemperature || room.temperature) <= 28,
-                    'hot': (room.avgTemperature || room.temperature) > 28
-                  }"></div>
+                  <!-- ═══════════════════════════════════
+                       CO2-HERO LAYOUT
+                       Rooms with only CO2 sensor (no temp)
+                       Large centered CO2 value + quality badge
+                       ═══════════════════════════════════ -->
+                  <template x-if="isCo2HeroRoom(room)">
+                    <div class="co2-hero-content">
+                      <div class="classic-comfort-strip" :class="getCo2QualityLevel(getRoomCo2(room))"></div>
 
-                  <!-- Card Header with inline averages -->
-                  <div class="classic-header-v2">
-                    <div class="room-title">
-                      <span class="room-icon" x-text="room.icon"></span>
-                      <span class="room-name" x-text="room.name"></span>
-                    </div>
-                    <div class="header-readings">
-                      <span class="header-temp" x-text="(room.avgTemperature ?? room.temperature) != null ? (room.avgTemperature ?? room.temperature).toFixed(1) + '°' : '--'"></span>
-                      <span class="header-humid">💧<span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '')"></span></span>
-                    </div>
-                  </div>
-
-                  <!-- Sensor List - show if multiple sensors OR has CO2 -->
-                  <div class="sensor-list" x-show="room.sensors && (room.sensors.filter(s => s.type !== 'illuminance').length > 1 || room.sensors.some(s => s.type === 'co2'))">
-                    <template x-for="sensor in (room.sensors || []).filter(s => s.type !== 'illuminance')" :key="sensor.name + '-' + sensor.type">
-                      <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null }">
-                        <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : (sensor.type === 'illuminance' ? '☀️' : ''))"></span>
-                        <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
-                        <template x-if="sensor.type === 'climate' || !sensor.type">
-                          <div class="sensor-values">
-                            <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
-                            <span class="sensor-humid" x-show="sensor.humidity != null">💧<span x-text="sensor.humidity ? sensor.humidity.toFixed(0) + '%' : ''"></span></span>
-                          </div>
-                        </template>
-                        <template x-if="sensor.type === 'thermostat'">
-                          <div class="sensor-values">
-                            <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
-                          </div>
-                        </template>
-                        <template x-if="sensor.type === 'co2'">
-                          <div class="sensor-values">
-                            <span class="sensor-co2" x-text="sensor.co2 != null ? sensor.co2 + ' ppm' : '-- ppm'"></span>
-                          </div>
-                        </template>
-                        <template x-if="sensor.type === 'illuminance'">
-                          <div class="sensor-values">
-                            <span class="sensor-lux" x-text="sensor.illuminance != null ? sensor.illuminance + ' lx' : '-- lx'"></span>
-                          </div>
-                        </template>
-                        <span class="sensor-status" :class="{ 'fresh': sensor.lastSeen && (Date.now() - sensor.lastSeen <= 300000) && (sensor.temperature != null || sensor.co2 != null || sensor.illuminance != null), 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000) || (sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null) }"></span>
+                      <div class="classic-header-v2">
+                        <div class="room-title">
+                          <span class="room-icon" x-text="room.icon"></span>
+                          <span class="room-name" x-text="room.name"></span>
+                        </div>
                       </div>
-                    </template>
-                  </div>
 
-                  <!-- Sparkline - only show when data exists -->
-                  <div class="classic-sparkline" x-show="room.tempHistory && room.tempHistory.length > 1">
-                    <svg :id="'classic-spark-' + room.id" class="sparkline-svg" preserveAspectRatio="none"></svg>
-                  </div>
+                      <div class="co2-hero-display">
+                        <div class="co2-hero-icon">💨</div>
+                        <div class="co2-hero-value" :class="getCo2QualityLevel(getRoomCo2(room))"
+                             x-text="getRoomCo2(room) ?? '--'"></div>
+                        <div class="co2-hero-unit">ppm</div>
+                      </div>
 
-                  <!-- Card Footer -->
-                  <div class="card-footer-v2">
-                    <span class="temp-spread" x-show="room.tempSpread && room.tempSpread >= 0.1">
-                      Spread: <span x-text="room.tempSpread ? '±' + (room.tempSpread / 2).toFixed(1) + '°' : ''"></span>
-                    </span>
-                    <button class="detail-btn" @click.stop="$store.roomDetail.open(room)">Details</button>
-                  </div>
+                      <div class="co2-quality-badge" :class="getCo2QualityLevel(getRoomCo2(room))">
+                        <span class="co2-badge-dot"></span>
+                        <span x-text="getCo2QualityLabel(getRoomCo2(room))"></span>
+                      </div>
+
+                      <div class="card-footer-v2">
+                        <span class="battery-status"
+                              x-show="getRoomCo2Battery(room) != null"
+                              :class="{ 'low': getRoomCo2Battery(room) < 20 }">
+                          <span x-text="getRoomCo2Battery(room) < 20 ? '🪫' : '🔋'"></span>
+                          <span x-text="getRoomCo2Battery(room) + '%'"></span>
+                        </span>
+                        <button class="detail-btn" @click.stop="$store.roomDetail.open(room)">Details</button>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- ═══════════════════════════════════
+                       STANDARD LAYOUT
+                       Rooms with temperature sensors
+                       ═══════════════════════════════════ -->
+                  <template x-if="!isCo2HeroRoom(room)">
+                    <div class="standard-card-content">
+                      <div class="classic-comfort-strip" :class="{
+                        'cold': (room.avgTemperature || room.temperature) < 20,
+                        'cool': (room.avgTemperature || room.temperature) >= 20 && (room.avgTemperature || room.temperature) < 23,
+                        'good': (room.avgTemperature || room.temperature) >= 23 && (room.avgTemperature || room.temperature) <= 26,
+                        'warm': (room.avgTemperature || room.temperature) > 26 && (room.avgTemperature || room.temperature) <= 28,
+                        'hot': (room.avgTemperature || room.temperature) > 28
+                      }"></div>
+
+                      <div class="classic-header-v2">
+                        <div class="room-title">
+                          <span class="room-icon" x-text="room.icon"></span>
+                          <span class="room-name" x-text="room.name"></span>
+                        </div>
+                        <div class="header-readings">
+                          <span class="header-temp" x-text="(room.avgTemperature ?? room.temperature) != null ? (room.avgTemperature ?? room.temperature).toFixed(1) + '°' : '--'"></span>
+                          <span class="header-humid">💧<span x-text="room.avgHumidity != null ? room.avgHumidity.toFixed(0) + '%' : (room.humidity != null ? room.humidity.toFixed(0) + '%' : '')"></span></span>
+                        </div>
+                      </div>
+
+                      <div class="sensor-list" x-show="room.sensors && (room.sensors.filter(s => s.type !== 'illuminance').length > 1 || room.sensors.some(s => s.type === 'co2'))">
+                        <template x-for="sensor in (room.sensors || []).filter(s => s.type !== 'illuminance')" :key="sensor.name + '-' + sensor.type">
+                          <div class="sensor-row" :class="{ 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000), 'no-data': sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null }">
+                            <span class="sensor-icon" x-text="sensor.type === 'motion' ? '👁' : (sensor.type === 'contact' ? '◯' : (sensor.type === 'illuminance' ? '☀️' : ''))"></span>
+                            <span class="sensor-label" x-text="sensor.label + (sensor.type === 'thermostat' ? ' △' : '')"></span>
+                            <template x-if="sensor.type === 'climate' || !sensor.type">
+                              <div class="sensor-values">
+                                <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
+                                <span class="sensor-humid" x-show="sensor.humidity != null">💧<span x-text="sensor.humidity ? sensor.humidity.toFixed(0) + '%' : ''"></span></span>
+                              </div>
+                            </template>
+                            <template x-if="sensor.type === 'thermostat'">
+                              <div class="sensor-values">
+                                <span class="sensor-temp" x-html="formatTempStyled(sensor.temperature)"></span>
+                              </div>
+                            </template>
+                            <template x-if="sensor.type === 'co2'">
+                              <div class="sensor-values">
+                                <span class="sensor-co2" x-text="sensor.co2 != null ? sensor.co2 + ' ppm' : '-- ppm'"></span>
+                              </div>
+                            </template>
+                            <template x-if="sensor.type === 'illuminance'">
+                              <div class="sensor-values">
+                                <span class="sensor-lux" x-text="sensor.illuminance != null ? sensor.illuminance + ' lx' : '-- lx'"></span>
+                              </div>
+                            </template>
+                            <span class="sensor-status" :class="{ 'fresh': sensor.lastSeen && (Date.now() - sensor.lastSeen <= 300000) && (sensor.temperature != null || sensor.co2 != null || sensor.illuminance != null), 'stale': !sensor.lastSeen || (Date.now() - sensor.lastSeen > 300000) || (sensor.temperature == null && sensor.co2 == null && sensor.illuminance == null) }"></span>
+                          </div>
+                        </template>
+                      </div>
+
+                      <div class="classic-sparkline" x-show="room.tempHistory && room.tempHistory.length > 1">
+                        <svg :id="'classic-spark-' + room.id" class="sparkline-svg" preserveAspectRatio="none"></svg>
+                      </div>
+
+                      <div class="card-footer-v2">
+                        <span class="temp-spread" x-show="room.tempSpread && room.tempSpread >= 0.1">
+                          Spread: <span x-text="room.tempSpread ? '±' + (room.tempSpread / 2).toFixed(1) + '°' : ''"></span>
+                        </span>
+                        <button class="detail-btn" @click.stop="$store.roomDetail.open(room)">Details</button>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </template>
 
@@ -6369,6 +6413,41 @@
           if (temp <= 26) return 'good';
           if (temp <= 28) return 'warm';
           return 'hot';
+        },
+
+        // CO2 air quality level (thresholds match co2-monitor.js)
+        getCo2QualityLevel(co2) {
+          if (co2 == null) return 'unknown';
+          if (co2 < 600) return 'excellent';
+          if (co2 < 1000) return 'good';
+          if (co2 < 1500) return 'moderate';
+          if (co2 < 2000) return 'poor';
+          return 'bad';
+        },
+
+        getCo2QualityLabel(co2) {
+          const labels = { excellent: 'Excellent', good: 'Good', moderate: 'Fair', poor: 'Poor', bad: 'Bad', unknown: 'No Data' };
+          return labels[this.getCo2QualityLevel(co2)];
+        },
+
+        // True for rooms with CO2 but no temperature (e.g. hallway)
+        isCo2HeroRoom(room) {
+          return room.temperature == null
+            && room.avgTemperature == null
+            && room.sensors
+            && room.sensors.some(s => s.type === 'co2');
+        },
+
+        getRoomCo2(room) {
+          if (!room.sensors) return null;
+          const s = room.sensors.find(s => s.type === 'co2' && s.co2 != null);
+          return s ? s.co2 : null;
+        },
+
+        getRoomCo2Battery(room) {
+          if (!room.sensors) return null;
+          const s = room.sensors.find(s => s.type === 'co2');
+          return (s && s.battery != null) ? s.battery : null;
         },
 
         formatUpdate(lastSeen) {
