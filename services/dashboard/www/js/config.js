@@ -305,7 +305,8 @@ export const VIEW_CATEGORIES = [
       { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
       { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
       { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W', primary: true },
-      { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' }
+      { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' },
+      { id: 'weather', name: 'Weather', icon: '🌤️', title: 'Weather Forecast', key: 'F' }
     ]
   },
   {

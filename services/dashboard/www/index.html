@@ -42,6 +42,7 @@
   <link rel="stylesheet" href="styles/views/device-health.css">
   <link rel="stylesheet" href="styles/views/notification-history.css">
   <link rel="stylesheet" href="styles/views/system.css?v=8">
+  <link rel="stylesheet" href="styles/views/weather-forecast.css">
   <link rel="stylesheet" href="styles/notifications.css">
 
   <!-- Three.js for 3D Floor Plan -->
@@ -2793,6 +2794,128 @@
           </div>
         </div>
 
+        <!-- Weather Forecast View — Mock D Design -->
+        <div x-show="currentView === 'weather'"
+             x-cloak
+             x-data="weatherForecastView()"
+             x-init="init()"
+             @view-changed.window="if ($event.detail.view !== 'weather') destroy()"
+             class="view weather-forecast-view">
+
+          <!-- Loading (first load only) -->
+          <template x-if="isLoading && !daily.length">
+            <div class="weather-loading">
+              <div class="weather-loading-text">Loading forecast...</div>
+            </div>
+          </template>
+
+          <!-- Error (no cached data) -->
+          <template x-if="hasError">
+            <div class="weather-error">
+              <strong>Cannot load forecast</strong><br>
+              <span x-text="store.error"></span>
+            </div>
+          </template>
+
+          <!-- ── Top Row: Hero + Alert side-by-side ── -->
+          <template x-if="current">
+            <div class="weather-top-row">
+              <!-- Hero Card -->
+              <div class="weather-hero-card">
+                <div class="weather-hero-emoji" x-text="heroEmoji"></div>
+                <div class="weather-hero-info">
+                  <div class="weather-hero-temp-line">
+                    <div class="weather-hero-temp">
+                      <span x-text="heroTemp"></span><span class="unit">&deg;</span>
+                    </div>
+                    <div class="weather-hero-desc" x-text="heroDescription"></div>
+                  </div>
+                  <div class="weather-hero-sub" x-text="heroSub"></div>
+                </div>
+              </div>
+              <!-- Alert Card -->
+              <div class="weather-alert-card" :class="getAlertType()" x-show="alertText">
+                <div class="weather-alert-icon" x-text="getAlertIcon()"></div>
+                <div class="weather-alert-title" x-text="getAlertTitle()"></div>
+                <div class="weather-alert-desc" x-text="getAlertDescription()"></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── Hourly Strip (Apple-style columns) ── -->
+          <template x-if="hourly.length > 0">
+            <div class="weather-card">
+              <div class="weather-section-label">Hourly Forecast</div>
+              <div class="weather-hourly-strip">
+                <template x-for="(h, i) in hourly.slice(0, 12)" :key="h.time?.toISOString() || i">
+                  <div class="weather-hourly-col" :class="{ 'now': i === 0 }">
+                    <span class="weather-hourly-time" x-text="formatHour(h, i)"></span>
+                    <span class="weather-hourly-emoji" x-text="h.emoji"></span>
+                    <span class="weather-hourly-temp" x-text="h.temp + '\u00B0'"></span>
+                    <span class="weather-hourly-precip" x-text="getPrecipDisplay(h.precipProb)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── Daily Forecast with Ruler Bars ── -->
+          <template x-if="daily.length > 0">
+            <div class="weather-card weather-daily-card">
+              <div class="weather-section-label">10-Day Forecast</div>
+
+              <!-- Ruler scale header -->
+              <div class="weather-ruler-header">
+                <span></span>
+                <span></span>
+                <div class="weather-ruler-scale">
+                  <template x-for="tick in getRulerTicks()" :key="tick.value">
+                    <span class="weather-ruler-tick" :style="'left: ' + tick.left" x-text="tick.value"></span>
+                  </template>
+                </div>
+                <span class="weather-ruler-label">Rain</span>
+              </div>
+
+              <!-- Daily rows -->
+              <template x-for="(day, i) in daily" :key="day.dateStr + '-' + i">
+                <div class="weather-daily-row" :class="{ 'today': i === 0 }">
+                  <div class="weather-day-name">
+                    <span x-text="day.dayName"></span>
+                    <span class="date-sub" x-text="day.dateStr" x-show="i > 1"></span>
+                  </div>
+                  <div class="weather-day-emoji" x-text="day.emoji"></div>
+                  <div class="weather-ruler-bar">
+                    <div class="weather-ruler-track">
+                      <div class="weather-ruler-fill" :style="getTempBarStyle(day)">
+                        <span class="weather-ruler-lo" x-text="day.tempMin + '\u00B0'"></span>
+                        <span class="weather-ruler-hi" x-text="day.tempMax + '\u00B0'"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="weather-day-precip"
+                       :class="{ 'rainy': isPrecipRainy(day) }"
+                       x-text="getPrecipText(day)"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- Stale data warning -->
+          <div x-show="isStale" class="weather-stale-warning">
+            Data may be outdated &middot; <span x-text="store.error"></span>
+          </div>
+
+          <!-- Footer -->
+          <div class="weather-footer">
+            Updated <span x-text="getLastUpdateText()"></span> &middot; Open-Meteo &middot;
+            <button class="weather-refresh-link" @click="refresh()" :disabled="isLoading">
+              <span x-show="!isLoading">Refresh</span>
+              <span x-show="isLoading">...</span>
+            </button>
+          </div>
+
+        </div>
+
       </div>
     </main>
 
@@ -4038,6 +4161,35 @@
         initNotificationHistoryStore(Alpine, window.CONFIG);
       });
       document.addEventListener('DOMContentLoaded', initNotificationHistory);
+    }
+  </script>
+
+  <!-- Weather Forecast View Module - loads store and view -->
+  <script type="module">
+    import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js';
+    import { weatherForecastView } from './views/weather-forecast.js';
+
+    // Expose view globally for Alpine x-data
+    window.weatherForecastView = weatherForecastView;
+    console.log('[weather-forecast] Module loaded, weatherForecastView ready');
+
+    // Initialize store when Alpine is ready (lazy - no eager fetch)
+    function initWeatherForecast() {
+      if (typeof Alpine !== 'undefined') {
+        if (!Alpine.store('weatherForecast')) {
+          initWeatherForecastStore(Alpine);
+          console.log('[weather-forecast] Store initialized (lazy - awaiting view activate)');
+        }
+      }
+    }
+
+    if (typeof Alpine !== 'undefined') {
+      initWeatherForecast();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initWeatherForecastStore(Alpine);
+      });
+      document.addEventListener('DOMContentLoaded', initWeatherForecast);
     }
   </script>
 
@@ -6072,7 +6224,8 @@
           { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
           { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' },
           { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' },
-          { id: 'transport', name: 'Transport', icon: '🚉', title: 'Transport Departures', key: 'T' }
+          { id: 'transport', name: 'Transport', icon: '🚉', title: 'Transport Departures', key: 'T' },
+          { id: 'weather', name: 'Weather', icon: '🌤️', title: 'Weather Forecast', key: 'F' }
         ]
       },
       {

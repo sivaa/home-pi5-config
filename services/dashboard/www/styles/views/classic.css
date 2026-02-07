@@ -11,12 +11,12 @@
 
     .classic-grid {
       display: grid;
-      grid-template-columns: 2fr 1.6fr 2.5fr 1.1fr;
+      grid-template-columns: 1.3fr 2fr 2.5fr 1.1fr;
       grid-template-rows: 0.85fr 0.85fr 1.3fr;
       grid-template-areas:
-        "bathroom hallway study   avg"
-        "kitchen  hallway study   avg"
-        "bedroom  bedroom living  balcony";
+        "bathroom hallway  study   avg"
+        "kitchen  hallway  study   avg"
+        "bedroom  bedroom  living  balcony";
       gap: var(--space-sm);
       flex: 1;
       min-height: 0;
