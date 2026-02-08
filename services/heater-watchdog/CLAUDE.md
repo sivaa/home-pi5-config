@@ -123,10 +123,41 @@ docker logs heater-watchdog --tail 100
 |                                                             |
 |  Layer 2: Heater Watchdog (Poll-Based, 5min intervals)      |
 |  +- Window safety check - catches anything L1 might miss   |
+|  +- Ghost external temp detection (clears stale values)    |
 |  +- Stuck-idle detection (45min threshold, 2-phase recovery)|
 |  +- Sets guard flag with retry (3 attempts) for resume     |
 +------------------------------------------------------------+
 ```
+
+## Ghost External Temperature Detection (Feb 9, 2026)
+
+**Proactive check** that runs every 5 minutes alongside window safety.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INCIDENT: Bedroom TRV idle despite 5.7°C deficit              │
+│  ROOT CAUSE: external_temperature_input stuck at 24°C          │
+│  while actual room was 16.3°C → TRV thought room was warm     │
+│                                                                 │
+│  DETECTION: |external_temp - local_temp| > 5°C                 │
+│  ACTION: Clear to 0 via MQTT + send alert                      │
+│  RUNS: Every 5 min (before stuck-idle check)                   │
+│                                                                 │
+│  WHY BEFORE STUCK-IDLE: Clearing the ghost temp may fix        │
+│  the idle state, making stuck-idle recovery unnecessary.        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key function:**
+- `check_ghost_external_temps()` — compares `number.*_external_temperature_input` to `climate.*_thermostat.current_temperature`
+
+**Entities checked:**
+| Thermostat | External Temp Entity |
+|-----------|---------------------|
+| `climate.study_thermostat` | `number.study_thermostat_external_temperature_input` |
+| `climate.living_thermostat_inner` | `number.living_thermostat_inner_external_temperature_input` |
+| `climate.living_thermostat_outer` | `number.living_thermostat_outer_external_temperature_input` |
+| `climate.bed_thermostat` | `number.bed_thermostat_external_temperature_input` |
 
 ## Stuck-Idle Detection (Feb 7, 2026)
 

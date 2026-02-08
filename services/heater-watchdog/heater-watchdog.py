@@ -124,6 +124,49 @@ GUARD_FLAG_ENTITY = "input_boolean.heaters_off_due_to_window"
 CO2_GUARD_FLAG = "input_boolean.heaters_off_due_to_co2"
 
 # =============================================================================
+# GHOST EXTERNAL TEMPERATURE DETECTION
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 9, 2026 — Bedroom TRV idle with 5.7°C deficit          │
+# │                                                                         │
+# │  Root cause: external_temperature_input was stuck at 24°C while        │
+# │  actual room temp was 16.3°C. Even with temperature_sensor_select      │
+# │  set to "internal", the stale external value may confuse TRVZB         │
+# │  firmware into thinking the room is warm enough → valve stays closed.  │
+# │                                                                         │
+# │  HOW IT HAPPENS:                                                        │
+# │    HA/automation sends external temp (e.g., from room sensor)          │
+# │    → Automation stops or sensor goes offline                           │
+# │    → Last value (24°C) stays stuck in TRV memory forever              │
+# │    → Room cools to 16°C but TRV still sees ghost 24°C                 │
+# │                                                                         │
+# │  ┌─── What we see ────────────────────────────────────────┐           │
+# │  │                                                         │           │
+# │  │  TRV brain:  "external says 24°C... room is warm"     │           │
+# │  │  Reality:    16°C and freezing                          │           │
+# │  │  Valve:      closed (idle)                              │           │
+# │  │  User:       WHY IS IT COLD?!                           │           │
+# │  │                                                         │           │
+# │  │  After clearing ghost:                                  │           │
+# │  │  TRV brain:  "internal says 16°C... need heat!"        │           │
+# │  │  Valve:      opens → heating starts                     │           │
+# │  └─────────────────────────────────────────────────────────┘           │
+# │                                                                         │
+# │  FIX: Every 5 min, compare external_temperature_input to local_temp.  │
+# │  If divergence > 5°C → clear to 0 via MQTT + alert user.             │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# Mapping: thermostat entity_id -> external_temperature_input number entity
+EXTERNAL_TEMP_ENTITIES = {
+    "climate.study_thermostat": "number.study_thermostat_external_temperature_input",
+    "climate.living_thermostat_inner": "number.living_thermostat_inner_external_temperature_input",
+    "climate.living_thermostat_outer": "number.living_thermostat_outer_external_temperature_input",
+    "climate.bed_thermostat": "number.bed_thermostat_external_temperature_input",
+}
+
+EXTERNAL_TEMP_MAX_DIVERGENCE = 5.0  # °C — clear if external drifts this far from local
+
+# =============================================================================
 # STUCK-IDLE DETECTION CONFIG
 # =============================================================================
 # ┌────────────────────────────────────────────────────────────────────┐
@@ -159,6 +202,7 @@ def log_banner():
        HEATER SAFETY WATCHDOG
        Independent safety monitor for heater-window violations
        + Stuck-idle TRV detection and auto-recovery (Layer 2 backup)
+       + Ghost external temperature detection and auto-clear
        Runs every 5 minutes as defense-in-depth layer
 ================================================================================
 """,
@@ -667,6 +711,117 @@ def check_stuck_idle():
                 log(f"  Recovery FAILED for {name} — will retry next cycle", "ERROR")
 
 
+ghost_temp_clear_tracker = defaultdict(list)  # {entity_id: [timestamp, ...]}
+GHOST_TEMP_MAX_CLEARS = 3  # Max clears per thermostat per hour
+
+
+def can_clear_ghost_temp(entity_id):
+    """Rate limit ghost temp clears: max 3 per thermostat per hour."""
+    now = time.time()
+    ghost_temp_clear_tracker[entity_id] = [
+        ts for ts in ghost_temp_clear_tracker[entity_id] if now - ts < 3600
+    ]
+    return len(ghost_temp_clear_tracker[entity_id]) < GHOST_TEMP_MAX_CLEARS
+
+
+def check_ghost_external_temps():
+    """Detect and clear stale external_temperature_input values on TRVs.
+
+    For each TRV, compares the external_temperature_input (number entity in HA)
+    against the TRV's own local_temperature reading (from climate entity).
+
+    If divergence exceeds EXTERNAL_TEMP_MAX_DIVERGENCE (5°C), the external value
+    is almost certainly stale/wrong. Clears it to 0 via MQTT and sends alert.
+
+    Rate limited: max 3 clears per thermostat per hour to prevent spam if an
+    automation keeps re-setting the external temp.
+    """
+    for entity_id in THERMOSTATS:
+        try:
+            ext_entity = EXTERNAL_TEMP_ENTITIES.get(entity_id)
+            if not ext_entity:
+                continue
+
+            name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+
+            # Read the external temperature input value
+            ext_state = get_entity_state(ext_entity)
+            ext_temp_str = ext_state.get("state", "0")
+            if ext_temp_str in ("unknown", "unavailable"):
+                log(f"  Ghost temp skip: {name} external_temperature_input is {ext_temp_str}", "WARN")
+                continue
+            ext_temp = float(ext_temp_str)
+            # ext_temp == 0 means "cleared/disabled" on TRVZB — nothing to validate
+            if ext_temp == 0:
+                continue
+
+            # Read the TRV's internal local temperature
+            climate_state = get_entity_state(entity_id)
+            attrs = climate_state.get("attributes", {})
+            local_temp = attrs.get("current_temperature")
+            if local_temp is None or str(local_temp) in ("unknown", "unavailable"):
+                log(f"  Ghost temp skip: {name} local_temperature is {local_temp}", "WARN")
+                continue
+            local_temp = float(local_temp)
+
+            divergence = abs(ext_temp - local_temp)
+
+            if divergence > EXTERNAL_TEMP_MAX_DIVERGENCE:
+                log(
+                    f"  GHOST TEMP: {name} external={ext_temp}°C vs "
+                    f"local={local_temp}°C (divergence={divergence:.1f}°C)",
+                    "WARN",
+                )
+
+                # Rate limit check
+                if not can_clear_ghost_temp(entity_id):
+                    log(
+                        f"  Rate limit hit for {name} "
+                        f"({GHOST_TEMP_MAX_CLEARS} clears/hour) — automation may be re-setting it",
+                        "WARN",
+                    )
+                    continue
+
+                # Clear via MQTT (set external_temperature_input to 0)
+                mqtt_topic = THERMOSTAT_MQTT_TOPICS.get(entity_id)
+                cleared = False
+                if mqtt_topic:
+                    payload = json.dumps({"external_temperature_input": 0})
+                    if publish_mqtt_via_ha(mqtt_topic, payload):
+                        log(f"  Cleared ghost external_temperature_input for {name}", "INFO")
+                        ghost_temp_clear_tracker[entity_id].append(time.time())
+                        cleared = True
+                    else:
+                        log(f"  FAILED to clear external_temperature_input for {name}", "ERROR")
+
+                # Notification reflects actual outcome
+                if cleared:
+                    send_notification(
+                        title=f"WATCHDOG: Ghost Temp Cleared ({name})",
+                        message=(
+                            f"Stale external_temperature_input on {name}.\n"
+                            f"External: {ext_temp}°C vs Local: {local_temp}°C "
+                            f"(diff: {divergence:.1f}°C)\n"
+                            f"Cleared to 0 to prevent heating blockage."
+                        ),
+                        importance="high",
+                    )
+                else:
+                    send_notification(
+                        title=f"WATCHDOG: Ghost Temp FAILED ({name})",
+                        message=(
+                            f"Stale external_temperature_input on {name}.\n"
+                            f"External: {ext_temp}°C vs Local: {local_temp}°C "
+                            f"(diff: {divergence:.1f}°C)\n"
+                            f"FAILED to clear — manual intervention required!"
+                        ),
+                        importance="max",
+                    )
+
+        except Exception as e:
+            log(f"Error checking external temp for {entity_id}: {e}", "WARN")
+
+
 def perform_safety_check():
     """
     Main safety check logic with HYBRID APPROACH:
@@ -752,6 +907,14 @@ def perform_safety_check():
         return "VIOLATION"
     else:
         log("Safety check: OK (no window+heating violation)", "INFO")
+
+        # ─── Ghost External Temperature Check ───
+        # Runs before stuck-idle: clearing a ghost temp may fix the idle state
+        log("Checking for ghost external temperatures...")
+        try:
+            check_ghost_external_temps()
+        except Exception as e:
+            log(f"Error during ghost temp check: {e}", "ERROR")
 
         # ─── Stuck-Idle Check (Layer 2 backup) ───
         # Only runs when no windows are open (window safety takes priority)
