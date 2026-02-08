@@ -2847,7 +2847,7 @@
             <div class="weather-card">
               <div class="weather-section-label">Hourly Forecast</div>
               <div class="weather-hourly-strip">
-                <template x-for="(h, i) in hourly.slice(0, 12)" :key="h.time?.toISOString() || i">
+                <template x-for="(h, i) in hourly.slice(0, 8)" :key="h.time?.toISOString() || i">
                   <div class="weather-hourly-col" :class="{ 'now': i === 0 }">
                     <span class="weather-hourly-time" x-text="formatHour(h, i)"></span>
                     <span class="weather-hourly-emoji" x-text="h.emoji"></span>
