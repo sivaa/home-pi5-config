@@ -223,7 +223,7 @@
 
           <!-- Navigation: groups spread across full bar -->
           <div class="nav-primary">
-            <template x-for="group in navGroups" :key="group.name">
+            <template x-for="(group, gi) in navGroups" :key="gi">
               <div class="nav-group">
                 <span class="nav-group-label" x-show="group.name" x-text="group.name"></span>
                 <div class="nav-group-items">
@@ -246,12 +246,6 @@
         <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
-            <!-- Link to new React Dashboard -->
-            <a href="/v2/"
-               class="react-dashboard-link"
-               title="Try new React Dashboard (Beta)">
-              ➡️ <span class="react-link-label">React</span>
-            </a>
             <!-- Hard Refresh Button (for kiosk mode) -->
             <button class="refresh-btn"
                     @click="location.reload(true)"
@@ -274,10 +268,6 @@
                       :class="{ active: $store.theme.preference === 'dark' }"
                       @click="$store.theme.setPreference('dark')"
                       title="Dark mode">🌙</button>
-              <button class="theme-toggle-btn"
-                      :class="{ active: $store.theme.preference === 'system' }"
-                      @click="$store.theme.setPreference('system')"
-                      title="System preference">⚙️</button>
             </div>
             <div class="date-time" x-text="currentDateTime"></div>
             <button class="panel-toggle"
@@ -2824,69 +2814,66 @@
             </div>
           </template>
 
-          <!-- ── Top Row: Hero + Alert side-by-side ── -->
+          <!-- ═══ SECTION 1: Combined Top Strip (Hero + Alert + 24h Hourly) ═══ -->
           <template x-if="current">
-            <div class="weather-top-row">
-              <!-- Hero Card -->
-              <div class="weather-hero-card">
-                <div class="weather-hero-emoji" x-text="heroEmoji"></div>
-                <div class="weather-hero-info">
-                  <div class="weather-hero-temp-line">
-                    <div class="weather-hero-temp">
-                      <span x-text="heroTemp"></span><span class="unit">&deg;</span>
-                    </div>
-                    <div class="weather-hero-desc" x-text="heroDescription"></div>
-                  </div>
-                  <div class="weather-hero-sub" x-text="heroSub"></div>
+            <div class="weather-top">
+              <!-- Current conditions -->
+              <div class="weather-now">
+                <div class="weather-now-emoji" x-text="heroEmoji"></div>
+                <div class="weather-now-info">
+                  <div class="weather-now-temp"><span x-text="heroTemp"></span><span class="unit">&deg;</span></div>
+                  <div class="weather-now-desc" x-text="heroDescription"></div>
+                  <div class="weather-now-hilo" x-text="heroSub"></div>
                 </div>
               </div>
-              <!-- Alert Card -->
-              <div class="weather-alert-card" :class="getAlertType()" x-show="alertText">
-                <div class="weather-alert-icon" x-text="getAlertIcon()"></div>
-                <div class="weather-alert-title" x-text="getAlertTitle()"></div>
-                <div class="weather-alert-desc" x-text="getAlertDescription()"></div>
-              </div>
-            </div>
-          </template>
 
-          <!-- ── Hourly Strip (Apple-style columns) ── -->
-          <template x-if="hourly.length > 0">
-            <div class="weather-card">
-              <div class="weather-section-label">Hourly Forecast</div>
-              <div class="weather-hourly-strip">
-                <template x-for="(h, i) in hourly.slice(0, 8)" :key="h.time?.toISOString() || i">
-                  <div class="weather-hourly-col" :class="{ 'now': i === 0 }">
-                    <span class="weather-hourly-time" x-text="formatHour(h, i)"></span>
-                    <span class="weather-hourly-emoji" x-text="h.emoji"></span>
-                    <span class="weather-hourly-temp" x-text="h.temp + '\u00B0'"></span>
-                    <span class="weather-hourly-precip" x-text="getPrecipDisplay(h.precipProb)"></span>
+              <!-- Alert badge -->
+              <div class="weather-alert-badge" :class="getAlertType()" x-show="alertText">
+                <div class="alert-icon" x-text="getAlertIcon()"></div>
+                <div>
+                  <div class="alert-text" x-text="getAlertTitle()"></div>
+                  <div class="alert-sub" x-text="getAlertSub()"></div>
+                </div>
+              </div>
+
+              <!-- 24h hourly strip — temp shown only when it changes -->
+              <div class="weather-hourly" x-show="hourly.length > 0">
+                <template x-for="(h, i) in getHourlyDisplay()" :key="'h-' + i">
+                  <div class="hourly-col"
+                       :class="{ 'change': h.isChange, 'midnight': h.isMidnight }">
+                    <div class="hourly-time" x-text="h.label"></div>
+                    <div class="hourly-emoji" x-text="h.emoji"></div>
+                    <template x-if="h.isChange">
+                      <div class="hourly-temp" x-text="h.temp + '\u00B0'"></div>
+                    </template>
+                    <template x-if="!h.isChange">
+                      <div class="hourly-temp-spacer"></div>
+                    </template>
                   </div>
                 </template>
               </div>
             </div>
           </template>
 
-          <!-- ── Daily Forecast with Ruler Bars ── -->
+          <!-- ═══ SECTION 2: 10-Day Forecast (Tiered Rows) ═══ -->
           <template x-if="daily.length > 0">
-            <div class="weather-card weather-daily-card">
-              <div class="weather-section-label">10-Day Forecast</div>
-
-              <!-- Ruler scale header -->
-              <div class="weather-ruler-header">
-                <span></span>
-                <span></span>
-                <div class="weather-ruler-scale">
+            <div class="weather-daily">
+              <!-- Scale header -->
+              <div class="weather-daily-header">
+                <div class="weather-daily-header-label">10-Day</div>
+                <div></div>
+                <div class="weather-daily-scale">
                   <template x-for="tick in getRulerTicks()" :key="tick.value">
-                    <span class="weather-ruler-tick"
+                    <span class="weather-daily-scale-tick"
                           :class="{ 'freezing': tick.isFreezing }"
                           :style="'left: ' + tick.left"
                           x-text="tick.value"></span>
                   </template>
                 </div>
-                <span class="weather-ruler-label">Rain</span>
+                <div class="weather-daily-rain-label">Rain</div>
               </div>
 
-              <!-- Vertical gridlines (behind rows, aligned to ruler column) -->
+              <!-- Vertical gridlines -->
               <div class="weather-ruler-gridlines">
                 <div></div><div></div>
                 <div class="weather-gridlines-area">
@@ -2899,13 +2886,13 @@
                 <div></div>
               </div>
 
-              <!-- Daily rows (flex-distributed to fill height) -->
+              <!-- Tiered daily rows -->
               <div class="weather-daily-rows">
                 <template x-for="(day, i) in daily" :key="day.dateStr + '-' + i">
-                  <div class="weather-daily-row" :class="{ 'today': i === 0 }">
-                    <div class="weather-day-name">
-                      <span x-text="day.dayName"></span>
-                      <span class="date-sub" x-text="day.dateStr" x-show="i > 1"></span>
+                  <div class="weather-daily-row" :class="getDailyRowClasses(i)">
+                    <div>
+                      <div class="weather-day-name" x-text="day.dayName"></div>
+                      <div class="weather-day-date" x-text="day.dateStr"></div>
                     </div>
                     <div class="weather-day-emoji" x-text="day.emoji"></div>
                     <div class="weather-ruler-bar">
@@ -2932,8 +2919,8 @@
 
           <!-- Footer -->
           <div class="weather-footer">
-            Updated <span x-text="getLastUpdateText()"></span> &middot; Open-Meteo &middot;
-            <button class="weather-refresh-link" @click="refresh()" :disabled="isLoading">
+            <span>Updated <span x-text="getLastUpdateText()"></span> &middot; Open-Meteo</span>
+            <button class="weather-refresh-btn" @click="refresh()" :disabled="isLoading">
               <span x-show="!isLoading">Refresh</span>
               <span x-show="isLoading">...</span>
             </button>
@@ -6300,14 +6287,15 @@
         primaryViews: PRIMARY_VIEWS,
         overflowCategories: OVERFLOW_CATEGORIES,
         allViews: ALL_VIEWS,
-        // Groups for spread layout: Display+Monitor | Visualize | Control
+        // 4-group spread: Monitor | Home | Outdoor | Control
         navGroups: (() => {
-          const catMap = {};
-          VIEW_CATEGORIES.forEach(cat => { catMap[cat.id] = { name: cat.name, views: cat.views }; });
+          const all = VIEW_CATEGORIES.flatMap(cat => cat.views);
+          const byId = id => all.find(v => v.id === id);
           return [
-            { name: '', views: catMap['display'].views.concat(catMap['monitor'].views) },
-            { name: 'Visualize', views: catMap['visualize'].views },
-            { name: 'Control', views: catMap['control'].views }
+            { name: '', views: ['network', 'timeline', 'notifications', 'logs', 'device-health'].map(byId).filter(Boolean) },
+            { name: '', views: ['hotwater', 'mailbox', 'system', 'classic', 'co2'].map(byId).filter(Boolean) },
+            { name: '', views: ['transport', 'weather'].map(byId).filter(Boolean) },
+            { name: 'Control', views: ['lights', 'heater'].map(byId).filter(Boolean) }
           ];
         })(),
 
