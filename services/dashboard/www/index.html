@@ -2870,10 +2870,26 @@
                 <span></span>
                 <div class="weather-ruler-scale">
                   <template x-for="tick in getRulerTicks()" :key="tick.value">
-                    <span class="weather-ruler-tick" :style="'left: ' + tick.left" x-text="tick.value"></span>
+                    <span class="weather-ruler-tick"
+                          :class="{ 'freezing': tick.isFreezing }"
+                          :style="'left: ' + tick.left"
+                          x-text="tick.value"></span>
                   </template>
                 </div>
                 <span class="weather-ruler-label">Rain</span>
+              </div>
+
+              <!-- Vertical gridlines (behind rows, aligned to ruler column) -->
+              <div class="weather-ruler-gridlines">
+                <div></div><div></div>
+                <div class="weather-gridlines-area">
+                  <template x-for="line in getRulerTicks()" :key="'grid-' + line.value">
+                    <div class="weather-gridline"
+                         :class="{ 'freezing': line.isFreezing }"
+                         :style="'left: ' + line.left"></div>
+                  </template>
+                </div>
+                <div></div>
               </div>
 
               <!-- Daily rows (flex-distributed to fill height) -->

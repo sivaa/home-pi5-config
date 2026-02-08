@@ -155,23 +155,24 @@ export function weatherForecastView() {
     },
 
     // ── Ruler Scale Ticks ──
-    // Generates evenly-spaced tick marks between globalMin and globalMax
-    // Placed via percentage left positioning
+    // Every 5° with freezing flag at 0°C
+    // Used for both header ticks and vertical gridlines
     getRulerTicks() {
       const range = this.globalTempRange;
       const totalRange = range.max - range.min;
       if (!Number.isFinite(totalRange) || totalRange <= 0) return [];
 
-      let step = 2;
-      if (totalRange <= 6) step = 1;
-      else if (totalRange > 14) step = 5;
-
+      const step = 5;
       const startTick = Math.ceil(range.min / step) * step;
       const ticks = [];
 
       for (let val = startTick; val <= range.max && ticks.length < 20; val += step) {
         const pct = ((val - range.min) / totalRange) * 100;
-        ticks.push({ value: `${val}\u00B0`, left: `${pct.toFixed(1)}%` });
+        ticks.push({
+          value: `${val}\u00B0`,
+          left: `${pct.toFixed(1)}%`,
+          isFreezing: val === 0
+        });
       }
       return ticks;
     },

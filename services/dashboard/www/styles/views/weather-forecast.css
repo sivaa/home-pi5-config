@@ -169,6 +169,44 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      position: relative;
+    }
+
+    /* Vertical gridlines overlay — spans full card behind rows */
+    .weather-ruler-gridlines {
+      position: absolute;
+      left: 14px;     /* match card horizontal padding */
+      right: 14px;
+      top: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: 80px 40px 1fr 62px;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .weather-gridlines-area {
+      position: relative;
+    }
+    .weather-gridline {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+    }
+    :root .weather-gridline {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    [data-theme="dark"] .weather-gridline {
+      background: rgba(255, 255, 255, 0.07);
+    }
+    /* 0°C freezing line — thicker, blue */
+    .weather-gridline.freezing {
+      width: 2px;
+      background: rgba(100, 210, 255, 0.35);
+    }
+    [data-theme="dark"] .weather-gridline.freezing {
+      background: rgba(100, 210, 255, 0.3);
     }
 
     /* Rows wrapper fills remaining card height, distributes rows evenly */
@@ -177,6 +215,8 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      position: relative;
+      z-index: 1;
     }
 
     /* Ruler scale header */
@@ -191,7 +231,7 @@
     }
     .weather-ruler-scale {
       position: relative;
-      height: 16px;
+      height: 20px;
       display: flex;
       align-items: center;
     }
@@ -205,18 +245,22 @@
     }
     .weather-ruler-tick {
       position: absolute;
-      font-size: 10px;
-      color: var(--color-text-tertiary);
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      font-weight: var(--font-weight-semibold);
       font-variant-numeric: tabular-nums;
       transform: translateX(-50%);
       background: var(--color-surface);
-      padding: 0 3px;
+      padding: 0 4px;
       z-index: 1;
     }
+    .weather-ruler-tick.freezing {
+      color: #64d2ff;
+    }
     .weather-ruler-label {
-      font-size: 10px;
-      color: var(--color-text-tertiary);
-      font-weight: var(--font-weight-medium);
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      font-weight: var(--font-weight-semibold);
       text-align: right;
     }
 
