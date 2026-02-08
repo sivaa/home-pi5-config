@@ -221,16 +221,23 @@
             <span class="status-dot" x-show="!$store.mqtt.connecting" :class="{ 'online': $store.mqtt.connected, 'offline': !$store.mqtt.connected }"></span>
           </div>
 
-          <!-- Navigation tabs - all views in single line -->
+          <!-- Navigation: groups spread across full bar -->
           <div class="nav-primary">
-            <template x-for="view in allViews" :key="view.id">
-              <button class="nav-tab"
-                      :class="{ active: currentView === view.id }"
-                      @click="setView(view.id)"
-                      :title="view.title + ' (' + view.key + ')'">
-                <span class="nav-icon" x-text="view.icon"></span>
-                <span class="nav-label" x-text="view.name"></span>
-              </button>
+            <template x-for="group in navGroups" :key="group.name">
+              <div class="nav-group">
+                <span class="nav-group-label" x-show="group.name" x-text="group.name"></span>
+                <div class="nav-group-items">
+                  <template x-for="view in group.views" :key="view.id">
+                    <button class="nav-tab"
+                            :class="{ active: currentView === view.id }"
+                            @click="setView(view.id)"
+                            :title="view.title + ' (' + view.key + ')'">
+                      <span class="nav-icon" x-text="view.icon"></span>
+                      <span class="nav-label" x-text="view.name"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
             </template>
           </div>
 
@@ -6268,11 +6275,15 @@
       }
     ];
 
-    // Classic first per user preference
+    // Classic first per user preference, tagged with group info for nav separators
     const ALL_VIEWS = (() => {
-      const all = VIEW_CATEGORIES.flatMap(cat => cat.views);
+      const all = VIEW_CATEGORIES.flatMap(cat =>
+        cat.views.map((v, i) => ({ ...v, groupStart: i === 0, groupName: cat.name }))
+      );
       const classic = all.find(v => v.id === 'classic');
-      return classic ? [classic, ...all.filter(v => v.id !== 'classic')] : all;
+      const rest = all.filter(v => v.id !== 'classic');
+      if (rest.length > 0) rest[0].groupStart = true;
+      return classic ? [{ ...classic, groupStart: false }, ...rest] : all;
     })();
     const PRIMARY_VIEWS = ALL_VIEWS.filter(v => v.primary);
     const OVERFLOW_CATEGORIES = VIEW_CATEGORIES.map(cat => ({
@@ -6289,6 +6300,16 @@
         primaryViews: PRIMARY_VIEWS,
         overflowCategories: OVERFLOW_CATEGORIES,
         allViews: ALL_VIEWS,
+        // Groups for spread layout: Display+Monitor | Visualize | Control
+        navGroups: (() => {
+          const catMap = {};
+          VIEW_CATEGORIES.forEach(cat => { catMap[cat.id] = { name: cat.name, views: cat.views }; });
+          return [
+            { name: '', views: catMap['display'].views.concat(catMap['monitor'].views) },
+            { name: 'Visualize', views: catMap['visualize'].views },
+            { name: 'Control', views: catMap['control'].views }
+          ];
+        })(),
 
         init() {
           // Restore last view from localStorage

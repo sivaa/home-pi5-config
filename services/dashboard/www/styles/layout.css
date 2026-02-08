@@ -29,6 +29,7 @@
 
     .header-nav {
       display: flex;
+      flex: 1;
       align-items: center;
       gap: var(--space-sm);
       flex-wrap: nowrap;
@@ -161,7 +162,8 @@
        ======================================== */
     .nav-primary {
       display: flex;
-      gap: 2px;
+      flex: 1;
+      justify-content: space-between;
       align-items: center;
       margin-left: var(--space-sm);
       flex-wrap: nowrap;
@@ -171,8 +173,8 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 10px 12px;
-      min-height: 44px;
+      padding: 10px 10px;
+      min-height: 48px;
       border: none;
       background: transparent;
       border-radius: var(--radius-full);
@@ -204,8 +206,37 @@
       color: white;
     }
 
-    .nav-icon { font-size: 14px; }
-    .nav-label { font-size: 11px; }
+    .nav-icon { font-size: 24px; }
+
+    /* Labels hidden by default — icon-only compact tabs */
+    .nav-label { font-size: 13px; display: none; }
+
+    /* Active tab expands to show its label */
+    .nav-tab.active { padding: 10px 14px; }
+    .nav-tab.active .nav-label { display: inline; }
+
+    /* Nav groups spread across full bar */
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .nav-group-items {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+
+    /* Category label above each group */
+    .nav-group-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--color-text-secondary);
+      opacity: 0.5;
+      line-height: 1;
+      margin-bottom: -1px;
+    }
 
     /* ========================================
        HEADER TEMPERATURE DISPLAY
@@ -266,16 +297,12 @@
     [x-cloak] { display: none !important; }
 
     /* ========================================
-       RESPONSIVE: Show icons only on smaller screens
+       RESPONSIVE: Tighter spacing on smaller screens
        ======================================== */
     @media (max-width: 1100px) {
-      .nav-tab .nav-label {
-        display: none;
-      }
       .nav-tab {
         padding: 6px;
       }
-      .nav-icon { font-size: 16px; }
     }
 
     @media (max-width: 900px) {
