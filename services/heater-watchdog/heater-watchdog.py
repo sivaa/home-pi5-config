@@ -218,6 +218,28 @@ VALVE_VOLTAGE_ENTITIES = {
 VALVE_VOLTAGE_ABS_MIN = 1700  # mV — alert if below this
 VALVE_VOLTAGE_PEER_DEVIATION = 0.20  # Alert if >20% below peer average
 
+# =============================================================================
+# ANOMALOUS SETPOINT DETECTION (Layer 3 Backup)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 9, 2026 — Living Inner TRV at 4°C in heat mode         │
+# │                                                                         │
+# │  Resume sent set_temperature(19°C) while TRV was offline. Zigbee       │
+# │  delivered set_hvac_mode(heat) 2h later, but set_temperature was lost. │
+# │  TRV entered heat mode with firmware default (4°C min_temp).           │
+# │                                                                         │
+# │  WHY EXISTING CHECKS MISS IT:                                          │
+# │    Stuck-idle: deficit = setpoint - current = 4 - 18 = -14°C → skip   │
+# │    (negative deficit = room warmer than setpoint = "correct" idle)      │
+# │                                                                         │
+# │  DETECTION: mode=heat AND setpoint < 10°C                              │
+# │  THRESHOLD: 10°C — 6°C below lowest legitimate (16°C schedule)        │
+# │  ACTION: Restore from input_number saved temp via HA API               │
+# └─────────────────────────────────────────────────────────────────────────┘
+ANOMALOUS_SETPOINT_THRESHOLD = 10  # °C — trigger if setpoint below this in heat mode
+ANOMALOUS_SETPOINT_DEFAULT = 18  # °C — fallback if saved temp is also anomalous
+ANOMALOUS_SETPOINT_MAX_CORRECTIONS = 2  # Max corrections per TRV per hour
+
 # State save timeout (seconds) - don't block core safety action
 STATE_SAVE_TIMEOUT = 5
 
@@ -508,8 +530,9 @@ def send_notification(title, message, importance="max"):
 # │    Phase 2: off → heat → MQTT reset → setpoint (aggressive)           │
 # └─────────────────────────────────────────────────────────────────────────┘
 
-# In-memory tracking (reset on container restart — acceptable for Layer 2)
+# In-memory tracking (reset on container restart — acceptable for Layer 2/3)
 stuck_idle_tracker = {}  # {entity_id: first_seen_timestamp}
+anomalous_setpoint_tracker = defaultdict(list)  # {entity_id: [correction_timestamps]}
 recovery_tracker = defaultdict(list)  # {entity_id: [timestamp, ...]}
 
 
@@ -971,6 +994,119 @@ def check_valve_voltages():
             )
 
 
+# =============================================================================
+# ANOMALOUS SETPOINT DETECTION (Layer 3 Backup)
+# =============================================================================
+
+
+def can_correct_anomalous_setpoint(entity_id):
+    """Rate limit anomalous setpoint corrections: max per TRV per hour."""
+    now = time.time()
+    anomalous_setpoint_tracker[entity_id] = [
+        ts for ts in anomalous_setpoint_tracker[entity_id] if now - ts < 3600
+    ]
+    return len(anomalous_setpoint_tracker[entity_id]) < ANOMALOUS_SETPOINT_MAX_CORRECTIONS
+
+
+def check_anomalous_setpoints():
+    """Detect and correct TRVs with anomalously low setpoints in heat mode.
+
+    Layer 3 backup for HA automation (anomalous_setpoint_guard).
+    Checks every 5 minutes: if any TRV has mode=heat and setpoint < 10°C,
+    restore from saved temp helper.
+
+    Why alongside HA automation:
+      HA fires instantly on setpoint change (fast), but if HA is restarting
+      or automation is disabled, it misses. Watchdog runs outside HA container.
+
+    Guards: only when no guard flags active, rate limited 2/TRV/hour.
+    """
+    if is_guard_flag_active():
+        return
+
+    for entity_id in THERMOSTATS:
+        try:
+            state = get_entity_state(entity_id)
+            attrs = state.get("attributes", {})
+            hvac_mode = state.get("state")
+            setpoint = attrs.get("temperature")
+            current_temp = attrs.get("current_temperature")
+            name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+
+            if hvac_mode != "heat" or setpoint is None:
+                continue
+
+            setpoint = float(setpoint)
+            if setpoint >= ANOMALOUS_SETPOINT_THRESHOLD:
+                continue
+
+            # Anomalous setpoint detected
+            log(
+                f"  ANOMALOUS SETPOINT: {name} — heat mode with "
+                f"setpoint={setpoint}°C (< {ANOMALOUS_SETPOINT_THRESHOLD}°C)",
+                "WARN",
+            )
+
+            if not can_correct_anomalous_setpoint(entity_id):
+                log(
+                    f"  Rate limit hit for {name} "
+                    f"({ANOMALOUS_SETPOINT_MAX_CORRECTIONS}/hour) — skipping",
+                    "WARN",
+                )
+                continue
+
+            # Read saved temp from input_number helper
+            _, saved_temp_entity = THERMOSTAT_HELPERS[entity_id]
+            try:
+                saved_state = get_entity_state(saved_temp_entity)
+                saved_temp = float(saved_state.get("state", ANOMALOUS_SETPOINT_DEFAULT))
+                if saved_temp < ANOMALOUS_SETPOINT_THRESHOLD:
+                    log(
+                        f"  Saved temp for {name} is also anomalous ({saved_temp}°C) "
+                        f"— using default {ANOMALOUS_SETPOINT_DEFAULT}°C",
+                        "WARN",
+                    )
+                    saved_temp = ANOMALOUS_SETPOINT_DEFAULT
+            except Exception as e:
+                log(f"  Cannot read saved temp for {name}: {e} — using default", "WARN")
+                saved_temp = ANOMALOUS_SETPOINT_DEFAULT
+
+            # Clear open_window flag first
+            mqtt_topic = THERMOSTAT_MQTT_TOPICS.get(entity_id)
+            if mqtt_topic:
+                try:
+                    publish_mqtt_via_ha(mqtt_topic, json.dumps({"open_window": "OFF"}))
+                except Exception as e:
+                    log(f"  MQTT reset failed for {name}: {e}", "WARN")
+
+            # Restore setpoint
+            try:
+                call_service(
+                    "climate",
+                    "set_temperature",
+                    {"entity_id": entity_id, "temperature": saved_temp},
+                )
+                anomalous_setpoint_tracker[entity_id].append(time.time())
+
+                log(f"  Corrected {name}: {setpoint}°C → {saved_temp}°C", "INFO")
+
+                send_notification(
+                    title=f"WATCHDOG: Anomalous Setpoint ({name})",
+                    message=(
+                        f"TRV {name} was in heat mode with setpoint {setpoint}°C!\n"
+                        f"Corrected to {saved_temp}°C (from saved temp helper).\n"
+                        f"Room temp: {current_temp}°C.\n"
+                        f"Likely cause: set_temperature dropped during resume."
+                    ),
+                    importance="high",
+                )
+            except Exception as e:
+                log(f"  FAILED to correct setpoint for {name}: {e}", "ERROR")
+
+        except Exception as e:
+            log(f"Error checking anomalous setpoint for {entity_id}: {e}", "WARN")
+
+
 def perform_safety_check():
     """
     Main safety check logic with HYBRID APPROACH:
@@ -1081,6 +1217,14 @@ def perform_safety_check():
         except Exception as e:
             log(f"Error during valve voltage check: {e}", "ERROR")
 
+        # ─── Anomalous Setpoint Check (Layer 3 backup) ───
+        # Catches setpoints < 10°C in heat mode (dropped set_temperature)
+        log("Checking for anomalous setpoints...")
+        try:
+            check_anomalous_setpoints()
+        except Exception as e:
+            log(f"Error during anomalous setpoint check: {e}", "ERROR")
+
         return "OK"
 
 
@@ -1129,6 +1273,7 @@ def main():
     log(f"  Stuck-idle urgent: {STUCK_IDLE_URGENT_THRESHOLD // 60}min (entry: deficit >= {STUCK_IDLE_DEFICIT}°C, recovery: deficit >= {STUCK_IDLE_URGENT_DEFICIT}°C)")
     log(f"  Stuck-idle max recoveries/hour: {STUCK_IDLE_MAX_RECOVERIES}")
     log(f"  Valve voltage alert: < {VALVE_VOLTAGE_ABS_MIN} mV or > {VALVE_VOLTAGE_PEER_DEVIATION * 100:.0f}% below peers")
+    log(f"  Anomalous setpoint guard: < {ANOMALOUS_SETPOINT_THRESHOLD}°C in heat mode → restore from saved temp")
     log("")
 
     # Validate configuration

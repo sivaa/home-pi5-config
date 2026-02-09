@@ -1253,6 +1253,95 @@
       data:
         temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
 
+    # ── VERIFY-RETRY: Confirm setpoints were actually applied ──
+    # ┌────────────────────────────────────────────────────────────────────────┐
+    # │  WHY: If a TRV was offline when set_temperature was sent (3s after    │
+    # │  set_hvac_mode), the command is silently dropped. TRV later comes     │
+    # │  online with mode=heat but setpoint=4°C (firmware minimum).           │
+    # │                                                                        │
+    # │  FIX: Wait 30s for TRV Zigbee reports, then verify each TRV's        │
+    # │  setpoint matches saved temp. Retry once if mismatch > 1°C.           │
+    # │  (Feb 9, 2026 — Living Inner incident)                                │
+    # └────────────────────────────────────────────────────────────────────────┘
+    - delay:
+        seconds: 30
+
+    - variables:
+        mismatched: >
+          {% set mm = namespace(items=[]) %}
+          {% if is_state('input_boolean.study_heater_was_on', 'on') %}
+            {% set expected = states('input_number.study_heater_saved_temp') | float(18) %}
+            {% set actual = state_attr('climate.study_thermostat', 'temperature') | float(0) %}
+            {% if (actual - expected) | abs > 1.0 %}
+              {% set mm.items = mm.items + [{'entity': 'climate.study_thermostat', 'name': 'Study', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Study] Thermostat/set'}] %}
+            {% endif %}
+          {% endif %}
+          {% if is_state('input_boolean.living_inner_heater_was_on', 'on') %}
+            {% set expected = states('input_number.living_inner_heater_saved_temp') | float(18) %}
+            {% set actual = state_attr('climate.living_thermostat_inner', 'temperature') | float(0) %}
+            {% if (actual - expected) | abs > 1.0 %}
+              {% set mm.items = mm.items + [{'entity': 'climate.living_thermostat_inner', 'name': 'Living Inner', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Living] Thermostat Inner/set'}] %}
+            {% endif %}
+          {% endif %}
+          {% if is_state('input_boolean.living_outer_heater_was_on', 'on') %}
+            {% set expected = states('input_number.living_outer_heater_saved_temp') | float(18) %}
+            {% set actual = state_attr('climate.living_thermostat_outer', 'temperature') | float(0) %}
+            {% if (actual - expected) | abs > 1.0 %}
+              {% set mm.items = mm.items + [{'entity': 'climate.living_thermostat_outer', 'name': 'Living Outer', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Living] Thermostat Outer/set'}] %}
+            {% endif %}
+          {% endif %}
+          {% if is_state('input_boolean.bedroom_heater_was_on', 'on') %}
+            {% set expected = states('input_number.bedroom_heater_saved_temp') | float(18) %}
+            {% set actual = state_attr('climate.bed_thermostat', 'temperature') | float(0) %}
+            {% if (actual - expected) | abs > 1.0 %}
+              {% set mm.items = mm.items + [{'entity': 'climate.bed_thermostat', 'name': 'Bedroom', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Bed] Thermostat/set'}] %}
+            {% endif %}
+          {% endif %}
+          {{ mm.items }}
+
+    - if:
+        - condition: template
+          value_template: "{{ mismatched | length > 0 }}"
+      then:
+        - repeat:
+            for_each: "{{ mismatched }}"
+            sequence:
+              - service: mqtt.publish
+                data:
+                  topic: "{{ repeat.item.mqtt }}"
+                  payload: '{"open_window": "OFF"}'
+                  retain: true
+              - delay:
+                  seconds: 2
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ repeat.item.entity }}"
+                data:
+                  temperature: "{{ repeat.item.expected }}"
+              - delay:
+                  seconds: 3
+
+        - service: notify.all_phones
+          data:
+            title: "🔄 Resume Verify-Retry (Window)"
+            message: >
+              Setpoint mismatch 30s after resume.
+              Retried: {{ mismatched | map(attribute='name') | join(', ') }}.
+              {% for m in mismatched %}{{ m.name }}: expected {{ m.expected }}°C, was {{ m.actual }}°C. {% endfor %}
+            data:
+              channel: "Warning"
+              importance: high
+              tag: "resume_verify_retry"
+
+        - service: influxdb.write
+          data:
+            measurement: thermostat_events
+            tags:
+              event_type: resume_verify_retry
+            fields:
+              thermostats: "{{ mismatched | map(attribute='name') | join(',') }}"
+              source: "window_resume"
+
     # Clear the guard flag (ready for next window event)
     - service: input_boolean.turn_off
       target:
@@ -1912,6 +2001,86 @@
             entity_id: climate.bed_thermostat
           data:
             temperature: "{{ states('input_number.bedroom_heater_saved_temp') | float(18) }}"
+
+        # ── VERIFY-RETRY: Same pattern as window resume (Feb 9, 2026) ──
+        - delay:
+            seconds: 30
+
+        - variables:
+            mismatched: >
+              {% set mm = namespace(items=[]) %}
+              {% if is_state('input_boolean.study_heater_was_on', 'on') %}
+                {% set expected = states('input_number.study_heater_saved_temp') | float(18) %}
+                {% set actual = state_attr('climate.study_thermostat', 'temperature') | float(0) %}
+                {% if (actual - expected) | abs > 1.0 %}
+                  {% set mm.items = mm.items + [{'entity': 'climate.study_thermostat', 'name': 'Study', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Study] Thermostat/set'}] %}
+                {% endif %}
+              {% endif %}
+              {% if is_state('input_boolean.living_inner_heater_was_on', 'on') %}
+                {% set expected = states('input_number.living_inner_heater_saved_temp') | float(18) %}
+                {% set actual = state_attr('climate.living_thermostat_inner', 'temperature') | float(0) %}
+                {% if (actual - expected) | abs > 1.0 %}
+                  {% set mm.items = mm.items + [{'entity': 'climate.living_thermostat_inner', 'name': 'Living Inner', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Living] Thermostat Inner/set'}] %}
+                {% endif %}
+              {% endif %}
+              {% if is_state('input_boolean.living_outer_heater_was_on', 'on') %}
+                {% set expected = states('input_number.living_outer_heater_saved_temp') | float(18) %}
+                {% set actual = state_attr('climate.living_thermostat_outer', 'temperature') | float(0) %}
+                {% if (actual - expected) | abs > 1.0 %}
+                  {% set mm.items = mm.items + [{'entity': 'climate.living_thermostat_outer', 'name': 'Living Outer', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Living] Thermostat Outer/set'}] %}
+                {% endif %}
+              {% endif %}
+              {% if is_state('input_boolean.bedroom_heater_was_on', 'on') %}
+                {% set expected = states('input_number.bedroom_heater_saved_temp') | float(18) %}
+                {% set actual = state_attr('climate.bed_thermostat', 'temperature') | float(0) %}
+                {% if (actual - expected) | abs > 1.0 %}
+                  {% set mm.items = mm.items + [{'entity': 'climate.bed_thermostat', 'name': 'Bedroom', 'expected': expected, 'actual': actual, 'mqtt': 'zigbee2mqtt/[Bed] Thermostat/set'}] %}
+                {% endif %}
+              {% endif %}
+              {{ mm.items }}
+
+        - if:
+            - condition: template
+              value_template: "{{ mismatched | length > 0 }}"
+          then:
+            - repeat:
+                for_each: "{{ mismatched }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ repeat.item.mqtt }}"
+                      payload: '{"open_window": "OFF"}'
+                      retain: true
+                  - delay:
+                      seconds: 2
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: "{{ repeat.item.entity }}"
+                    data:
+                      temperature: "{{ repeat.item.expected }}"
+                  - delay:
+                      seconds: 3
+
+            - service: notify.all_phones
+              data:
+                title: "🔄 Resume Verify-Retry (CO2)"
+                message: >
+                  Setpoint mismatch 30s after CO2 resume.
+                  Retried: {{ mismatched | map(attribute='name') | join(', ') }}.
+                  {% for m in mismatched %}{{ m.name }}: expected {{ m.expected }}°C, was {{ m.actual }}°C. {% endfor %}
+                data:
+                  channel: "Warning"
+                  importance: high
+                  tag: "resume_verify_retry"
+
+            - service: influxdb.write
+              data:
+                measurement: thermostat_events
+                tags:
+                  event_type: resume_verify_retry
+                fields:
+                  thermostats: "{{ mismatched | map(attribute='name') | join(',') }}"
+                  source: "co2_resume"
 
         # Clear CO2 flag
         - service: input_boolean.turn_off
@@ -5833,3 +6002,201 @@
       data:
         message: "LOW BATTERY: {{ thermostat_name }} thermostat at {{ battery_level }}%"
         level: warning
+
+# =============================================================================
+# ANOMALOUS SETPOINT GUARD
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 9, 2026 — Living Inner TRV at 4°C setpoint in heat mode    │
+# │                                                                             │
+# │  Resume automation sent set_temperature(19°C) while TRV was offline.       │
+# │  Zigbee delivered set_hvac_mode(heat) 2 hours later, but set_temperature   │
+# │  was lost. TRV entered heat mode with firmware minimum (4°C).              │
+# │                                                                             │
+# │  ┌──────────────────┬────────────────────────────────────────────────────┐ │
+# │  │ Existing Safety  │ Why It Missed                                      │ │
+# │  ├──────────────────┼────────────────────────────────────────────────────┤ │
+# │  │ Zombie recovery  │ Only catches mode=OFF — this was heat             │ │
+# │  │ Stuck-idle       │ Needs deficit ≥ 2°C — deficit was -14°C           │ │
+# │  │ Energy cap       │ Only fires when setpoint > 19°C                   │ │
+# │  └──────────────────┴────────────────────────────────────────────────────┘ │
+# │                                                                             │
+# │  THIS AUTOMATION fills the gap: catches setpoint < 10°C in heat mode.     │
+# │  Threshold 10°C: 6°C below lowest legitimate setting (16°C schedule).     │
+# │  Catches firmware defaults (4°C min_temp, 7°C frost protection).          │
+# │                                                                             │
+# │  ANTI-LOOP: Restores to ~19°C → energy cap may fire → sets to 19°C →     │
+# │  19°C > 10°C → guard does NOT re-fire. No loop possible.                  │
+# │                                                                             │
+# │  30s COOLDOWN after guard flag changes: avoids racing with resume          │
+# │  automation which briefly has a transient 4°C before set_temperature.      │
+# └─────────────────────────────────────────────────────────────────────────────┘
+- id: anomalous_setpoint_guard
+  alias: "Anomalous Setpoint Guard (< 10°C in heat mode)"
+  description: >
+    Detects and corrects TRVs with anomalously low setpoints (< 10°C) while in
+    heat mode. Caused by set_temperature command dropped during resume when TRV
+    was temporarily offline. Layer 1 defense (instant + /10 fallback).
+  mode: parallel
+  max: 4
+
+  trigger:
+    # Trigger A: Setpoint attribute changes (instant detection)
+    - platform: state
+      entity_id:
+        - climate.study_thermostat
+        - climate.living_thermostat_inner
+        - climate.living_thermostat_outer
+        - climate.bed_thermostat
+      attribute: temperature
+      id: setpoint_change
+
+    # Trigger B: Periodic fallback (catches HA restart, missed events)
+    - platform: time_pattern
+      minutes: "/10"
+      id: periodic_check
+
+  variables:
+    anomalous_threshold: 10
+    saved_temp_map:
+      climate.study_thermostat: "input_number.study_heater_saved_temp"
+      climate.living_thermostat_inner: "input_number.living_inner_heater_saved_temp"
+      climate.living_thermostat_outer: "input_number.living_outer_heater_saved_temp"
+      climate.bed_thermostat: "input_number.bedroom_heater_saved_temp"
+    name_map:
+      climate.study_thermostat: "Study"
+      climate.living_thermostat_inner: "Living Inner"
+      climate.living_thermostat_outer: "Living Outer"
+      climate.bed_thermostat: "Bedroom"
+    mqtt_topic_map:
+      climate.study_thermostat: "zigbee2mqtt/[Study] Thermostat/set"
+      climate.living_thermostat_inner: "zigbee2mqtt/[Living] Thermostat Inner/set"
+      climate.living_thermostat_outer: "zigbee2mqtt/[Living] Thermostat Outer/set"
+      climate.bed_thermostat: "zigbee2mqtt/[Bed] Thermostat/set"
+
+  condition:
+    # Guard flags must be OFF (intentional shutoff → let resume handle it)
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+    # 30s cooldown after guard flag changes (avoid racing with resume)
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(now()) - as_timestamp(states.input_boolean.heaters_off_due_to_window.last_changed)) > 30
+           and (as_timestamp(now()) - as_timestamp(states.input_boolean.heaters_off_due_to_co2.last_changed)) > 30 }}
+
+  action:
+    # For setpoint_change: check only the triggering entity
+    # For periodic_check: check all thermostats
+    - variables:
+        entities_to_check: >
+          {% if trigger.id == 'setpoint_change' %}
+            {{ [trigger.entity_id] }}
+          {% else %}
+            {{ ['climate.study_thermostat', 'climate.living_thermostat_inner',
+                'climate.living_thermostat_outer', 'climate.bed_thermostat'] }}
+          {% endif %}
+
+    - repeat:
+        for_each: "{{ entities_to_check }}"
+        sequence:
+          - variables:
+              entity: "{{ repeat.item }}"
+              hvac_mode: "{{ states(entity) }}"
+              setpoint: "{{ state_attr(entity, 'temperature') | float(20) }}"
+              current_temp: "{{ state_attr(entity, 'current_temperature') | float(0) }}"
+              heater_name: "{{ name_map.get(entity, entity) }}"
+              saved_temp_entity: "{{ saved_temp_map.get(entity, '') }}"
+              saved_temp: "{{ states(saved_temp_entity) | float(18) if saved_temp_entity else 18 }}"
+              restore_temp: "{{ saved_temp if saved_temp | float >= anomalous_threshold else 18 }}"
+              mqtt_topic: "{{ mqtt_topic_map.get(entity, '') }}"
+
+          - if:
+              - condition: template
+                value_template: >
+                  {{ hvac_mode == 'heat' and setpoint | float < anomalous_threshold }}
+            then:
+              # Clear open_window flag (might be stuck from off→heat transition)
+              - if:
+                  - condition: template
+                    value_template: "{{ mqtt_topic != '' }}"
+                then:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ mqtt_topic }}"
+                      payload: '{"open_window": "OFF"}'
+                      retain: true
+
+              # Restore setpoint from saved temp
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ entity }}"
+                data:
+                  temperature: "{{ restore_temp }}"
+
+              # Log to InfluxDB
+              - service: influxdb.write
+                data:
+                  measurement: thermostat_events
+                  tags:
+                    event_type: anomalous_setpoint_corrected
+                  fields:
+                    thermostat: "{{ heater_name }}"
+                    anomalous_setpoint: "{{ setpoint }}"
+                    restored_to: "{{ restore_temp }}"
+                    trigger: "{{ trigger.id }}"
+
+              # Phone notification
+              - service: notify.all_phones
+                data:
+                  title: "🛡️ Anomalous Setpoint Corrected"
+                  message: >
+                    {{ heater_name }}: was {{ setpoint }}°C in heat mode!
+                    Restored to {{ restore_temp }}°C (room: {{ current_temp }}°C).
+                    Cause: set_temperature likely dropped during resume.
+                  data:
+                    channel: "Warning"
+                    importance: high
+                    tag: "anomalous_setpoint_{{ entity }}"
+
+              # Email (paper trail)
+              - service: script.send_alert_email
+                data:
+                  severity: "WARNING"
+                  title: "Anomalous Setpoint Corrected"
+                  subtitle: "{{ heater_name }}"
+                  description: >-
+                    TRV {{ heater_name }} was in heat mode with setpoint {{ setpoint }}°C
+                    (below {{ anomalous_threshold }}°C threshold). Restored to {{ restore_temp }}°C
+                    from saved temp helper. Trigger: {{ trigger.id }}.
+                  actions: "Verify TRV is heating correctly|Check resume automation logs"
+                  details: >-
+                    Entity: {{ entity }}
+                    Anomalous setpoint: {{ setpoint }}°C
+                    Restored to: {{ restore_temp }}°C
+                    Saved temp helper: {{ saved_temp }}°C
+                    Room temp: {{ current_temp }}°C
+                  plain_text: >-
+                    {{ heater_name }} TRV anomalous setpoint corrected: {{ setpoint }}°C → {{ restore_temp }}°C.
+                    Room temp: {{ current_temp }}°C. Trigger: {{ trigger.id }}.
+
+# ─── ANOMALOUS SETPOINT GUARD — STARTUP CHECK ───
+# On HA startup, entities settle slowly. Wait 30s then trigger the main guard.
+- id: anomalous_setpoint_guard_startup
+  alias: "Anomalous Setpoint Guard - Startup Check"
+  description: "On HA startup, check for anomalous setpoints from while HA was down"
+  mode: single
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  action:
+    - delay:
+        seconds: 30
+    - service: automation.trigger
+      target:
+        entity_id: automation.anomalous_setpoint_guard

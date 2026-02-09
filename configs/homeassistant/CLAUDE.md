@@ -562,6 +562,45 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 
 ---
 
+## Anomalous Setpoint Guard (Feb 9, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ANOMALOUS SETPOINT GUARD — Catches dropped set_temperature commands        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  INCIDENT: Living Inner TRV at 4°C setpoint in heat mode for 2+ hours      │
+│  Resume sent set_temperature(19°C) while TRV was offline → command lost     │
+│  TRV came online with mode=heat + firmware default 4°C                      │
+│                                                                              │
+│  DETECTION: mode=heat AND setpoint < 10°C AND guard flags OFF               │
+│  THRESHOLD: 10°C (6°C below lowest legitimate 16°C schedule setting)        │
+│  ACTION: Restore from input_number.*_heater_saved_temp (or 18°C default)    │
+│                                                                              │
+│  THREE LAYERS:                                                               │
+│    Layer 1: HA automation (instant on setpoint change + /10 min poll)        │
+│    Layer 2: Verify-retry in resume automations (30s after initial restore)   │
+│    Layer 3: Heater watchdog (5 min poll, reads saved temp from HA API)       │
+│                                                                              │
+│  ANTI-LOOP: Restores to ~19°C → energy cap may fire → 19°C > 10°C → safe  │
+│  30s COOLDOWN: After guard flag changes, avoids racing with resume           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Automations
+
+| Automation | ID | Trigger | Action |
+|------------|-----|---------|--------|
+| Anomalous Setpoint Guard | `anomalous_setpoint_guard` | setpoint change + /10 min | Restore from saved temp |
+| Anomalous Guard Startup | `anomalous_setpoint_guard_startup` | HA start | Trigger main guard after 30s |
+
+### Verify-Retry in Resume Automations
+
+Both `all_windows_closed_resume_heaters` and `co2_low_resume_heaters` have a 30s verify-retry block that checks if each TRV's actual setpoint matches the saved temp. If divergence > 1°C, retries with MQTT open_window OFF + set_temperature.
+
+---
+
 ## Stuck-Idle TRV Recovery (Feb 7, 2026)
 
 ```
@@ -616,6 +655,14 @@ Rooms: `study`, `living_inner`, `living_outer`, `bedroom`
 
 ## History
 
+- **Feb 9, 2026**: Added anomalous setpoint guard (3-layer defense)
+  - Incident: Living Inner TRV stuck at 4°C setpoint (heat mode) for 2+ hours
+  - Root cause: set_temperature dropped during window resume (TRV was offline)
+  - New: `anomalous_setpoint_guard` automation (instant + /10 min poll)
+  - New: `anomalous_setpoint_guard_startup` companion automation
+  - Enhanced: Window + CO2 resume automations with 30s verify-retry block
+  - Enhanced: Heater watchdog with `check_anomalous_setpoints()` (Layer 3)
+  - Threshold: 10°C (6°C below lowest legitimate 16°C schedule)
 - **Feb 7, 2026**: Added stuck-idle TRV recovery + fixed zombie recovery masking
   - Incident: Living Inner TRV stuck idle 10+ hours, valve motor seized
   - Root cause: 10h in OFF mode → valve voltage degraded 1770→1145 mV

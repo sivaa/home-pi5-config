@@ -127,6 +127,7 @@ docker logs heater-watchdog --tail 100
 |  +- Ghost external temp detection (clears stale values)    |
 |  +- Stuck-idle detection (tiered: 20min urgent / 45min)    |
 |  +- Valve voltage early warning (motor degradation alert)  |
+|  +- Anomalous setpoint guard (< 10°C in heat mode)        |
 |  +- Sets guard flag with retry (3 attempts) for resume     |
 +------------------------------------------------------------+
 ```
@@ -235,6 +236,31 @@ docker logs heater-watchdog --tail 100
 | `climate.living_thermostat_inner` | `sensor.living_thermostat_inner_valve_opening_limit_voltage` |
 | `climate.living_thermostat_outer` | `sensor.living_thermostat_outer_valve_opening_limit_voltage` |
 | `climate.bed_thermostat` | `sensor.bed_thermostat_valve_opening_limit_voltage` |
+
+## Anomalous Setpoint Guard (Feb 9, 2026)
+
+**Layer 3 backup** for HA automation `anomalous_setpoint_guard`.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INCIDENT: Feb 9, 2026 — Living Inner TRV at 4°C in heat      │
+│  ROOT CAUSE: set_temperature dropped during window resume       │
+│  while TRV was temporarily offline (2 hours unresponsive)       │
+│                                                                 │
+│  DETECTION: mode=heat AND setpoint < 10°C                      │
+│  ACTION: Restore from input_number saved temp via HA API        │
+│  THRESHOLD: 10°C — 6°C below lowest legitimate (16°C)          │
+│  RATE LIMIT: 2 corrections/TRV/hour (in-memory)                │
+│  RUNS: Every 5 min (after valve voltage check)                  │
+│                                                                 │
+│  WHY NOT IN STUCK-IDLE: Stuck-idle checks deficit               │
+│  (setpoint - current >= 2°C). With setpoint=4 and room=18,     │
+│  deficit is -14°C → no trigger. Different failure mode.         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key function:**
+- `check_anomalous_setpoints()` — reads saved temps from `input_number.*_heater_saved_temp` helpers
 
 ## Daily Valve Exercise (Feb 9, 2026)
 
