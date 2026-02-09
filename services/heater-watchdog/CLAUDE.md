@@ -120,11 +120,13 @@ docker logs heater-watchdog --tail 100
 |  +- prevent_heating_if_window_open (immediate block)       |
 |  +- all_windows_closed_resume_heaters                      |
 |  +- watchdog_recovery_resume_check (1min periodic safety)  |
+|  +- daily_valve_exercise (3 AM, prevents motor seizure)    |
 |                                                             |
 |  Layer 2: Heater Watchdog (Poll-Based, 5min intervals)      |
 |  +- Window safety check - catches anything L1 might miss   |
 |  +- Ghost external temp detection (clears stale values)    |
-|  +- Stuck-idle detection (45min threshold, 2-phase recovery)|
+|  +- Stuck-idle detection (tiered: 20min urgent / 45min)    |
+|  +- Valve voltage early warning (motor degradation alert)  |
 |  +- Sets guard flag with retry (3 attempts) for resume     |
 +------------------------------------------------------------+
 ```
@@ -159,14 +161,26 @@ docker logs heater-watchdog --tail 100
 | `climate.living_thermostat_outer` | `number.living_thermostat_outer_external_temperature_input` |
 | `climate.bed_thermostat` | `number.bed_thermostat_external_temperature_input` |
 
-## Stuck-Idle Detection (Feb 7, 2026)
+## Stuck-Idle Detection (Feb 7, 2026, updated Feb 9)
 
 **Layer 2 backup** for HA automation `thermostat_stuck_idle_recovery`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  DETECTION: mode=heat + action=idle + deficit ≥ 2°C            │
-│  THRESHOLD: 45 minutes (longer than HA's 60+15=75min)          │
+│  DETECTION: mode=heat + action=idle + entry deficit ≥ 2°C      │
+│                                                                 │
+│  TIERED THRESHOLDS (Fix 1, Feb 9 2026):                        │
+│  ┌──────────┬──────────┬──────────────────────────────────────┐ │
+│  │ URGENT   │ 20 min   │ deficit ≥ 4°C → clearly broken       │ │
+│  │ NORMAL   │ 45 min   │ any tracked TRV still idle           │ │
+│  └──────────┴──────────┴──────────────────────────────────────┘ │
+│                                                                 │
+│  DEADLOCK FIX (Fix 5, Feb 9 2026):                             │
+│  Once tracked, only remove when hvac_action != "idle".          │
+│  Ambient warming reducing deficit does NOT clear tracker.       │
+│  Before: deficit 3°C→1.5°C → removed → never recovers.        │
+│  Now:    stays tracked until valve actually opens.              │
+│                                                                 │
 │  RATE LIMIT: 2 recoveries/thermostat/hour (in-memory)          │
 │                                                                 │
 │  TWO-PHASE RECOVERY (same as HA automation):                   │
@@ -181,15 +195,68 @@ docker logs heater-watchdog --tail 100
 ```
 
 **Key functions:**
-- `get_stuck_idle_thermostats()` — queries HA API for stuck TRVs
 - `recover_stuck_idle_thermostat()` — two-phase recovery via HA REST API
 - `check_stuck_idle()` — orchestrator called from `perform_safety_check()`
 
 **When this fires vs HA automation:**
 - HA automation: every 15min, 60min stuck threshold → catches most cases
-- Watchdog: every 5min poll, 45min stuck tracking → fires only if HA missed it
-- The 45min watchdog threshold + 5min polling means watchdog fires ~50min in practice,
-  which is earlier than HA's effective 75min (60min stuck + 15min poll alignment)
+- Watchdog urgent tier: 20min + 4°C deficit → fires before HA (catches severe cases fast)
+- Watchdog normal tier: 45min (any tracked TRV) → fires ~50min in practice
+- HA's effective response: 60min stuck + 15min poll = 75min
+
+## Valve Voltage Early Warning (Feb 9, 2026)
+
+**Proactive monitoring** for valve motor degradation.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  INCIDENT: Feb 9, 2026 — Bedroom TRV at 1662 mV while         │
+│  peers were at 2070 mV. Motor too weak to open valve.          │
+│                                                                 │
+│  DETECTION:                                                     │
+│    1. Absolute: voltage < 1700 mV (motor failing)              │
+│    2. Relative: >20% below peer average (outlier)              │
+│                                                                 │
+│  ACTION: Alert only (no recovery — early warning system)       │
+│  COOLDOWN: 4 hours per TRV (avoid alert spam)                  │
+│  RUNS: Every 5 min (after stuck-idle check)                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key function:**
+- `check_valve_voltages()` — compares `sensor.*_valve_opening_limit_voltage` across TRVs
+
+**Entities checked:**
+| Thermostat | Voltage Entity |
+|-----------|---------------|
+| `climate.study_thermostat` | `sensor.study_thermostat_valve_opening_limit_voltage` |
+| `climate.living_thermostat_inner` | `sensor.living_thermostat_inner_valve_opening_limit_voltage` |
+| `climate.living_thermostat_outer` | `sensor.living_thermostat_outer_valve_opening_limit_voltage` |
+| `climate.bed_thermostat` | `sensor.bed_thermostat_valve_opening_limit_voltage` |
+
+## Daily Valve Exercise (Feb 9, 2026)
+
+**HA automation** (`daily_valve_exercise`) — prevents motor seizure.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  TRIGGER: 3:07 AM daily (offset from :00 to avoid /15 polls)   │
+│  ACTION: For each TRV in heat mode + battery >= 40%:           │
+│    1. Clear open_window flag via MQTT                          │
+│    2. Bump setpoint +5°C (forces valve open)                   │
+│    3. Wait 30s (motor exercises)                               │
+│    4. Restore original setpoint (with retry verification)      │
+│    5. 15s pause between TRVs (Zigbee traffic)                  │
+│                                                                 │
+│  SAFETY:                                                       │
+│    - Only TRVs in heat mode + battery >= 40%                   │
+│    - Skip if windows open or CO2 guard active                  │
+│    - Setpoint restore retries once on failure                  │
+│    - 3 AM = everyone asleep, brief bump is imperceptible       │
+│                                                                 │
+│  LOCATION: configs/homeassistant/automations.yaml              │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Auto-Resume Flow
 

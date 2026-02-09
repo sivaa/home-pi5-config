@@ -169,16 +169,57 @@ EXTERNAL_TEMP_MAX_DIVERGENCE = 5.0  # °C — clear if external drifts this far 
 # =============================================================================
 # STUCK-IDLE DETECTION CONFIG
 # =============================================================================
-# ┌────────────────────────────────────────────────────────────────────┐
-# │  Layer 2 backup for HA automation (thermostat_stuck_idle_recovery) │
-# │  HA checks every 15min with 60min threshold → effective ~75min    │
-# │  Watchdog uses 45min threshold to avoid conflict with HA          │
-# │  Only fires when no windows are open (window safety takes priority)│
-# └────────────────────────────────────────────────────────────────────┘
-STUCK_IDLE_THRESHOLD = 45 * 60  # 45 minutes before attempting recovery
-STUCK_IDLE_DEFICIT = 2.0  # Minimum °C deficit to consider "stuck"
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  Layer 2 backup for HA automation (thermostat_stuck_idle_recovery)      │
+# │                                                                         │
+# │  TIERED THRESHOLDS (Fix 1, Feb 9 2026):                                │
+# │  ┌──────────────────────────────────────────────────────────────────┐  │
+# │  │  Tier    │ Time     │ Deficit │ Reasoning                        │  │
+# │  │  ────────┼──────────┼─────────┼────────────────────────────────  │  │
+# │  │  URGENT  │ 20 min   │ ≥ 4°C   │ 4°C gap = clearly broken        │  │
+# │  │  NORMAL  │ 45 min   │ ≥ 2°C   │ Original threshold (Layer 2)    │  │
+# │  └──────────────────────────────────────────────────────────────────┘  │
+# │                                                                         │
+# │  DEADLOCK FIX (Fix 5, Feb 9 2026):                                     │
+# │  After HA restart, last_changed resets for all entities. The HA         │
+# │  automation requires last_changed > 60 min, but ambient warming from    │
+# │  other rooms reduces the deficit below 2°C before 60 min passes.       │
+# │  The two conditions never overlap → automation never fires.             │
+# │                                                                         │
+# │  Fix: Once a TRV enters stuck_idle_tracker, only remove it when         │
+# │  hvac_action becomes "heating" (not when deficit drops). Ambient        │
+# │  warming masks the problem but doesn't fix the stuck valve.             │
+# └─────────────────────────────────────────────────────────────────────────┘
+STUCK_IDLE_THRESHOLD = 45 * 60  # Normal: 45 minutes before recovery
+STUCK_IDLE_URGENT_THRESHOLD = 20 * 60  # Urgent: 20 min if deficit is severe
+STUCK_IDLE_DEFICIT = 2.0  # Normal minimum °C deficit
+STUCK_IDLE_URGENT_DEFICIT = 4.0  # Urgent tier: recover faster with big gap
 STUCK_IDLE_MAX_RECOVERIES = 2  # Max recoveries per thermostat per hour
 STUCK_IDLE_SETPOINT_FLOOR = 18  # Min setpoint for race condition guard
+
+# =============================================================================
+# VALVE VOLTAGE EARLY WARNING (Fix 4, Feb 9 2026)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  TRVZB valve motors degrade over time, especially after extended OFF.  │
+# │  valve_opening_limit_voltage indicates how much force the motor needs  │
+# │  to open the valve. Healthy TRVs read ~2000-2100 mV.                  │
+# │                                                                         │
+# │  Feb 9 2026: Bedroom TRV was at 1662 mV while peers were at 2070 mV. │
+# │  The motor was too weak to open the valve → stuck idle.                │
+# │                                                                         │
+# │  DETECTION: Compare each TRV's opening voltage against its peers.      │
+# │  If one TRV is >20% below the average of others → alert.              │
+# │  Also alert if absolute voltage < 1700 mV.                             │
+# └─────────────────────────────────────────────────────────────────────────┘
+VALVE_VOLTAGE_ENTITIES = {
+    "climate.study_thermostat": "sensor.study_thermostat_valve_opening_limit_voltage",
+    "climate.living_thermostat_inner": "sensor.living_thermostat_inner_valve_opening_limit_voltage",
+    "climate.living_thermostat_outer": "sensor.living_thermostat_outer_valve_opening_limit_voltage",
+    "climate.bed_thermostat": "sensor.bed_thermostat_valve_opening_limit_voltage",
+}
+VALVE_VOLTAGE_ABS_MIN = 1700  # mV — alert if below this
+VALVE_VOLTAGE_PEER_DEVIATION = 0.20  # Alert if >20% below peer average
 
 # State save timeout (seconds) - don't block core safety action
 STATE_SAVE_TIMEOUT = 5
@@ -203,6 +244,7 @@ def log_banner():
        Independent safety monitor for heater-window violations
        + Stuck-idle TRV detection and auto-recovery (Layer 2 backup)
        + Ghost external temperature detection and auto-clear
+       + Valve voltage early warning (motor degradation detection)
        Runs every 5 minutes as defense-in-depth layer
 ================================================================================
 """,
@@ -486,44 +528,6 @@ def is_guard_flag_active():
     return False
 
 
-def get_stuck_idle_thermostats():
-    """Find thermostats stuck in heat+idle with significant temperature deficit.
-
-    Returns list of dicts: [{entity_id, name, setpoint, current_temp, deficit}]
-    """
-    stuck = []
-    for entity_id in THERMOSTATS:
-        try:
-            state = get_entity_state(entity_id)
-            attrs = state.get("attributes", {})
-            hvac_mode = state.get("state")  # 'heat', 'off', etc.
-            hvac_action = attrs.get("hvac_action")  # 'idle', 'heating', etc.
-            setpoint = attrs.get("temperature", 0)
-            current_temp = attrs.get("current_temperature", 0)
-            name = THERMOSTAT_NAMES.get(entity_id, entity_id)
-
-            if (
-                hvac_mode == "heat"
-                and hvac_action == "idle"
-                and setpoint is not None
-                and current_temp is not None
-            ):
-                deficit = float(setpoint) - float(current_temp)
-                if deficit >= STUCK_IDLE_DEFICIT:
-                    stuck.append(
-                        {
-                            "entity_id": entity_id,
-                            "name": name,
-                            "setpoint": float(setpoint),
-                            "current_temp": float(current_temp),
-                            "deficit": deficit,
-                        }
-                    )
-        except Exception as e:
-            log(f"Error checking stuck-idle for {entity_id}: {e}", "WARN")
-    return stuck
-
-
 def can_recover(entity_id):
     """Check if we haven't exceeded rate limit for this thermostat."""
     now = time.time()
@@ -640,46 +644,88 @@ def check_stuck_idle():
     """Check for and recover stuck-idle thermostats (Layer 2 backup).
 
     Only runs when no guard flags are active and no windows are open.
-    Uses 45-min threshold (longer than HA's 60+15=75min to avoid conflict).
+
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │  Fix 1 (Feb 9 2026): TIERED THRESHOLDS                            │
+    │  ┌──────────┬──────────┬─────────────────────────────────────────┐ │
+    │  │ URGENT   │ 20 min   │ deficit ≥ 4°C → clearly broken         │ │
+    │  │ NORMAL   │ 45 min   │ any tracked TRV still idle             │ │
+    │  └──────────┴──────────┴─────────────────────────────────────────┘ │
+    │                                                                     │
+    │  Fix 5 (Feb 9 2026): DEADLOCK PREVENTION                          │
+    │  Once tracked, only remove when hvac_action changes from "idle".   │
+    │  Ambient warming reducing deficit does NOT clear the tracker —     │
+    │  the valve is still stuck even if the room warms from other heat.  │
+    │                                                                     │
+    │  Old bug: deficit drops 3°C→1.5°C (ambient) → removed from        │
+    │  tracker → never recovers. Now: stays tracked until valve opens.   │
+    └─────────────────────────────────────────────────────────────────────┘
     """
     # Don't interfere with intentional shutoffs
     if is_guard_flag_active():
         return
 
-    stuck = get_stuck_idle_thermostats()
     now = time.time()
 
-    # Update tracker: add newly stuck, remove recovered
-    current_stuck_ids = {s["entity_id"] for s in stuck}
-    for entity_id in list(stuck_idle_tracker.keys()):
-        if entity_id not in current_stuck_ids:
+    for entity_id in THERMOSTATS:
+        try:
+            state = get_entity_state(entity_id)
+            attrs = state.get("attributes", {})
+            hvac_mode = state.get("state")  # 'heat', 'off', etc.
+            hvac_action = attrs.get("hvac_action")  # 'idle', 'heating', etc.
+            setpoint = attrs.get("temperature")
+            current_temp = attrs.get("current_temperature")
             name = THERMOSTAT_NAMES.get(entity_id, entity_id)
-            log(f"  Stuck-idle cleared: {name} (no longer stuck)", "INFO")
-            del stuck_idle_tracker[entity_id]
 
-    for s in stuck:
-        if s["entity_id"] not in stuck_idle_tracker:
-            stuck_idle_tracker[s["entity_id"]] = now
-            log(
-                f"  Stuck-idle detected: {s['name']} "
-                f"({s['current_temp']}°C / {s['setpoint']}°C target, "
-                f"deficit={s['deficit']:.1f}°C) — tracking started",
-                "WARN",
-            )
+            # ─── Fix 5: Only clear tracker when TRV actually recovers ───
+            # NOT when deficit drops (ambient warming masks the real problem)
+            if entity_id in stuck_idle_tracker:
+                if hvac_mode != "heat" or hvac_action != "idle":
+                    log(f"  Stuck-idle cleared: {name} (now {hvac_mode}/{hvac_action})", "INFO")
+                    del stuck_idle_tracker[entity_id]
+                    continue
 
-    # Check which ones have exceeded threshold
-    for s in stuck:
-        entity_id = s["entity_id"]
-        first_seen = stuck_idle_tracker.get(entity_id, now)
-        duration = now - first_seen
+            # Skip if not in stuck-idle state
+            if hvac_mode != "heat" or hvac_action != "idle":
+                continue
+            if setpoint is None or current_temp is None:
+                continue
 
-        if duration >= STUCK_IDLE_THRESHOLD:
-            name = s["name"]
-            log(
-                f"  Stuck-idle THRESHOLD reached: {name} "
-                f"({duration / 60:.0f}min, deficit={s['deficit']:.1f}°C)",
-                "WARN",
-            )
+            deficit = float(setpoint) - float(current_temp)
+
+            # ─── Track new stuck TRVs (entry requires deficit ≥ 2°C) ───
+            if entity_id not in stuck_idle_tracker:
+                if deficit >= STUCK_IDLE_DEFICIT:
+                    stuck_idle_tracker[entity_id] = now
+                    log(
+                        f"  Stuck-idle detected: {name} "
+                        f"({current_temp}°C / {setpoint}°C target, "
+                        f"deficit={deficit:.1f}°C) — tracking started",
+                        "WARN",
+                    )
+                continue  # Just started tracking, don't recover yet
+
+            # ─── Fix 1: Tiered threshold check ───
+            first_seen = stuck_idle_tracker[entity_id]
+            duration = now - first_seen
+
+            threshold_met = False
+            tier_name = ""
+
+            # Tier 1: URGENT — big deficit, recover fast
+            if deficit >= STUCK_IDLE_URGENT_DEFICIT and duration >= STUCK_IDLE_URGENT_THRESHOLD:
+                threshold_met = True
+                tier_name = f"URGENT ({duration / 60:.0f}min, deficit={deficit:.1f}°C)"
+            # Tier 2: NORMAL — after 45min, recover regardless of current deficit
+            # (Fix 5: deficit may have dropped from ambient warming, valve still stuck)
+            elif duration >= STUCK_IDLE_THRESHOLD:
+                threshold_met = True
+                tier_name = f"NORMAL ({duration / 60:.0f}min, deficit={deficit:.1f}°C)"
+
+            if not threshold_met:
+                continue
+
+            log(f"  Stuck-idle {tier_name}: {name}", "WARN")
 
             if not can_recover(entity_id):
                 log(
@@ -693,22 +739,23 @@ def check_stuck_idle():
             result = recover_stuck_idle_thermostat(entity_id)
 
             if result in ("phase1", "phase2"):
-                # Clear tracker on successful recovery
                 stuck_idle_tracker.pop(entity_id, None)
-
-                # Notify
                 phase_desc = "MQTT reset" if result == "phase1" else "off/heat cycle"
                 send_notification(
                     title=f"WATCHDOG: Stuck-Idle Recovery ({name})",
                     message=(
                         f"Recovered {name} via {phase_desc}.\n"
-                        f"Was: {s['current_temp']}°C (target {s['setpoint']}°C)\n"
-                        f"Stuck for {duration / 60:.0f} minutes."
+                        f"Was: {current_temp}°C (target {setpoint}°C)\n"
+                        f"Stuck for {duration / 60:.0f} minutes.\n"
+                        f"Tier: {tier_name}"
                     ),
                     importance="high",
                 )
             else:
                 log(f"  Recovery FAILED for {name} — will retry next cycle", "ERROR")
+
+        except Exception as e:
+            log(f"Error checking stuck-idle for {entity_id}: {e}", "WARN")
 
 
 ghost_temp_clear_tracker = defaultdict(list)  # {entity_id: [timestamp, ...]}
@@ -822,6 +869,106 @@ def check_ghost_external_temps():
             log(f"Error checking external temp for {entity_id}: {e}", "WARN")
 
 
+# =============================================================================
+# VALVE VOLTAGE EARLY WARNING (Fix 4, Feb 9 2026)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  TRVZB valve motors degrade over time. The valve_opening_limit_voltage │
+# │  shows how much force the motor needs. Healthy = ~2000-2100 mV.       │
+# │                                                                         │
+# │  Feb 9 2026 incident:                                                   │
+# │    Bedroom: 1662 mV ← motor struggling                                 │
+# │    Peers:   2070 mV ← healthy                                          │
+# │    Result:  Valve stuck closed → room freezing                         │
+# │                                                                         │
+# │  This is EARLY WARNING only — alerts, no recovery.                     │
+# │  Detection: absolute floor (1700 mV) OR >20% below peer average.      │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+valve_voltage_alert_tracker = {}  # {entity_id: last_alert_timestamp}
+VALVE_VOLTAGE_ALERT_COOLDOWN = 3600 * 4  # 4 hours between alerts per TRV
+
+
+def check_valve_voltages():
+    """Check TRV valve opening voltages for degradation.
+
+    Compares each TRV's valve_opening_limit_voltage against:
+    1. Absolute minimum (1700 mV) — motor too weak to open valve
+    2. Peer average — >20% below peers suggests degradation
+
+    Sends alert only (no recovery) — early warning system.
+    """
+    voltages = {}
+
+    for entity_id, voltage_entity in VALVE_VOLTAGE_ENTITIES.items():
+        try:
+            state = get_entity_state(voltage_entity)
+            voltage_str = state.get("state", "0")
+            if voltage_str in ("unknown", "unavailable"):
+                log(
+                    f"  Valve voltage skip: {THERMOSTAT_NAMES.get(entity_id, entity_id)} "
+                    f"voltage is {voltage_str}",
+                    "WARN",
+                )
+                continue
+            voltages[entity_id] = float(voltage_str)
+        except Exception as e:
+            log(f"Error reading valve voltage for {entity_id}: {e}", "WARN")
+
+    if len(voltages) < 2:
+        return  # Need at least 2 peers to compare
+
+    now = time.time()
+
+    for entity_id, voltage in voltages.items():
+        name = THERMOSTAT_NAMES.get(entity_id, entity_id)
+        alerts = []
+
+        # Check 1: Absolute minimum
+        if voltage < VALVE_VOLTAGE_ABS_MIN:
+            alerts.append(
+                f"Below absolute minimum ({voltage:.0f} mV < {VALVE_VOLTAGE_ABS_MIN} mV)"
+            )
+
+        # Check 2: Peer comparison
+        peer_voltages = [v for eid, v in voltages.items() if eid != entity_id]
+        if peer_voltages:
+            peer_avg = sum(peer_voltages) / len(peer_voltages)
+            if peer_avg > 0:
+                deviation = (peer_avg - voltage) / peer_avg
+                if deviation > VALVE_VOLTAGE_PEER_DEVIATION:
+                    alerts.append(
+                        f"{deviation * 100:.0f}% below peer average "
+                        f"({voltage:.0f} mV vs avg {peer_avg:.0f} mV)"
+                    )
+
+        if alerts:
+            # Rate limit: 4h cooldown per TRV
+            last_alert = valve_voltage_alert_tracker.get(entity_id, 0)
+            if now - last_alert < VALVE_VOLTAGE_ALERT_COOLDOWN:
+                log(f"  Valve voltage alert suppressed for {name} (cooldown)", "INFO")
+                continue
+
+            valve_voltage_alert_tracker[entity_id] = now
+            alert_detail = "; ".join(alerts)
+            log(f"  VALVE VOLTAGE WARNING: {name} — {alert_detail}", "WARN")
+
+            all_voltages = ", ".join(
+                f"{THERMOSTAT_NAMES.get(eid, eid)}={v:.0f}mV"
+                for eid, v in voltages.items()
+            )
+            send_notification(
+                title=f"WATCHDOG: Valve Voltage Warning ({name})",
+                message=(
+                    f"TRV {name} valve motor may be degrading.\n"
+                    f"{alert_detail}\n"
+                    f"All voltages: {all_voltages}\n"
+                    f"Consider: off/heat cycle or replace battery."
+                ),
+                importance="high",
+            )
+
+
 def perform_safety_check():
     """
     Main safety check logic with HYBRID APPROACH:
@@ -924,6 +1071,14 @@ def perform_safety_check():
         except Exception as e:
             log(f"Error during stuck-idle check: {e}", "ERROR")
 
+        # ─── Valve Voltage Early Warning (Fix 4) ───
+        # Detect degrading valve motors before they seize
+        log("Checking valve voltages...")
+        try:
+            check_valve_voltages()
+        except Exception as e:
+            log(f"Error during valve voltage check: {e}", "ERROR")
+
         return "OK"
 
 
@@ -968,9 +1123,10 @@ def main():
     log(f"  Monitoring {len(DOOR_SENSORS)} door sensors ({DOOR_OPEN_DELAY}s delay)")
     log(f"  Monitoring {len(THERMOSTATS)} thermostats")
     log(f"  Worst-case response time for doors: {CHECK_INTERVAL + DOOR_OPEN_DELAY}s ({(CHECK_INTERVAL + DOOR_OPEN_DELAY) // 60}min)")
-    log(f"  Stuck-idle threshold: {STUCK_IDLE_THRESHOLD}s ({STUCK_IDLE_THRESHOLD // 60}min)")
-    log(f"  Stuck-idle deficit: {STUCK_IDLE_DEFICIT}°C")
+    log(f"  Stuck-idle normal: {STUCK_IDLE_THRESHOLD}s ({STUCK_IDLE_THRESHOLD // 60}min) @ deficit >= {STUCK_IDLE_DEFICIT}°C")
+    log(f"  Stuck-idle urgent: {STUCK_IDLE_URGENT_THRESHOLD}s ({STUCK_IDLE_URGENT_THRESHOLD // 60}min) @ deficit >= {STUCK_IDLE_URGENT_DEFICIT}°C")
     log(f"  Stuck-idle max recoveries/hour: {STUCK_IDLE_MAX_RECOVERIES}")
+    log(f"  Valve voltage alert: < {VALVE_VOLTAGE_ABS_MIN} mV or > {VALVE_VOLTAGE_PEER_DEVIATION * 100:.0f}% below peers")
     log("")
 
     # Validate configuration

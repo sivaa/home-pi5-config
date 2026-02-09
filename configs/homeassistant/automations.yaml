@@ -5294,6 +5294,142 @@
           thermostats: "{{ maxed_out | map(attribute='name') | join(',') }}"
 
 # =============================================================================
+# DAILY VALVE EXERCISE (Fix 3, Feb 9 2026)
+# =============================================================================
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  INCIDENT: Feb 9, 2026 — Bedroom TRV valve motor seized after         │
+# │  extended idle period. Motor voltage degraded 2070→1662 mV.           │
+# │                                                                         │
+# │  PREVENTION: At 3:07 AM, briefly bump each TRV's setpoint by 5°C for │
+# │  30 seconds, then restore. Forces the valve to open/close, preventing │
+# │  the motor from seizing due to prolonged inactivity.                  │
+# │  Time offset from 03:00 to avoid collision with /15 minute polls.    │
+# │                                                                         │
+# │  Timeline per TRV:                                                     │
+# │  ┌──────────┬──────────┬──────────┬──────────┬──────────┐            │
+# │  │ MQTT     │ Bump     │ Wait     │ Restore  │ Pause    │            │
+# │  │ reset    │ +5°C     │ 30s      │ +verify  │ 15s      │            │
+# │  └──────────┴──────────┴──────────┴──────────┴──────────┘            │
+# │                                                                         │
+# │  Safety: Only TRVs in heat mode, no windows open, no CO2 guard.      │
+# │  3 AM chosen: everyone asleep, brief temp bump is imperceptible.      │
+# └─────────────────────────────────────────────────────────────────────────┘
+# =============================================================================
+
+- id: daily_valve_exercise
+  alias: "Daily Valve Exercise (3:07 AM)"
+  description: >
+    At 3:07 AM, briefly bump setpoint on all TRVs in heat mode by 5°C for 30s,
+    then restore. Forces valve motor to open/close, preventing seizure.
+    Time offset from 03:00 to avoid collision with /15 minute poll automations.
+  mode: single
+
+  trigger:
+    # Offset from 03:00 to avoid collision with time_pattern /15 automations
+    # (stuck-idle recovery polls at :00, :15, :30, :45)
+    - platform: time
+      at: "03:07:00"
+
+  condition:
+    # Safety: no windows open
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    # Safety: no CO2 guard
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+
+  action:
+    - variables:
+        thermostats:
+          - entity_id: climate.study_thermostat
+            name: Study
+            mqtt_topic: "zigbee2mqtt/[Study] Thermostat/set"
+            battery_entity: sensor.study_thermostat_battery
+          - entity_id: climate.living_thermostat_inner
+            name: Living Inner
+            mqtt_topic: "zigbee2mqtt/[Living] Thermostat Inner/set"
+            battery_entity: sensor.living_thermostat_inner_battery
+          - entity_id: climate.living_thermostat_outer
+            name: Living Outer
+            mqtt_topic: "zigbee2mqtt/[Living] Thermostat Outer/set"
+            battery_entity: sensor.living_thermostat_outer_battery
+          - entity_id: climate.bed_thermostat
+            name: Bedroom
+            mqtt_topic: "zigbee2mqtt/[Bed] Thermostat/set"
+            battery_entity: sensor.bed_thermostat_battery
+
+    - repeat:
+        for_each: "{{ thermostats }}"
+        sequence:
+          # Only exercise TRVs in heat mode
+          - condition: template
+            value_template: "{{ states(repeat.item.entity_id) == 'heat' }}"
+
+          # Skip low-battery TRVs (motor exercise drains battery)
+          - condition: template
+            value_template: "{{ states(repeat.item.battery_entity) | int(100) >= 40 }}"
+
+          - variables:
+              original_setpoint: "{{ state_attr(repeat.item.entity_id, 'temperature') | float(18) }}"
+              exercise_setpoint: "{{ [original_setpoint + 5, 30] | min }}"
+
+          # Clear any stuck open_window flag first
+          - service: mqtt.publish
+            data:
+              topic: "{{ repeat.item.mqtt_topic }}"
+              payload: '{"open_window": "OFF"}'
+              retain: true
+          - delay:
+              seconds: 3
+
+          # Bump setpoint (forces valve to open wider)
+          - service: climate.set_temperature
+            target:
+              entity_id: "{{ repeat.item.entity_id }}"
+            data:
+              temperature: "{{ exercise_setpoint }}"
+
+          # Wait for valve to physically move
+          - delay:
+              seconds: 30
+
+          # Restore original setpoint (with retry — if this fails, TRV stays hot)
+          - service: climate.set_temperature
+            target:
+              entity_id: "{{ repeat.item.entity_id }}"
+            data:
+              temperature: "{{ original_setpoint }}"
+          - delay:
+              seconds: 5
+
+          # Verify restore succeeded — retry once if not
+          - if:
+              - condition: template
+                value_template: >
+                  {{ state_attr(repeat.item.entity_id, 'temperature') | float(0) != original_setpoint | float(0) }}
+            then:
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ repeat.item.entity_id }}"
+                data:
+                  temperature: "{{ original_setpoint }}"
+
+          # Pause between TRVs (space out Zigbee commands)
+          - delay:
+              seconds: 15
+
+    # Log to InfluxDB
+    - service: influxdb.write
+      data:
+        measurement: thermostat_events
+        tags:
+          event_type: daily_valve_exercise
+        fields:
+          status: "completed"
+
+# =============================================================================
 # PRESENCE-BASED LIGHTING (AUTO-OFF)
 # =============================================================================
 # Trigger: mmWave human presence sensors
