@@ -55,9 +55,6 @@ DOOR_SENSORS = [
     "binary_sensor.hallway_window_contact_sensor_main_door_contact",
 ]
 
-# Combined list for backwards compatibility
-CONTACT_SENSORS = WINDOW_SENSORS + DOOR_SENSORS
-
 # Door delay in seconds (matches HA automation behavior)
 # Doors opened briefly for entry/exit won't trigger violation
 # NOTE: With 5-min poll interval, worst-case response time = CHECK_INTERVAL + DOOR_OPEN_DELAY
@@ -174,10 +171,10 @@ EXTERNAL_TEMP_MAX_DIVERGENCE = 5.0  # °C — clear if external drifts this far 
 # │                                                                         │
 # │  TIERED THRESHOLDS (Fix 1, Feb 9 2026):                                │
 # │  ┌──────────────────────────────────────────────────────────────────┐  │
-# │  │  Tier    │ Time     │ Deficit │ Reasoning                        │  │
-# │  │  ────────┼──────────┼─────────┼────────────────────────────────  │  │
-# │  │  URGENT  │ 20 min   │ ≥ 4°C   │ 4°C gap = clearly broken        │  │
-# │  │  NORMAL  │ 45 min   │ ≥ 2°C   │ Original threshold (Layer 2)    │  │
+# │  │  Tier    │ Time     │ Entry     │ Recovery  │ Reasoning          │  │
+# │  │  ────────┼──────────┼───────────┼───────────┼──────────────────  │  │
+# │  │  URGENT  │ 20 min   │ ≥ 2°C     │ ≥ 4°C     │ Big gap = fast    │  │
+# │  │  NORMAL  │ 45 min   │ ≥ 2°C     │ any       │ Time-only (Fix 5) │  │
 # │  └──────────────────────────────────────────────────────────────────┘  │
 # │                                                                         │
 # │  DEADLOCK FIX (Fix 5, Feb 9 2026):                                     │
@@ -517,14 +514,21 @@ recovery_tracker = defaultdict(list)  # {entity_id: [timestamp, ...]}
 
 
 def is_guard_flag_active():
-    """Check if any guard flag is active (heaters intentionally off)."""
+    """Check if any guard flag is active (heaters intentionally off).
+
+    FAIL-SAFE: Returns True (assume active) if HA is unreachable.
+    This prevents stuck-idle recovery from running when we can't
+    confirm guard flags are off — better to skip recovery than
+    to fight an intentional shutoff.
+    """
     for flag in [GUARD_FLAG_ENTITY, CO2_GUARD_FLAG]:
         try:
             state = get_entity_state(flag)
             if state.get("state") == "on":
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Cannot read guard flag {flag}: {e} — assuming active (fail-safe)", "WARN")
+            return True
     return False
 
 
@@ -564,7 +568,8 @@ def recover_stuck_idle_thermostat(entity_id):
         state = get_entity_state(entity_id)
         attrs = state.get("attributes", {})
         setpoint = max(float(attrs.get("temperature", 18)), STUCK_IDLE_SETPOINT_FLOOR)
-    except Exception:
+    except Exception as e:
+        log(f"  Cannot read setpoint for {name}: {e} — using floor ({STUCK_IDLE_SETPOINT_FLOOR}°C)", "WARN")
         setpoint = STUCK_IDLE_SETPOINT_FLOOR
 
     # ─── Phase 1: Gentle (MQTT reset + re-poke setpoint) ───
@@ -586,7 +591,7 @@ def recover_stuck_idle_thermostat(entity_id):
     log(f"  Waiting 60s for Phase 1 to take effect on {name}...", "INFO")
     time.sleep(60)
 
-    # Re-check
+    # Re-check — if HA unreachable, don't blindly escalate to Phase 2
     try:
         state = get_entity_state(entity_id)
         attrs = state.get("attributes", {})
@@ -594,8 +599,10 @@ def recover_stuck_idle_thermostat(entity_id):
             recovery_tracker[entity_id].append(time.time())
             log(f"  Phase 1 SUCCESS: {name} is now {attrs.get('hvac_action')}", "INFO")
             return "phase1"
-    except Exception:
-        pass
+    except Exception as e:
+        log(f"  Phase 1 re-check failed for {name}: {e} — skipping Phase 2 (can't confirm state)", "WARN")
+        recovery_tracker[entity_id].append(time.time())
+        return "phase1"  # Assume Phase 1 worked rather than escalate blindly
 
     # ─── Phase 2: Aggressive (off → heat → MQTT reset → setpoint) ───
     log(f"  Phase 2 (aggressive): Off→heat cycle for {name}", "WARN")
@@ -647,9 +654,10 @@ def check_stuck_idle():
 
     ┌─────────────────────────────────────────────────────────────────────┐
     │  Fix 1 (Feb 9 2026): TIERED THRESHOLDS                            │
+    │  Entry: deficit ≥ 2°C to start tracking any TRV.                 │
     │  ┌──────────┬──────────┬─────────────────────────────────────────┐ │
-    │  │ URGENT   │ 20 min   │ deficit ≥ 4°C → clearly broken         │ │
-    │  │ NORMAL   │ 45 min   │ any tracked TRV still idle             │ │
+    │  │ URGENT   │ 20 min   │ recovery needs deficit ≥ 4°C           │ │
+    │  │ NORMAL   │ 45 min   │ time-only (deficit may have dropped)   │ │
     │  └──────────┴──────────┴─────────────────────────────────────────┘ │
     │                                                                     │
     │  Fix 5 (Feb 9 2026): DEADLOCK PREVENTION                          │
@@ -709,20 +717,14 @@ def check_stuck_idle():
             first_seen = stuck_idle_tracker[entity_id]
             duration = now - first_seen
 
-            threshold_met = False
-            tier_name = ""
-
             # Tier 1: URGENT — big deficit, recover fast
             if deficit >= STUCK_IDLE_URGENT_DEFICIT and duration >= STUCK_IDLE_URGENT_THRESHOLD:
-                threshold_met = True
                 tier_name = f"URGENT ({duration / 60:.0f}min, deficit={deficit:.1f}°C)"
             # Tier 2: NORMAL — after 45min, recover regardless of current deficit
             # (Fix 5: deficit may have dropped from ambient warming, valve still stuck)
             elif duration >= STUCK_IDLE_THRESHOLD:
-                threshold_met = True
                 tier_name = f"NORMAL ({duration / 60:.0f}min, deficit={deficit:.1f}°C)"
-
-            if not threshold_met:
+            else:
                 continue
 
             log(f"  Stuck-idle {tier_name}: {name}", "WARN")
@@ -903,8 +905,8 @@ def check_valve_voltages():
     for entity_id, voltage_entity in VALVE_VOLTAGE_ENTITIES.items():
         try:
             state = get_entity_state(voltage_entity)
-            voltage_str = state.get("state", "0")
-            if voltage_str in ("unknown", "unavailable"):
+            voltage_str = state.get("state")
+            if not voltage_str or voltage_str in ("unknown", "unavailable"):
                 log(
                     f"  Valve voltage skip: {THERMOSTAT_NAMES.get(entity_id, entity_id)} "
                     f"voltage is {voltage_str}",
@@ -915,8 +917,8 @@ def check_valve_voltages():
         except Exception as e:
             log(f"Error reading valve voltage for {entity_id}: {e}", "WARN")
 
-    if len(voltages) < 2:
-        return  # Need at least 2 peers to compare
+    if not voltages:
+        return
 
     now = time.time()
 
@@ -924,13 +926,13 @@ def check_valve_voltages():
         name = THERMOSTAT_NAMES.get(entity_id, entity_id)
         alerts = []
 
-        # Check 1: Absolute minimum
+        # Check 1: Absolute minimum (always runs, even with 1 TRV)
         if voltage < VALVE_VOLTAGE_ABS_MIN:
             alerts.append(
                 f"Below absolute minimum ({voltage:.0f} mV < {VALVE_VOLTAGE_ABS_MIN} mV)"
             )
 
-        # Check 2: Peer comparison
+        # Check 2: Peer comparison (needs at least 2 TRVs with readings)
         peer_voltages = [v for eid, v in voltages.items() if eid != entity_id]
         if peer_voltages:
             peer_avg = sum(peer_voltages) / len(peer_voltages)
@@ -1123,8 +1125,8 @@ def main():
     log(f"  Monitoring {len(DOOR_SENSORS)} door sensors ({DOOR_OPEN_DELAY}s delay)")
     log(f"  Monitoring {len(THERMOSTATS)} thermostats")
     log(f"  Worst-case response time for doors: {CHECK_INTERVAL + DOOR_OPEN_DELAY}s ({(CHECK_INTERVAL + DOOR_OPEN_DELAY) // 60}min)")
-    log(f"  Stuck-idle normal: {STUCK_IDLE_THRESHOLD}s ({STUCK_IDLE_THRESHOLD // 60}min) @ deficit >= {STUCK_IDLE_DEFICIT}°C")
-    log(f"  Stuck-idle urgent: {STUCK_IDLE_URGENT_THRESHOLD}s ({STUCK_IDLE_URGENT_THRESHOLD // 60}min) @ deficit >= {STUCK_IDLE_URGENT_DEFICIT}°C")
+    log(f"  Stuck-idle normal: {STUCK_IDLE_THRESHOLD // 60}min (entry: deficit >= {STUCK_IDLE_DEFICIT}°C, recovery: time-only)")
+    log(f"  Stuck-idle urgent: {STUCK_IDLE_URGENT_THRESHOLD // 60}min (entry: deficit >= {STUCK_IDLE_DEFICIT}°C, recovery: deficit >= {STUCK_IDLE_URGENT_DEFICIT}°C)")
     log(f"  Stuck-idle max recoveries/hour: {STUCK_IDLE_MAX_RECOVERIES}")
     log(f"  Valve voltage alert: < {VALVE_VOLTAGE_ABS_MIN} mV or > {VALVE_VOLTAGE_PEER_DEVIATION * 100:.0f}% below peers")
     log("")

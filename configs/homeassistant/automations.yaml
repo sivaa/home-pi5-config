@@ -5415,6 +5415,26 @@
                   entity_id: "{{ repeat.item.entity_id }}"
                 data:
                   temperature: "{{ original_setpoint }}"
+              - delay:
+                  seconds: 5
+              # Final check — alert if still wrong after retry
+              - if:
+                  - condition: template
+                    value_template: >
+                      {{ state_attr(repeat.item.entity_id, 'temperature') | float(0) != original_setpoint | float(0) }}
+                then:
+                  - service: notify.mobile_app_22111317pg
+                    data:
+                      title: "VALVE EXERCISE: Restore FAILED"
+                      message: >
+                        {{ repeat.item.name }} setpoint stuck at
+                        {{ state_attr(repeat.item.entity_id, 'temperature') }}°C
+                        instead of {{ original_setpoint }}°C after valve exercise.
+                        Manual restore required!
+                      data:
+                        channel: Critical
+                        importance: high
+                        tag: valve_exercise_failed
 
           # Pause between TRVs (space out Zigbee commands)
           - delay:

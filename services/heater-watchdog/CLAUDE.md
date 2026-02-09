@@ -182,6 +182,8 @@ docker logs heater-watchdog --tail 100
 │  Now:    stays tracked until valve actually opens.              │
 │                                                                 │
 │  RATE LIMIT: 2 recoveries/thermostat/hour (in-memory)          │
+│  (Note: HA Layer 1 allows 3/hour — watchdog is more            │
+│   conservative as a backup layer)                               │
 │                                                                 │
 │  TWO-PHASE RECOVERY (same as HA automation):                   │
 │    Phase 1 (gentle): MQTT open_window OFF + re-poke setpoint   │
@@ -201,7 +203,7 @@ docker logs heater-watchdog --tail 100
 **When this fires vs HA automation:**
 - HA automation: every 15min, 60min stuck threshold → catches most cases
 - Watchdog urgent tier: 20min + 4°C deficit → fires before HA (catches severe cases fast)
-- Watchdog normal tier: 45min (any tracked TRV) → fires ~50min in practice
+- Watchdog normal tier: 45min tracking + up to 5min poll delay = 45-50min effective
 - HA's effective response: 60min stuck + 15min poll = 75min
 
 ## Valve Voltage Early Warning (Feb 9, 2026)
