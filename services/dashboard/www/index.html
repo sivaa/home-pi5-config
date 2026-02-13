@@ -43,6 +43,7 @@
   <link rel="stylesheet" href="styles/views/notification-history.css">
   <link rel="stylesheet" href="styles/views/system.css?v=8">
   <link rel="stylesheet" href="styles/views/weather-forecast.css">
+  <link rel="stylesheet" href="styles/views/tts.css">
   <link rel="stylesheet" href="styles/notifications.css">
 
   <!-- Three.js for 3D Floor Plan -->
@@ -2928,6 +2929,67 @@
 
         </div>
 
+        <!-- TTS Announce (hidden - URL hash #tts only) -->
+        <div x-show="currentView === 'tts'" x-cloak x-data="ttsView()" x-init="init()">
+          <div class="tts-view">
+            <div class="tts-card">
+
+              <div class="tts-header">
+                <div class="tts-header-icon">📢</div>
+                <div class="tts-header-title">Announce</div>
+              </div>
+
+              <!-- Speaker -->
+              <div class="tts-field">
+                <label class="tts-label">Speaker</label>
+                <select class="tts-select" x-model="$store.tts.selectedSpeaker">
+                  <template x-for="speaker in $store.tts.speakers" :key="speaker.id">
+                    <option :value="speaker.id" x-text="speaker.label"></option>
+                  </template>
+                </select>
+              </div>
+
+              <!-- Volume -->
+              <div class="tts-field">
+                <label class="tts-label">Volume</label>
+                <div class="tts-volume-row">
+                  <span class="tts-volume-icon">🔊</span>
+                  <input type="range" class="tts-volume-slider"
+                    min="0" max="100" step="5"
+                    x-model.number="$store.tts.volume">
+                  <span class="tts-volume-value" x-text="$store.tts.volume + '%'"></span>
+                </div>
+              </div>
+
+              <!-- Message -->
+              <div class="tts-field">
+                <label class="tts-label">Message</label>
+                <textarea class="tts-textarea"
+                  placeholder="Type your announcement..."
+                  x-model="$store.tts.message"
+                  @keydown="handleKeydown($event)"
+                  :disabled="$store.tts.sending"></textarea>
+              </div>
+
+              <!-- Send Button -->
+              <button class="tts-button"
+                @click="$store.tts.announce()"
+                :disabled="!$store.tts.message.trim() || $store.tts.sending"
+                x-text="$store.tts.sending ? 'Sending...' : '📢 Announce'">
+              </button>
+
+              <!-- Status -->
+              <template x-if="$store.tts.status">
+                <div class="tts-status"
+                  :class="{ 'is-success': $store.tts.status.type === 'success', 'is-error': $store.tts.status.type === 'error' }"
+                  x-text="$store.tts.status.text">
+                </div>
+              </template>
+
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
 
@@ -4307,6 +4369,23 @@
         initEventsStore(Alpine, window.CONFIG);
       });
       document.addEventListener('DOMContentLoaded', initEvents);
+    }
+  </script>
+
+  <!-- TTS Announce View Module - loads store and view -->
+  <script type="module">
+    import { initTtsStore } from './js/stores/tts-store.js';
+    import { ttsView } from './views/tts.js';
+
+    window.ttsView = ttsView;
+
+    // Module scripts resolve imports async - Alpine (defer) may not be
+    // loaded yet. Register on alpine:init which fires before Alpine
+    // processes the DOM, guaranteeing the store exists for x-data bindings.
+    if (typeof Alpine !== 'undefined') {
+      initTtsStore(Alpine);
+    } else {
+      document.addEventListener('alpine:init', () => initTtsStore(Alpine));
     }
   </script>
 
@@ -5974,6 +6053,12 @@
           // Restore last view
           const saved = localStorage.getItem('dashboard-view');
           if (saved) this.currentView = saved;
+
+          // URL hash routing for hidden views (e.g., #tts)
+          if (window.location.hash) {
+            const hashView = window.location.hash.slice(1);
+            if (hashView) this.currentView = hashView;
+          }
 
           // Update time - PERFORMANCE: reduced from 1s to 5s (clock precision isn't critical)
           this.updateDateTime();
