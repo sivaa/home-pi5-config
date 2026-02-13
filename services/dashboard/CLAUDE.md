@@ -777,5 +777,90 @@ ssh pi@pi 'timeout 5 docker exec mosquitto mosquitto_sub -t "dashboard/notify" -
 ssh pi@pi 'curl -s "http://localhost:8086/query?db=homeassistant" \
   --data-urlencode "q=SELECT * FROM notifications ORDER BY time DESC LIMIT 5"'
 
-# 4. Open dashboard → Notifications view → verify data appears
+# 4. Open dashboard -> Notifications view -> verify data appears
+```
+
+---
+
+## TTS Announce View (2026-02-13)
+
+Hidden view for sending text-to-speech announcements to Google Cast speakers via Home Assistant REST API.
+
+### Access
+
+```
+http://pi/#tts       (production)
+http://localhost:8888#tts  (local dev)
+```
+
+No nav entry - accessible only via URL hash. Not persisted to localStorage (kiosk won't get stuck on it).
+
+### Architecture
+
+```
++-----------------------------------------------------------------+
+|  TTS ANNOUNCE DATA FLOW                                         |
++-----------------------------------------------------------------+
+|                                                                 |
+|  Phone/Browser                                                  |
+|       |                                                         |
+|       |  User types message, picks speaker, adjusts volume      |
+|       v                                                         |
+|  tts-store.js  announce()                                       |
+|       |                                                         |
+|       |  Step 1: Set volume                                     |
+|       |  POST /api/services/media_player/volume_set             |
+|       |  { entity_id, volume_level: 0.0-1.0 }                  |
+|       |                                                         |
+|       |  Step 2: Speak                                          |
+|       |  POST /api/services/tts/google_translate_say            |
+|       |  { entity_id, message, language: 'en' }                 |
+|       v                                                         |
+|  Home Assistant (pi:8123)                                       |
+|       |                                                         |
+|       v                                                         |
+|  Cast Speaker (audio plays in the room)                         |
+|                                                                 |
++-----------------------------------------------------------------+
+```
+
+### Available Speakers
+
+| Speaker | Entity ID | Location |
+|---------|-----------|----------|
+| Kitchen Display | `media_player.kitchen_display` | Kitchen (default) |
+| Bedroom Clock | `media_player.master_bedroom_clock` | Bedroom |
+| Broken Display | `media_player.broken_display` | Spare (cracked screen, speaker works) |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `js/stores/tts-store.js` | Alpine store - HA API calls, form state, status management |
+| `views/tts.js` | View controller with init/destroy lifecycle |
+| `styles/views/tts.css` | Purple-themed card UI (Pi-safe CSS) |
+| `index.html` (~line 2933) | View HTML with Alpine directives |
+| `index.html` (~line 4375) | Module script with alpine:init registration |
+| `index.html` (~line 6057) | Hash routing in app init |
+
+### Features
+
+- Speaker dropdown (3 Cast devices)
+- Volume slider (0-100%, sent as 0.0-1.0 to HA)
+- Message textarea (maxlength 1000, Google TTS limit)
+- Enter key to send (Shift+Enter for newline)
+- Auto-clearing success/error status (8 seconds)
+- Touch-friendly (48px button, 44px select)
+
+### Testing
+
+```bash
+# 1. Open the TTS view
+# http://pi/#tts
+
+# 2. Or test the HA API directly
+ssh pi@pi 'curl -X POST http://localhost:8123/api/services/tts/google_translate_say \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"entity_id\": \"media_player.kitchen_display\", \"message\": \"Hello from the terminal\", \"language\": \"en\"}"'
 ```
