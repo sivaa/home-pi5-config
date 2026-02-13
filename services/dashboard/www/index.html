@@ -2966,6 +2966,7 @@
                 <label class="tts-label">Message</label>
                 <textarea class="tts-textarea"
                   placeholder="Type your announcement..."
+                  maxlength="1000"
                   x-model="$store.tts.message"
                   @keydown="handleKeydown($event)"
                   :disabled="$store.tts.sending"></textarea>

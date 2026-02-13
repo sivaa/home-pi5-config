@@ -6,8 +6,22 @@
 
 export function ttsView() {
   return {
+    _initialized: false,
+
     init() {
+      if (this._initialized) return;
+      this._initialized = true;
       console.log('[tts-view] Initialized');
+    },
+
+    destroy() {
+      if (this.store._statusTimer) {
+        clearTimeout(this.store._statusTimer);
+        this.store._statusTimer = null;
+      }
+      this.store.status = null;
+      this._initialized = false;
+      console.log('[tts-view] Destroyed');
     },
 
     get store() {
