@@ -371,9 +371,14 @@
 
 # -----------------------------------------------------------------------------
 # WINDOW OPEN TOO LONG (TEMPERATURE-AWARE)
-# Trigger: Any window/balcony door open for 5min (freezing) or 10min (normal)
-# Condition: Temperature-based (<=0C = freezing = 5min, >0C = 10min)
-# Action: TTS + mobile notification, repeat every 1 minute until closed
+# Trigger: Any window/balcony door open for 5min (freezing) or 10min (standard)
+# Condition: Temperature-based (<=0C = freezing, >0C = standard with graduated delays)
+# Action: TTS + mobile notification, repeat interval scales with temperature:
+#   <=0C:   first at 5min,  repeat every 1 min  (freezing - urgent)
+#   0-10C:  first at 10min, repeat every 2 min  (cold)
+#   10-15C: first at 15min, repeat every 5 min  (cool)
+#   15-20C: first at 20min, repeat every 15 min (mild)
+#   >20C:   first at 30min, repeat every 60 min (warm - courtesy nudge)
 # Sensors: All 7 windows + balcony door (main door has separate 3-min alert)
 # Backup: Cold weather alert (15min, <18C) catches edge cases
 # -----------------------------------------------------------------------------
@@ -441,6 +446,35 @@
     is_freezing: "{{ trigger.id == 'freezing' }}"
 
   action:
+    # For standard trigger: extra wait based on temperature before first alert
+    # Trigger already waited 10 min. Extra wait graduates the first TTS:
+    #   0-10C: +0 min (first TTS at 10 min)
+    #   10-15C: +5 min (first TTS at 15 min)
+    #   15-20C: +10 min (first TTS at 20 min)
+    #   >20C: +20 min (first TTS at 30 min)
+    - if:
+        - condition: template
+          value_template: "{{ trigger.id == 'standard' }}"
+      then:
+        - variables:
+            extra_wait: >
+              {% set temp = states('sensor.balcony_temperature_humidity_temperature') | float(-999) %}
+              {% if temp >= 20 %}
+                {{ 20 }}
+              {% elif temp >= 15 %}
+                {{ 10 }}
+              {% elif temp >= 10 %}
+                {{ 5 }}
+              {% else %}
+                {{ 0 }}
+              {% endif %}
+        - delay:
+            minutes: "{{ extra_wait | int }}"
+        # Re-check window is still open after extra wait
+        # (exits then-block only; repeat's while-check is the true safety gate)
+        - condition: template
+          value_template: "{{ is_state(trigger.entity_id, 'on') }}"
+
     - repeat:
         while:
           - condition: template
@@ -468,8 +502,22 @@
                 channel: "{% if is_freezing %}Critical{% else %}Alerts{% endif %}"
                 importance: "{% if is_freezing %}max{% else %}high{% endif %}"
                 tag: "window_{{ trigger.entity_id | replace('.', '_') }}"
+          # Repeat interval scales with temperature:
+          #   <=0C: 1 min, 0-10C: 2 min, 10-15C: 5 min, 15-20C: 15 min, >20C: 60 min
           - delay:
-              minutes: 1
+              minutes: >
+                {% set temp = states('sensor.balcony_temperature_humidity_temperature') | float(-999) %}
+                {% if temp <= 0 %}
+                  1
+                {% elif temp < 10 %}
+                  2
+                {% elif temp < 15 %}
+                  5
+                {% elif temp < 20 %}
+                  15
+                {% else %}
+                  60
+                {% endif %}
 
 # =============================================================================
 # HEATER NOTIFICATIONS
