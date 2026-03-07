@@ -17,13 +17,13 @@ export function initTtsLogStore(Alpine, CONFIG) {
     // Hardcoded automation config (static metadata + live state from HA API)
     automations: [
       // CO2
-      { id: 'co2_high_alert', name: 'CO2 High', category: 'co2', icon: '💨',
+      { id: 'co2_high_level_alert', name: 'CO2 High', category: 'co2', icon: '💨',
         triggerDesc: 'CO2 > 1200 ppm', repeatDesc: 'No (30min cooldown)', quietHours: '07:00-23:00' },
-      { id: 'co2_critical_alert', name: 'CO2 Critical', category: 'co2', icon: '🚨',
+      { id: 'co2_critical_level_alert', name: 'CO2 Critical', category: 'co2', icon: '🚨',
         triggerDesc: 'CO2 > 1600 ppm', repeatDesc: 'Every 10 min', quietHours: '07:00-23:00' },
-      { id: 'co2_good_level', name: 'CO2 Good', category: 'co2', icon: '✅',
+      { id: 'co2_good_level_notification', name: 'CO2 Good', category: 'co2', icon: '✅',
         triggerDesc: 'CO2 < 500 ppm', repeatDesc: 'No', quietHours: '07:00-23:00' },
-      { id: 'co2_high_turn_off_heaters', name: 'CO2 Heater Shutoff', category: 'co2', icon: '⚠️',
+      { id: 'co2_high_turn_off_all_heaters', name: 'CO2 Heater Shutoff', category: 'co2', icon: '⚠️',
         triggerDesc: 'CO2 > 1200 ppm', repeatDesc: 'No', quietHours: 'None' },
       { id: 'co2_low_resume_heaters', name: 'CO2 Resume Heaters', category: 'co2', icon: '🔄',
         triggerDesc: 'CO2 < 1100 + windows closed', repeatDesc: 'No', quietHours: 'None' },
@@ -31,17 +31,17 @@ export function initTtsLogStore(Alpine, CONFIG) {
         triggerDesc: 'Heater starts + CO2 > 1200', repeatDesc: 'No', quietHours: 'None' },
 
       // Window/Door
-      { id: 'window_open_too_long', name: 'Window Open Too Long', category: 'window', icon: '🪟',
+      { id: 'window_open_too_long_temperature_aware', name: 'Window Open Too Long', category: 'window', icon: '🪟',
         triggerDesc: '5min (freezing) / 10min (standard)', repeatDesc: '1-60 min (by temp)', quietHours: 'None (24/7)' },
-      { id: 'main_door_open_too_long', name: 'Main Door Alert', category: 'window', icon: '🚪',
+      { id: 'main_door_open_too_long_repeat_alert', name: 'Main Door Alert', category: 'window', icon: '🚪',
         triggerDesc: 'Door open > 3 min', repeatDesc: 'Every 5 min', quietHours: 'None (24/7)' },
       { id: 'window_open_cold_weather_alert', name: 'Cold Weather Alert', category: 'window', icon: '🥶',
         triggerDesc: 'Open > 15 min + < 18C', repeatDesc: 'Every 2 min', quietHours: 'None (24/7)' },
       { id: 'all_windows_closed_resume_heaters', name: 'Windows Closed Resume', category: 'window', icon: '🔄',
         triggerDesc: 'All sensors closed', repeatDesc: 'No', quietHours: 'None' },
-      { id: 'window_open_turn_off_heaters', name: 'Window Heater Shutoff', category: 'window', icon: '⚠️',
+      { id: 'window_open_turn_off_all_heaters', name: 'Window Heater Shutoff', category: 'window', icon: '⚠️',
         triggerDesc: 'Window open 30s', repeatDesc: 'No', quietHours: 'None (24/7)' },
-      { id: 'door_open_turn_off_heaters', name: 'Door Heater Shutoff', category: 'window', icon: '⚠️',
+      { id: 'door_open_2min_turn_off_all_heaters', name: 'Door Heater Shutoff', category: 'window', icon: '⚠️',
         triggerDesc: 'Door open 2 min', repeatDesc: 'No', quietHours: 'None (24/7)' },
       { id: 'prevent_heating_if_window_open', name: 'Prevent Heat (Window)', category: 'window', icon: '🛡️',
         triggerDesc: 'Heater starts + window open', repeatDesc: 'No', quietHours: 'None (24/7)' },
@@ -59,11 +59,11 @@ export function initTtsLogStore(Alpine, CONFIG) {
         triggerDesc: 'hvac_action: heating', repeatDesc: 'No', quietHours: 'None' },
       { id: 'living_outer_heater_stopped', name: 'Living Outer Stopped', category: 'heater', icon: '❄️',
         triggerDesc: 'hvac_action: idle', repeatDesc: 'No', quietHours: 'None' },
-      { id: 'bed_heater_started', name: 'Bedroom Started', category: 'heater', icon: '🔥',
+      { id: 'bedroom_heater_started', name: 'Bedroom Started', category: 'heater', icon: '🔥',
         triggerDesc: 'hvac_action: heating', repeatDesc: 'No', quietHours: 'None' },
-      { id: 'bed_heater_stopped', name: 'Bedroom Stopped', category: 'heater', icon: '❄️',
+      { id: 'bedroom_heater_stopped', name: 'Bedroom Stopped', category: 'heater', icon: '❄️',
         triggerDesc: 'hvac_action: idle', repeatDesc: 'No', quietHours: 'None' },
-      { id: 'temperature_reached_energy_cap', name: 'Energy Cap', category: 'heater', icon: '⚡',
+      { id: 'temperature_reached_energy_cap_21degc_room_19degc_setpoint', name: 'Energy Cap', category: 'heater', icon: '⚡',
         triggerDesc: 'Room >= 21C, setpoint > 19C', repeatDesc: 'No', quietHours: 'None' },
 
       // Recovery
@@ -75,7 +75,7 @@ export function initTtsLogStore(Alpine, CONFIG) {
       // Other
       { id: 'mailbox_motion_alert', name: 'Mailbox Motion', category: 'other', icon: '📬',
         triggerDesc: 'Motion detected', repeatDesc: 'No (30s cooldown)', quietHours: '07:00-23:00' },
-      { id: 'kitchen_presence_light_reminder', name: 'Kitchen Light', category: 'other', icon: '💡',
+      { id: 'kitchen_light_reminder_when_unoccupied', name: 'Kitchen Light', category: 'other', icon: '💡',
         triggerDesc: 'Light on + no presence', repeatDesc: 'Every 3 min', quietHours: '07:00-23:00' }
     ],
 
@@ -505,6 +505,19 @@ export function initTtsLogStore(Alpine, CONFIG) {
       return date.toLocaleDateString('en-AU', {
         weekday: 'short', hour: 'numeric', minute: '2-digit'
       });
+    },
+
+    getSummary() {
+      const total = this.automations.length;
+      let active = 0, disabled = 0, unknown = 0, paused = 0;
+      for (const a of this.automations) {
+        if (this.pausedAutomations[a.id]) { paused++; continue; }
+        const s = this.automationStates[a.id];
+        if (!s) { unknown++; continue; }
+        if (s.state === 'on') active++;
+        else disabled++;
+      }
+      return { total, active, disabled, unknown, paused, eventCount: this.events.length };
     },
 
     formatAutomation(automation) {

@@ -2803,11 +2803,32 @@
 
           <div class="tts-log-container">
 
+            <!-- Summary Strip -->
+            <div class="tts-summary-strip">
+              <div class="tts-summary-stat">
+                <span class="tts-summary-value tts-summary-active" x-text="summary.active"></span>
+                <span class="tts-summary-label">Active</span>
+              </div>
+              <div class="tts-summary-stat" x-show="summary.paused > 0" x-cloak>
+                <span class="tts-summary-value tts-summary-paused" x-text="summary.paused"></span>
+                <span class="tts-summary-label">Paused</span>
+              </div>
+              <div class="tts-summary-stat" x-show="summary.disabled > 0" x-cloak>
+                <span class="tts-summary-value tts-summary-disabled" x-text="summary.disabled"></span>
+                <span class="tts-summary-label">Off</span>
+              </div>
+              <div class="tts-summary-stat tts-summary-events">
+                <span class="tts-summary-value" x-text="summary.eventCount"></span>
+                <span class="tts-summary-label">Events (24h)</span>
+              </div>
+              <button class="tts-refresh-btn" @click="refresh()" :disabled="automationsLoading">Refresh</button>
+            </div>
+
             <!-- Automation Overview Section -->
             <div>
               <div class="tts-section-header">
                 <div class="tts-section-title">Automations</div>
-                <button class="tts-refresh-btn" @click="refresh()" :disabled="automationsLoading">Refresh</button>
+                <span class="tts-section-subtitle" x-text="summary.total + ' total'"></span>
               </div>
 
               <!-- Loading -->
@@ -2924,7 +2945,10 @@
                     <div class="event-row">
                       <div class="event-status-dot" :class="getEventStatusClass(event)"></div>
                       <div class="event-content">
-                        <div class="event-message" x-text="event.message"></div>
+                        <div class="event-message">
+                          <span x-text="event.message"></span>
+                          <span class="event-repeat-badge" x-show="event._repeatCount > 1" x-cloak x-text="'x' + event._repeatCount"></span>
+                        </div>
                         <div class="event-meta">
                           <template x-if="formatAutomation(event.automation)">
                             <span class="event-automation" x-text="formatAutomation(event.automation)"></span>

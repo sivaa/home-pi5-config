@@ -33,6 +33,53 @@
   gap: var(--space-lg);
 }
 
+/* ---------- Summary Strip ---------- */
+.tts-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 10px var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.tts-summary-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.tts-summary-value {
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  color: var(--color-text-primary, var(--color-text));
+}
+
+.tts-summary-active { color: #16a34a; }
+.tts-summary-paused { color: #d97706; }
+.tts-summary-disabled { color: #9ca3af; }
+
+[data-theme="dark"] .tts-summary-active { color: #4ade80; }
+[data-theme="dark"] .tts-summary-paused { color: #fbbf24; }
+
+.tts-summary-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.tts-summary-events {
+  margin-left: auto;
+}
+
+.tts-summary-strip .tts-refresh-btn {
+  flex-shrink: 0;
+}
+
 /* ---------- Section Headers ---------- */
 .tts-section-header {
   display: flex;
@@ -132,7 +179,7 @@
   gap: var(--space-sm);
   padding: 8px var(--space-sm) 8px 0;
   background: var(--color-surface);
-  border-left: 3px solid transparent;
+  border-left: 4px solid transparent;
   min-height: 44px;
   transition: background var(--transition-fast), opacity var(--transition-fast);
 }
@@ -230,12 +277,17 @@
 }
 
 /* ---------- Card Details (inline, compact) ---------- */
+/* Hidden by default, shown on row hover */
 .card-details {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--space-md);
   flex: 1;
   min-width: 0;
+}
+
+.automation-card:hover .card-details {
+  display: flex;
 }
 
 .card-detail {
@@ -284,22 +336,30 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: 1px solid transparent;
+  width: 34px;
+  height: 34px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 11px;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   transition: all var(--transition-fast);
   padding: 0;
 }
 
+[data-theme="dark"] .card-pause-btn {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .card-pause-btn:hover {
-  background: var(--color-surface-hover, rgba(0,0,0,0.04));
+  background: rgba(0, 0, 0, 0.08);
   color: var(--color-text-primary, var(--color-text));
-  border-color: var(--color-border);
+  border-color: var(--color-text-tertiary);
+}
+
+[data-theme="dark"] .card-pause-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .card-pause-btn .pause-icon {
@@ -411,6 +471,12 @@
   background: #fbbf24;
 }
 
+/* ---------- Section Divider ---------- */
+.tts-log-container > div + div {
+  padding-top: var(--space-md);
+  border-top: 2px solid var(--color-border);
+}
+
 /* ─────────────────────────────────────────
    EVENT LOG SECTION
    ───────────────────────────────────────── */
@@ -483,12 +549,31 @@
 }
 
 .event-message {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: var(--font-size-sm);
   color: var(--color-text-primary, var(--color-text));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+}
+
+.event-repeat-badge {
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  padding: 0 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .event-repeat-badge {
+  background: rgba(129, 140, 248, 0.15);
+  color: #818cf8;
 }
 
 .event-meta {
@@ -580,11 +665,21 @@
     padding: var(--space-sm);
   }
 
+  .tts-summary-strip {
+    gap: var(--space-md);
+    padding: 8px var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .tts-summary-value {
+    font-size: 16px;
+  }
+
   /* Switch to stacked card layout on mobile */
   .automation-card {
     flex-wrap: wrap;
     padding: var(--space-sm);
-    padding-left: calc(var(--space-sm) + 3px);
+    padding-left: calc(var(--space-sm) + 4px);
     gap: 4px;
   }
 
@@ -630,10 +725,17 @@
   }
 }
 
-/* Hide details columns on very small screens */
+/* On touch (no hover), always show details */
+@media (hover: none) {
+  .card-details {
+    display: flex;
+  }
+}
+
+/* Hide details on very small screens regardless */
 @media (max-width: 550px) {
   .card-details {
-    display: none;
+    display: none !important;
   }
 }
 

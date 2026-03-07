@@ -29,7 +29,23 @@ export function ttsLogView() {
     },
 
     get events() {
-      return this.$store.ttsLog.events;
+      return this.collapseRepeats(this.$store.ttsLog.events);
+    },
+
+    // Collapse consecutive identical messages into one row with a count
+    collapseRepeats(events) {
+      if (!events.length) return events;
+      const collapsed = [];
+      for (const e of events) {
+        const prev = collapsed[collapsed.length - 1];
+        if (prev && prev.message === e.message && prev.automation === e.automation) {
+          prev._repeatCount = (prev._repeatCount || 1) + 1;
+          prev._lastTimestamp = e.timestamp;
+        } else {
+          collapsed.push({ ...e, _repeatCount: 1, _lastTimestamp: null });
+        }
+      }
+      return collapsed;
     },
 
     get eventsLoading() {
@@ -38,6 +54,10 @@ export function ttsLogView() {
 
     get eventsError() {
       return this.$store.ttsLog.eventsError;
+    },
+
+    get summary() {
+      return this.$store.ttsLog.getSummary();
     },
 
     get automationsLoading() {
