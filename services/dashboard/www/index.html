@@ -44,6 +44,7 @@
   <link rel="stylesheet" href="styles/views/system.css?v=8">
   <link rel="stylesheet" href="styles/views/weather-forecast.css">
   <link rel="stylesheet" href="styles/views/tts.css">
+  <link rel="stylesheet" href="styles/views/tts-log.css">
   <link rel="stylesheet" href="styles/notifications.css">
 
   <!-- Three.js for 3D Floor Plan -->
@@ -2792,6 +2793,163 @@
           </div>
         </div>
 
+        <!-- TTS Log View -->
+        <div x-show="currentView === 'tts-log'"
+             x-cloak
+             x-data="ttsLogView()"
+             x-init="init()"
+             @view-changed.window="$event.detail.view === 'tts-log' ? init() : destroy()"
+             class="view tts-log-view">
+
+          <div class="tts-log-container">
+
+            <!-- Automation Overview Section -->
+            <div>
+              <div class="tts-section-header">
+                <div class="tts-section-title">Automations</div>
+                <button class="tts-refresh-btn" @click="refresh()" :disabled="automationsLoading">Refresh</button>
+              </div>
+
+              <!-- Loading -->
+              <template x-if="automationsLoading && !Object.keys($store.ttsLog.automationStates).length">
+                <div class="tts-log-loading">Loading automations...</div>
+              </template>
+
+              <!-- Error -->
+              <template x-if="automationsError && !Object.keys($store.ttsLog.automationStates).length">
+                <div class="tts-log-error">
+                  <span x-text="automationsError"></span>
+                  <button @click="$store.ttsLog.fetchAutomationStates()">Retry</button>
+                </div>
+              </template>
+
+              <!-- Category groups -->
+              <div class="automation-categories">
+                <template x-for="category in automationsByCategory" :key="category.id">
+                  <div class="automation-category" :data-cat="category.id">
+                    <div class="category-header">
+                      <span class="category-icon" x-text="category.icon"></span>
+                      <span x-text="category.name"></span>
+                    </div>
+                    <div class="automation-grid">
+                      <template x-for="auto in category.automations" :key="auto.id">
+                        <div class="automation-card" :class="[getStatusClass(auto.id), isPaused(auto.id) ? 'status-paused' : '']">
+                          <!-- Left: Icon + Name + Badge -->
+                          <div class="card-header">
+                            <span class="card-icon" x-text="auto.icon"></span>
+                            <span class="card-name" x-text="auto.name"></span>
+                            <span class="card-status-badge"
+                                  :class="getState(auto.id).state || 'unknown'"
+                                  x-text="getState(auto.id).state === 'on' ? 'ON' : getState(auto.id).state === 'off' ? 'OFF' : '...'"></span>
+                          </div>
+                          <!-- Center: Trigger + Repeat inline -->
+                          <div class="card-details">
+                            <div class="card-detail">
+                              <span class="card-detail-label">Trg</span>
+                              <span class="card-detail-value" x-text="auto.triggerDesc"></span>
+                            </div>
+                            <div class="card-detail">
+                              <span class="card-detail-label">Rpt</span>
+                              <span class="card-detail-value" x-text="auto.repeatDesc"></span>
+                            </div>
+                          </div>
+                          <!-- Pause status (shown when paused) -->
+                          <div class="pause-status" x-show="isPaused(auto.id)" x-cloak>
+                            <span class="pause-status-dot"></span>
+                            <span x-text="getPauseRemaining(auto.id)"></span>
+                          </div>
+                          <!-- Right: Last triggered -->
+                          <div class="card-last-triggered" x-show="!isPaused(auto.id)">
+                            <span class="triggered-time" x-text="getLastTriggered(auto.id)"></span>
+                          </div>
+                          <!-- Pause/Resume button -->
+                          <div class="card-pause-wrapper" @click.outside="if (pauseMenuOpen === auto.id) closePauseMenu()">
+                            <button class="card-pause-btn"
+                                    :title="isPaused(auto.id) ? 'Resume automation' : 'Pause automation'"
+                                    @click="isPaused(auto.id) ? cancelPause(auto.id) : togglePauseMenu(auto.id)">
+                              <template x-if="!isPaused(auto.id)">
+                                <span class="pause-icon"><span class="pause-bar"></span><span class="pause-bar"></span></span>
+                              </template>
+                              <template x-if="isPaused(auto.id)">
+                                <span class="play-arrow"></span>
+                              </template>
+                            </button>
+                            <!-- Duration dropdown -->
+                            <div class="pause-menu" x-show="pauseMenuOpen === auto.id" x-cloak>
+                              <div class="pause-menu-label">Pause for</div>
+                              <button class="pause-option" @click="pauseAutomation(auto.id, 60)">1h</button>
+                              <button class="pause-option" @click="pauseAutomation(auto.id, 120)">2h</button>
+                              <button class="pause-option" @click="pauseAutomation(auto.id, 240)">4h</button>
+                              <button class="pause-option" @click="pauseAutomation(auto.id, 480)">8h</button>
+                              <button class="pause-option" @click="pauseAutomation(auto.id, 1440)">24h</button>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Event Log Section -->
+            <div>
+              <div class="tts-section-header">
+                <div class="tts-section-title">Event Log</div>
+                <span class="tts-section-subtitle" x-text="events.length + ' events'"></span>
+              </div>
+
+              <!-- Loading -->
+              <template x-if="eventsLoading && !events.length">
+                <div class="tts-log-loading">Loading events...</div>
+              </template>
+
+              <!-- Error -->
+              <template x-if="eventsError && !events.length">
+                <div class="tts-log-error">
+                  <span x-text="eventsError"></span>
+                  <button @click="$store.ttsLog.loadHistorical()">Retry</button>
+                </div>
+              </template>
+
+              <!-- Empty -->
+              <template x-if="!eventsLoading && !eventsError && !events.length">
+                <div class="tts-log-empty">No TTS events in the last 24 hours</div>
+              </template>
+
+              <!-- Event list -->
+              <template x-if="events.length > 0">
+                <div class="event-log-list">
+                  <template x-for="event in events" :key="event.id">
+                    <div class="event-row">
+                      <div class="event-status-dot" :class="getEventStatusClass(event)"></div>
+                      <div class="event-content">
+                        <div class="event-message" x-text="event.message"></div>
+                        <div class="event-meta">
+                          <template x-if="formatAutomation(event.automation)">
+                            <span class="event-automation" x-text="formatAutomation(event.automation)"></span>
+                          </template>
+                          <template x-if="event.devices && event.devices.length">
+                            <div class="event-devices">
+                              <template x-for="device in event.devices" :key="device.name || device">
+                                <span class="device-badge"
+                                      :class="device.success !== false ? 'device-ok' : 'device-fail'"
+                                      x-text="(device.success !== false ? '\u2713 ' : '\u2717 ') + (device.name || device)"></span>
+                              </template>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="event-time" :title="formatTime(event.timestamp)" x-text="formatRelativeTime(event.timestamp)"></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+          </div>
+        </div>
+
         <!-- Weather Forecast View — Mock D Design -->
         <div x-show="currentView === 'weather'"
              x-cloak
@@ -4387,6 +4545,20 @@
       initTtsStore(Alpine);
     } else {
       document.addEventListener('alpine:init', () => initTtsStore(Alpine));
+    }
+  </script>
+
+  <!-- TTS Log View Module - automation overview + event log -->
+  <script type="module">
+    import { initTtsLogStore } from './js/stores/tts-log-store.js';
+    import { ttsLogView } from './views/tts-log.js';
+
+    window.ttsLogView = ttsLogView;
+
+    if (typeof Alpine !== 'undefined') {
+      initTtsLogStore(Alpine, window.CONFIG);
+    } else {
+      document.addEventListener('alpine:init', () => initTtsLogStore(Alpine, window.CONFIG));
     }
   </script>
 
@@ -6319,6 +6491,7 @@
           { id: 'notifications', name: 'Alerts', icon: '📱', title: 'Notification History', key: 'P' },
           { id: 'co2', name: 'CO2', icon: '💨', title: 'CO2 Monitor', key: '0' },
           { id: 'logs', name: 'Logs', icon: '📋', title: 'Activity Logs', key: 'L' },
+          { id: 'tts-log', name: 'TTS Log', icon: '🔊', title: 'TTS Automation Log', key: 'A' },
           { id: 'device-health', name: 'Health', icon: '💚', title: 'Device Health', key: 'D' },
           { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' },
           { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' },
@@ -6378,7 +6551,7 @@
           const all = VIEW_CATEGORIES.flatMap(cat => cat.views);
           const byId = id => all.find(v => v.id === id);
           return [
-            { name: '', views: ['network', 'timeline', 'notifications', 'logs', 'device-health'].map(byId).filter(Boolean) },
+            { name: '', views: ['network', 'timeline', 'notifications', 'tts-log', 'logs', 'device-health'].map(byId).filter(Boolean) },
             { name: '', views: ['hotwater', 'mailbox', 'system', 'classic', 'co2'].map(byId).filter(Boolean) },
             { name: '', views: ['transport', 'weather'].map(byId).filter(Boolean) },
             { name: 'Control', views: ['lights', 'heater'].map(byId).filter(Boolean) }
