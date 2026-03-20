@@ -653,7 +653,69 @@ Rooms: `study`, `living_inner`, `living_outer`, `bedroom`
 
 ---
 
+## Outdoor Temperature-Based Setpoint Adjustment (Mar 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  OUTDOOR TEMP SETPOINT RULES                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Outdoor > 10°C  →  TRV setpoint = 16°C                                     │
+│  Outdoor 5-10°C  →  TRV setpoint = 17°C                                     │
+│  Outdoor < 5°C   →  TRV setpoint = 18°C                                     │
+│                                                                              │
+│  SENSOR: sensor.balcony_temperature_humidity_temperature                     │
+│                                                                              │
+│  TRIGGER: Dual-trigger (threshold cross + /30 min poll + HA startup)         │
+│                                                                              │
+│  MANUAL OVERRIDE:                                                            │
+│    Threshold crossings always enforce the new target.                         │
+│    Periodic checks skip TRVs with setpoint > target (assumes manual raise). │
+│    Override lasts until the next real threshold crossing event.               │
+│                                                                              │
+│  EXCLUSIONS:                                                                 │
+│    - Window/CO2 guard active (heaters already off)                           │
+│    - TRV in OFF mode                                                         │
+│    - Bedroom night mode active                                               │
+│    - Per-TRV or global boost active                                          │
+│    - Setpoint already at or below target                                     │
+│                                                                              │
+│  SAVED TEMP SYNC:                                                            │
+│    When setpoint is lowered, saved_temp helper is also updated.              │
+│    This keeps resume automations (window close, CO2 low) consistent.         │
+│    The save-floor in window/door/CO2 turn-off automations also uses          │
+│    the same outdoor-temp-based thresholds instead of hardcoded 18°C.         │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Automations
+
+| Automation | ID | Trigger | Action |
+|------------|-----|---------|--------|
+| Outdoor Temp Adjust | `outdoor_temp_adjust_setpoints` | Threshold cross + /30 min + startup | Lower setpoints based on outdoor temp |
+
+### Interaction Matrix
+
+| Automation | Interaction | Safe? |
+|------------|-------------|-------|
+| Energy cap (19°C) | Our max is 18°C < 19°C, cap never fires | Yes |
+| Anomalous guard (<10°C) | Our min is 16°C > 10°C threshold | Yes |
+| Boost (per-TRV + global) | Skipped during boost | Yes |
+| Night mode (bedroom) | Bedroom skipped when night mode active | Yes |
+| Window/CO2 resume | Saved temps updated, save floor is outdoor-based | Yes |
+| Watchdog floor (18°C) | Conservative - outdoor auto corrects in 30 min | Acceptable |
+
+---
+
 ## History
+
+- **Mar 20, 2026**: Added outdoor temperature-based setpoint adjustment
+  - Rule: >10°C=16°C, 5-10°C=17°C, <5°C=18°C
+  - New: `outdoor_temp_adjust_setpoints` automation (threshold cross + /30 min poll)
+  - Modified: Save floor in window/door/CO2 turn-off automations from hardcoded 18°C to outdoor-based
+  - Manual overrides respected until next threshold crossing
+  - Updates saved temp helpers to keep resume automations consistent
 
 - **Feb 9, 2026**: Added anomalous setpoint guard (3-layer defense)
   - Incident: Living Inner TRV stuck at 4°C setpoint (heat mode) for 2+ hours

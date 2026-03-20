@@ -886,27 +886,40 @@
 
     # SAVE current setpoints BEFORE turning off
     # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
-    # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
+    # RACE CONDITION FIX: Use max(current_setpoint, floor) to prevent saving 7°C frost protection
+    # Floor is outdoor-temp-based: >10°C=16, 5-10°C=17, <5°C=18 (matches outdoor_temp_adjust_setpoints)
+    - variables:
+        outdoor_temp_for_floor: "{{ states('sensor.balcony_temperature_humidity_temperature') | float(-999) }}"
+        save_floor: >
+          {% if outdoor_temp_for_floor == -999 %}
+            18
+          {% elif outdoor_temp_for_floor > 10 %}
+            16
+          {% elif outdoor_temp_for_floor >= 5 %}
+            17
+          {% else %}
+            18
+          {% endif %}
     - service: input_number.set_value
       target:
         entity_id: input_number.study_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_inner_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_outer_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.bedroom_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
 
     # Turn off all heaters
     - service: climate.set_hvac_mode
@@ -1064,27 +1077,40 @@
 
     # SAVE current setpoints BEFORE turning off
     # (TRVZB firmware drops setpoint to frost protection when mode is set to off)
-    # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
+    # RACE CONDITION FIX: Use max(current_setpoint, floor) to prevent saving 7°C frost protection
+    # Floor is outdoor-temp-based: >10°C=16, 5-10°C=17, <5°C=18 (matches outdoor_temp_adjust_setpoints)
+    - variables:
+        outdoor_temp_for_floor: "{{ states('sensor.balcony_temperature_humidity_temperature') | float(-999) }}"
+        save_floor: >
+          {% if outdoor_temp_for_floor == -999 %}
+            18
+          {% elif outdoor_temp_for_floor > 10 %}
+            16
+          {% elif outdoor_temp_for_floor >= 5 %}
+            17
+          {% else %}
+            18
+          {% endif %}
     - service: input_number.set_value
       target:
         entity_id: input_number.study_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_inner_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.living_outer_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(save_floor), save_floor | float] | max }}"
     - service: input_number.set_value
       target:
         entity_id: input_number.bedroom_heater_saved_temp
       data:
-        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
+        value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
 
     # Turn off all heaters
     - service: climate.set_hvac_mode
@@ -1789,27 +1815,40 @@
             entity_id: input_boolean.bedroom_heater_was_on
 
         # SAVE current setpoints
-        # RACE CONDITION FIX: Use max(current_setpoint, 18) to prevent saving 7°C frost protection
+        # RACE CONDITION FIX: Use max(current_setpoint, floor) to prevent saving 7°C frost protection
+        # Floor is outdoor-temp-based: >10°C=16, 5-10°C=17, <5°C=18 (matches outdoor_temp_adjust_setpoints)
+        - variables:
+            outdoor_temp_for_floor: "{{ states('sensor.balcony_temperature_humidity_temperature') | float(-999) }}"
+            save_floor: >
+              {% if outdoor_temp_for_floor == -999 %}
+                18
+              {% elif outdoor_temp_for_floor > 10 %}
+                16
+              {% elif outdoor_temp_for_floor >= 5 %}
+                17
+              {% else %}
+                18
+              {% endif %}
         - service: input_number.set_value
           target:
             entity_id: input_number.study_heater_saved_temp
           data:
-            value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(18), 18] | max }}"
+            value: "{{ [state_attr('climate.study_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.living_inner_heater_saved_temp
           data:
-            value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(18), 18] | max }}"
+            value: "{{ [state_attr('climate.living_thermostat_inner', 'temperature') | float(save_floor), save_floor | float] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.living_outer_heater_saved_temp
           data:
-            value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(18), 18] | max }}"
+            value: "{{ [state_attr('climate.living_thermostat_outer', 'temperature') | float(save_floor), save_floor | float] | max }}"
         - service: input_number.set_value
           target:
             entity_id: input_number.bedroom_heater_saved_temp
           data:
-            value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(18), 18] | max }}"
+            value: "{{ [state_attr('climate.bed_thermostat', 'temperature') | float(save_floor), save_floor | float] | max }}"
 
         # Turn off all heaters
         - service: climate.set_hvac_mode
@@ -6248,3 +6287,166 @@
     - service: automation.trigger
       target:
         entity_id: automation.anomalous_setpoint_guard
+
+# ─── OUTDOOR TEMPERATURE-BASED SETPOINT ADJUSTMENT ───
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  Adjusts TRV setpoints based on outdoor temperature to save energy.        │
+# │                                                                             │
+# │  Outdoor > 10°C  →  16°C                                                   │
+# │  Outdoor 5-10°C  →  17°C                                                   │
+# │  Outdoor < 5°C   →  18°C                                                   │
+# │                                                                             │
+# │  MANUAL OVERRIDE: Threshold crossings always enforce. Periodic checks      │
+# │  skip TRVs with setpoint > target (assumes manual raise). Override lasts   │
+# │  until the next real threshold crossing.                                    │
+# │                                                                             │
+# │  INTERACTIONS:                                                              │
+# │    - Boost: skipped (per-TRV and global)                                   │
+# │    - Night mode: bedroom skipped when active                                │
+# │    - Window/CO2 guard: skipped (heaters already off)                       │
+# │    - Energy cap: safe (our max 18 < cap's 19)                              │
+# │    - Anomalous guard: safe (our min 16 > guard's 10)                       │
+# │    - Saved temps: updated so resume automations stay consistent             │
+# └─────────────────────────────────────────────────────────────────────────────┘
+- id: outdoor_temp_adjust_setpoints
+  alias: "Outdoor Temp - Adjust TRV Setpoints"
+  description: >
+    Adjusts TRV setpoints based on outdoor temperature thresholds.
+    >10°C: 16°C, 5-10°C: 17°C, <5°C: 18°C.
+    Updates saved temp helpers so resume automations use correct values.
+  mode: single
+
+  trigger:
+    # Threshold crossings (instant detection)
+    - platform: numeric_state
+      entity_id: sensor.balcony_temperature_humidity_temperature
+      above: 10
+      id: threshold_cross
+    - platform: numeric_state
+      entity_id: sensor.balcony_temperature_humidity_temperature
+      below: 10
+      id: threshold_cross
+    - platform: numeric_state
+      entity_id: sensor.balcony_temperature_humidity_temperature
+      above: 5
+      id: threshold_cross
+    - platform: numeric_state
+      entity_id: sensor.balcony_temperature_humidity_temperature
+      below: 5
+      id: threshold_cross
+    # Periodic fallback (HA restart, gradual drift)
+    - platform: time_pattern
+      minutes: "/30"
+      id: periodic_check
+    # Startup check
+    - platform: homeassistant
+      event: start
+      id: ha_startup
+
+  condition:
+    # Don't adjust if heaters are off due to window or CO2
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_window
+      state: "off"
+    - condition: state
+      entity_id: input_boolean.heaters_off_due_to_co2
+      state: "off"
+    # Guard flag cooldown (30s) - avoid racing with resume automations
+    - condition: template
+      value_template: >
+        {{ (as_timestamp(now()) - as_timestamp(states.input_boolean.heaters_off_due_to_window.last_changed)) > 30
+           and (as_timestamp(now()) - as_timestamp(states.input_boolean.heaters_off_due_to_co2.last_changed)) > 30 }}
+
+  variables:
+    outdoor_temp: "{{ states('sensor.balcony_temperature_humidity_temperature') | float(-999) }}"
+    target_setpoint: >
+      {% if outdoor_temp == -999 %}
+        18
+      {% elif outdoor_temp > 10 %}
+        16
+      {% elif outdoor_temp >= 5 %}
+        17
+      {% else %}
+        18
+      {% endif %}
+    is_threshold_cross: "{{ trigger.id == 'threshold_cross' }}"
+
+  action:
+    # Delay on HA startup for entities to settle
+    - if:
+        - condition: template
+          value_template: "{{ trigger.id == 'ha_startup' }}"
+      then:
+        - delay:
+            seconds: 45
+
+    # Skip if sensor unavailable
+    - condition: template
+      value_template: "{{ outdoor_temp != -999 }}"
+
+    # Per-TRV adjustment loop
+    - repeat:
+        for_each:
+          - entity_id: climate.study_thermostat
+            saved_temp: input_number.study_heater_saved_temp
+            name: Study
+            boost_end: input_datetime.study_boost_end
+          - entity_id: climate.living_thermostat_inner
+            saved_temp: input_number.living_inner_heater_saved_temp
+            name: Living Inner
+            boost_end: input_datetime.living_inner_boost_end
+          - entity_id: climate.living_thermostat_outer
+            saved_temp: input_number.living_outer_heater_saved_temp
+            name: Living Outer
+            boost_end: input_datetime.living_outer_boost_end
+          - entity_id: climate.bed_thermostat
+            saved_temp: input_number.bedroom_heater_saved_temp
+            name: Bedroom
+            boost_end: input_datetime.bedroom_boost_end
+        sequence:
+          - variables:
+              entity: "{{ repeat.item.entity_id }}"
+              trv_name: "{{ repeat.item.name }}"
+              current_setpoint: "{{ state_attr(entity, 'temperature') | float(0) }}"
+              is_heat_mode: "{{ states(entity) == 'heat' }}"
+              # Skip bedroom during night mode
+              is_night_mode: >
+                {{ entity == 'climate.bed_thermostat'
+                   and is_state('input_boolean.bedroom_night_mode_active', 'on') }}
+              # Skip if per-TRV boost is active
+              is_boosted: >
+                {% set be = states(repeat.item.boost_end) %}
+                {{ be not in ['unknown', 'unavailable', '']
+                   and as_timestamp(be) > as_timestamp(now()) }}
+              # Skip if global boost is active
+              is_global_boosted: >
+                {% set gbe = states('input_datetime.global_boost_end') %}
+                {{ gbe not in ['unknown', 'unavailable', '']
+                   and as_timestamp(gbe) > as_timestamp(now()) }}
+          # MANUAL OVERRIDE RESPECT:
+          #   Threshold crossings: always enforce the new target
+          #   Periodic/startup: only act if current setpoint is a known automation value
+          #   (16, 17, 18) - not a manual override like 20 or 22.
+          #   This way: HA restart re-applies the rule, but manual raises are preserved.
+          - if:
+              - condition: template
+                value_template: >
+                  {% set known_auto_setpoints = [16, 17, 18] %}
+                  {{ is_heat_mode
+                     and not is_night_mode
+                     and not is_boosted
+                     and not is_global_boosted
+                     and current_setpoint > target_setpoint | float
+                     and (is_threshold_cross or current_setpoint | float in known_auto_setpoints) }}
+            then:
+              - service: climate.set_temperature
+                target:
+                  entity_id: "{{ entity }}"
+                data:
+                  temperature: "{{ target_setpoint | float }}"
+              # Update saved temp helper so resume automations stay consistent
+              - service: input_number.set_value
+                target:
+                  entity_id: "{{ repeat.item.saved_temp }}"
+                data:
+                  value: "{{ target_setpoint | float }}"
