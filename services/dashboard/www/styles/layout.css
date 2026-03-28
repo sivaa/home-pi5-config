@@ -1076,6 +1076,36 @@
     /* @keyframes footerGlow removed for CPU efficiency */
 
     /* ========================================
+       SAILING NAV BUTTON (Prominent shortcut)
+       ======================================== */
+    .sailing-nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      height: 32px;
+      background: #1e3a5f;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      color: #93c5fd;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+
+    .sailing-nav-btn.active {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .sailing-nav-btn:active {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    /* ========================================
        HARD REFRESH BUTTON (Kiosk Mode)
        ======================================== */
     .refresh-btn {

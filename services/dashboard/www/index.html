@@ -44,6 +44,7 @@
   <link rel="stylesheet" href="styles/views/system.css?v=8">
   <link rel="stylesheet" href="styles/views/weather-forecast.css">
   <link rel="stylesheet" href="styles/views/tts.css">
+  <link rel="stylesheet" href="styles/views/sailing.css?v=2">
   <link rel="stylesheet" href="styles/views/tts-log.css">
   <link rel="stylesheet" href="styles/notifications.css">
 
@@ -245,9 +246,16 @@
 
         </div>
 
-        <!-- Right: Kiosk Controls + Theme Toggle + Date/Time -->
+        <!-- Right: Sailing shortcut + Kiosk Controls + Theme Toggle + Date/Time -->
         <div class="header-right">
           <div class="header-top">
+            <!-- Sailing View Quick Button -->
+            <button class="sailing-nav-btn"
+                    :class="{ active: currentView === 'sailing' }"
+                    @click="setView('sailing')"
+                    title="Where Is Siva? (V)">
+              ⛵ Sailing
+            </button>
             <!-- Hard Refresh Button (for kiosk mode) -->
             <button class="refresh-btn"
                     @click="location.reload(true)"
@@ -256,7 +264,7 @@
             </button>
             <!-- Close Browser Button (for kiosk mode) -->
             <button class="close-btn"
-                    @click="window.close()"
+                    @click="fetch('http://localhost:8889/api/kiosk/close').catch(() => {})"
                     title="Close browser session">
               ✕
             </button>
@@ -2431,22 +2439,27 @@
         <div x-show="currentView === 'transport'"
              x-cloak
              x-data="transportView()"
-             x-init="init()"
-             @view-destroy.window="if ($event.detail === 'transport') destroy()"
+             x-init="if ($store.navigation?.currentView === 'transport') init()"
+             @view-changed.window="$event.detail.view === 'transport' ? init() : destroy()"
              class="view transport-view">
 
-          <!-- Compact Status Bar -->
+          <!-- Compact Status Bar (manual refresh only - no auto-polling) -->
           <div class="transport-status-bar">
             <div class="status-indicator">
               <div class="status-dot" :class="{ 'error': isError }"></div>
               <span class="status-label" x-text="isError ? 'Offline' : 'Online'"></span>
             </div>
-            <span class="status-divider">│</span>
+            <span class="status-divider">|</span>
             <span class="status-item">Updated <strong x-text="lastUpdated"></strong></span>
-            <span class="status-divider">│</span>
-            <span class="status-item">Next <strong x-text="countdownSeconds + 's'"></strong></span>
+            <template x-if="stats">
+              <span>
+                <span class="status-divider">|</span>
+                <span class="status-item" style="opacity: 0.6"
+                      x-text="'#' + stats.total_requests + ' · ' + stats.scrapes + ' scrape · ' + stats.hafas_fallbacks + ' HAFAS'"></span>
+              </span>
+            </template>
             <button class="refresh-btn-compact" @click="refresh()" :disabled="isLoading">
-              <span x-show="!isLoading">🔄 Refresh</span>
+              <span x-show="!isLoading">Refresh</span>
               <span x-show="isLoading">...</span>
             </button>
           </div>
@@ -2542,7 +2555,10 @@
                     </template>
                   </div>
                   <div class="board-footer">
-                    Street level
+                    <span>Street level</span>
+                    <template x-if="$store.transport.source?.bus">
+                      <span class="board-source" x-text="'via ' + $store.transport.source.bus"></span>
+                    </template>
                   </div>
                 </div>
 
@@ -2583,7 +2599,10 @@
                     </template>
                   </div>
                   <div class="board-footer">
-                    Platform 1: Wannsee · Platform 2: Oranienburg
+                    <span>Pl 1: Wannsee · Pl 2: Oranienburg</span>
+                    <template x-if="$store.transport.source?.sbahn">
+                      <span class="board-source" x-text="'via ' + $store.transport.source.sbahn"></span>
+                    </template>
                   </div>
                 </div>
 
@@ -3108,6 +3127,151 @@
               <span x-show="isLoading">...</span>
             </button>
           </div>
+
+        </div>
+
+        <!-- Sailing - Where Is Siva? -->
+        <div x-show="currentView === 'sailing'"
+             x-cloak
+             x-data="sailingView()"
+             x-init="init()"
+             @view-changed.window="if ($event.detail.view !== 'sailing') destroy()"
+             class="view sailing-view">
+
+          <!-- Loading -->
+          <template x-if="isLoading">
+            <div class="sailing-loading">Loading voyage data...</div>
+          </template>
+
+          <!-- Error -->
+          <template x-if="hasError">
+            <div class="sailing-error">
+              Cannot reach tracker &middot; <span x-text="store.error"></span>
+            </div>
+          </template>
+
+          <!-- Main content -->
+          <template x-if="hasData">
+            <div style="display:flex;flex-direction:column;height:100%;gap:8px;">
+
+              <!-- Header -->
+              <div class="sailing-header">
+                <div>
+                  <div class="sailing-title">Where Is Siva?</div>
+                  <div class="sailing-subtitle" x-text="(route?.origin || 'Origin') + ' &rarr; ' + (route?.destination || 'Destination')"></div>
+                </div>
+                <div class="sailing-update">
+                  <div x-text="heading + ' &middot; ' + currentSpeed + ' km/h'"></div>
+                  <div x-text="lastUpdate"></div>
+                </div>
+              </div>
+
+              <!-- SVG Map -->
+              <div class="sailing-map">
+                <svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+                  <!-- Planned route (dashed) -->
+                  <path :d="routePath" class="sailing-map-route" />
+
+                  <!-- Actual track (solid blue) -->
+                  <path :d="trackPath" class="sailing-map-track" />
+
+                  <!-- Waypoints -->
+                  <template x-for="wp in waypointPositions" :key="wp.name">
+                    <g>
+                      <circle :cx="wp.x" :cy="wp.y" r="8" class="sailing-map-waypoint" />
+                      <text :x="wp.x" :y="wp.y - 15" class="sailing-map-waypoint-label" x-text="wp.name"></text>
+                    </g>
+                  </template>
+
+                  <!-- Current position (boat) -->
+                  <template x-if="boatPosition">
+                    <g>
+                      <circle :cx="boatPosition.x" :cy="boatPosition.y" r="18" class="sailing-map-boat-ring" />
+                      <circle :cx="boatPosition.x" :cy="boatPosition.y" r="10" class="sailing-map-boat" />
+                    </g>
+                  </template>
+                </svg>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="sailing-progress">
+                <div class="sailing-progress-bar">
+                  <div class="sailing-progress-fill" :style="'width:' + progressPct + '%'"></div>
+                </div>
+                <div class="sailing-progress-labels">
+                  <span x-text="distanceCompleted + ' km sailed'"></span>
+                  <span class="sailing-progress-pct" x-text="progressPct + '%'"></span>
+                  <span x-text="distanceRemaining + ' km to go'"></span>
+                </div>
+              </div>
+
+              <!-- Stats Grid -->
+              <div class="sailing-stats">
+                <div class="sailing-stat">
+                  <div class="sailing-stat-value"><span x-text="currentSpeed"></span><span class="sailing-stat-unit"> km/h</span></div>
+                  <div class="sailing-stat-label">Speed</div>
+                </div>
+                <div class="sailing-stat">
+                  <div class="sailing-stat-value"><span x-text="avgSpeed"></span><span class="sailing-stat-unit"> km/h</span></div>
+                  <div class="sailing-stat-label">Avg Speed</div>
+                </div>
+                <div class="sailing-stat">
+                  <div class="sailing-stat-value" x-text="etaText"></div>
+                  <div class="sailing-stat-label">ETA</div>
+                </div>
+                <div class="sailing-stat">
+                  <div class="sailing-stat-value"><span x-text="daysRemaining"></span><span class="sailing-stat-unit"> days</span></div>
+                  <div class="sailing-stat-label">Remaining</div>
+                </div>
+              </div>
+
+              <!-- Bottom: Daily distances + Messages -->
+              <div class="sailing-bottom">
+                <!-- Daily distances -->
+                <div class="sailing-daily" x-show="dailyDistances.length > 0">
+                  <div class="sailing-daily-title">Daily Distance</div>
+                  <template x-for="day in dailyDistances" :key="day.date">
+                    <div class="sailing-daily-row">
+                      <div class="sailing-daily-label" x-text="formatDayLabel(day.date)"></div>
+                      <div class="sailing-daily-bar-bg">
+                        <div class="sailing-daily-bar" :style="'width:' + dailyBarWidth(day.distance_km)"></div>
+                      </div>
+                      <div class="sailing-daily-km" x-text="day.distance_km + ' km'"></div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Messages -->
+                <div class="sailing-messages" x-show="recentMessages.length > 0">
+                  <div class="sailing-messages-title">Check-ins</div>
+                  <template x-for="msg in recentMessages" :key="msg.timestamp">
+                    <div class="sailing-message">
+                      <div class="sailing-message-text" x-text="msg.text"></div>
+                      <div class="sailing-message-time" x-text="formatMessageTime(msg.timestamp)"></div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="sailing-footer">
+                <span>Where Is Siva &middot; <span x-text="totalRouteKm + ' km voyage'"></span></span>
+                <button class="sailing-refresh-btn" @click="refresh()" :disabled="store.loading">
+                  <span x-show="!store.loading">Refresh</span>
+                  <span x-show="store.loading">...</span>
+                </button>
+              </div>
+
+            </div>
+          </template>
+
+          <!-- No data yet -->
+          <template x-if="!isLoading && !hasError && !hasData">
+            <div class="sailing-no-data">
+              <div>No voyage data yet</div>
+              <div class="sailing-subtitle">Waiting for first tracking point...</div>
+            </div>
+          </template>
 
         </div>
 
@@ -4447,6 +4611,33 @@
         initWeatherForecastStore(Alpine);
       });
       document.addEventListener('DOMContentLoaded', initWeatherForecast);
+    }
+  </script>
+
+  <!-- Sailing View Module - Where Is Siva? -->
+  <script type="module">
+    import { initSailingStore } from './js/stores/sailing-store.js';
+    import { sailingView } from './views/sailing.js';
+
+    window.sailingView = sailingView;
+    console.log('[sailing] Module loaded, sailingView ready');
+
+    function initSailing() {
+      if (typeof Alpine !== 'undefined') {
+        if (!Alpine.store('sailing')) {
+          initSailingStore(Alpine);
+          console.log('[sailing] Store initialized (lazy - awaiting view activate)');
+        }
+      }
+    }
+
+    if (typeof Alpine !== 'undefined') {
+      initSailing();
+    } else {
+      document.addEventListener('alpine:init', () => {
+        initSailingStore(Alpine);
+      });
+      document.addEventListener('DOMContentLoaded', initSailing);
     }
   </script>
 
@@ -6232,7 +6423,7 @@
     // ========================================
     function app() {
       return {
-        currentView: 'classic',
+        currentView: 'sailing',
         currentDateTime: '',
         now: Date.now(),
         panelOpen: localStorage.getItem('panel-open') !== 'false',
@@ -6520,7 +6711,8 @@
           { id: 'hotwater', name: 'Hot Water', icon: '🚿', title: 'Hot Water Monitor', key: 'W' },
           { id: 'system', name: 'System', icon: '💻', title: 'System Health', key: 'S' },
           { id: 'transport', name: 'Transport', icon: '🚉', title: 'Transport Departures', key: 'T' },
-          { id: 'weather', name: 'Weather', icon: '🌤️', title: 'Weather Forecast', key: 'F' }
+          { id: 'weather', name: 'Weather', icon: '🌤️', title: 'Weather Forecast', key: 'F' },
+          { id: 'sailing', name: 'Sailing', icon: '⛵', title: 'Where Is Siva?', key: 'V', primary: true }
         ]
       },
       {
@@ -6566,7 +6758,7 @@
       return {
         moreMenuOpen: false,
         mobileMenuOpen: false,
-        currentView: 'classic',
+        currentView: 'sailing',
         primaryViews: PRIMARY_VIEWS,
         overflowCategories: OVERFLOW_CATEGORIES,
         allViews: ALL_VIEWS,

@@ -1,0 +1,47 @@
+[Unit]
+Description=Where Is Siva - Sailing Tracker Dashboard
+Documentation=file:///opt/where-is-siva/docs/
+# Wait for network to be fully up (DNS resolution needed for Garmin + GitHub)
+After=network-online.target
+Wants=network-online.target
+# After 5 failures in 30 min, stop trying. Lenient so the service survives
+# transient issues at sea without needing manual intervention.
+StartLimitIntervalSec=1800
+StartLimitBurst=5
+
+[Service]
+Type=notify
+NotifyAccess=all
+User=pi
+WorkingDirectory=/opt/where-is-siva
+ExecStart=/opt/where-is-siva/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# Auto-restart on any failure
+Restart=always
+RestartSec=10
+
+# Systemd watchdog: service must ping within 120s or gets killed + restarted
+WatchdogSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=where-is-siva
+
+# Secrets and config loaded from env file (not committed to git)
+# Contains: GARMIN_FEED_URL, GIT_PUSH_ENABLED, GIT_REPO_PATH
+EnvironmentFile=/opt/where-is-siva/.env
+
+Environment=USE_MOCK_DATA=false
+Environment=POLL_INTERVAL_SECONDS=300
+Environment=DB_PATH=/opt/where-is-siva/data/tracker.db
+Environment=STATIC_DIR=/opt/where-is-siva/static
+Environment=GIT_PUSH_INTERVAL_SECONDS=600
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/where-is-siva/data /opt/where-is-siva/static /opt/where-is-siva/public-repo
+
+[Install]
+WantedBy=multi-user.target

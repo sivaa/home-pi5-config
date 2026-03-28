@@ -1,0 +1,20 @@
+[Unit]
+Description=Fake Garmin InReach KML Feed - Sailing Simulator
+Documentation=file:///opt/where-is-siva/docs/
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python3 /opt/where-is-siva/fake-garmin.py --port 9000 --speed 60
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Not enabled by default - start manually for testing:
+#   sudo systemctl start fake-garmin
+# For real Garmin feed, stop this and set GARMIN_FEED_URL in where-is-siva.service
+
+[Install]
+WantedBy=multi-user.target

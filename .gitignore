@@ -19,6 +19,10 @@ configs/**/secrets.yaml
 node_modules/
 .playwright-mcp/
 
+# Where-is-siva runtime data
+services/where-is-siva/data/
+services/where-is-siva/static/data.json
+
 # Prototype HTML files
 services/dashboard/www/prototypes/
 

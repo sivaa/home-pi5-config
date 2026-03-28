@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+  <!-- Ocean background -->
+  <rect width="1000" height="500" fill="#0a1628"/>
+
+  <!-- Grid lines (subtle) -->
+  <g stroke="#141e33" stroke-width="0.5" fill="none">
+    <!-- Longitude lines every 10 degrees: -80, -70, -60, -50, -40, -30, -20 -->
+    <line x1="76.9" y1="0" x2="76.9" y2="500"/>
+    <line x1="230.8" y1="0" x2="230.8" y2="500"/>
+    <line x1="384.6" y1="0" x2="384.6" y2="500"/>
+    <line x1="538.5" y1="0" x2="538.5" y2="500"/>
+    <line x1="692.3" y1="0" x2="692.3" y2="500"/>
+    <line x1="846.2" y1="0" x2="846.2" y2="500"/>
+    <!-- Latitude lines every 5 degrees: 20, 25, 30, 35, 40, 45 -->
+    <line x1="0" y1="500" x2="1000" y2="500"/>
+    <line x1="0" y1="400" x2="1000" y2="400"/>
+    <line x1="0" y1="300" x2="1000" y2="300"/>
+    <line x1="0" y1="200" x2="1000" y2="200"/>
+    <line x1="0" y1="100" x2="1000" y2="100"/>
+    <line x1="0" y1="0" x2="1000" y2="0"/>
+  </g>
+
+  <!-- Coordinate helper: lon -85 to -20 = 65 deg, lat 20 to 45 = 25 deg
+       x = (lon - (-85)) / 65 * 1000
+       y = (45 - lat) / 25 * 500
+       So: lon=-80 -> x=76.9, lon=-70 -> x=230.8, lon=-28 -> x=876.9
+           lat=45 -> y=0, lat=40 -> y=100, lat=26 -> y=380, lat=20 -> y=500 -->
+
+  <!-- North America (Florida + East Coast) - simplified -->
+  <path d="M0,0 L0,140 L30,145 L50,160 L55,175 L50,195 L38,210 L30,230
+           L25,250 L22,270 L28,285 L40,300 L55,320 L60,340 L70,355
+           L80,365 L90,375 L95,380 L100,390 L95,400 L85,410 L80,420
+           L82,440 L90,455 L100,465 L110,470 L95,480 L80,490 L70,500
+           L0,500 Z" fill="#1a2744" stroke="#243352" stroke-width="1"/>
+
+  <!-- Florida peninsula detail -->
+  <path d="M55,320 L65,335 L75,350 L82,360 L90,375 L95,380 L85,385
+           L75,390 L65,395 L55,400 L50,410 L55,420 L65,430
+           L60,440 L50,445 L40,440 L35,430 L30,420 L35,405
+           L40,390 L45,375 L48,360 L50,345 L52,335 L55,320" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Cuba -->
+  <path d="M50,445 L70,440 L100,435 L130,438 L150,442 L140,448 L120,450
+           L90,452 L60,450 L50,445" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Bahamas (dots) -->
+  <circle cx="115" cy="415" r="4" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="130" cy="420" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="105" cy="425" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Bermuda (small island) -->
+  <circle cx="323" cy="250" r="4" fill="#1a2744" stroke="#3b82f6" stroke-width="1"/>
+
+  <!-- Azores islands (small dots) -->
+  <circle cx="870" cy="122" r="3.5" fill="#1a2744" stroke="#3b82f6" stroke-width="1"/>
+  <circle cx="855" cy="130" r="2.5" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="882" cy="118" r="2" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="845" cy="125" r="2" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="890" cy="128" r="2" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Europe / Portugal coast (far right edge) -->
+  <path d="M1000,0 L970,0 L965,20 L960,50 L955,80 L958,100 L960,120
+           L955,150 L950,170 L952,190 L960,200 L970,195 L980,200
+           L990,210 L1000,205 Z" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Africa / Morocco coast (far right, lower) -->
+  <path d="M1000,205 L990,210 L980,230 L975,260 L970,290 L975,320
+           L980,350 L985,380 L990,400 L1000,420 L1000,205" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+
+  <!-- Place labels -->
+  <g font-family="system-ui, sans-serif" font-size="11" fill="#4a6080" font-weight="500">
+    <text x="60" y="310" text-anchor="end">Florida</text>
+    <text x="323" y="240" text-anchor="middle">Bermuda</text>
+    <text x="870" y="108" text-anchor="middle">Azores</text>
+    <text x="975" y="150" text-anchor="end" font-size="9">Portugal</text>
+  </g>
+
+  <!-- Coordinate labels -->
+  <g font-family="monospace" font-size="8" fill="#1e3050">
+    <text x="76.9" y="495">80W</text>
+    <text x="230.8" y="495">70W</text>
+    <text x="384.6" y="495">60W</text>
+    <text x="538.5" y="495">50W</text>
+    <text x="692.3" y="495">40W</text>
+    <text x="846.2" y="495">30W</text>
+    <text x="5" y="108">40N</text>
+    <text x="5" y="208">35N</text>
+    <text x="5" y="308">30N</text>
+    <text x="5" y="408">25N</text>
+  </g>
+</svg>
