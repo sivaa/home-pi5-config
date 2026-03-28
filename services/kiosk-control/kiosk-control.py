@@ -7,6 +7,7 @@ HTTP API for controlling the kiosk display mode via labwc/wtype.
 Endpoints:
   GET /api/kiosk/toggle  - Toggle fullscreen mode (sends F11)
   GET /api/kiosk/refresh - Refresh the browser (sends F5)
+  GET /api/kiosk/close   - Close the browser (stops kiosk-browser service)
   GET /health            - Health check
 
 Port: 8889 (localhost only)
@@ -41,6 +42,8 @@ class KioskHandler(BaseHTTPRequestHandler):
             self.toggle_fullscreen()
         elif self.path == '/api/kiosk/refresh':
             self.refresh_browser()
+        elif self.path == '/api/kiosk/close':
+            self.close_browser()
         elif self.path == '/health':
             self.send_json(200, {'status': 'ok'})
         else:
@@ -91,12 +94,31 @@ class KioskHandler(BaseHTTPRequestHandler):
             'action': 'refresh'
         })
 
+    def close_browser(self):
+        """Stop the kiosk-browser service (clean shutdown, no auto-restart)."""
+        try:
+            result = subprocess.run(
+                ['systemctl', '--user', 'stop', 'kiosk-browser'],
+                capture_output=True,
+                timeout=10
+            )
+            success = result.returncode == 0
+            if not success:
+                print(f"[kiosk-control] Failed to stop kiosk-browser: {result.stderr.decode().strip()}")
+        except Exception as e:
+            print(f"[kiosk-control] Error stopping kiosk-browser: {e}")
+            success = False
+        self.send_json(200, {
+            'success': success,
+            'action': 'close_browser'
+        })
+
 
 def main():
     """Start the kiosk control HTTP server."""
     server = HTTPServer(('127.0.0.1', PORT), KioskHandler)
     print(f"[kiosk-control] Service running on http://127.0.0.1:{PORT}")
-    print("[kiosk-control] Endpoints: /api/kiosk/toggle, /api/kiosk/refresh, /health")
+    print("[kiosk-control] Endpoints: /api/kiosk/toggle, /api/kiosk/refresh, /api/kiosk/close, /health")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

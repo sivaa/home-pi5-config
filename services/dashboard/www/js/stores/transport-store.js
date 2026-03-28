@@ -12,6 +12,8 @@ export function initTransportStore(Alpine, CONFIG) {
     errorDetails: null,  // Technical details for debugging
     fallback: null,
     fetchStartTime: null,
+    stats: null,   // Request tracking from scraper
+    source: null,  // Data source per type: { bus: "BVG"|"HAFAS", sbahn: "bahnhof.de"|"HAFAS" }
 
     // Configuration
     WALK_TIME: 5,  // Minutes to reach stops
@@ -51,6 +53,8 @@ export function initTransportStore(Alpine, CONFIG) {
         this.lastUpdated = data.updated;
         this.error = data.error;
         this.fallback = data.fallback;
+        this.stats = data.stats || null;
+        this.source = data.source || null;
         this.containerStopped = false;  // Container is working
 
         // If API returned an error in the response body, show technical details

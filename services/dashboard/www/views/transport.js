@@ -3,8 +3,10 @@
  * Full-page departure board for S-Bahn and Bus
  * Design: Train station split-flap aesthetic
  *
- * Auto-switch: After 20 minutes, switches to heater view automatically
- * to prevent indefinite transport polling and reduce Pi CPU usage.
+ * Manual refresh only - no auto-polling to avoid IP blocks from
+ * BVG's Link11 DDoS protection. User taps refresh button.
+ *
+ * Auto-switch: After 20 minutes, switches to heater view automatically.
  */
 
 export function transportView() {
@@ -13,8 +15,6 @@ export function transportView() {
     // STATE
     // ========================================
 
-    countdownSeconds: 60,
-    _countdownInterval: null,
     _viewTimeout: null,
     _initialized: false,  // Guard against x-init re-running on x-show toggle
 
@@ -26,42 +26,24 @@ export function transportView() {
     // ========================================
 
     init() {
-      console.log('[transport-view] Initializing...');
-
-      // Guard against re-initialization when x-show toggles
-      if (this._initialized) {
-        console.log('[transport-view] Already initialized, skipping');
-        return;
-      }
+      // Skip if already active (e.g. duplicate event)
+      if (this._initialized) return;
       this._initialized = true;
 
-      // Start countdown to next refresh
-      this.resetCountdown();
-      this._countdownInterval = setInterval(() => {
-        this.countdownSeconds--;
-        if (this.countdownSeconds <= 0) {
-          this.refresh();
-          this.resetCountdown();
-        }
-      }, 1000);
+      console.log('[transport-view] Initializing...');
 
       // Auto-switch to heater view after 20 minutes
-      // This prevents indefinite transport polling and reduces CPU usage
       this._viewTimeout = setTimeout(() => {
         console.log('[transport-view] 20-min timeout - auto-switching to heater view');
         this.switchToHeater();
       }, this.VIEW_TIMEOUT_MS);
 
-      // Initial data fetch if store exists
+      // Fetch fresh data on every view open
       this.refresh();
     },
 
     destroy() {
       console.log('[transport-view] Destroying...');
-      if (this._countdownInterval) {
-        clearInterval(this._countdownInterval);
-        this._countdownInterval = null;
-      }
       if (this._viewTimeout) {
         clearTimeout(this._viewTimeout);
         this._viewTimeout = null;
@@ -80,14 +62,6 @@ export function transportView() {
       window.dispatchEvent(new CustomEvent('force-view-change', {
         detail: { view: 'heater' }
       }));
-    },
-
-    // ========================================
-    // COUNTDOWN
-    // ========================================
-
-    resetCountdown() {
-      this.countdownSeconds = 60;
     },
 
     // ========================================
@@ -116,6 +90,10 @@ export function transportView() {
 
     get lastUpdated() {
       return this.store?.lastUpdated || '--:--';
+    },
+
+    get stats() {
+      return this.store?.stats || null;
     },
 
     // ========================================

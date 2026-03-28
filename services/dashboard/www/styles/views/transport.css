@@ -311,6 +311,14 @@
   border-top: 1px solid var(--color-transport-border);
   background: rgba(0, 0, 0, 0.2);
   font-weight: var(--font-weight-medium);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.board-source {
+  opacity: 0.5;
+  font-size: 0.85em;
 }
 
 /* ---------- Icon Badges (replace broken emojis) ---------- */

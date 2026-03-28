@@ -58,6 +58,18 @@ Sends F5 keypress to refresh the browser.
 }
 ```
 
+### GET /api/kiosk/close
+
+Stops the kiosk-browser systemd service (clean shutdown, no auto-restart trigger).
+
+**Response:**
+```json
+{
+  "success": true,
+  "action": "close_browser"
+}
+```
+
 ### GET /health
 
 Health check endpoint.

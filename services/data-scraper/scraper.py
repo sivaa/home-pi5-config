@@ -27,6 +27,7 @@ import os
 import re
 import signal
 import time
+import urllib.request
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -73,6 +74,26 @@ CANCELLATION_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# ─────────────────────────────────────────────────────────────────
+# HAFAS API FALLBACK (for when BVG website blocks scraping)
+#
+#   ┌───────────────────────────────────────────────────────────────┐
+#   │  HAFAS is the underlying API that powers BVG/VBB apps.       │
+#   │  Used as FALLBACK when Playwright scraping fails (e.g. 403). │
+#   │  Scraper remains primary because it matches the real website │
+#   │  experience and catches visual-only info (strike banners).   │
+#   └───────────────────────────────────────────────────────────────┘
+HAFAS_ENDPOINT = "https://bvg.hafas.cloud/apps/gate"
+HAFAS_BUS_STOP_ID = "900049354"       # Laehrstr. (Berlin)
+HAFAS_SBAHN_STOP_ID = "900049201"     # S Zehlendorf (Berlin)
+HAFAS_REQUEST_BASE = {
+    "client": {"type": "WEB", "id": "VBB", "v": 10002, "name": "webapp"},
+    "ext": "BVG.1",
+    "ver": "1.72",
+    "auth": {"type": "AID", "aid": "dVg4TZbW8anjx9ztPwe2uk4LVRi9wO"},
+    "lang": "de"
+}
+
 # Cache results for 60 seconds (matches dashboard refresh interval)
 CACHE_TTL = 60
 
@@ -92,6 +113,14 @@ _event_loop = None
 _cache = {
     "data": None,
     "timestamp": None
+}
+
+# Request tracking (helps diagnose IP blocks from excessive requests)
+_request_stats = {
+    "total": 0,          # Total /api/transport requests
+    "scrapes": 0,        # Actual scrapes (cache misses)
+    "hafas_fallbacks": 0, # Times HAFAS fallback was used
+    "started": None,      # Process start time (ISO)
 }
 
 
@@ -382,6 +411,107 @@ def filter_sbahn_departures(departures):
 
 
 # ─────────────────────────────────────────────────────────────────
+# HAFAS API FALLBACK
+# ─────────────────────────────────────────────────────────────────
+
+def fetch_hafas_departures(stop_id, duration=60, max_results=15):
+    """Fetch departures from HAFAS API (no browser needed).
+
+    Fallback for when Playwright scraping fails (e.g. BVG 403).
+    Returns list of departure dicts in same format as scraper output.
+    """
+    now = datetime.now()
+
+    request_body = {
+        **HAFAS_REQUEST_BASE,
+        "svcReqL": [{
+            "meth": "StationBoard",
+            "req": {
+                "stbLoc": {"lid": f"A=1@L={stop_id}@"},
+                "type": "DEP",
+                "dur": duration,
+                "maxJny": max_results,
+            }
+        }]
+    }
+
+    body_bytes = json.dumps(request_body).encode("utf-8")
+    req = urllib.request.Request(
+        HAFAS_ENDPOINT,
+        data=body_bytes,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read())
+
+    res = data["svcResL"][0]["res"]
+    prods = res.get("common", {}).get("prodL", [])
+    departures = []
+
+    for jny in res.get("jnyL", []):
+        try:
+            prod = prods[jny["prodX"]]
+            line = prod.get("name", "?")
+            direction = jny.get("dirTxt", "Unknown")
+
+            stb = jny.get("stbStop", {})
+            planned_str = stb.get("dTimeS", "")  # e.g. "125500"
+            actual_str = stb.get("dTimeR", planned_str)
+            cancelled = stb.get("dCncl", False)
+
+            if len(planned_str) < 6:
+                continue
+            hour = int(planned_str[:2])
+            minute = int(planned_str[2:4])
+
+            # HAFAS uses 24+ hour notation for post-midnight services
+            # e.g. "253000" means 01:30 the next day
+            day_offset = 0
+            if hour >= 24:
+                hour -= 24
+                day_offset = 1
+
+            # Calculate delay from planned vs actual
+            delay = 0
+            if actual_str and actual_str != planned_str and len(actual_str) >= 6:
+                actual_h, actual_m = int(actual_str[:2]), int(actual_str[2:4])
+                delay = (actual_h * 60 + actual_m) - (hour * 60 + minute + day_offset * 1440)
+                if delay < 0:
+                    delay = 0
+
+            # Calculate minutes until departure (using actual time)
+            dep_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            dep_time += timedelta(days=day_offset)
+            actual_dep_time = dep_time + timedelta(minutes=delay)
+
+            if actual_dep_time < now:
+                if (now - actual_dep_time).total_seconds() < 3600:
+                    continue
+                dep_time = dep_time + timedelta(days=1)
+                actual_dep_time = dep_time + timedelta(minutes=delay)
+
+            minutes = int((actual_dep_time - now).total_seconds() / 60)
+            if minutes < 0:
+                continue
+
+            departures.append({
+                "line": line,
+                "direction": direction,
+                "minutes": minutes,
+                "time": f"{hour:02d}:{minute:02d}",
+                "delay": delay,
+                "platform": None,
+                "cancelled": cancelled
+            })
+        except (ValueError, KeyError, IndexError):
+            continue
+
+    return sorted(departures, key=lambda x: x["minutes"])
+
+
+# ─────────────────────────────────────────────────────────────────
 # S-BAHN SCRAPING (bahnhof.de)
 # ─────────────────────────────────────────────────────────────────
 
@@ -512,7 +642,26 @@ async def scrape_sbahn_departures():
             # Pattern: S1 followed by "to DESTINATION." followed by time
             # Example: "S1\nto Berlin-Wannsee.\nplanned 10 52...\n10:52"
             pattern = r'(S\d+)\s*\nto\s+([^.]+)\.\s*.*?(\d{1,2}):(\d{2})'
-            for match in re.finditer(pattern, all_text, re.DOTALL):
+
+            # Collect all matches first for bounded cancellation detection
+            #
+            #   ┌──────────────────────────────────────────────────────┐
+            #   │  BOUNDED WINDOWS (prev match end .. next match start)│
+            #   │                                                      │
+            #   │  OLD: Fixed 100-char backward window bled across     │
+            #   │  adjacent departures. "Trip cancelled" from the      │
+            #   │  Wannsee entry leaked into Oranienburg's window.     │
+            #   │                                                      │
+            #   │  NEW: Each departure's window is bounded by its      │
+            #   │  neighbors. Cancellation text is only attributed     │
+            #   │  to the departure it belongs to.                     │
+            #   │                                                      │
+            #   │  ...[prev match end] .. cancel? .. [match] .. [next] │
+            #   │       ▲ window_start               window_end ▲      │
+            #   └──────────────────────────────────────────────────────┘
+            all_matches = list(re.finditer(pattern, all_text, re.DOTALL))
+
+            for i, match in enumerate(all_matches):
                 try:
                     line = match.group(1)
                     direction_raw = match.group(2).strip()
@@ -539,20 +688,10 @@ async def scrape_sbahn_departures():
                     if minutes < 0 or minutes > 120:
                         continue
 
-                    # Extract platform and cancellation from nearby text
-                    #
-                    #   ┌──────────────────────────────────────────────────┐
-                    #   │  BIDIRECTIONAL WINDOW (100 before + 200 after)  │
-                    #   │                                                  │
-                    #   │  Why not forward-only? Cancellation badges      │
-                    #   │  can appear BEFORE the departure entry on       │
-                    #   │  bahnhof.de (e.g. status label above the row). │
-                    #   │                                                  │
-                    #   │  ◄─100─► match.start() ◄──────200──────►       │
-                    #   │  [cancel] S1 to Frohnau. Trip cancelled. 12:33  │
-                    #   └──────────────────────────────────────────────────┘
-                    window_start = max(0, match.start() - 100)
-                    nearby_text = all_text[window_start:match.start() + 200]
+                    # Bounded window: from end of previous match to start of next match
+                    window_start = all_matches[i-1].end() if i > 0 else 0
+                    window_end = all_matches[i+1].start() if i < len(all_matches) - 1 else len(all_text)
+                    nearby_text = all_text[window_start:window_end]
 
                     platform = None
                     plat_match = re.search(r'Platform\s+(\d+)', nearby_text)
@@ -614,6 +753,7 @@ async def fetch_transport_async():
             log(f"Returning cached data (age: {age:.1f}s)")
             return _cache["data"]
 
+    _request_stats["scrapes"] += 1
     log("Fetching fresh transport data...")
 
     try:
@@ -634,14 +774,43 @@ async def fetch_transport_async():
         bus_departures = filter_bus_departures(bus_departures)
         sbahn_departures = filter_sbahn_departures(sbahn_departures)
 
-        log(f"OK: {len(sbahn_departures)} S-Bahn, {len(bus_departures)} bus")
+        # Track data source per transport type
+        bus_source = "BVG" if bus_departures else None
+        sbahn_source = "bahnhof.de" if sbahn_departures else None
+
+        # HAFAS fallback: if scraping returned no bus departures, try the API
+        if not bus_departures:
+            try:
+                log("[BUS] Scraper returned 0 results, trying HAFAS API fallback...")
+                hafas_bus = fetch_hafas_departures(HAFAS_BUS_STOP_ID)
+                bus_departures = filter_bus_departures(hafas_bus)
+                log(f"[BUS] HAFAS fallback returned {len(bus_departures)} departures")
+                _request_stats["hafas_fallbacks"] += 1
+                bus_source = "HAFAS"
+            except Exception as he:
+                log(f"[BUS] HAFAS fallback also failed: {he}")
+
+        # HAFAS fallback: if scraping returned no S-Bahn departures, try the API
+        if not sbahn_departures:
+            try:
+                log("[S-BAHN] Scraper returned 0 results, trying HAFAS API fallback...")
+                hafas_sbahn = fetch_hafas_departures(HAFAS_SBAHN_STOP_ID)
+                sbahn_departures = filter_sbahn_departures(hafas_sbahn)
+                log(f"[S-BAHN] HAFAS fallback returned {len(sbahn_departures)} departures")
+                _request_stats["hafas_fallbacks"] += 1
+                sbahn_source = "HAFAS"
+            except Exception as he:
+                log(f"[S-BAHN] HAFAS fallback also failed: {he}")
+
+        log(f"OK: {len(sbahn_departures)} S-Bahn ({sbahn_source}), {len(bus_departures)} bus ({bus_source})")
 
         result = {
             "sbahn": sbahn_departures,
             "bus": bus_departures,
             "updated": datetime.now().strftime("%H:%M"),
             "error": None,
-            "fallback": FALLBACK
+            "fallback": FALLBACK,
+            "source": {"bus": bus_source, "sbahn": sbahn_source},
         }
 
         # Update cache
@@ -657,7 +826,8 @@ async def fetch_transport_async():
             "bus": [],
             "updated": None,
             "error": str(e),
-            "fallback": FALLBACK
+            "fallback": FALLBACK,
+            "source": None,
         }
 
     finally:
@@ -688,7 +858,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/api/transport":
+            _request_stats["total"] += 1
             result = fetch_transport()
+            # Include request stats in response for dashboard visibility
+            result["stats"] = {
+                "total_requests": _request_stats["total"],
+                "scrapes": _request_stats["scrapes"],
+                "hafas_fallbacks": _request_stats["hafas_fallbacks"],
+                "started": _request_stats["started"],
+            }
             # Update activity timestamp for cleanup service
             update_activity()
             self.send_json(result)
@@ -696,7 +874,8 @@ class Handler(BaseHTTPRequestHandler):
             # Health check doesn't start browser
             self.send_json({
                 "status": "ok",
-                "browser_active": _browser is not None
+                "browser_active": _browser is not None,
+                "stats": _request_stats,
             })
         else:
             self.send_json({"error": "not found"}, 404)
@@ -707,6 +886,7 @@ def main():
     # Auto-reap zombie child processes (Python as PID 1 doesn't do this by default)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
+    _request_stats["started"] = datetime.now().isoformat()
     log(f"Starting transport scraper on port {PORT}")
     log(f"Architecture: Launch → Scrape → Kill (browser killed after each request)")
     log(f"Cache TTL: {CACHE_TTL}s | Activity file: {ACTIVITY_FILE}")
