@@ -136,7 +136,9 @@ def parse_kml(kml_text: str) -> tuple[list[TrackPoint], list[Message]]:
             heading_str = ext_data.get("Course", ext_data.get("heading", ""))
             if heading_str:
                 try:
-                    heading = float(heading_str.replace("°", "").strip())
+                    # Garmin format: "0.00 ° True" - strip unit and reference
+                    cleaned = heading_str.replace("°", "").replace("True", "").replace("Magnetic", "").strip()
+                    heading = float(cleaned)
                 except ValueError:
                     pass
 
