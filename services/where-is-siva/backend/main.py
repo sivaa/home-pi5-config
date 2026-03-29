@@ -91,14 +91,26 @@ async def build_dashboard_data() -> dict:
 # ========================================
 
 async def poll_garmin_feed():
-    """Fetch the Garmin KML feed, parse it, and store new data."""
+    """Fetch the Garmin KML feed, parse it, and store new data.
+
+    The default Garmin MapShare feed only returns the latest 1-2 placemarks.
+    Adding d1/d2 date parameters fetches all data in that window, ensuring
+    we don't miss messages or track points between polls.
+    """
     if not config.GARMIN_FEED_URL:
         logger.debug("No GARMIN_FEED_URL configured, skipping poll")
         return
 
     try:
+        # Request last 24h of data to catch anything missed between polls
+        now = dt.now()
+        d1 = (now - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%Sz")
+        d2 = (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%Sz")
+        sep = "&" if "?" in config.GARMIN_FEED_URL else "?"
+        feed_url = f"{config.GARMIN_FEED_URL}{sep}d1={d1}&d2={d2}"
+
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(config.GARMIN_FEED_URL)
+            resp = await client.get(feed_url)
             resp.raise_for_status()
 
         if not resp.text.strip():
