@@ -106,9 +106,10 @@ def parse_kml(kml_text: str) -> tuple[list[TrackPoint], list[Message]]:
         timestamp = _normalize_timestamp(raw_ts)
 
         # Determine if this is a user check-in message or a track point.
-        # Garmin event types:
+        # Garmin event types observed in the wild:
         #   "Tracking interval received." / "Tracking message received." = GPS positions
-        #   "Text Message to MapShare received." / "Quick Text Message sent." = user messages
+        #   "Msg to shared map received" = user message sent to MapShare
+        #   "Text Message to MapShare received." = user text message
         #   "Preset Message sent." / "Check-in sent." = user check-ins
         # "Tracking message received." contains "message" but is NOT a user message -
         # it's a GPS position sent via Iridium message. Exclude it explicitly.
@@ -116,7 +117,8 @@ def parse_kml(kml_text: str) -> tuple[list[TrackPoint], list[Message]]:
         is_tracking = "tracking" in event_type
         is_message = (
             not is_tracking
-            and ("message" in event_type or "checkin" in event_type or "check-in" in event_type)
+            and ("message" in event_type or "msg" in event_type
+                 or "checkin" in event_type or "check-in" in event_type)
         )
 
         # Also check for user-typed text in the Text extended data field
