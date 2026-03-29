@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS messages (
 async def init_db():
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.executescript(SCHEMA)
-        # WAL mode: more robust crash recovery + allows concurrent reads during writes
+        # WAL mode must be set before any DDL to take effect
         await db.execute("PRAGMA journal_mode=WAL")
+        await db.executescript(SCHEMA)
         await db.commit()
 
 
@@ -43,11 +43,35 @@ async def insert_track_point(lat, lon, speed, heading, elevation, timestamp):
         await db.commit()
 
 
+async def insert_track_points_batch(points: list[tuple]):
+    """Batch insert track points in a single connection/transaction."""
+    if not points:
+        return
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.executemany(
+            "INSERT OR IGNORE INTO track_points (lat, lon, speed, heading, elevation, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+            points,
+        )
+        await db.commit()
+
+
 async def insert_message(text, lat, lon, timestamp):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "INSERT OR IGNORE INTO messages (text, lat, lon, timestamp) VALUES (?, ?, ?, ?)",
             (text, lat, lon, timestamp),
+        )
+        await db.commit()
+
+
+async def insert_messages_batch(messages: list[tuple]):
+    """Batch insert messages in a single connection/transaction."""
+    if not messages:
+        return
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.executemany(
+            "INSERT OR IGNORE INTO messages (text, lat, lon, timestamp) VALUES (?, ?, ?, ?)",
+            messages,
         )
         await db.commit()
 

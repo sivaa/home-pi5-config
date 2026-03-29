@@ -23,7 +23,7 @@ DB_PATH = os.getenv("DB_PATH", "data/tracker.db")
 STATIC_DIR = os.getenv("STATIC_DIR", "static")
 DATA_JSON_PATH = os.path.join(STATIC_DIR, "data.json")
 
-USE_MOCK_DATA = os.getenv("USE_MOCK_DATA", "true").lower() == "true"
+USE_MOCK_DATA = os.getenv("USE_MOCK_DATA", "false").lower() == "true"
 
 GIT_PUSH_ENABLED = os.getenv("GIT_PUSH_ENABLED", "false").lower() == "true"
 GIT_PUSH_INTERVAL_SECONDS = int(os.getenv("GIT_PUSH_INTERVAL_SECONDS", "600"))

@@ -5,7 +5,7 @@ import os
 import socket
 import tempfile
 from contextlib import asynccontextmanager
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,7 +20,9 @@ from backend.database import (
     get_all_track_points,
     init_db,
     insert_message,
+    insert_messages_batch,
     insert_track_point,
+    insert_track_points_batch,
 )
 from backend.kml_parser import parse_kml
 from backend.tracker import compute_voyage_stats
@@ -105,12 +107,14 @@ async def poll_garmin_feed():
 
         track_points, messages = parse_kml(resp.text)
 
-        for tp in track_points:
-            await insert_track_point(
-                tp.lat, tp.lon, tp.speed, tp.heading, tp.elevation, tp.timestamp
-            )
-        for msg in messages:
-            await insert_message(msg.text, msg.lat, msg.lon, msg.timestamp)
+        await insert_track_points_batch([
+            (tp.lat, tp.lon, tp.speed, tp.heading, tp.elevation, tp.timestamp)
+            for tp in track_points
+        ])
+        await insert_messages_batch([
+            (msg.text, msg.lat, msg.lon, msg.timestamp)
+            for msg in messages
+        ])
 
         logger.info("Polled KML: %d track points, %d messages", len(track_points), len(messages))
         await export_data_json()
@@ -185,9 +189,9 @@ async def lifespan(app: FastAPI):
         scheduler.add_job(
             async_push_data_json, "interval",
             seconds=config.GIT_PUSH_INTERVAL_SECONDS,
-            next_run_time=dt.now(),
+            next_run_time=dt.now() + timedelta(seconds=30),
         )
-        logger.info("Scheduled git push every %ds (first push: now)", config.GIT_PUSH_INTERVAL_SECONDS)
+        logger.info("Scheduled git push every %ds (first push: 30s delay)", config.GIT_PUSH_INTERVAL_SECONDS)
 
     # Watchdog: ping systemd every 30s (WatchdogSec=120, so 4x safety margin)
     scheduler.add_job(watchdog_ping, "interval", seconds=30)
