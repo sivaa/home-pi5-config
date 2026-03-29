@@ -101,8 +101,8 @@ def compute_voyage_stats(track_points: list[dict]) -> dict:
         "current_position": {
             "lat": round(current_lat, 4),
             "lon": round(current_lon, 4),
-            "heading": round(latest.get("heading") or heading_to_dest, 1),
-            "heading_compass": compass_direction(latest.get("heading") or heading_to_dest),
+            "heading": round(latest.get("heading") if latest.get("heading") is not None else heading_to_dest, 1),
+            "heading_compass": compass_direction(latest.get("heading") if latest.get("heading") is not None else heading_to_dest),
             "last_update": latest["timestamp"],
         },
         "voyage": {
