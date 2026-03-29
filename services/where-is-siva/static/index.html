@@ -501,7 +501,7 @@
     <div class="card">
       <div class="card-header">Position</div>
       <div class="card-body">
-        <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+        <a id="gmaps-link" href="#" target="_blank" rel="noopener" style="display: flex; gap: 16px; margin-bottom: 8px; text-decoration: none; color: inherit;" title="Open in Google Maps">
           <div>
             <div class="coord-label">LAT</div>
             <div class="coord" id="lat">--</div>
@@ -510,7 +510,8 @@
             <div class="coord-label">LON</div>
             <div class="coord" id="lon">--</div>
           </div>
-        </div>
+          <div style="display: flex; align-items: center; margin-left: auto; opacity: 0.5; font-size: 12px;">&#x1F517;</div>
+        </a>
         <div class="compass">
           <div class="compass-ring">
             <div class="compass-needle" id="compass-needle" style="transform: rotate(0deg)"></div>
@@ -777,6 +778,7 @@
     var pos = stats.current_position;
     document.getElementById('lat').textContent = formatCoord(pos.lat, 'N', 'S');
     document.getElementById('lon').textContent = formatCoord(pos.lon, 'E', 'W');
+    document.getElementById('gmaps-link').href = 'https://www.google.com/maps?q=' + pos.lat + ',' + pos.lon;
     document.getElementById('heading-degrees').textContent = pos.heading.toFixed(1) + '\u00B0';
     document.getElementById('heading-compass').textContent = pos.heading_compass;
     document.getElementById('compass-needle').style.transform = 'rotate(' + pos.heading + 'deg)';
