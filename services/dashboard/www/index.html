@@ -3256,10 +3256,16 @@
               <!-- Footer -->
               <div class="sailing-footer">
                 <span>Where Is Siva &middot; <span x-text="totalRouteKm + ' km voyage'"></span></span>
-                <button class="sailing-refresh-btn" @click="refresh()" :disabled="store.loading">
-                  <span x-show="!store.loading">Refresh</span>
-                  <span x-show="store.loading">...</span>
-                </button>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <a href="https://where-is-siva.vercel.app/" target="_blank" rel="noopener"
+                     style="background:#dc2626;color:#fff;padding:6px 16px;border-radius:6px;font-weight:700;font-size:13px;text-decoration:none;border:2px solid #ef4444;letter-spacing:0.5px;">
+                    Where Is Siva
+                  </a>
+                  <button class="sailing-refresh-btn" @click="refresh()" :disabled="store.loading">
+                    <span x-show="!store.loading">Refresh</span>
+                    <span x-show="store.loading">...</span>
+                  </button>
+                </div>
               </div>
 
             </div>

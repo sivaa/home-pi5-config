@@ -40,17 +40,17 @@
            L45,440 L35,445 L25,440 L20,430 L15,420 L20,405
            L25,390 L30,375 L33,360 L35,345 L37,335 L40,320" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
 
-  <!-- Cuba -->
-  <path d="M50,445 L70,440 L100,435 L130,438 L150,442 L140,448 L120,450
-           L90,452 L60,450 L50,445" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <!-- Cuba - shifted ~10px left to match projection (Havana lon=-82.35 -> x=40.8) -->
+  <path d="M40,445 L60,440 L90,435 L120,438 L140,442 L130,448 L110,450
+           L80,452 L50,450 L40,445" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
 
-  <!-- Bahamas (dots) -->
-  <circle cx="115" cy="415" r="4" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
-  <circle cx="130" cy="420" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
-  <circle cx="105" cy="425" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <!-- Bahamas (dots) - Nassau lon=-77.35 -> x=117.7, lat=25.06 -> y=399 -->
+  <circle cx="110" cy="400" r="4" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="125" cy="405" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <circle cx="100" cy="410" r="3" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
 
-  <!-- Bermuda (small island) -->
-  <circle cx="323" cy="250" r="4" fill="#1a2744" stroke="#3b82f6" stroke-width="1"/>
+  <!-- Bermuda (small island) - lon=-64.68 -> x=312.6, lat=32.38 -> y=252.4 -->
+  <circle cx="313" cy="252" r="4" fill="#1a2744" stroke="#3b82f6" stroke-width="1"/>
 
   <!-- Azores islands (small dots) -->
   <circle cx="870" cy="122" r="3.5" fill="#1a2744" stroke="#3b82f6" stroke-width="1"/>
@@ -71,7 +71,7 @@
   <!-- Place labels -->
   <g font-family="system-ui, sans-serif" font-size="11" fill="#4a6080" font-weight="500">
     <text x="45" y="310" text-anchor="end">Florida</text>
-    <text x="323" y="240" text-anchor="middle">Bermuda</text>
+    <text x="313" y="240" text-anchor="middle">Bermuda</text>
     <text x="870" y="108" text-anchor="middle">Azores</text>
     <text x="975" y="150" text-anchor="end" font-size="9">Portugal</text>
   </g>
