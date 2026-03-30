@@ -116,20 +116,23 @@ def parse_kml(kml_text: str) -> tuple[list[TrackPoint], list[Message]]:
         # it's a GPS position sent via Iridium message. Exclude it explicitly.
         event_type = ext_data.get("Event", "").lower()
         is_tracking = "tracking" in event_type
-        is_message = (
-            not is_tracking
-            and ("message" in event_type or "msg" in event_type
-                 or "checkin" in event_type or "check-in" in event_type
-                 or "quick text" in event_type)
+
+        # Primary: match known Garmin message event keywords
+        known_message_event = (
+            "message" in event_type or "msg" in event_type
+            or "checkin" in event_type or "check-in" in event_type
+            or "quick text" in event_type
         )
 
-        # Also check for user-typed text in the Text extended data field
+        # Fallback: non-tracking event with user-typed text.
+        # Garmin's Text field is reliably empty for tracking events,
+        # so this catches future unknown message event types.
         user_text = ext_data.get("Text", "").strip()
         desc_el = placemark.find(f"{KML_NS}description")
         description = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
-
-        # Use Text field if available (preferred), fall back to description
         message_text = user_text or description
+
+        is_message = not is_tracking and (known_message_event or bool(user_text))
 
         if is_message and message_text:
             messages.append(Message(
