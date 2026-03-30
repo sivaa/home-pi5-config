@@ -143,8 +143,9 @@ export function sailingView() {
     // ========================================
 
     get recentMessages() {
-      // messages are already newest-first from the API (ORDER BY timestamp DESC)
-      return this.messages.slice(0, 5);
+      return [...this.messages]
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+        .slice(0, 5);
     },
 
     formatMessageTime(ts) {
