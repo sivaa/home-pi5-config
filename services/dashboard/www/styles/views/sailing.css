@@ -52,8 +52,10 @@
       min-height: 0;
       position: relative;
       overflow: hidden;
-      /* Atlantic map background */
-      background: url('../../images/atlantic-map.svg') center/cover no-repeat #0a1628;
+      /* Atlantic map background - must use 'contain' to match SVG overlay's
+         preserveAspectRatio="xMidYMid meet". Using 'cover' causes the background
+         to scale differently from the overlay, misaligning coordinates. */
+      background: url('../../images/atlantic-map.svg') center/contain no-repeat #0a1628;
     }
 
     .sailing-map svg {
