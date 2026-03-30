@@ -26,18 +26,19 @@
        So: lon=-80 -> x=76.9, lon=-70 -> x=230.8, lon=-28 -> x=876.9
            lat=45 -> y=0, lat=40 -> y=100, lat=26 -> y=380, lat=20 -> y=500 -->
 
-  <!-- North America (Florida + East Coast) - simplified -->
-  <path d="M0,0 L0,140 L30,145 L50,160 L55,175 L50,195 L38,210 L30,230
-           L25,250 L22,270 L28,285 L40,300 L55,320 L60,340 L70,355
-           L80,365 L90,375 L95,380 L100,390 L95,400 L85,410 L80,420
-           L82,440 L90,455 L100,465 L110,470 L95,480 L80,490 L70,500
+  <!-- North America (Florida + East Coast) - aligned to projection grid
+       Key reference: lon=-80 = x=76.9, so Florida east coast must be at x<=77 -->
+  <path d="M0,0 L0,140 L15,145 L35,160 L40,175 L35,195 L23,210 L15,230
+           L10,250 L7,270 L13,285 L25,300 L40,320 L45,340 L55,355
+           L65,365 L75,375 L80,380 L85,390 L80,400 L70,410 L65,420
+           L67,440 L75,455 L85,465 L95,470 L80,480 L65,490 L55,500
            L0,500 Z" fill="#1a2744" stroke="#243352" stroke-width="1"/>
 
-  <!-- Florida peninsula detail -->
-  <path d="M55,320 L65,335 L75,350 L82,360 L90,375 L95,380 L85,385
-           L75,390 L65,395 L55,400 L50,410 L55,420 L65,430
-           L60,440 L50,445 L40,440 L35,430 L30,420 L35,405
-           L40,390 L45,375 L48,360 L50,345 L52,335 L55,320" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
+  <!-- Florida peninsula detail - east coast aligned to lon=-80 (x=77) -->
+  <path d="M40,320 L50,335 L60,350 L67,360 L75,375 L80,380 L70,385
+           L60,390 L50,395 L40,400 L35,410 L40,420 L50,430
+           L45,440 L35,445 L25,440 L20,430 L15,420 L20,405
+           L25,390 L30,375 L33,360 L35,345 L37,335 L40,320" fill="#1a2744" stroke="#243352" stroke-width="0.5"/>
 
   <!-- Cuba -->
   <path d="M50,445 L70,440 L100,435 L130,438 L150,442 L140,448 L120,450
@@ -69,7 +70,7 @@
 
   <!-- Place labels -->
   <g font-family="system-ui, sans-serif" font-size="11" fill="#4a6080" font-weight="500">
-    <text x="60" y="310" text-anchor="end">Florida</text>
+    <text x="45" y="310" text-anchor="end">Florida</text>
     <text x="323" y="240" text-anchor="middle">Bermuda</text>
     <text x="870" y="108" text-anchor="middle">Azores</text>
     <text x="975" y="150" text-anchor="end" font-size="9">Portugal</text>
