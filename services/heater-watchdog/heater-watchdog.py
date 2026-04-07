@@ -207,7 +207,7 @@ STUCK_IDLE_SETPOINT_FLOOR = 18  # Min setpoint for race condition guard
 # │                                                                         │
 # │  DETECTION: Compare each TRV's opening voltage against its peers.      │
 # │  If one TRV is >20% below the average of others → alert.              │
-# │  Also alert if absolute voltage < 1700 mV.                             │
+# │  Also alert if absolute voltage < 1550 mV.                             │
 # └─────────────────────────────────────────────────────────────────────────┘
 VALVE_VOLTAGE_ENTITIES = {
     "climate.study_thermostat": "sensor.study_thermostat_valve_opening_limit_voltage",
@@ -215,7 +215,7 @@ VALVE_VOLTAGE_ENTITIES = {
     "climate.living_thermostat_outer": "sensor.living_thermostat_outer_valve_opening_limit_voltage",
     "climate.bed_thermostat": "sensor.bed_thermostat_valve_opening_limit_voltage",
 }
-VALVE_VOLTAGE_ABS_MIN = 1700  # mV — alert if below this
+VALVE_VOLTAGE_ABS_MIN = 1550  # mV — alert if below this (lowered from 1700: daily valve exercise prevents seizure, 1700 caused noise)
 VALVE_VOLTAGE_PEER_DEVIATION = 0.20  # Alert if >20% below peer average
 
 # =============================================================================
@@ -907,18 +907,18 @@ def check_ghost_external_temps():
 # │    Result:  Valve stuck closed → room freezing                         │
 # │                                                                         │
 # │  This is EARLY WARNING only — alerts, no recovery.                     │
-# │  Detection: absolute floor (1700 mV) OR >20% below peer average.      │
+# │  Detection: absolute floor (1550 mV) OR >20% below peer average.      │
 # └─────────────────────────────────────────────────────────────────────────┘
 
 valve_voltage_alert_tracker = {}  # {entity_id: last_alert_timestamp}
-VALVE_VOLTAGE_ALERT_COOLDOWN = 3600 * 4  # 4 hours between alerts per TRV
+VALVE_VOLTAGE_ALERT_COOLDOWN = 3600 * 12  # 12 hours between alerts per TRV (raised from 4h: alerts are rare at 1550 threshold)
 
 
 def check_valve_voltages():
     """Check TRV valve opening voltages for degradation.
 
     Compares each TRV's valve_opening_limit_voltage against:
-    1. Absolute minimum (1700 mV) — motor too weak to open valve
+    1. Absolute minimum (1550 mV) — motor too weak to open valve
     2. Peer average — >20% below peers suggests degradation
 
     Sends alert only (no recovery) — early warning system.
@@ -968,7 +968,7 @@ def check_valve_voltages():
                     )
 
         if alerts:
-            # Rate limit: 4h cooldown per TRV
+            # Rate limit: 12h cooldown per TRV
             last_alert = valve_voltage_alert_tracker.get(entity_id, 0)
             if now - last_alert < VALVE_VOLTAGE_ALERT_COOLDOWN:
                 log(f"  Valve voltage alert suppressed for {name} (cooldown)", "INFO")

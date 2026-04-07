@@ -217,11 +217,11 @@ docker logs heater-watchdog --tail 100
 │  peers were at 2070 mV. Motor too weak to open valve.          │
 │                                                                 │
 │  DETECTION:                                                     │
-│    1. Absolute: voltage < 1700 mV (motor failing)              │
+│    1. Absolute: voltage < 1550 mV (motor failing)              │
 │    2. Relative: >20% below peer average (outlier)              │
 │                                                                 │
 │  ACTION: Alert only (no recovery — early warning system)       │
-│  COOLDOWN: 4 hours per TRV (avoid alert spam)                  │
+│  COOLDOWN: 12 hours per TRV                                    │
 │  RUNS: Every 5 min (after stuck-idle check)                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
