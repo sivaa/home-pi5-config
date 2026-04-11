@@ -5804,6 +5804,49 @@
         entity_id: input_boolean.circadian_living_override
 
 # -----------------------------------------------------------------------------
+# STUDY - IKEA Light ON when occupied
+# ┌────────────────────────────────────────────────────────────────┐
+# │  Same dual-trigger pattern as bathroom:                        │
+# │                                                                │
+# │  Trigger 1: state → "on"      (instant when person enters)    │
+# │  Trigger 2: time_pattern /5   (fallback for HA restart)       │
+# │                                                                │
+# │  Study IKEA light is turned off via Zigbee (software off),    │
+# │  so it needs an explicit turn_on - same as AwoX bath light.   │
+# │  circadian_power_on handles brightness & color temp on start. │
+# └────────────────────────────────────────────────────────────────┘
+# -----------------------------------------------------------------------------
+- id: study_presence_ikea_light_on
+  alias: "[Study] IKEA Light On When Occupied"
+  description: "Turn on Study IKEA light when human presence detected"
+  mode: single
+
+  trigger:
+    # Instant: fires the moment presence sensor transitions to on
+    - platform: state
+      entity_id: binary_sensor.study_human_presence_occupancy
+      to: "on"
+    # Fallback: catches HA restart while person is in dark study
+    - platform: time_pattern
+      minutes: "/5"
+
+  condition:
+    # Light must be OFF (don't re-trigger if already on)
+    - condition: state
+      entity_id: light.study_ikea_light
+      state: "off"
+    # Presence must be ON (essential for the periodic fallback)
+    - condition: state
+      entity_id: binary_sensor.study_human_presence_occupancy
+      state: "on"
+
+  action:
+    # Just turn on - circadian_power_on handles brightness & color temp
+    - service: light.turn_on
+      target:
+        entity_id: light.study_ikea_light
+
+# -----------------------------------------------------------------------------
 # STUDY - IKEA Light OFF when unoccupied
 # ┌────────────────────────────────────────────────────────────────┐
 # │  Dual-trigger pattern (resilient to HA automation reloads):   │
