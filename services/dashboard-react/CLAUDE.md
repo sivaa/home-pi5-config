@@ -1,6 +1,26 @@
 # Dashboard React - AI Context
 
-This file provides context for AI coding sessions on this project.
+```
+╔══════════════════════════════════════════════════════════════════╗
+║  🛑 ON HOLD — NOT USED, NOT MAINTAINED  (as of 2026-04-15)       ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  This React rewrite is PAUSED. All active development and       ║
+║  feature work happens in the classic Alpine.js dashboard at:    ║
+║                                                                  ║
+║      services/dashboard/www/                                     ║
+║                                                                  ║
+║  Do NOT update this React codebase for new features unless the  ║
+║  user explicitly revives it. When adding Zigbee devices, config ║
+║  changes, or bug fixes, ONLY modify the classic dashboard.      ║
+║                                                                  ║
+║  The `/v2/` URL on the Pi may still serve stale builds; that's  ║
+║  fine — it is not the production surface.                       ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+This file provides historical context for the paused React rewrite.
 
 ## Project Overview
 

@@ -2,8 +2,8 @@
  * Zigbee Device Configuration
  * Device layout for network visualization
  *
- * Total Devices: 46 (including coordinator)
- * Last Updated: 2026-02-03
+ * Total Devices: 48 (including coordinator)
+ * Last Updated: 2026-04-15
  */
 
 export const ZIGBEE_DEVICES = [
@@ -20,8 +20,9 @@ export const ZIGBEE_DEVICES = [
   { id: 'study-light', name: '[Study] IKEA Light', type: 'router', icon: '💡', room: 'study', x: 0.85, z: 0.25 },
   { id: 'living-light', name: '[Living] IKEA Light', type: 'router', icon: '💡', room: 'living', x: 0.4, z: 0.35 },
 
-  // AwoX Light (mains-powered router)
+  // AwoX Lights (mains-powered routers)
   { id: 'bath-light', name: '[Bath] Light', type: 'router', icon: '💡', room: 'bathroom', x: 0.80, z: 0.05 },
+  { id: 'bed-light', name: '[Bed] Light', type: 'router', icon: '💡', room: 'bedroom', x: 0.50, z: 0.50 },
 
   // CO2 Sensor (USB-powered router)
   { id: 'co2', name: '[Hallway] CO2', type: 'router', icon: '🌬️', room: 'hallway', x: 0.5, z: 0.5 },

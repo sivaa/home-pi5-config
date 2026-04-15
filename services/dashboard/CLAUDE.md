@@ -600,9 +600,9 @@ getRoomLightClass(roomId):
 |------|-----------------|------------------|----------------|
 | Study | ✓ (IKEA FLOALT) | ✓ (SONOFF) | Smart light state |
 | Living | ✓ (IKEA FLOALT) | ✓ (SONOFF) | Smart light state |
-| Bedroom | ✗ | ✓ (SONOFF) | **Switch state** |
+| Bedroom | ✓ (EGLO Rovito-Z) | ✓ (SONOFF) | Smart light state |
+| Bathroom | ✓ (AwoX 33955) | ✗ | Smart light state |
 | Kitchen | ✗ | ✗ | Illumination |
-| Bathroom | ✗ | ✗ | Illumination |
 
 ### Switch Configuration
 

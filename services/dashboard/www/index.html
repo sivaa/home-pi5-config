@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css">
+  <link rel="stylesheet" href="styles/views/lights.css?v=4">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -773,6 +773,52 @@
                     <div class="colortemp-labels">
                       <span>Cool</span>
                       <span>Warm</span>
+                    </div>
+                  </div>
+
+                  <!-- Color (Hue) - only for RGB-capable lights like EGLO Rovito-Z -->
+                  <div class="light-control"
+                       x-show="light.supportsColor"
+                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
+                    <div class="control-row">
+                      <label class="control-label">
+                        <span class="control-icon">🎨</span>
+                        Color
+                      </label>
+                      <span class="control-value">
+                        <span x-show="light.syncing" class="control-syncing">⟳</span>
+                        <span class="color-swatch" :style="'background: hsl(' + light.hue + ',' + light.saturation + '%,50%)'"></span>
+                      </span>
+                    </div>
+                    <input type="range" class="slider hue-slider" min="0" max="360"
+                           x-model="light.hue"
+                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
+                           @input="$store.lights.setHue(light, $event.target.value)">
+                    <div class="color-presets">
+                      <button class="color-preset-btn" style="background:#ff4444" title="Red"
+                              @click="$store.lights.setColorPreset(light, 0, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#ff8800" title="Orange"
+                              @click="$store.lights.setColorPreset(light, 30, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#ffee00" title="Yellow"
+                              @click="$store.lights.setColorPreset(light, 60, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#44dd44" title="Green"
+                              @click="$store.lights.setColorPreset(light, 120, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#00ccff" title="Cyan"
+                              @click="$store.lights.setColorPreset(light, 180, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#3366ff" title="Blue"
+                              @click="$store.lights.setColorPreset(light, 240, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#cc44ff" title="Purple"
+                              @click="$store.lights.setColorPreset(light, 280, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
+                      <button class="color-preset-btn" style="background:#ff44aa" title="Pink"
+                              @click="$store.lights.setColorPreset(light, 320, 100)"
+                              :disabled="light.state !== 'ON' || !light.available"></button>
                     </div>
                   </div>
 
@@ -5257,6 +5303,9 @@
             colorTemp: 370,
             colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
             colorTempMax: 454,
+            supportsColor: false,
+            hue: 0,
+            saturation: 100,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -5272,6 +5321,9 @@
             colorTemp: 370,
             colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
             colorTempMax: 454,
+            supportsColor: false,
+            hue: 0,
+            saturation: 100,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -5287,6 +5339,27 @@
             colorTemp: 370,
             colorTempMin: 153,   // AwoX 33955: 153-370 mired (2703K-6536K)
             colorTempMax: 370,
+            supportsColor: false,
+            hue: 0,
+            saturation: 100,
+            linkquality: null,
+            lastSeen: null,
+            syncing: false,
+            available: true
+          },
+          {
+            id: 'bed_light',
+            name: 'Bedroom',
+            icon: '🛏️',
+            topic: '[Bed] Light',
+            state: 'OFF',
+            brightness: 254,
+            colorTemp: 370,
+            colorTempMin: 153,   // EGLO Rovito-Z (AwoX EBF_RGB_Zm): 153-370 mired
+            colorTempMax: 370,
+            supportsColor: true, // EGLO Rovito-Z has full RGB alongside CCT
+            hue: 0,
+            saturation: 100,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -5297,6 +5370,7 @@
         initializing: true,
         _brightnessTimeout: null,
         _colorTempTimeout: null,
+        _hueTimeout: null,
 
         get anyLightSyncing() {
           return this.list.some(l => l.syncing);
@@ -5327,6 +5401,11 @@
             if (data.brightness !== undefined) light.brightness = data.brightness;
             if (data.color_temp !== undefined) light.colorTemp = data.color_temp;
             if (data.linkquality !== undefined) light.linkquality = data.linkquality;
+            // Color (HS) — only applies to lights with supportsColor
+            if (light.supportsColor && data.color) {
+              if (data.color.hue !== undefined) light.hue = data.color.hue;
+              if (data.color.saturation !== undefined) light.saturation = data.color.saturation;
+            }
             light.lastSeen = Date.now();
             light.syncing = false;
             this.initializing = false;
@@ -5403,6 +5482,24 @@
           this._colorTempTimeout = setTimeout(() => {
             this.publishCommand(light, { color_temp: colorTemp });
           }, 150);
+        },
+
+        setHue(light, value) {
+          if (!light.supportsColor) return;
+          const hue = parseInt(value);
+          light.hue = hue;
+          // Debounce: rapid drags shouldn't flood Z2M
+          clearTimeout(this._hueTimeout);
+          this._hueTimeout = setTimeout(() => {
+            this.publishCommand(light, { color: { hue, saturation: light.saturation } });
+          }, 150);
+        },
+
+        setColorPreset(light, hue, saturation) {
+          if (!light.supportsColor) return;
+          light.hue = hue;
+          light.saturation = saturation;
+          this.publishCommand(light, { color: { hue, saturation } });
         },
 
         applyPreset(light, presetName) {

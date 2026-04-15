@@ -36,6 +36,18 @@ export const LIGHTS_CONFIG = [
     icon: '🛋️',
     topic: '[Living] IKEA Light',
   },
+  {
+    id: 'bath_light',
+    name: 'Bathroom Light',
+    icon: '🛁',
+    topic: '[Bath] Light',
+  },
+  {
+    id: 'bed_light',
+    name: 'Bedroom Light',
+    icon: '🛏️',
+    topic: '[Bed] Light',
+  },
 ] as const;
 
 // Light presets
@@ -242,6 +254,8 @@ export const ZIGBEE_DEVICES: ZigbeeDevice[] = [
   { id: 'plug3', name: 'Smart Plug [3]', type: 'router', icon: '🔌', room: 'kitchen', x: 0.6, z: 0.1 },
   { id: 'study-light', name: '[Study] IKEA Light', type: 'router', icon: '💡', room: 'study', x: 0.85, z: 0.25 },
   { id: 'living-light', name: '[Living] IKEA Light', type: 'router', icon: '💡', room: 'living', x: 0.4, z: 0.35 },
+  { id: 'bath-light', name: '[Bath] Light', type: 'router', icon: '💡', room: 'bathroom', x: 0.80, z: 0.05 },
+  { id: 'bed-light', name: '[Bed] Light', type: 'router', icon: '💡', room: 'bedroom', x: 0.50, z: 0.50 },
   { id: 'co2', name: '[Hallway] CO2', type: 'router', icon: '🌬️', room: 'hallway', x: 0.5, z: 0.5 },
 
   // End devices (battery-powered)

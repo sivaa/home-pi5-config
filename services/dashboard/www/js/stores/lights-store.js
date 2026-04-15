@@ -16,6 +16,9 @@ export function initLightsStore(Alpine, CONFIG) {
         colorTemp: 370,
         colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
         colorTempMax: 454,
+        supportsColor: false,
+        hue: 0,
+        saturation: 100,
         linkquality: null,
         lastSeen: null,
         syncing: false,
@@ -31,6 +34,9 @@ export function initLightsStore(Alpine, CONFIG) {
         colorTemp: 370,
         colorTempMin: 250,   // IKEA FLOALT: 250-454 mired (2200K-4000K)
         colorTempMax: 454,
+        supportsColor: false,
+        hue: 0,
+        saturation: 100,
         linkquality: null,
         lastSeen: null,
         syncing: false,
@@ -46,6 +52,27 @@ export function initLightsStore(Alpine, CONFIG) {
         colorTemp: 370,
         colorTempMin: 153,   // AwoX 33955: 153-370 mired (2703K-6536K)
         colorTempMax: 370,
+        supportsColor: false,
+        hue: 0,
+        saturation: 100,
+        linkquality: null,
+        lastSeen: null,
+        syncing: false,
+        available: true
+      },
+      {
+        id: 'bed_light',
+        name: 'Bedroom',
+        icon: '🛏️',
+        topic: '[Bed] Light',
+        state: 'OFF',
+        brightness: 254,
+        colorTemp: 370,
+        colorTempMin: 153,   // EGLO Rovito-Z (AwoX EBF_RGB_Zm): 153-370 mired
+        colorTempMax: 370,
+        supportsColor: true, // EGLO Rovito-Z has full RGB alongside CCT
+        hue: 0,
+        saturation: 100,
         linkquality: null,
         lastSeen: null,
         syncing: false,
@@ -84,6 +111,11 @@ export function initLightsStore(Alpine, CONFIG) {
         if (data.brightness !== undefined) light.brightness = data.brightness;
         if (data.color_temp !== undefined) light.colorTemp = data.color_temp;
         if (data.linkquality !== undefined) light.linkquality = data.linkquality;
+        // Color (HS) — only applies to lights with supportsColor
+        if (light.supportsColor && data.color) {
+          if (data.color.hue !== undefined) light.hue = data.color.hue;
+          if (data.color.saturation !== undefined) light.saturation = data.color.saturation;
+        }
         light.lastSeen = Date.now();
         light.syncing = false;
         this.initializing = false;
@@ -154,6 +186,20 @@ export function initLightsStore(Alpine, CONFIG) {
     setColorTemp(light, value) {
       const colorTemp = parseInt(value);
       this.publishCommand(light, { color_temp: colorTemp });
+    },
+
+    setHue(light, value) {
+      if (!light.supportsColor) return;
+      const hue = parseInt(value);
+      light.hue = hue;
+      this.publishCommand(light, { color: { hue, saturation: light.saturation } });
+    },
+
+    setColorPreset(light, hue, saturation) {
+      if (!light.supportsColor) return;
+      light.hue = hue;
+      light.saturation = saturation;
+      this.publishCommand(light, { color: { hue, saturation } });
     },
 
     applyPreset(light, presetName) {

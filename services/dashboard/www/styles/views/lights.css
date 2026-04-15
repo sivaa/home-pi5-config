@@ -3,7 +3,7 @@
        ======================================== */
     .lights-view {
       padding: var(--space-md) var(--space-lg);
-      max-width: 800px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
@@ -106,10 +106,10 @@
       /* grayscale removed for CPU efficiency */
     }
 
-    /* Light Cards Grid — 3 cards in one row, no scrolling */
+    /* Light Cards Grid — responsive wrap, cards flow to next row as needed */
     .lights-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: var(--space-md);
       margin-bottom: var(--space-md);
     }
@@ -878,5 +878,62 @@
     flex: 1;
     text-align: center;
   }
+}
+
+/* ========================================
+   HUE / COLOR PICKER (RGB-capable lights)
+   ======================================== */
+.hue-slider {
+  background: linear-gradient(
+    to right,
+    hsl(0, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+}
+
+.color-swatch {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border, #ddd);
+  vertical-align: middle;
+}
+
+.color-presets {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.color-preset-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border, #ddd);
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+  transition: transform 0.15s ease;
+}
+
+.color-preset-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.color-preset-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.color-preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 

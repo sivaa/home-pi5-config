@@ -82,7 +82,7 @@ Don't know which service? Use: `find . -name CLAUDE.md`
 - **Hardware:**
   - Zigbee: Sonoff Zigbee 3.0 USB Dongle Plus V2
   - Path: `/dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...-if00-port0`
-- **Zigbee Devices:** 47 total (including coordinator)
+- **Zigbee Devices:** 48 total (including coordinator)
   - 12x Temperature sensors (SNZB-02P, SNZB-02WD)
   - 8x Window/door contact sensors (SNZB-04P)
   - 5x Human presence sensors (SNZB-06P) - Study, Living, Kitchen, Bath, Bed
@@ -90,7 +90,7 @@ Don't know which service? Use: `find . -name CLAUDE.md`
   - 3x Light switches (SONOFF ZBM5-1C-80/86) - Study, Bed, Living
   - 3x Smart plugs (S60ZBTPF)
   - 2x IKEA FLOALT lights + 2x remotes
-  - 1x AwoX LED light (33955) - Bath
+  - 2x AwoX LED lights - Bath (33955), Bed (EGLO Rovito-Z 900087)
   - 1x EGLO remote controller (99099) - Bath
   - 1x CO2 sensor (NOUS E10)
   - 1x Light sensor (Moes ZSS-QT-LS-C) - Kitchen
@@ -333,6 +333,37 @@ shell_command:
 ---
 
 ## Lessons Learned (AI Memory)
+
+### EGLO connect.z Lamps Need BLE Firmware Update Before Z2M Pairing (2026-04-15)
+
+**Incident:** Paired new EGLO Rovito-Z (model 900087, AwoX firmware). Device joined the Zigbee network but every interview failed at the first ZDO step with "Interview failed because can not get node descriptor". 10+ retries, different routers, touchlink scans - all failed identically. Matches GitHub issues #16431 and #18322.
+
+**Root cause:** Shipped firmware reports old Zigbee spec revision (21 vs current 23) and the AwoX ZDO handler doesn't respond to NodeDescriptor unicasts. Z2M's interview state machine requires NodeDescriptor as the first step before any fingerprint matching can occur, so no data can be captured and no external_converter can rescue it.
+
+**Fix:** BLE-side firmware update via the "AwoX HomeControl" phone app. Install the app, pair the lamp over Bluetooth, trigger the firmware update - changelog literally says "Improved compatibility with third-party hubs". Post-update version: `3.0.1_1593`. After update, removed from AwoX app, factory-reset, re-paired to Z2M. Interview succeeded on first try, identified as `AwoX EBF_RGB_Zm` (matches Z2M's built-in converter).
+
+**Prevention for future AwoX / EGLO connect.z lamps:**
+```
+┌──────────────────────────────────────────────────────────────┐
+│  BEFORE pairing a new EGLO connect.z / AwoX lamp to Z2M:     │
+│  1. Install "AwoX HomeControl" app on phone                  │
+│  2. Pair lamp via Bluetooth                                  │
+│  3. Check & apply firmware update (usually ≥ 3.0.x)          │
+│  4. Remove from AwoX app, factory reset                      │
+│  5. THEN pair to Z2M                                         │
+│                                                              │
+│  Symptoms to recognize:                                      │
+│  • Device joins (gets nwkAddr) but interview stalls          │
+│  • Log: "Interview failed because can not get node           │
+│    descriptor"                                               │
+│  • Log: "Device is only compliant to revision '21' of the    │
+│    Zigbee specification"                                     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Important:** AwoX / EGLO connect.z lamps are dual-protocol (Zigbee + Bluetooth). The Bluetooth side is the only way to update firmware. There is no Zigbee OTA path.
+
+---
 
 ### Dashboard Network View - Wall Index Tracing (2024-12-14)
 
