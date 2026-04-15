@@ -910,30 +910,11 @@
   vertical-align: middle;
 }
 
-/* Backlight brightness row — only shown on dual-endpoint devices where the
-   backlight strip has its own brightness, independent of the main ring. */
-.backlight-brightness-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+/* Backlight brightness control — only shown on dual-endpoint devices. The
+   slider spans the full card width like the main Brightness / Color Temp /
+   Hue sliders; label + % sit on a stacked header row above it. */
+.backlight-brightness-control {
   margin-top: var(--space-sm);
-}
-
-.backlight-brightness-row .brightness-slider {
-  flex: 1;
-  min-width: 0;
-}
-
-.backlight-brightness-label,
-.backlight-brightness-value {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.backlight-brightness-value {
-  min-width: 32px;
-  text-align: right;
 }
 
 .color-presets {

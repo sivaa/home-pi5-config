@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css?v=12">
+  <link rel="stylesheet" href="styles/views/lights.css?v=14">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -806,18 +806,44 @@
                            x-model="light.hue"
                            :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
                            @input="$store.lights.setHue(light, $event.target.value)">
+                    <!-- Pseudo-dim via saturation for single-endpoint dual-LED
+                         lamps (EGLO Rovito-Z). Real brightness is shared with
+                         the main ring so we can't physically dim just the
+                         backlight — lowering saturation fades the color
+                         toward the main ring's white instead, which visually
+                         reads as "softer/less prominent backlight". -->
+                    <div class="backlight-brightness-control"
+                         x-show="light.supportsColor && !light.colorPropSuffix"
+                         :class="{ 'control-disabled': !light.backlightOn }">
+                      <div class="control-row">
+                        <label class="control-label">
+                          <span class="control-icon">🔅</span>
+                          Intensity
+                        </label>
+                        <span class="control-value" x-text="light.backlightIntensity + '%'"></span>
+                      </div>
+                      <input type="range" class="slider" min="0" max="100"
+                             x-model="light.backlightIntensity"
+                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
+                             @input="$store.lights.setBacklightIntensity(light, $event.target.value)">
+                    </div>
                     <!-- Independent brightness for the rgb strip on dual-endpoint
                          devices (Aqara T1M). Hidden for single-endpoint lamps
                          where main-ring brightness already applies to both LEDs. -->
-                    <div class="backlight-brightness-row"
+                    <div class="backlight-brightness-control"
                          x-show="light.colorPropSuffix"
                          :class="{ 'control-disabled': !light.backlightOn }">
-                      <span class="backlight-brightness-label">Dim</span>
+                      <div class="control-row">
+                        <label class="control-label">
+                          <span class="control-icon">🔅</span>
+                          Backlight Dim
+                        </label>
+                        <span class="control-value" x-text="Math.round(light.backlightBrightness / 254 * 100) + '%'"></span>
+                      </div>
                       <input type="range" class="slider brightness-slider" min="1" max="254"
                              x-model="light.backlightBrightness"
                              :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
                              @input="$store.lights.setBacklightBrightness(light, $event.target.value)">
-                      <span class="backlight-brightness-value" x-text="Math.round(light.backlightBrightness / 254 * 100) + '%'"></span>
                     </div>
                     <div class="color-presets" :class="{ 'control-disabled': !light.backlightOn }">
                       <button class="color-preset-btn" style="background:#ff4444" title="Red"
@@ -5386,6 +5412,7 @@
             hue: 0,
             saturation: 100,
             backlightOn: true,   // tracks if backlight is colored (true) or blended to white (false)
+            backlightIntensity: 100, // pseudo-dim: interpolates from blend (0) to vivid (100)
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -5458,12 +5485,29 @@
             // colorPropSuffix (falls back to propSuffix for single-endpoint).
             const s = light.propSuffix;
             const cs = light.colorPropSuffix || s;
-            const stateKey = s ? `state_${s}` : 'state';
             const brightKey = s ? `brightness_${s}` : 'brightness';
             const ctKey = s ? `color_temp_${s}` : 'color_temp';
             const colorKey = cs ? `color_${cs}` : 'color';
             const backlightStateKey = cs ? `state_${cs}` : null;
-            if (data[stateKey] !== undefined) light.state = data[stateKey];
+            // Drive the card-level toggle so it reads ON whenever ANY part of
+            // the fixture is glowing. For dual-endpoint devices we compute
+            // the logical OR of the two endpoint states ourselves (Z2M's
+            // top-level `state` tracks only one endpoint and is unreliable
+            // as an aggregate). Single-endpoint devices use `state` directly.
+            if (s && cs && cs !== s) {
+              const mainState = data[`state_${s}`];
+              const colorState = data[`state_${cs}`];
+              if (mainState !== undefined || colorState !== undefined) {
+                const anyOn = mainState === 'ON' || colorState === 'ON' ||
+                              (mainState === undefined && light.state === 'ON') ||
+                              (colorState === undefined && light.backlightOn);
+                light.state = anyOn ? 'ON' : 'OFF';
+              }
+            } else if (s && data[`state_${s}`] !== undefined) {
+              light.state = data[`state_${s}`];
+            } else if (data.state !== undefined) {
+              light.state = data.state;
+            }
             if (data[brightKey] !== undefined) light.brightness = data[brightKey];
             if (data[ctKey] !== undefined) light.colorTemp = data[ctKey];
             if (data.linkquality !== undefined) light.linkquality = data.linkquality;
@@ -5542,9 +5586,58 @@
           });
         },
 
+        // Build the toggle payload for a given light and target state. For
+        // dual-endpoint devices (Aqara T1M) we flip BOTH rings in the same
+        // message so the main On/Off toggle matches user expectation that
+        // "light on" = whole fixture powered. Single-endpoint devices keep
+        // the original single-key payload that goes through publishCommand's
+        // suffix rewriter.
+        _togglePayload(light, newState) {
+          if (light.colorPropSuffix) {
+            const payload = {};
+            payload[`state_${light.propSuffix}`] = newState;
+            payload[`state_${light.colorPropSuffix}`] = newState;
+            return payload;
+          }
+          return { state: newState };
+        },
+
+        // Publish a payload AS-IS, bypassing the publishCommand suffix
+        // rewriter. Needed for toggle payloads that already contain suffixed
+        // keys for multiple endpoints.
+        _publishRaw(light, payload) {
+          const client = Alpine.store('mqtt').client;
+          if (!client || !Alpine.store('mqtt').connected) {
+            console.error('MQTT not connected');
+            return;
+          }
+          light.syncing = true;
+          this.syncing = true;
+          const topic = `zigbee2mqtt/${light.topic}/set`;
+          client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
+            if (err) {
+              console.error('Failed to publish:', err);
+              light.syncing = false;
+              this.syncing = this.anyLightSyncing;
+            } else {
+              setTimeout(() => {
+                if (light.syncing) {
+                  light.syncing = false;
+                  this.syncing = this.anyLightSyncing;
+                }
+              }, 3000);
+            }
+          });
+        },
+
         toggleLight(light) {
           const newState = light.state === 'ON' ? 'OFF' : 'ON';
-          this.publishCommand(light, { state: newState });
+          if (light.colorPropSuffix) {
+            this._publishRaw(light, this._togglePayload(light, newState));
+            light.backlightOn = (newState === 'ON'); // optimistic
+          } else {
+            this.publishCommand(light, { state: newState });
+          }
           light.state = newState; // Optimistic update
         },
 
@@ -5552,7 +5645,12 @@
           const allOn = this.list.every(l => l.state === 'ON');
           const newState = allOn ? 'OFF' : 'ON';
           this.list.forEach(light => {
-            this.publishCommand(light, { state: newState });
+            if (light.colorPropSuffix) {
+              this._publishRaw(light, this._togglePayload(light, newState));
+              light.backlightOn = (newState === 'ON');
+            } else {
+              this.publishCommand(light, { state: newState });
+            }
             light.state = newState;
           });
         },
@@ -5669,7 +5767,12 @@
           if (!light.supportsColor) return;
           const hue = parseInt(value);
           light.hue = hue;
-          light.saturation = 100;
+          // Preserve current saturation so the user's intensity setting
+          // sticks when they drag the hue slider. Only default to 100 if
+          // the backlight was OFF (turning it back on should be vivid).
+          if (!light.backlightOn || light.saturation === 0) {
+            light.saturation = 100;
+          }
           light.backlightOn = true; // adjusting color implies backlight on
           // Debounce: rapid drags shouldn't flood Z2M
           clearTimeout(this._hueTimeout);
@@ -5689,10 +5792,44 @@
               // in the same message so the AwoX firmware doesn't auto-drift
               // the main ring when a color command arrives.
               this.publishCommand(light, {
-                color: { hue, saturation: 100 },
+                color: { hue, saturation: light.saturation },
                 color_temp: light.colorTemp
               });
             }
+          }, 150);
+        },
+
+        // Pseudo-dim for single-endpoint dual-LED lamps (EGLO Rovito-Z).
+        // Real brightness is shared across both LEDs on one endpoint, so
+        // we can't physically dim just the backlight. Instead, we linearly
+        // interpolate between TWO endpoints based on the 0-100 intensity:
+        //   intensity = 100 → user's hue at saturation 100 (vivid color)
+        //   intensity =   0 → blend values for current CCT (invisible match)
+        //
+        // Sending sat=0 naively produces D65 cold-bright-white (the RGB
+        // LEDs drive R+G+B equally). So at low intensity we converge on
+        // the empirical blend curve (same as the OFF pill), which fades
+        // the backlight into the main ring instead of making it bright.
+        setBacklightIntensity(light, value) {
+          if (!light.supportsColor || light.colorPropSuffix) return;
+          const intensity = Math.max(0, Math.min(100, parseInt(value))) / 100;
+          light.backlightIntensity = Math.round(intensity * 100);
+          // Blend target at the current main-ring CCT
+          const min = light.colorTempMin || 153;
+          const max = light.colorTempMax || 370;
+          const coldAnchor = min + 0.30 * (max - min);
+          const blendFactor = Math.max(0, Math.min(1, (light.colorTemp - coldAnchor) / (max - coldAnchor)));
+          const blendHue = Math.round(blendFactor * 22);
+          const blendSat = Math.round(blendFactor * 70);
+          // Interpolate: at 0% blend target, at 100% user's vivid color
+          const hue = Math.round(blendHue + (light.hue - blendHue) * intensity);
+          const saturation = Math.round(blendSat + (100 - blendSat) * intensity);
+          clearTimeout(this._intensityTimeout);
+          this._intensityTimeout = setTimeout(() => {
+            this.publishCommand(light, {
+              color: { hue, saturation },
+              color_temp: light.colorTemp
+            });
           }, 150);
         },
 

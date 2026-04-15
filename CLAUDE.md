@@ -358,7 +358,17 @@ shell_command:
 - Z2M's `color_mode` field on this lamp only reflects the *last command type*, not the active output state. Don't trust it.
 - Exposing CCT slider + color picker gives genuinely independent main/backlight control via standard Zigbee. No external converter needed.
 - `saturation: 0` on HS does NOT turn the backlight off - it desaturates to white AND appears to drag main ring CCT toward cool white (~167 mired). Treat it as "backlight white", not "backlight off".
-- **There is no standard Zigbee way to turn off ONLY the backlight while keeping main ring on.** The physical EGLO 99099 remote has the same limitation - its power button toggles both elements together. True independent on/off would require the AwoX proprietary cluster `0xFC57` (64599) on endpoint 1 or `0xFF50/0xFF51` on endpoint 3, which isn't worth reverse-engineering without a hardware feature that even the vendor's own remote exposes.
+- **There is no standard Zigbee way to turn off ONLY the backlight while keeping main ring on.** The physical EGLO 99099 remote has the same limitation - its power button toggles both elements together.
+
+**Proprietary-cluster dead end (2026-04-15):** We probed cluster 0xFC57 (64599) on endpoint 1 and cluster 0xFF50/0xFF51 (65360/65361) on endpoint 3 with manufacturer code 0x1135. Findings:
+- **0xFC57 is NOT proprietary AwoX.** It's the Amazon WWAH (Works With All Hubs) cluster. Z2M logs it as `manuSpecificAmazonWWAH.read`. Readable attributes are all standard WWAH fields (`disableOTADowngrades`, `mgmtLeaveWithoutRejoinEnabled`, `nwkRetryCount`, `touchlinkInterpanEnabled`, etc). Zero backlight content.
+- **0xFF50 / 0xFF51 on endpoint 3** — all attribute reads time out at 10s. These clusters are likely pure command-driven (no readable attributes) or only respond to multicast/group addressing. Without sniffing the AwoX phone app's traffic (which may be BLE, not Zigbee), we can't discover the commands.
+- GitHub issues #1927 (PADROGIANO-Z) and z2m #18366 document other users hitting the same wall with no public resolution. zigbee-herdsman-converters has fingerprints for these clusters but zero parsing code.
+- **Do NOT re-attempt** unless someone publicly posts decoded AwoX command payloads.
+
+The exploratory probe converter is kept at `configs/zigbee2mqtt/external_converters/eglo-rovito-probe.js` for reference only — it was deployed, run once, then removed from the Pi.
+
+**Software pseudo-dim we shipped instead:** the Bed Light dashboard card has an 🔅 Intensity slider that linearly interpolates between the user's vivid color (at 100%) and the blend values (at 0%, same as the 🎨 OFF pill). See `setBacklightIntensity` in `services/dashboard/www/index.html`. It's not real dimming; it's color-fade that reads as "less prominent backlight" against the main ring.
 
 **Dashboard label convention (services/dashboard/www/index.html):**
 - For lights with `supportsColor: true`, the CCT slider is labeled "🌡️ Main Ring" and the color picker is labeled "🎨 Backlight Color".
