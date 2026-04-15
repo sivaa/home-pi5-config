@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css?v=5">
+  <link rel="stylesheet" href="styles/views/lights.css?v=10">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -778,7 +778,11 @@
 
                   <!-- Backlight Color (only on dual-LED lamps like EGLO Rovito-Z).
                        color_temp affects main ring; color (hs) affects backlight.
-                       Both LEDs run simultaneously - see CLAUDE.md lessons learned. -->
+                       Both LEDs run simultaneously - see CLAUDE.md lessons learned.
+                       The "backlight" toggle here sends saturation=0 which blends
+                       the RGB backlight into neutral white so it visually merges
+                       with the main ring (standard Zigbee can't turn only the
+                       backlight hardware off; even the EGLO remote can't). -->
                   <div class="light-control"
                        x-show="light.supportsColor"
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
@@ -789,14 +793,20 @@
                       </label>
                       <span class="control-value">
                         <span x-show="light.syncing" class="control-syncing">⟳</span>
-                        <span class="color-swatch" :style="'background: hsl(' + light.hue + ',' + light.saturation + '%,50%)'"></span>
+                        <span class="color-swatch"
+                              :style="light.backlightOn ? ('background: hsl(' + light.hue + ',100%,50%)') : 'background: #f0f0f0'"></span>
+                        <button class="backlight-toggle"
+                                :class="{ 'backlight-off': !light.backlightOn }"
+                                :disabled="light.state !== 'ON' || !light.available"
+                                @click="$store.lights.setBacklightOn(light, !light.backlightOn)"
+                                x-text="light.backlightOn ? 'ON' : 'OFF'"></button>
                       </span>
                     </div>
                     <input type="range" class="slider hue-slider" min="0" max="360"
                            x-model="light.hue"
-                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
+                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
                            @input="$store.lights.setHue(light, $event.target.value)">
-                    <div class="color-presets">
+                    <div class="color-presets" :class="{ 'control-disabled': !light.backlightOn }">
                       <button class="color-preset-btn" style="background:#ff4444" title="Red"
                               @click="$store.lights.setColorPreset(light, 0, 100)"
                               :disabled="light.state !== 'ON' || !light.available"></button>
@@ -5362,6 +5372,34 @@
             supportsColor: true, // EGLO Rovito-Z has full RGB alongside CCT
             hue: 0,
             saturation: 100,
+            backlightOn: true,   // tracks if backlight is colored (true) or blended to white (false)
+            linkquality: null,
+            lastSeen: null,
+            syncing: false,
+            available: true
+          },
+          {
+            id: 'hallway_light',
+            name: 'Hallway',
+            icon: '🚪',
+            topic: '[Hallway] Light',
+            // Aqara T1M (lumi.light.acn032) has two independent endpoints:
+            //   - 'white' = main CCT ceiling ring (state/brightness/color_temp)
+            //   - 'rgb'   = secondary ambient strip (state/brightness/color)
+            // Z2M publishes suffixed keys on the parent topic. propSuffix drives
+            // the main ring controls; colorPropSuffix routes the color picker
+            // and backlight toggle to the rgb endpoint.
+            propSuffix: 'white',
+            colorPropSuffix: 'rgb',
+            state: 'OFF',
+            brightness: 254,
+            colorTemp: 370,
+            colorTempMin: 153,   // Aqara T1M white ring: 153-370 mired
+            colorTempMax: 370,
+            supportsColor: true,
+            backlightOn: true,
+            hue: 0,
+            saturation: 100,
             linkquality: null,
             lastSeen: null,
             syncing: false,
@@ -5399,14 +5437,32 @@
         updateLight(topic, data) {
           const light = this.list.find(l => l.topic === topic);
           if (light) {
-            if (data.state !== undefined) light.state = data.state;
-            if (data.brightness !== undefined) light.brightness = data.brightness;
-            if (data.color_temp !== undefined) light.colorTemp = data.color_temp;
+            // Multi-endpoint devices (e.g. Aqara T1M) publish suffixed keys
+            // on the parent topic: state_white, brightness_white, etc. The
+            // main ring uses propSuffix; the backlight / color picker uses
+            // colorPropSuffix (falls back to propSuffix for single-endpoint).
+            const s = light.propSuffix;
+            const cs = light.colorPropSuffix || s;
+            const stateKey = s ? `state_${s}` : 'state';
+            const brightKey = s ? `brightness_${s}` : 'brightness';
+            const ctKey = s ? `color_temp_${s}` : 'color_temp';
+            const colorKey = cs ? `color_${cs}` : 'color';
+            const backlightStateKey = cs ? `state_${cs}` : null;
+            if (data[stateKey] !== undefined) light.state = data[stateKey];
+            if (data[brightKey] !== undefined) light.brightness = data[brightKey];
+            if (data[ctKey] !== undefined) light.colorTemp = data[ctKey];
             if (data.linkquality !== undefined) light.linkquality = data.linkquality;
             // Color (HS) — only applies to lights with supportsColor
-            if (light.supportsColor && data.color) {
-              if (data.color.hue !== undefined) light.hue = data.color.hue;
-              if (data.color.saturation !== undefined) light.saturation = data.color.saturation;
+            if (light.supportsColor && data[colorKey]) {
+              if (data[colorKey].hue !== undefined) light.hue = data[colorKey].hue;
+              if (data[colorKey].saturation !== undefined) light.saturation = data[colorKey].saturation;
+            }
+            // For dual-endpoint devices, track the rgb strip's power state as
+            // the backlight on/off indicator. Single-endpoint bed light uses
+            // its own saturation=0 hack to represent "backlight off" and does
+            // not have a separate state key to watch.
+            if (backlightStateKey && data[backlightStateKey] !== undefined) {
+              light.backlightOn = data[backlightStateKey] === 'ON';
             }
             light.lastSeen = Date.now();
             light.syncing = false;
@@ -5423,7 +5479,7 @@
           }
         },
 
-        publishCommand(light, payload) {
+        publishCommand(light, payload, suffixOverride) {
           const client = Alpine.store('mqtt').client;
           if (!client || !Alpine.store('mqtt').connected) {
             console.error('MQTT not connected');
@@ -5434,8 +5490,17 @@
           light.syncing = true;
           this.syncing = true;
 
+          // For multi-endpoint devices (Aqara T1M), Z2M expects suffixed
+          // property names on the parent set topic: state -> state_white.
+          // A per-call suffixOverride lets color commands target a different
+          // endpoint (e.g. 'rgb') than the main ring ('white').
+          const s = suffixOverride !== undefined ? suffixOverride : light.propSuffix;
+          const outPayload = s
+            ? Object.fromEntries(Object.entries(payload).map(([k, v]) => [`${k}_${s}`, v]))
+            : payload;
+
           const topic = `zigbee2mqtt/${light.topic}/set`;
-          client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
+          client.publish(topic, JSON.stringify(outPayload), { qos: 0 }, (err) => {
             if (err) {
               console.error('Failed to publish:', err);
               light.syncing = false;
@@ -5479,21 +5544,127 @@
 
         setColorTemp(light, value) {
           const colorTemp = parseInt(value);
+          light.colorTemp = colorTemp;
           // Debounce: only publish after 150ms of no changes (for touch compatibility)
           clearTimeout(this._colorTempTimeout);
           this._colorTempTimeout = setTimeout(() => {
             this.publishCommand(light, { color_temp: colorTemp });
+            // For single-endpoint dual-LED lamps (EGLO Rovito-Z) where the
+            // backlight is "off" (blended), refresh the backlight to track
+            // the new main ring temp. Uses empirically tuned values that
+            // visually match the CCT LEDs (see _applyBacklightBlend).
+            if (light.supportsColor && !light.colorPropSuffix && light.backlightOn === false) {
+              setTimeout(() => this._applyBacklightBlend(light, colorTemp), 200);
+            }
           }, 150);
+        },
+
+        // Empirically-tuned "backlight-off blend" for the EGLO Rovito-Z.
+        // The RGB LEDs cannot render true warm white (their native sat=0 is
+        // a cold D65-ish blue-white). User testing 2026-04-15 dialed in:
+        //   * At 370 mired (100% warm, 2700K):  hue=22, sat=70 (amber)
+        //   * At 153 mired (0% warm, 6535K):    hue=0,  sat=0  (cold white)
+        //   * At 283 mired (60% warm):          sat=70 still looked warm
+        // We linearly interpolate hue+sat between the two endpoints based on
+        // where the current color_temp sits in the mired range, so the
+        // backlight tracks the main ring smoothly.
+        _applyBacklightBlend(light, colorTemp) {
+          const min = light.colorTempMin || 153;
+          const max = light.colorTempMax || 370;
+          const factor = Math.max(0, Math.min(1, (colorTemp - min) / (max - min)));
+          const hue = Math.round(factor * 22);
+          const saturation = Math.round(factor * 70);
+          light.hue = hue;
+          light.saturation = saturation;
+          this.publishCommand(light, { color: { hue, saturation } });
+          // After the color command, re-assert the main ring's color_temp so
+          // the AwoX firmware doesn't silently drift it (a known side effect
+          // of sat=0 / low-saturation messages on this hardware).
+          setTimeout(() => {
+            this.publishCommand(light, { color_temp: colorTemp });
+          }, 250);
+        },
+
+        // Convert HSL hue (0-360) at full saturation/50% lightness to CIE 1931
+        // xy. Needed for dual-endpoint lights (Aqara T1M) because Z2M does not
+        // translate hue/saturation into xy when the color property is
+        // endpoint-suffixed (color_rgb) — the device keeps reporting the last
+        // xy it actually received and the strip never changes color.
+        _hueToXy(hue) {
+          const h = ((hue % 360) + 360) % 360;
+          const c = 1;
+          const hp = h / 60;
+          const x = c * (1 - Math.abs(hp % 2 - 1));
+          let r = 0, g = 0, b = 0;
+          if (hp < 1)      { r = c; g = x; }
+          else if (hp < 2) { r = x; g = c; }
+          else if (hp < 3) { g = c; b = x; }
+          else if (hp < 4) { g = x; b = c; }
+          else if (hp < 5) { r = x; b = c; }
+          else             { r = c; b = x; }
+          const lin = v => v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
+          const rl = lin(r), gl = lin(g), bl = lin(b);
+          const X = 0.4124 * rl + 0.3576 * gl + 0.1805 * bl;
+          const Y = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+          const Z = 0.0193 * rl + 0.1192 * gl + 0.9505 * bl;
+          const sum = X + Y + Z || 1;
+          return {
+            x: Math.round((X / sum) * 10000) / 10000,
+            y: Math.round((Y / sum) * 10000) / 10000
+          };
+        },
+
+        // Convert a mired color temperature to CIE 1931 xy chromaticity on the
+        // black-body (Planckian) locus. Used to make the backlight's RGB LEDs
+        // emit the same white point as the main ring's CCT LEDs.
+        // Formula: Kim, Weyrich, Kautz 2002 approximation.
+        _miredToXy(mired) {
+          const K = 1e6 / mired;
+          let x;
+          if (K <= 4000) {
+            x = -0.2661239e9 / Math.pow(K, 3) - 0.2343580e6 / Math.pow(K, 2) + 0.8776956e3 / K + 0.179910;
+          } else {
+            x = -3.0258469e9 / Math.pow(K, 3) + 2.1070379e6 / Math.pow(K, 2) + 0.2226347e3 / K + 0.240390;
+          }
+          let y;
+          if (K <= 2222) {
+            y = -1.1063814 * Math.pow(x, 3) - 1.34811020 * Math.pow(x, 2) + 2.18555832 * x - 0.20219683;
+          } else if (K <= 4000) {
+            y = -0.9549476 * Math.pow(x, 3) - 1.37418593 * Math.pow(x, 2) + 2.09137015 * x - 0.16748867;
+          } else {
+            y =  3.0817580 * Math.pow(x, 3) - 5.87338670 * Math.pow(x, 2) + 3.75112997 * x - 0.37001483;
+          }
+          return { x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 };
         },
 
         setHue(light, value) {
           if (!light.supportsColor) return;
           const hue = parseInt(value);
           light.hue = hue;
+          light.saturation = 100;
+          light.backlightOn = true; // adjusting color implies backlight on
           // Debounce: rapid drags shouldn't flood Z2M
           clearTimeout(this._hueTimeout);
           this._hueTimeout = setTimeout(() => {
-            this.publishCommand(light, { color: { hue, saturation: light.saturation } });
+            if (light.colorPropSuffix) {
+              // Dual-endpoint (T1M): Z2M does not convert hue/saturation when
+              // the color property is endpoint-suffixed, so we convert to xy
+              // client-side and send that directly. Also ensure the RGB strip
+              // is on and routed to the rgb endpoint.
+              const xy = this._hueToXy(hue);
+              this.publishCommand(light, {
+                state: 'ON',
+                color: { x: xy.x, y: xy.y }
+              }, light.colorPropSuffix);
+            } else {
+              // Single-endpoint dual-LED (EGLO Rovito-Z): include color_temp
+              // in the same message so the AwoX firmware doesn't auto-drift
+              // the main ring when a color command arrives.
+              this.publishCommand(light, {
+                color: { hue, saturation: 100 },
+                color_temp: light.colorTemp
+              });
+            }
           }, 150);
         },
 
@@ -5501,7 +5672,40 @@
           if (!light.supportsColor) return;
           light.hue = hue;
           light.saturation = saturation;
-          this.publishCommand(light, { color: { hue, saturation } });
+          light.backlightOn = true; // clicking a color preset implies backlight on
+          if (light.colorPropSuffix) {
+            // Dual-endpoint devices need xy not hue/saturation (see setHue).
+            const xy = this._hueToXy(hue);
+            this.publishCommand(light, {
+              state: 'ON',
+              color: { x: xy.x, y: xy.y }
+            }, light.colorPropSuffix);
+          } else {
+            // Include color_temp to prevent firmware main-ring drift
+            this.publishCommand(light, {
+              color: { hue, saturation },
+              color_temp: light.colorTemp
+            });
+          }
+        },
+
+        setBacklightOn(light, enabled) {
+          if (!light.supportsColor) return;
+          light.backlightOn = enabled;
+          if (light.colorPropSuffix) {
+            // Dual-endpoint: the RGB strip really can be turned on/off.
+            this.publishCommand(light, { state: enabled ? 'ON' : 'OFF' }, light.colorPropSuffix);
+            return;
+          }
+          if (enabled) {
+            // Restore backlight to the last selected hue at full saturation
+            light.saturation = 100;
+            this.publishCommand(light, { color: { hue: light.hue, saturation: 100 } });
+          } else {
+            // Blend the backlight to visually match the main ring.
+            // See _applyBacklightBlend for the empirical hue/sat calibration.
+            this._applyBacklightBlend(light, light.colorTemp);
+          }
         },
 
         applyPreset(light, presetName) {

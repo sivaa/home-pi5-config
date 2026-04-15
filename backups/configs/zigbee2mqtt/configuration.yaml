@@ -1,0 +1,168 @@
+homeassistant:
+  enabled: true
+frontend:
+  enabled: true
+  port: 8080
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+serial:
+  port: /dev/ttyUSB0
+  adapter: ember
+advanced:
+  channel: 25
+  pan_id: 6754
+  ext_pan_id:
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+    - 221
+  network_key:
+    - 154
+    - 10
+    - 161
+    - 209
+    - 86
+    - 38
+    - 78
+    - 156
+    - 164
+    - 180
+    - 119
+    - 154
+    - 8
+    - 108
+    - 247
+    - 94
+  log_level: info
+  last_seen: epoch
+availability:
+  enabled: true
+  active:
+    timeout: 2
+  passive:
+    timeout: 2400
+device_options:
+  retain: true
+devices:
+  '0xd0cf5efffe25ab28':
+    friendly_name: '[Study] IKEA Light'
+  '0xd0cf5efffe24d093':
+    friendly_name: '[Living] IKEA Light'
+  '0xa4c1384bd2ed5c7e':
+    friendly_name: '[Bath] Light'
+  '0xa4c138963338c36c':
+    friendly_name: '[Bed] Light Remote'
+  '0x90fd9ffffef4cebf':
+    friendly_name: '[Study] IKEA Remote'
+  '0x90fd9ffffee43106':
+    friendly_name: '[Living] IKEA Remote'
+  '0x4c97a1fffecd9a31':
+    friendly_name: '[Study] Light Switch'
+  '0x58263afffefc1d02':
+    friendly_name: '[Bed] Light Switch'
+  '0x58263afffefc5706':
+    friendly_name: '[Living] Light Switch'
+  '0xa4c13802b54effff':
+    friendly_name: Smart Plug [1]
+    debounce: 60000
+  '0xa4c13802c8b9ffff':
+    friendly_name: Smart Plug [2]
+    debounce: 60000
+  '0xa4c13803091fffff':
+    friendly_name: Smart Plug [3]
+    debounce: 60000
+  '0xa4c138d2b1446edf':
+    friendly_name: '[Hallway] CO2'
+  '0xc09b9efffed502b9':
+    friendly_name: '[Living] Temperature & Humidity'
+  '0xc09b9efffef541b2':
+    friendly_name: '[Study] Temperature & Humidity'
+  '0xc09b9efffed502b7':
+    friendly_name: '[Kitchen] Temperature & Humidity'
+  '0xc09b9efffec0e447':
+    friendly_name: '[Bath] Temperature & Humidity'
+  '0xa4c1380286dbffff':
+    friendly_name: '[Balcony] Temperature & Humidity'
+  '0xc09b9efffef541a8':
+    friendly_name: '[Bed] Temperature & Humidity'
+  '0x8c73dafffe2a0459':
+    friendly_name: '[Living] Temperature & Humidity 6'
+  '0x8c73dafffe2a0638':
+    friendly_name: '[Living] Temperature & Humidity 7'
+  '0xf044d3fffe0806bc':
+    friendly_name: '[Study] Temperature & Humidity 8'
+  '0xf044d3fffe0806da':
+    friendly_name: '[Bed] Temperature & Humidity 9'
+  '0xf044d3fffe07f88a':
+    friendly_name: '[Kitchen] Temperature & Humidity 10'
+  '0x8c73dafffeb33c57':
+    friendly_name: '[Bath] Temperature & Humidity 11'
+  '0x3425b4fffe1432aa':
+    friendly_name: '[Mailbox] Motion Sensor'
+  '0xc09b9efffe4af947':
+    friendly_name: '[Bath] Window Contact Sensor'
+  '0xc4d8c8fffe0f7eab':
+    friendly_name: '[Bed] Window Contact Sensor'
+  '0x983268fffe608ed9':
+    friendly_name: '[Kitchen] Window Contact Sensor'
+  '0xe456acfffe55ffb3':
+    friendly_name: '[Study] Window Contact Sensor - Large'
+  '0x983268fffe9be51b':
+    friendly_name: '[Study] Window Contact Sensor - Small'
+  '0x983268fffe9beede':
+    friendly_name: '[Living] Window Contact Sensor - Balcony Door'
+  '0x8c73dafffecacc18':
+    friendly_name: '[Living] Window Contact Sensor - Window'
+  '0x983268fffe653343':
+    friendly_name: '[Hallway] Window Contact Sensor - Main Door'
+  '0xc4d8c8fffe02cef8':
+    friendly_name: '[Study] Thermostat'
+    homeassistant:
+      timer_mode_target_temp: false
+  '0xc4d8c8fffe0d9fcc':
+    friendly_name: '[Bed] Thermostat'
+    homeassistant:
+      timer_mode_target_temp: false
+  '0x286847fffe3926dd':
+    friendly_name: '[Living] Thermostat Inner'
+    homeassistant:
+      timer_mode_target_temp: false
+  '0x286847fffe38ed6c':
+    friendly_name: '[Living] Thermostat Outer'
+    homeassistant:
+      timer_mode_target_temp: false
+  '0xa4c13863257ea097':
+    friendly_name: Vibration Sensor
+  '0xa4c1384949538a9b':
+    friendly_name: Fingerbot
+  '0xf84477fffe0437f4':
+    friendly_name: '[Bed] Human Presence'
+  '0xc4d8c8fffe1e40b5':
+    friendly_name: '[Living] Human Presence'
+  '0xc4d8c8fffe1e4673':
+    friendly_name: '[Kitchen] Human Presence'
+  '0xd44867fffe08083c':
+    friendly_name: '[Study] Human Presence'
+  '0xd44867fffe079897':
+    friendly_name: '[Bath] Human Presence'
+  '0xa4c138dad83a328f':
+    friendly_name: '[Kitchen] Light Sensor'
+  '0xa4c13861dca860a7':
+    friendly_name: '[Bed] Light'
+  '0x54ef441001208726':
+    friendly_name: '[Hallway] Light'
+groups:
+  '10':
+    friendly_name: legacy_group10
+  '32779':
+    friendly_name: bed_remote_zone1
+  '32780':
+    friendly_name: eglo_remote_group1
+  '32781':
+    friendly_name: bed_remote_zone3
+version: 4

@@ -106,21 +106,24 @@
       /* grayscale removed for CPU efficiency */
     }
 
-    /* Light Cards Grid — responsive wrap, cards flow to next row as needed */
+    /* Light Cards Grid — fixed 5-column layout so all rooms stay in one row
+       on the kiosk. `minmax(0, 1fr)` lets each card shrink below its content
+       width (otherwise grid tracks default to min-content and overflow). */
     .lights-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: var(--space-md);
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--space-sm);
       margin-bottom: var(--space-md);
     }
 
     .light-card {
       background: var(--color-surface);
       border-radius: var(--radius-xl);
-      padding: var(--space-lg);
+      padding: var(--space-md);
       box-shadow: var(--shadow-sm);
       transition: all var(--transition-normal);
       border: 2px solid transparent;
+      min-width: 0; /* allow flex/grid shrink inside the card */
     }
 
     .light-card.light-on {
@@ -549,8 +552,10 @@
         margin: 0 auto;
       }
 
+      /* Keep all 5 light cards on one row at every width. */
       .lights-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: var(--space-xs);
       }
 
       .scenes-grid {
@@ -933,6 +938,31 @@
 }
 
 .color-preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.backlight-toggle {
+  margin-left: var(--space-sm);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border, #ddd);
+  background: var(--color-warning, #ffa500);
+  color: white;
+  cursor: pointer;
+  min-width: 44px;
+  touch-action: manipulation;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.backlight-toggle.backlight-off {
+  background: var(--color-bg, #f0f0f0);
+  color: var(--color-text-secondary, #888);
+}
+
+.backlight-toggle:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

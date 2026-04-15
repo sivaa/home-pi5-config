@@ -77,6 +77,31 @@ export function initLightsStore(Alpine, CONFIG) {
         lastSeen: null,
         syncing: false,
         available: true
+      },
+      {
+        id: 'hallway_light',
+        name: 'Hallway',
+        icon: '🚪',
+        topic: '[Hallway] Light',
+        // Aqara T1M (lumi.light.acn032) is a multi-endpoint device: 'white' is
+        // the main CCT ceiling ring, 'rgb' is a secondary ambient strip. We
+        // expose the white ring as the primary control surface. Z2M publishes
+        // state as state_white / brightness_white / color_temp_white on the
+        // parent topic — propSuffix tells the store to translate to/from those
+        // suffixed property names.
+        propSuffix: 'white',
+        state: 'OFF',
+        brightness: 254,
+        colorTemp: 370,
+        colorTempMin: 153,   // Aqara T1M white ring: 153-370 mired
+        colorTempMax: 370,
+        supportsColor: false,
+        hue: 0,
+        saturation: 100,
+        linkquality: null,
+        lastSeen: null,
+        syncing: false,
+        available: true
       }
     ],
     syncing: false,
@@ -107,14 +132,19 @@ export function initLightsStore(Alpine, CONFIG) {
     updateLight(topic, data) {
       const light = this.list.find(l => l.topic === topic);
       if (light) {
-        if (data.state !== undefined) light.state = data.state;
-        if (data.brightness !== undefined) light.brightness = data.brightness;
-        if (data.color_temp !== undefined) light.colorTemp = data.color_temp;
+        const s = light.propSuffix;
+        const stateKey = s ? `state_${s}` : 'state';
+        const brightKey = s ? `brightness_${s}` : 'brightness';
+        const ctKey = s ? `color_temp_${s}` : 'color_temp';
+        const colorKey = s ? `color_${s}` : 'color';
+        if (data[stateKey] !== undefined) light.state = data[stateKey];
+        if (data[brightKey] !== undefined) light.brightness = data[brightKey];
+        if (data[ctKey] !== undefined) light.colorTemp = data[ctKey];
         if (data.linkquality !== undefined) light.linkquality = data.linkquality;
         // Color (HS) — only applies to lights with supportsColor
-        if (light.supportsColor && data.color) {
-          if (data.color.hue !== undefined) light.hue = data.color.hue;
-          if (data.color.saturation !== undefined) light.saturation = data.color.saturation;
+        if (light.supportsColor && data[colorKey]) {
+          if (data[colorKey].hue !== undefined) light.hue = data[colorKey].hue;
+          if (data[colorKey].saturation !== undefined) light.saturation = data[colorKey].saturation;
         }
         light.lastSeen = Date.now();
         light.syncing = false;
@@ -141,8 +171,15 @@ export function initLightsStore(Alpine, CONFIG) {
       light.syncing = true;
       this.syncing = true;
 
+      // For multi-endpoint devices (e.g. Aqara T1M), Z2M expects suffixed
+      // property names on the parent set topic: state → state_white, etc.
+      const s = light.propSuffix;
+      const outPayload = s
+        ? Object.fromEntries(Object.entries(payload).map(([k, v]) => [`${k}_${s}`, v]))
+        : payload;
+
       const topic = `zigbee2mqtt/${light.topic}/set`;
-      client.publish(topic, JSON.stringify(payload), { qos: 0 }, (err) => {
+      client.publish(topic, JSON.stringify(outPayload), { qos: 0 }, (err) => {
         if (err) {
           console.error('Failed to publish:', err);
           light.syncing = false;

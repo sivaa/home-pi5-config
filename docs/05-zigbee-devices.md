@@ -1,7 +1,7 @@
 # Zigbee Device Inventory
 
 > **Last Updated:** April 15, 2026
-> **Total Devices:** 48 (including coordinator)
+> **Total Devices:** 49 (including coordinator)
 > **Purpose:** Complete device reference for disaster recovery
 
 ---
@@ -92,6 +92,7 @@
 | 45 | Bath | [Bath] Light Remote | 99099 | EGLO | 3-Group Remote Controller |
 | 46 | Kitchen | [Kitchen] Light Sensor | ZSS-QT-LS-C | Moes | Light Sensor (Battery) |
 | 47 | Bed | [Bed] Light | 900087 (EBF_RGB_Zm) | EGLO / AwoX | LED Ceiling Light (RGB + Color Temp, Router) |
+| 48 | Hallway | [Hallway] Light | T1M (lumi.light.acn032) | Aqara | Dual-endpoint Ceiling Light (CCT white ring + RGB strip, Router) |
 
 ---
 
