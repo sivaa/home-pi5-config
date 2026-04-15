@@ -910,6 +910,32 @@
   vertical-align: middle;
 }
 
+/* Backlight brightness row — only shown on dual-endpoint devices where the
+   backlight strip has its own brightness, independent of the main ring. */
+.backlight-brightness-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.backlight-brightness-row .brightness-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.backlight-brightness-label,
+.backlight-brightness-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.backlight-brightness-value {
+  min-width: 32px;
+  text-align: right;
+}
+
 .color-presets {
   display: flex;
   gap: var(--space-sm);

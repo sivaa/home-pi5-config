@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css?v=10">
+  <link rel="stylesheet" href="styles/views/lights.css?v=12">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -806,6 +806,19 @@
                            x-model="light.hue"
                            :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
                            @input="$store.lights.setHue(light, $event.target.value)">
+                    <!-- Independent brightness for the rgb strip on dual-endpoint
+                         devices (Aqara T1M). Hidden for single-endpoint lamps
+                         where main-ring brightness already applies to both LEDs. -->
+                    <div class="backlight-brightness-row"
+                         x-show="light.colorPropSuffix"
+                         :class="{ 'control-disabled': !light.backlightOn }">
+                      <span class="backlight-brightness-label">Dim</span>
+                      <input type="range" class="slider brightness-slider" min="1" max="254"
+                             x-model="light.backlightBrightness"
+                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
+                             @input="$store.lights.setBacklightBrightness(light, $event.target.value)">
+                      <span class="backlight-brightness-value" x-text="Math.round(light.backlightBrightness / 254 * 100) + '%'"></span>
+                    </div>
                     <div class="color-presets" :class="{ 'control-disabled': !light.backlightOn }">
                       <button class="color-preset-btn" style="background:#ff4444" title="Red"
                               @click="$store.lights.setColorPreset(light, 0, 100)"
@@ -5398,6 +5411,7 @@
             colorTempMax: 370,
             supportsColor: true,
             backlightOn: true,
+            backlightBrightness: 254, // independent brightness for the rgb strip
             hue: 0,
             saturation: 100,
             linkquality: null,
@@ -5411,6 +5425,7 @@
         _brightnessTimeout: null,
         _colorTempTimeout: null,
         _hueTimeout: null,
+        _backlightBrightnessTimeout: null,
 
         get anyLightSyncing() {
           return this.list.some(l => l.syncing);
@@ -5463,6 +5478,15 @@
             // not have a separate state key to watch.
             if (backlightStateKey && data[backlightStateKey] !== undefined) {
               light.backlightOn = data[backlightStateKey] === 'ON';
+            }
+            // Dual-endpoint devices expose an independent brightness for the
+            // rgb strip — read it into backlightBrightness so the dedicated
+            // slider stays in sync with the actual device state.
+            if (light.colorPropSuffix) {
+              const backlightBrightKey = `brightness_${light.colorPropSuffix}`;
+              if (data[backlightBrightKey] !== undefined) {
+                light.backlightBrightness = data[backlightBrightKey];
+              }
             }
             light.lastSeen = Date.now();
             light.syncing = false;
@@ -5571,7 +5595,11 @@
         _applyBacklightBlend(light, colorTemp) {
           const min = light.colorTempMin || 153;
           const max = light.colorTempMax || 370;
-          const factor = Math.max(0, Math.min(1, (colorTemp - min) / (max - min)));
+          // Cold-white anchor at 30% warm: below this point the RGB native
+          // sat=0 white is already a visual match for the cool CCT LEDs,
+          // so we clamp. Only interpolate for the warm 70% of the range.
+          const coldAnchor = min + 0.30 * (max - min);
+          const factor = Math.max(0, Math.min(1, (colorTemp - coldAnchor) / (max - coldAnchor)));
           const hue = Math.round(factor * 22);
           const saturation = Math.round(factor * 70);
           light.hue = hue;
@@ -5687,6 +5715,16 @@
               color_temp: light.colorTemp
             });
           }
+        },
+
+        setBacklightBrightness(light, value) {
+          if (!light.colorPropSuffix) return; // slider only exists for dual-endpoint devices
+          const brightness = parseInt(value);
+          light.backlightBrightness = brightness;
+          clearTimeout(this._backlightBrightnessTimeout);
+          this._backlightBrightnessTimeout = setTimeout(() => {
+            this.publishCommand(light, { brightness }, light.colorPropSuffix);
+          }, 150);
         },
 
         setBacklightOn(light, enabled) {
