@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css?v=14">
+  <link rel="stylesheet" href="styles/views/lights.css?v=15">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -5437,6 +5437,10 @@
             colorTempMin: 153,   // Aqara T1M white ring: 153-370 mired
             colorTempMax: 370,
             supportsColor: true,
+            // Dual-endpoint state tracking: each endpoint has its own on/off,
+            // and `state` is derived as (mainOn || backlightOn) so the card
+            // reads ON whenever any part of the fixture is glowing.
+            mainOn: false,
             backlightOn: true,
             backlightBrightness: 254, // independent brightness for the rgb strip
             hue: 0,
@@ -5488,21 +5492,19 @@
             const brightKey = s ? `brightness_${s}` : 'brightness';
             const ctKey = s ? `color_temp_${s}` : 'color_temp';
             const colorKey = cs ? `color_${cs}` : 'color';
-            const backlightStateKey = cs ? `state_${cs}` : null;
-            // Drive the card-level toggle so it reads ON whenever ANY part of
-            // the fixture is glowing. For dual-endpoint devices we compute
-            // the logical OR of the two endpoint states ourselves (Z2M's
-            // top-level `state` tracks only one endpoint and is unreliable
-            // as an aggregate). Single-endpoint devices use `state` directly.
             if (s && cs && cs !== s) {
-              const mainState = data[`state_${s}`];
-              const colorState = data[`state_${cs}`];
-              if (mainState !== undefined || colorState !== undefined) {
-                const anyOn = mainState === 'ON' || colorState === 'ON' ||
-                              (mainState === undefined && light.state === 'ON') ||
-                              (colorState === undefined && light.backlightOn);
-                light.state = anyOn ? 'ON' : 'OFF';
+              // Dual-endpoint device: track each endpoint's on/off EXPLICITLY
+              // and only update the field we actually heard about. light.state
+              // is a pure derivation of (mainOn || backlightOn) — never a
+              // self-referential fallback — so half-state echoes during a tab
+              // resume or optimistic/publish races can't poison it.
+              if (data[`state_${s}`] !== undefined) {
+                light.mainOn = data[`state_${s}`] === 'ON';
               }
+              if (data[`state_${cs}`] !== undefined) {
+                light.backlightOn = data[`state_${cs}`] === 'ON';
+              }
+              light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
             } else if (s && data[`state_${s}`] !== undefined) {
               light.state = data[`state_${s}`];
             } else if (data.state !== undefined) {
@@ -5515,13 +5517,6 @@
             if (light.supportsColor && data[colorKey]) {
               if (data[colorKey].hue !== undefined) light.hue = data[colorKey].hue;
               if (data[colorKey].saturation !== undefined) light.saturation = data[colorKey].saturation;
-            }
-            // For dual-endpoint devices, track the rgb strip's power state as
-            // the backlight on/off indicator. Single-endpoint bed light uses
-            // its own saturation=0 hack to represent "backlight off" and does
-            // not have a separate state key to watch.
-            if (backlightStateKey && data[backlightStateKey] !== undefined) {
-              light.backlightOn = data[backlightStateKey] === 'ON';
             }
             // Dual-endpoint devices expose an independent brightness for the
             // rgb strip — read it into backlightBrightness so the dedicated
@@ -5634,11 +5629,15 @@
           const newState = light.state === 'ON' ? 'OFF' : 'ON';
           if (light.colorPropSuffix) {
             this._publishRaw(light, this._togglePayload(light, newState));
-            light.backlightOn = (newState === 'ON'); // optimistic
+            // Optimistic: both endpoints flip together. light.state stays a
+            // pure derivation of mainOn || backlightOn.
+            light.mainOn = (newState === 'ON');
+            light.backlightOn = (newState === 'ON');
+            light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
           } else {
             this.publishCommand(light, { state: newState });
+            light.state = newState;
           }
-          light.state = newState; // Optimistic update
         },
 
         toggleAllLights() {
@@ -5647,11 +5646,13 @@
           this.list.forEach(light => {
             if (light.colorPropSuffix) {
               this._publishRaw(light, this._togglePayload(light, newState));
+              light.mainOn = (newState === 'ON');
               light.backlightOn = (newState === 'ON');
+              light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
             } else {
               this.publishCommand(light, { state: newState });
+              light.state = newState;
             }
-            light.state = newState;
           });
         },
 
@@ -5685,30 +5686,17 @@
         // The RGB LEDs cannot render true warm white (their native sat=0 is
         // a cold D65-ish blue-white). User testing 2026-04-15 dialed in:
         //   * At 370 mired (100% warm, 2700K):  hue=22, sat=70 (amber)
-        //   * At 153 mired (0% warm, 6535K):    hue=0,  sat=0  (cold white)
-        //   * At 283 mired (60% warm):          sat=70 still looked warm
-        // We linearly interpolate hue+sat between the two endpoints based on
-        // where the current color_temp sits in the mired range, so the
-        // backlight tracks the main ring smoothly.
+        //   * Sending {color:{x:0,y:0}} TRULY turns off the backlight RGB
+        //     LEDs without affecting the main ring. color_temp is NOT dragged
+        //     (unlike sat=0 which pulls main toward cool white). This is the
+        //     best outcome we could hope for — real off via standard Zigbee.
+        //   * Any xy or hs with values slightly away from (0,0) gets clamped
+        //     to the nearest gamut vertex and the backlight lights up at
+        //     full vividness, so there is NO gradient between off and on.
         _applyBacklightBlend(light, colorTemp) {
-          const min = light.colorTempMin || 153;
-          const max = light.colorTempMax || 370;
-          // Cold-white anchor at 30% warm: below this point the RGB native
-          // sat=0 white is already a visual match for the cool CCT LEDs,
-          // so we clamp. Only interpolate for the warm 70% of the range.
-          const coldAnchor = min + 0.30 * (max - min);
-          const factor = Math.max(0, Math.min(1, (colorTemp - coldAnchor) / (max - coldAnchor)));
-          const hue = Math.round(factor * 22);
-          const saturation = Math.round(factor * 70);
-          light.hue = hue;
-          light.saturation = saturation;
-          this.publishCommand(light, { color: { hue, saturation } });
-          // After the color command, re-assert the main ring's color_temp so
-          // the AwoX firmware doesn't silently drift it (a known side effect
-          // of sat=0 / low-saturation messages on this hardware).
-          setTimeout(() => {
-            this.publishCommand(light, { color_temp: colorTemp });
-          }, 250);
+          // Magic "xy origin" value that puts the backlight RGB LEDs into
+          // an off state while leaving the main ring's CCT LEDs untouched.
+          this.publishCommand(light, { color: { x: 0, y: 0 } });
         },
 
         // Convert HSL hue (0-360) at full saturation/50% lightness to CIE 1931
@@ -5716,6 +5704,8 @@
         // translate hue/saturation into xy when the color property is
         // endpoint-suffixed (color_rgb) — the device keeps reporting the last
         // xy it actually received and the strip never changes color.
+        // Saturation is baked in at 100%. To support partial saturation later,
+        // desaturate by pulling (x,y) toward the D65 white point (0.3127, 0.3290).
         _hueToXy(hue) {
           const h = ((hue % 360) + 360) % 360;
           const c = 1;
@@ -5870,6 +5860,10 @@
           if (light.colorPropSuffix) {
             // Dual-endpoint: the RGB strip really can be turned on/off.
             this.publishCommand(light, { state: enabled ? 'ON' : 'OFF' }, light.colorPropSuffix);
+            // Re-derive light.state now that backlightOn changed. Without
+            // this, turning off the backlight while the main ring is already
+            // off would leave the card stuck on ON until the echo arrives.
+            light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
             return;
           }
           if (enabled) {
@@ -6906,7 +6900,8 @@
           const roomLightMap = {
             'study': 'study_light',
             'living': 'living_light',
-            'bathroom': 'bath_light'
+            'bathroom': 'bath_light',
+            'bedroom': 'bed_light'
           };
 
           // Priority 1: Check smart light state if room has one
@@ -6920,8 +6915,9 @@
             // Light unavailable - fall through to switch/illumination
           }
 
-          // Priority 2: Check smart switch state (for rooms with switch but no smart bulb)
-          // Only bedroom has this configuration - Study/Living use their smart lights instead
+          // Priority 2: Check smart switch state (fallback when smart bulb is offline
+          // or for rooms whose only controlled device is a wall switch). Currently all
+          // rooms with a smart light also have a switch cutting power upstream.
           const sw = Alpine.store('switches')?.getSwitchForRoom(roomId);
           if (sw) {
             return sw.state === 'ON' ? 'lit' : 'off';
