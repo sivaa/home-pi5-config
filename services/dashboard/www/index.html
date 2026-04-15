@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="styles/views/timeline.css">
   <link rel="stylesheet" href="styles/views/logs.css">
   <link rel="stylesheet" href="styles/views/classic.css?v=10">
-  <link rel="stylesheet" href="styles/views/lights.css?v=4">
+  <link rel="stylesheet" href="styles/views/lights.css?v=5">
   <link rel="stylesheet" href="styles/views/co2-view.css">
   <link rel="stylesheet" href="styles/views/network.css">
   <link rel="stylesheet" href="styles/views/thermostat.css?v=8">
@@ -752,13 +752,13 @@
                     </div>
                   </div>
 
-                  <!-- Color Temperature Slider -->
+                  <!-- Color Temperature Slider (main ring on dual-LED lamps) -->
                   <div class="light-control"
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
                     <div class="control-row">
                       <label class="control-label">
                         <span class="control-icon">🌡️</span>
-                        Color Temp
+                        <span x-text="light.supportsColor ? 'Main Ring' : 'Color Temp'"></span>
                       </label>
                       <span class="control-value">
                         <span x-show="light.syncing" class="control-syncing">⟳</span>
@@ -776,14 +776,16 @@
                     </div>
                   </div>
 
-                  <!-- Color (Hue) - only for RGB-capable lights like EGLO Rovito-Z -->
+                  <!-- Backlight Color (only on dual-LED lamps like EGLO Rovito-Z).
+                       color_temp affects main ring; color (hs) affects backlight.
+                       Both LEDs run simultaneously - see CLAUDE.md lessons learned. -->
                   <div class="light-control"
                        x-show="light.supportsColor"
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
                     <div class="control-row">
                       <label class="control-label">
                         <span class="control-icon">🎨</span>
-                        Color
+                        Backlight Color
                       </label>
                       <span class="control-value">
                         <span x-show="light.syncing" class="control-syncing">⟳</span>

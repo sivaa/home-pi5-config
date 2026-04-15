@@ -334,6 +334,37 @@ shell_command:
 
 ## Lessons Learned (AI Memory)
 
+### EGLO Rovito-Z `color_mode` is Misleading; Main Ring and Backlight are Independent (2026-04-15)
+
+**Observation:** The EGLO Rovito-Z (AwoX EBF_RGB_Zm, model 900087) has two physical LED elements — a CCT main ring and an RGB backlight strip. Z2M reports a single `color_mode` attribute (`color_temp` or `hs`), which led me to assume the two elements are mutually exclusive. **That is wrong.** Both LEDs run simultaneously by default.
+
+**Verified behavior:**
+```
+┌──────────────────────────────────────────────────────────────┐
+│  COMMAND                    → PHYSICAL EFFECT                │
+├──────────────────────────────────────────────────────────────┤
+│  {"color_temp": 300}        → main ring only (backlight     │
+│                                unchanged)                    │
+│  {"color":{"hue":X,"sat":Y}}→ backlight only (main          │
+│                                unchanged)                    │
+│  {"state":"ON"/"OFF"}       → both                           │
+│  {"brightness": N}          → both (coupled at endpoint      │
+│                                level)                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Implication for Z2M / dashboard UX:**
+- Z2M's `color_mode` field on this lamp only reflects the *last command type*, not the active output state. Don't trust it.
+- Exposing CCT slider + color picker gives genuinely independent main/backlight control via standard Zigbee. No external converter needed.
+- `saturation: 0` on HS does NOT turn the backlight off - it desaturates to white AND appears to drag main ring CCT toward cool white (~167 mired). Treat it as "backlight white", not "backlight off".
+- **There is no standard Zigbee way to turn off ONLY the backlight while keeping main ring on.** The physical EGLO 99099 remote has the same limitation - its power button toggles both elements together. True independent on/off would require the AwoX proprietary cluster `0xFC57` (64599) on endpoint 1 or `0xFF50/0xFF51` on endpoint 3, which isn't worth reverse-engineering without a hardware feature that even the vendor's own remote exposes.
+
+**Dashboard label convention (services/dashboard/www/index.html):**
+- For lights with `supportsColor: true`, the CCT slider is labeled "🌡️ Main Ring" and the color picker is labeled "🎨 Backlight Color".
+- For CCT-only lights (IKEA FLOALT, AwoX 33955), labels remain the generic "Color Temp" with no color picker section.
+
+---
+
 ### EGLO connect.z Lamps Need BLE Firmware Update Before Z2M Pairing (2026-04-15)
 
 **Incident:** Paired new EGLO Rovito-Z (model 900087, AwoX firmware). Device joined the Zigbee network but every interview failed at the first ZDO step with "Interview failed because can not get node descriptor". 10+ retries, different routers, touchlink scans - all failed identically. Matches GitHub issues #16431 and #18322.
