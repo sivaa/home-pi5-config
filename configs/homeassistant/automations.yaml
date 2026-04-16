@@ -3594,6 +3594,109 @@
                 color_temp_kelvin: "{{ final_color_temp }}"
                 transition: 30
 
+    # Bed light — main ring + backlight (if on and not overridden)
+    # Single-endpoint EGLO Rovito-Z: light.turn_on with color_temp_kelvin
+    # switches both main ring and backlight to CCT mode (circadian overrides
+    # any manual backlight color). If the user wants a manual color, the
+    # override detection will kick in and pause circadian for 30 min.
+    - if:
+        - condition: state
+          entity_id: light.0xa4c13861dca860a7
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_bed_override
+          state: "off"
+      then:
+        - variables:
+            current_brightness: "{{ state_attr('light.0xa4c13861dca860a7', 'brightness') | default(255) | int }}"
+            current_color_temp: "{{ state_attr('light.0xa4c13861dca860a7', 'color_temp_kelvin') | default(4000) | int }}"
+            final_brightness: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int }}
+              {% else %}
+                {{ [brightness_value | int, current_brightness] | min }}
+              {% endif %}
+            final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+            should_apply: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+              {% else %}
+                {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+              {% endif %}
+        - if:
+            - condition: template
+              value_template: "{{ should_apply }}"
+          then:
+            - service: light.turn_on
+              entity_id: light.0xa4c13861dca860a7
+              data:
+                brightness: "{{ final_brightness }}"
+                color_temp_kelvin: "{{ final_color_temp }}"
+                transition: 30
+
+    # Hallway light — BOTH endpoints (if on and not overridden)
+    # Dual-endpoint Aqara T1M: update white ring and RGB strip independently.
+    # Both endpoints support color_temp, so circadian sets matching warmth on
+    # both for a unified glow. RGB strip gets same brightness + color_temp so
+    # it acts as supplementary warm/cool white rather than colored ambient.
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_hallway_override
+          state: "off"
+        - condition: or
+          conditions:
+            - condition: state
+              entity_id: light.0x54ef441001208726_white
+              state: "on"
+            - condition: state
+              entity_id: light.0x54ef441001208726_rgb
+              state: "on"
+      then:
+        - variables:
+            current_brightness_w: "{{ state_attr('light.0x54ef441001208726_white', 'brightness') | default(255) | int }}"
+            current_color_temp_w: "{{ state_attr('light.0x54ef441001208726_white', 'color_temp_kelvin') | default(4000) | int }}"
+            final_brightness: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int }}
+              {% else %}
+                {{ [brightness_value | int, current_brightness_w] | min }}
+              {% endif %}
+            final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp_w] | min }}"
+            should_apply: >
+              {% if phase == 'Sunrise' %}
+                {{ brightness_value | int != current_brightness_w or color_temp_kelvin | int != current_color_temp_w }}
+              {% else %}
+                {{ final_brightness < current_brightness_w or final_color_temp < current_color_temp_w }}
+              {% endif %}
+        - if:
+            - condition: template
+              value_template: "{{ should_apply }}"
+          then:
+            # Update white ring
+            - if:
+                - condition: state
+                  entity_id: light.0x54ef441001208726_white
+                  state: "on"
+              then:
+                - service: light.turn_on
+                  entity_id: light.0x54ef441001208726_white
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 30
+            # Update RGB strip with same circadian values
+            - if:
+                - condition: state
+                  entity_id: light.0x54ef441001208726_rgb
+                  state: "on"
+              then:
+                - service: light.turn_on
+                  entity_id: light.0x54ef441001208726_rgb
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 30
+
     # Clear debounce flag after 5 seconds (allows time for light state to update)
     - delay:
         seconds: 5
@@ -3613,22 +3716,15 @@
   mode: parallel
   max: 3
 
-  # NOTE: light.bed_light (EGLO Rovito-Z) and light.hallway_light (Aqara T1M) are
-  # intentionally NOT in this trigger list. Adding them requires a matching set
-  # of per-room helpers (input_boolean circadian_{room}_override + input_datetime
-  # circadian_{room}_override_expires), per-room blocks in circadian_schedule_update,
-  # and override-detection/expired automations. That is a feature expansion, not
-  # a gap fix. For bed_light, circadian would only engage while the wall switch
-  # is closed (most of the day the switch is off). For hallway_light, there is
-  # no presence sensor so auto-on/off is manual anyway. If/when circadian is
-  # expanded to these rooms, update CLAUDE.md device table and the MQTT dashboard
-  # exposure block in configuration.yaml as well.
   trigger:
     - platform: state
       entity_id:
         - light.study_ikea_light
         - light.living_ikea_light
         - light.bath_light
+        - light.0xa4c13861dca860a7
+        - light.0x54ef441001208726_white
+        - light.0x54ef441001208726_rgb
       from: "off"
       to: "on"
 
@@ -3641,11 +3737,15 @@
     room: >
       {% if trigger.entity_id == 'light.study_ikea_light' %}study
       {% elif trigger.entity_id == 'light.bath_light' %}bath
+      {% elif trigger.entity_id == 'light.0xa4c13861dca860a7' %}bed
+      {% elif '0x54ef441001208726' in trigger.entity_id %}hallway
       {% else %}living{% endif %}
     override_flag: "input_boolean.circadian_{{ room }}_override"
     light_name: >
       {% if room == 'study' %}Study
       {% elif room == 'bath' %}Bath
+      {% elif room == 'bed' %}Bed
+      {% elif room == 'hallway' %}Hallway
       {% else %}Living{% endif %}
     brightness_pct: "{{ states('sensor.circadian_brightness') | int(100) }}"
     # Power-on floor: minimum 5% brightness so users can see the light turned on
@@ -3715,6 +3815,24 @@
     - platform: state
       entity_id: light.bath_light
       attribute: color_temp
+    - platform: state
+      entity_id: light.0xa4c13861dca860a7
+      attribute: brightness
+    - platform: state
+      entity_id: light.0xa4c13861dca860a7
+      attribute: color_temp
+    - platform: state
+      entity_id: light.0x54ef441001208726_white
+      attribute: brightness
+    - platform: state
+      entity_id: light.0x54ef441001208726_white
+      attribute: color_temp
+    - platform: state
+      entity_id: light.0x54ef441001208726_rgb
+      attribute: brightness
+    - platform: state
+      entity_id: light.0x54ef441001208726_rgb
+      attribute: color_temp
 
   condition:
     # Light must be on
@@ -3741,12 +3859,17 @@
     room: >
       {% if 'study' in trigger.entity_id %}study
       {% elif 'bath' in trigger.entity_id %}bath
+      {% elif '0xa4c13861dca860a7' in trigger.entity_id %}bed
+      {% elif '0x54ef441001208726' in trigger.entity_id %}hallway
+      {% elif 'living' in trigger.entity_id %}living
       {% else %}living{% endif %}
     override_flag: "input_boolean.circadian_{{ room }}_override"
     expiry_entity: "input_datetime.circadian_{{ room }}_override_expires"
     light_name: >
       {% if room == 'study' %}Study
       {% elif room == 'bath' %}Bath
+      {% elif room == 'bed' %}Bed
+      {% elif room == 'hallway' %}Hallway
       {% else %}Living{% endif %}
     # Format expiration time as strings (avoid strftime on variable)
     expiry_datetime: "{{ (now() + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S') }}"
@@ -3802,6 +3925,12 @@
           state: "on"
         - condition: state
           entity_id: input_boolean.circadian_bath_override
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_bed_override
+          state: "on"
+        - condition: state
+          entity_id: input_boolean.circadian_hallway_override
           state: "on"
 
   variables:
@@ -4010,6 +4139,143 @@
                       channel: "Lights"
                       importance: low
                       tag: "circadian_override_bath"
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              entity_id: input_boolean.circadian_automation_active
+
+    # Check Bed override expiry
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_bed_override
+          state: "on"
+        - condition: template
+          value_template: >
+            {{ as_timestamp(states('input_datetime.circadian_bed_override_expires'))
+               < as_timestamp(now()) }}
+      then:
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.circadian_bed_override
+        - if:
+            - condition: state
+              entity_id: light.0xa4c13861dca860a7
+              state: "on"
+          then:
+            - variables:
+                current_brightness: "{{ state_attr('light.0xa4c13861dca860a7', 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr('light.0xa4c13861dca860a7', 'color_temp_kelvin') | default(4000) | int }}"
+                final_brightness: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int }}
+                  {% else %}
+                    {{ [brightness_value | int, current_brightness] | min }}
+                  {% endif %}
+                final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+                should_apply: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                  {% else %}
+                    {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+                  {% endif %}
+            - service: input_boolean.turn_on
+              entity_id: input_boolean.circadian_automation_active
+            - if:
+                - condition: template
+                  value_template: "{{ should_apply }}"
+              then:
+                - service: light.turn_on
+                  entity_id: light.0xa4c13861dca860a7
+                  data:
+                    brightness: "{{ final_brightness }}"
+                    color_temp_kelvin: "{{ final_color_temp }}"
+                    transition: 60
+                - service: notify.all_phones
+                  data:
+                    title: "💡 Bed Light"
+                    message: "Override ended. Adjusted to {{ ((final_brightness | int / 255) * 100) | round(0) }}%."
+                    data:
+                      channel: "Lights"
+                      importance: low
+                      tag: "circadian_override_bed"
+            - delay:
+                seconds: 5
+            - service: input_boolean.turn_off
+              entity_id: input_boolean.circadian_automation_active
+
+    # Check Hallway override expiry
+    - if:
+        - condition: state
+          entity_id: input_boolean.circadian_hallway_override
+          state: "on"
+        - condition: template
+          value_template: >
+            {{ as_timestamp(states('input_datetime.circadian_hallway_override_expires'))
+               < as_timestamp(now()) }}
+      then:
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.circadian_hallway_override
+        - if:
+            - condition: or
+              conditions:
+                - condition: state
+                  entity_id: light.0x54ef441001208726_white
+                  state: "on"
+                - condition: state
+                  entity_id: light.0x54ef441001208726_rgb
+                  state: "on"
+          then:
+            - variables:
+                current_brightness: "{{ state_attr('light.0x54ef441001208726_white', 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr('light.0x54ef441001208726_white', 'color_temp_kelvin') | default(4000) | int }}"
+                final_brightness: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int }}
+                  {% else %}
+                    {{ [brightness_value | int, current_brightness] | min }}
+                  {% endif %}
+                final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
+                should_apply: >
+                  {% if phase == 'Sunrise' %}
+                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                  {% else %}
+                    {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
+                  {% endif %}
+            - service: input_boolean.turn_on
+              entity_id: input_boolean.circadian_automation_active
+            - if:
+                - condition: template
+                  value_template: "{{ should_apply }}"
+              then:
+                - if:
+                    - condition: state
+                      entity_id: light.0x54ef441001208726_white
+                      state: "on"
+                  then:
+                    - service: light.turn_on
+                      entity_id: light.0x54ef441001208726_white
+                      data:
+                        brightness: "{{ final_brightness }}"
+                        color_temp_kelvin: "{{ final_color_temp }}"
+                        transition: 60
+                - if:
+                    - condition: state
+                      entity_id: light.0x54ef441001208726_rgb
+                      state: "on"
+                  then:
+                    - service: light.turn_on
+                      entity_id: light.0x54ef441001208726_rgb
+                      data:
+                        brightness: "{{ final_brightness }}"
+                        color_temp_kelvin: "{{ final_color_temp }}"
+                        transition: 60
+                - service: notify.all_phones
+                  data:
+                    title: "💡 Hallway Light"
+                    message: "Override ended. Adjusted to {{ ((final_brightness | int / 255) * 100) | round(0) }}%."
+                    data:
+                      channel: "Lights"
+                      importance: low
+                      tag: "circadian_override_hallway"
             - delay:
                 seconds: 5
             - service: input_boolean.turn_off
@@ -4230,9 +4496,13 @@
         - input_boolean.circadian_study_override
         - input_boolean.circadian_living_override
         - input_boolean.circadian_bath_override
+        - input_boolean.circadian_bed_override
+        - input_boolean.circadian_hallway_override
         - input_datetime.circadian_study_override_expires
         - input_datetime.circadian_living_override_expires
         - input_datetime.circadian_bath_override_expires
+        - input_datetime.circadian_bed_override_expires
+        - input_datetime.circadian_hallway_override_expires
 
   action:
     - service: mqtt.publish
@@ -4257,6 +4527,14 @@
               "bath": {
                 "active": {{ is_state('input_boolean.circadian_bath_override', 'on') | lower }},
                 "expires": "{{ states('input_datetime.circadian_bath_override_expires') }}"
+              },
+              "bed": {
+                "active": {{ is_state('input_boolean.circadian_bed_override', 'on') | lower }},
+                "expires": "{{ states('input_datetime.circadian_bed_override_expires') }}"
+              },
+              "hallway": {
+                "active": {{ is_state('input_boolean.circadian_hallway_override', 'on') | lower }},
+                "expires": "{{ states('input_datetime.circadian_hallway_override_expires') }}"
               }
             },
             "timestamp": "{{ now().isoformat() }}"

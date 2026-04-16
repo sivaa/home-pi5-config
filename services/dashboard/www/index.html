@@ -712,19 +712,19 @@
 
                   <!-- Circadian Override Banner -->
                   <div class="override-banner"
-                       x-show="$store.circadian.enabled && $store.circadian.overrides[light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living']?.active"
+                       x-show="$store.circadian.enabled && $store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active"
                        x-cloak>
                     <div class="override-info">
                       <span class="override-icon">✋</span>
                       <div class="override-text">
                         <span class="override-title">Manual Override</span>
                         <span class="override-expiry"
-                              x-text="'Expires in ' + $store.circadian.formatExpiry(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')">
+                              x-text="'Expires in ' + $store.circadian.formatExpiry($store.circadian.getRoom(light.id))">
                         </span>
                       </div>
                     </div>
                     <button class="override-clear"
-                            @click="$store.circadian.clearOverride(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')"
+                            @click="$store.circadian.clearOverride($store.circadian.getRoom(light.id))"
                             title="Resume circadian schedule">
                       Clear
                     </button>
@@ -881,7 +881,7 @@
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
                     <button class="preset-btn circadian-preset"
                             x-show="$store.circadian.enabled"
-                            @click="$store.circadian.applySchedule(light.id.includes('study') ? 'study' : light.id.includes('bath') ? 'bath' : 'living')"
+                            @click="$store.circadian.applySchedule($store.circadian.getRoom(light.id))"
                             title="Follow Circadian Schedule">🔄</button>
                   </div>
 
@@ -5943,13 +5943,23 @@
         overrides: {
           study: { active: false, expires: null },
           living: { active: false, expires: null },
-          bath: { active: false, expires: null }
+          bath: { active: false, expires: null },
+          bed: { active: false, expires: null },
+          hallway: { active: false, expires: null }
         },
 
         // Computed helpers
         get phaseIcon() {
           const icons = { Night: '🌙', Sunrise: '🌅', Day: '☀️', Sunset: '🌆' };
           return icons[this.phase] || '❓';
+        },
+
+        getRoom(lightId) {
+          if (lightId.includes('study')) return 'study';
+          if (lightId.includes('bath')) return 'bath';
+          if (lightId.includes('bed')) return 'bed';
+          if (lightId.includes('hallway')) return 'hallway';
+          return 'living';
         },
 
         get colorTempLabel() {
@@ -5998,6 +6008,16 @@
                   this.overrides.bath.expires = data.overrides.bath.expires ?
                     new Date(data.overrides.bath.expires).getTime() : null;
                 }
+                if (data.overrides.bed) {
+                  this.overrides.bed.active = data.overrides.bed.active === true;
+                  this.overrides.bed.expires = data.overrides.bed.expires ?
+                    new Date(data.overrides.bed.expires).getTime() : null;
+                }
+                if (data.overrides.hallway) {
+                  this.overrides.hallway.active = data.overrides.hallway.active === true;
+                  this.overrides.hallway.expires = data.overrides.hallway.expires ?
+                    new Date(data.overrides.hallway.expires).getTime() : null;
+                }
               }
 
               console.log('[circadian] State updated:', {
@@ -6029,12 +6049,20 @@
             this.overrides.living.active = state === 'on';
           } else if (topic.includes('circadian_bath_override/state')) {
             this.overrides.bath.active = state === 'on';
+          } else if (topic.includes('circadian_bed_override/state')) {
+            this.overrides.bed.active = state === 'on';
+          } else if (topic.includes('circadian_hallway_override/state')) {
+            this.overrides.hallway.active = state === 'on';
           } else if (topic.includes('circadian_study_override_expires/state')) {
             this.overrides.study.expires = new Date(state).getTime();
           } else if (topic.includes('circadian_living_override_expires/state')) {
             this.overrides.living.expires = new Date(state).getTime();
           } else if (topic.includes('circadian_bath_override_expires/state')) {
             this.overrides.bath.expires = new Date(state).getTime();
+          } else if (topic.includes('circadian_bed_override_expires/state')) {
+            this.overrides.bed.expires = new Date(state).getTime();
+          } else if (topic.includes('circadian_hallway_override_expires/state')) {
+            this.overrides.hallway.expires = new Date(state).getTime();
           }
         },
 

@@ -555,6 +555,12 @@ input_boolean:
   circadian_bath_override:
     name: Bath Light Override
     icon: mdi:hand-back-right
+  circadian_bed_override:
+    name: Bed Light Override
+    icon: mdi:hand-back-right
+  circadian_hallway_override:
+    name: Hallway Light Override
+    icon: mdi:hand-back-right
 
 # =============================================================================
 # INPUT DATETIMES - Override Expiration Timestamps
@@ -573,6 +579,16 @@ input_datetime:
     icon: mdi:timer-sand
   circadian_bath_override_expires:
     name: Bath Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  circadian_bed_override_expires:
+    name: Bed Override Expires
+    has_date: true
+    has_time: true
+    icon: mdi:timer-sand
+  circadian_hallway_override_expires:
+    name: Hallway Override Expires
     has_date: true
     has_time: true
     icon: mdi:timer-sand
@@ -829,10 +845,14 @@ mqtt_statestream:
       - input_boolean.circadian_study_override
       - input_boolean.circadian_living_override
       - input_boolean.circadian_bath_override
+      - input_boolean.circadian_bed_override
+      - input_boolean.circadian_hallway_override
       # Override expiration timestamps
       - input_datetime.circadian_study_override_expires
       - input_datetime.circadian_living_override_expires
       - input_datetime.circadian_bath_override_expires
+      - input_datetime.circadian_bed_override_expires
+      - input_datetime.circadian_hallway_override_expires
 
 # History tracking sensors (history_stats)
 sensor:
