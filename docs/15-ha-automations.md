@@ -754,7 +754,7 @@ These automations manage automatic brightness and color temperature adjustments 
 | Property | Value |
 |----------|-------|
 | **ID** | `circadian_mqtt_control` |
-| **Trigger** | MQTT message to `dashboard/circadian/command` |
+| **Trigger** | MQTT message to `homeassistant/circadian/command` |
 | **Action** | Enable/disable circadian based on `{ "enabled": true/false }` |
 | **Purpose** | Dashboard control of circadian system |
 
@@ -762,9 +762,9 @@ These automations manage automatic brightness and color temperature adjustments 
 | Property | Value |
 |----------|-------|
 | **ID** | `circadian_mqtt_state_publisher` |
-| **Trigger** | Circadian enabled changes, phase changes, 10-min schedule |
-| **Action** | Publish state to `dashboard/circadian/state` (retained) |
-| **Payload** | `{ enabled, phase, brightness, color_temp, study_override, living_override }` |
+| **Trigger** | Circadian enabled changes, phase changes, override changes for any of 5 rooms, 10-min schedule |
+| **Action** | Publish state to `homeassistant/circadian/state` (retained) |
+| **Payload** | `{ phase, brightness, colorTemp, enabled, overrides: { study, living, bath, bed, hallway } (each with active + expires), timestamp }` |
 | **Purpose** | Dashboard displays current circadian state |
 
 ---

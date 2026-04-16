@@ -323,12 +323,14 @@ export function networkView() {
       networkState.scene.add(baseFloor);
 
       // Build rooms (each room has its own floor and outer walls)
-      // NOTE: This runs FIRST, creating walls 0-15
+      // NOTE: This runs FIRST, pushing only non-consolidated room walls to wallMeshes.
+      // See WALL INDEX REFERENCE above for the authoritative indices (0-2).
       FLOOR_PLAN_CONFIG.rooms.forEach(config => {
         this.createRoom(config);
       });
 
-      // Interior divider walls (created AFTER room walls, so these are walls 16-17)
+      // Consolidated walls (created AFTER room walls, indices 3-9).
+      // See WALL INDEX REFERENCE above.
       const wallHeight = 0.8;
       const wallMat = new THREE.MeshStandardMaterial({ color: 0xB5A080, roughness: 0.7, transparent: true, opacity: 0.6 });
 

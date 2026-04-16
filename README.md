@@ -39,10 +39,12 @@
 │    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog,  │
 │      data-scraper                                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Systemd Services:                                          │
-│    Cloudflared:   Tunnel to ha.sivaa.in                     │
-│    where-is-siva: http://pi:8000 (location tracker)         │
-│    fake-garmin:   http://pi:9000 (test mock)                │
+│  Systemd Services (18 units):                               │
+│    Cloudflared:         Tunnel to ha.sivaa.in               │
+│    where-is-siva:       http://pi:8000 (location tracker)   │
+│    fake-garmin:         http://pi:9000 (test mock)          │
+│    pi-metrics-collector: Pi → MQTT → InfluxDB metrics       │
+│    zigbee2mqtt:         Z2M container (validation pre-start)│
 ├─────────────────────────────────────────────────────────────┤
 │  Zigbee Devices: 49 total (including coordinator)            │
 │    Sensors: 29 (12x temp, 1x CO2, 1x light, 1x PIR,         │
@@ -106,7 +108,8 @@
 | `sshd_config.original` | Original SSH server configuration (before changes) |
 | `wifi-powersave-off.conf` | NetworkManager WiFi power save disable config |
 | `journal-persistent.md` | Persistent journal storage setup notes |
-| `zigbee2mqtt/` | Zigbee2MQTT database and coordinator backups |
+| `zigbee2mqtt/configuration.yaml` | Live Zigbee2MQTT config snapshot (device list, friendly names, groups) |
+| `zigbee2mqtt/network_key.txt` | Disaster-recovery copy of current network key (see `configs/zigbee2mqtt/NETWORK_KEYS.md` for full keys reference) |
 
 ### Service Configs (`configs/`)
 
@@ -217,64 +220,6 @@ ssh pi@pi
 # Check router DHCP leases or use:
 nmap -sn 192.168.1.0/24 | grep -B2 "Raspberry"
 ```
-
----
-
-## Dashboard Versions (Dual-Dashboard Setup)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    DASHBOARD ARCHITECTURE                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Classic Dashboard (Alpine.js)      React Dashboard (Beta)      │
-│  ───────────────────────────────    ─────────────────────────   │
-│  URL:    http://pi:8888/            URL: http://pi:8888/v2/     │
-│  Path:   /opt/dashboard/www/        Path: /opt/dashboard/www/v2/ │
-│  Stack:  Alpine.js + vanilla JS     Stack: React 18 + Zustand   │
-│  Status: STABLE (production)        Status: BETA (testing)      │
-│                                                                 │
-│  Both dashboards share:                                          │
-│    • MQTT connection (pi:1883)                                  │
-│    • Same Zigbee devices                                        │
-│    • Same nginx server (:8888)                                  │
-│                                                                 │
-│  Navigation:                                                     │
-│    • Classic → React: Click "➡️ React" button in header          │
-│    • React → Classic: Click "⬅️ Classic" button in header        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Cutover Process (Future)
-
-**Both versions will run in parallel until manual cutover.**
-
-When ready to switch to React as default:
-
-1. **Verify stability** - React dashboard must run 48+ hours without issues
-2. **Feature parity** - All 9 views functioning identically
-3. **Update kiosk config**:
-   ```bash
-   # Edit: configs/kiosk-browser/kiosk-browser.service
-   # Change: http://localhost:8888/ → http://localhost:8888/v2/
-   ssh pi@pi 'systemctl --user restart kiosk-browser'
-   ```
-4. **Archive Classic** (optional) - Move to `/opt/dashboard/www/classic/`
-
-### Current React Dashboard Views
-
-| View | Route | Status |
-|------|-------|--------|
-| Classic (Home) | `/v2/#/` | ✅ Complete |
-| Timeline | `/v2/#/timeline` | ✅ Complete |
-| Logs | `/v2/#/logs` | ✅ Complete |
-| CO2 | `/v2/#/co2` | ✅ Complete |
-| Hot Water | `/v2/#/hotwater` | ✅ Complete |
-| Network | `/v2/#/network` | ✅ Complete (2D SVG) |
-| Lights | `/v2/#/lights` | ✅ Complete |
-| Heater | `/v2/#/heater` | ✅ Complete |
-| Mailbox | `/v2/#/mailbox` | ✅ Complete |
 
 ---
 

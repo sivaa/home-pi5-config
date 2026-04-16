@@ -50,7 +50,7 @@ Every configuration is documented and backed up. The system can be fully rebuilt
 | Smart Plugs | 3 | SONOFF S60ZBTPF |
 | Other Sensors | 6 | CO2, motion, vibration, remotes, switch |
 
-For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration.yaml` lines 55-156
+For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration.yaml` lines 55-187
 
 ---
 
@@ -127,7 +127,7 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 │                        │    HTTP:8890          │                            │
 │                        └───────────────────────┘                            │
 │                                                                             │
-│  Systemd Services (19 units):                                               │
+│  Systemd Services (18 units):                                               │
 │  ├── Display Scheduler (on/off timers, brightness, wake)                   │
 │  ├── Kiosk (browser, control, toggle)                                       │
 │  ├── Watchdogs (WiFi, Zigbee, Z2M validation)                               │

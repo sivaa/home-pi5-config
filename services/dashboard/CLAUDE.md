@@ -95,7 +95,7 @@ Alpine.js reactive state stores. Each manages data for one domain.
 |------|---------|
 | `utils/idle-refresh.js` | Auto-refreshes page after user inactivity (kiosk self-healing) |
 | `utils/insights.js` | Generates human-readable suggestions from room sensor data |
-| `utils/mqtt-client.js` | MQTT WebSocket client class (legacy, now mostly handled by mqtt-store) |
+| `utils/mqtt-client.js` | Orphaned (no imports remain - kept in repo but candidate for deletion; `mqtt-store` owns all WebSocket/subscription logic now) |
 | `js/config.js` | Central configuration - hosts, MQTT URLs, rooms, views, floor plan |
 | `js/data/zigbee-devices.js` | Zigbee device layout for 3D network visualization (49 devices) |
 | `js/three/orbit-controls.js` | Three.js camera controls for 3D floor plan view |

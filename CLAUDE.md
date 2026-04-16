@@ -367,6 +367,8 @@ shell_command:
 │                                unchanged)                    │
 │  {"color":{"hue":X,"sat":Y}}→ backlight only (main          │
 │                                unchanged)                    │
+│  {"color":{"x":0,"y":0}}    → backlight OFF only (main      │
+│                                ring preserved) [see below]   │
 │  {"state":"ON"/"OFF"}       → both                           │
 │  {"brightness": N}          → both (coupled at endpoint      │
 │                                level)                        │
@@ -377,7 +379,8 @@ shell_command:
 - Z2M's `color_mode` field on this lamp only reflects the *last command type*, not the active output state. Don't trust it.
 - Exposing CCT slider + color picker gives genuinely independent main/backlight control via standard Zigbee. No external converter needed.
 - `saturation: 0` on HS does NOT turn the backlight off - it desaturates to white AND appears to drag main ring CCT toward cool white (~167 mired). Treat it as "backlight white", not "backlight off".
-- **There is no standard Zigbee way to turn off ONLY the backlight while keeping main ring on.** The physical EGLO 99099 remote has the same limitation - its power button toggles both elements together.
+
+**Breakthrough (2026-04-15 evening, commit a324145): real backlight OFF via xy(0,0).** An earlier version of this lesson claimed "there is no standard Zigbee way to turn off ONLY the backlight while keeping main ring on." That was wrong. Sending `{"color":{"x":0,"y":0}}` on the main endpoint truly turns off the RGB backlight LEDs without affecting the main CCT ring - and without dragging main-ring color_temp (unlike sat=0, which pulls it toward cool white). This is implemented in `services/dashboard/www/index.html` via `_applyBacklightBlend` / `setBacklightOn(light, false)`. It is the cleanest standard-Zigbee path we have for backlight-only power control; no external converter, no proprietary cluster required. The physical EGLO 99099 remote still can't do this - its power button toggles both elements together, but that's a remote-UX limitation, not a network-protocol one.
 
 **Proprietary-cluster dead end (2026-04-15):** We probed cluster 0xFC57 (64599) on endpoint 1 and cluster 0xFF50/0xFF51 (65360/65361) on endpoint 3 with manufacturer code 0x1135. Findings:
 - **0xFC57 is NOT proprietary AwoX.** It's the Amazon WWAH (Works With All Hubs) cluster. Z2M logs it as `manuSpecificAmazonWWAH.read`. Readable attributes are all standard WWAH fields (`disableOTADowngrades`, `mgmtLeaveWithoutRejoinEnabled`, `nwkRetryCount`, `touchlinkInterpanEnabled`, etc). Zero backlight content.
@@ -387,7 +390,7 @@ shell_command:
 
 The exploratory probe converter is kept at `configs/zigbee2mqtt/external_converters/eglo-rovito-probe.js` for reference only — it was deployed, run once, then removed from the Pi.
 
-**Software pseudo-dim we shipped instead:** the Bed Light dashboard card has an 🔅 Intensity slider that linearly interpolates between the user's vivid color (at 100%) and the blend values (at 0%, same as the 🎨 OFF pill). See `setBacklightIntensity` in `services/dashboard/www/index.html`. It's not real dimming; it's color-fade that reads as "less prominent backlight" against the main ring.
+**Software pseudo-dim:** the Bed Light dashboard card has an 🔅 Intensity slider (`setBacklightIntensity` in `services/dashboard/www/index.html`) that linearly interpolates between the user's vivid color (at 100%) and a neutral hue/sat blend (at 0%). At 0% the slider sends `{color:{hue,sat}, color_temp}` to match the main ring - this is *visual fade*, not a power-off. The 🎨 OFF pill is different: it sends `{color:{x:0,y:0}}` to truly power down the backlight LEDs (see breakthrough note above). Intensity=0 and OFF pill are NOT equivalent - one blends, one powers off. Keep them as two distinct UI affordances.
 
 **Dashboard label convention (services/dashboard/www/index.html):**
 - For lights with `supportsColor: true`, the CCT slider is labeled "🌡️ Main Ring" and the color picker is labeled "🎨 Backlight Color".
@@ -426,31 +429,12 @@ The exploratory probe converter is kept at `configs/zigbee2mqtt/external_convert
 
 ---
 
-### Dashboard Network View - Wall Index Tracing (2024-12-14)
+### Dashboard Network View - Wall Index Tracing
 
-**Mistake Made:** When tracing wall indices in `services/dashboard/www/index.html`, incorrectly assumed interior divider walls (wall1, wall2) were created BEFORE room walls. This led to wrong wall identification (claimed wall 17 was bathroom's exterior wall when it's actually the Kitchen↔Bedroom interior divider).
+**Rule:** Do not cache wall indices in memory or documentation. They change when the floor plan is refactored.
 
-**Root Cause:** Did not carefully read the execution order in `buildFloorPlan()`:
-```javascript
-buildFloorPlan() {
-  // FIRST: Room walls created (walls 0-15)
-  FLOOR_PLAN_CONFIG.rooms.forEach(config => this.createRoom(config));
+**History:** An earlier version of this lesson documented an 18-wall layout (indices 0-17 across room walls 0-15 and interior dividers 16-17). That map is obsolete. The floor plan was consolidated (most exterior room walls merged into shared north/south/east/west walls, Kitchen↔Bedroom interior divider removed entirely) and the wall count is now 10 (indices 0-9).
 
-  // THEN: Interior walls created (walls 16-17)
-  // wall1 → index 16
-  // wall2 → index 17
-}
-```
+**Authoritative source:** the docblock at the top of `buildFloorPlan()` in `services/dashboard/www/views/network.js` (search for `WALL INDEX REFERENCE`). When debugging wall rendering, read it there - not from this file. If you refactor the floor plan again, update the docblock in one place and leave this lesson intact.
 
-**Correct Wall Index Map:**
-```
-0-2:   Study (back, left, right)
-3-5:   Living (front, left, right)
-6-8:   Bedroom (front, left, right)
-9-11:  Kitchen (back, left, right)
-12-15: Bathroom (back, front, left, right)
-16:    Interior - Study↔Living horizontal divider
-17:    Interior - Kitchen↔Bedroom horizontal divider
-```
-
-**Prevention:** Always verify execution order by reading the actual code flow. Don't assume based on code comments or naming. When debugging visual elements, cross-reference with the actual rendered output (screenshots) rather than relying solely on code tracing.
+**Prevention:** Always verify execution order by reading the actual code flow. When debugging visual elements, cross-reference with the rendered output (screenshot via Playwright) rather than relying solely on code tracing.

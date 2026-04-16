@@ -70,6 +70,9 @@ export const ZIGBEE_DEVICES = [
   // Motion Sensor (Mailbox)
   { id: 'motion-mailbox', name: '[Mailbox] Motion Sensor', type: 'end-device', icon: '📬', room: 'mailbox', x: 0.05, z: 0.5 },
 
+  // Light Sensor (Moes ZSS-QT-LS-C)
+  { id: 'light-sensor-kitchen', name: '[Kitchen] Light Sensor', type: 'end-device', icon: '☀️', room: 'kitchen', x: 0.62, z: 0.08 },
+
   // IKEA Remotes
   { id: 'remote-study', name: '[Study] Light Remote', type: 'end-device', icon: '🎛️', room: 'study', x: 0.82, z: 0.22 },
   { id: 'remote-living', name: '[Living] Light Remote', type: 'end-device', icon: '🎛️', room: 'living', x: 0.38, z: 0.38 },

@@ -779,10 +779,10 @@
                   <!-- Backlight Color (only on dual-LED lamps like EGLO Rovito-Z).
                        color_temp affects main ring; color (hs) affects backlight.
                        Both LEDs run simultaneously - see CLAUDE.md lessons learned.
-                       The "backlight" toggle here sends saturation=0 which blends
-                       the RGB backlight into neutral white so it visually merges
-                       with the main ring (standard Zigbee can't turn only the
-                       backlight hardware off; even the EGLO remote can't). -->
+                       The backlight OFF toggle sends {color:{x:0,y:0}} to truly
+                       power down the RGB LEDs without affecting the main ring
+                       CCT (commit a324145). The EGLO 99099 remote still can't
+                       do this - it toggles both elements together. -->
                   <div class="light-control"
                        x-show="light.supportsColor"
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">

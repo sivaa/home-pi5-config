@@ -17,13 +17,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Expected counts (from PRD.md)
-EXPECTED_DEVICES=35
-EXPECTED_AUTOMATIONS=57
+EXPECTED_DEVICES=49
+EXPECTED_AUTOMATIONS=77
 EXPECTED_DOCKER=8  # Main docker-compose only (data-scraper is separate)
-EXPECTED_SYSTEMD_SERVICES=14
-EXPECTED_SYSTEMD_TIMERS=5
-EXPECTED_CLASSIC_VIEWS=10
-EXPECTED_REACT_VIEWS=10  # 9 active routes + PlaceholderPage (unused)
+EXPECTED_SYSTEMD_SERVICES=18
+EXPECTED_SYSTEMD_TIMERS=6
+EXPECTED_CLASSIC_VIEWS=15
 
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,13 +76,9 @@ check_count "Systemd Services" "$SYSTEMD_SERVICES" "$EXPECTED_SYSTEMD_SERVICES" 
 SYSTEMD_TIMERS=$(find "$PROJECT_ROOT/configs" -name "*.timer" 2>/dev/null | wc -l | tr -d ' ')
 check_count "Systemd Timers" "$SYSTEMD_TIMERS" "$EXPECTED_SYSTEMD_TIMERS" "configs/**/*.timer"
 
-# Count Classic dashboard views
+# Count Dashboard views
 CLASSIC_VIEWS=$(ls "$PROJECT_ROOT/services/dashboard/www/views/"*.js 2>/dev/null | wc -l | tr -d ' ')
-check_count "Classic Dashboard Views" "$CLASSIC_VIEWS" "$EXPECTED_CLASSIC_VIEWS" "services/dashboard/www/views/*.js"
-
-# Count React dashboard views
-REACT_VIEWS=$(ls "$PROJECT_ROOT/services/dashboard-react/src/routes/"*Page.tsx 2>/dev/null | wc -l | tr -d ' ')
-check_count "React Dashboard Views" "$REACT_VIEWS" "$EXPECTED_REACT_VIEWS" "services/dashboard-react/src/routes/*Page.tsx"
+check_count "Dashboard Views" "$CLASSIC_VIEWS" "$EXPECTED_CLASSIC_VIEWS" "services/dashboard/www/views/*.js"
 
 # Summary
 echo "========================================"

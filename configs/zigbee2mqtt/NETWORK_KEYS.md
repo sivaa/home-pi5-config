@@ -1,7 +1,7 @@
 # Zigbee Network Recovery Keys
 
 > **CRITICAL:** These keys are needed to restore the Zigbee network after disaster.
-> Without them, ALL 35 devices must be re-paired manually!
+> Without them, ALL 49 devices must be re-paired manually!
 
 ---
 

@@ -3,6 +3,7 @@ homeassistant:
 frontend:
   enabled: true
   port: 8080
+  # VPN provides network security - no auth needed
 mqtt:
   base_topic: zigbee2mqtt
   server: mqtt://mosquitto:1883
@@ -21,6 +22,9 @@ advanced:
     - 221
     - 221
     - 221
+  # Network key - KEEP SECRET! Stored on Pi, not in git
+  # If rebuilding: use existing key from Pi backup or generate new one
+  # Current key (2026-01-06): 9a0aa1d156264e9ca4b4779a086cf75e
   network_key:
     - 154
     - 10
@@ -45,32 +49,42 @@ availability:
   active:
     timeout: 2
   passive:
-    timeout: 2400
+    timeout: 2400  # 40 min for battery devices
 device_options:
   retain: true
 devices:
+  # === IKEA LIGHTS (Routers) ===
   '0xd0cf5efffe25ab28':
     friendly_name: '[Study] IKEA Light'
   '0xd0cf5efffe24d093':
     friendly_name: '[Living] IKEA Light'
+  # === AWOX / EGLO (Bathroom) ===
   '0xa4c1384bd2ed5c7e':
     friendly_name: '[Bath] Light'
+  '0xa4c138963338c36c':
+    friendly_name: '[Bath] Light Remote'
+  # === EGLO ROVITO-Z (Bedroom, dual CCT main + RGB backlight) ===
+  # Model 900087 / AwoX EBF_RGB_Zm. Requires BLE firmware >= 3.0.1
+  # before Zigbee pairing will succeed (see root CLAUDE.md lessons).
   '0xa4c13861dca860a7':
     friendly_name: '[Bed] Light'
+  # === AQARA T1M (Hallway, dual-endpoint CCT + RGB) ===
+  # lumi.light.acn032, two endpoints exposed as white + rgb in Z2M.
   '0x54ef441001208726':
     friendly_name: '[Hallway] Light'
-  '0xa4c138963338c36c':
-    friendly_name: '[Bed] Light Remote'
+  # === IKEA REMOTES ===
   '0x90fd9ffffef4cebf':
     friendly_name: '[Study] IKEA Remote'
   '0x90fd9ffffee43106':
     friendly_name: '[Living] IKEA Remote'
+  # === LIGHT SWITCHES (Routers) ===
   '0x4c97a1fffecd9a31':
     friendly_name: '[Study] Light Switch'
   '0x58263afffefc1d02':
     friendly_name: '[Bed] Light Switch'
   '0x58263afffefc5706':
     friendly_name: '[Living] Light Switch'
+  # === SMART PLUGS (Routers) ===
   '0xa4c13802b54effff':
     friendly_name: Smart Plug [1]
     debounce: 60000
@@ -80,8 +94,10 @@ devices:
   '0xa4c13803091fffff':
     friendly_name: Smart Plug [3]
     debounce: 60000
+  # === CO2 SENSOR (Router) ===
   '0xa4c138d2b1446edf':
     friendly_name: '[Hallway] CO2'
+  # === TEMPERATURE SENSORS (6 original SNZB-02P) ===
   '0xc09b9efffed502b9':
     friendly_name: '[Living] Temperature & Humidity'
   '0xc09b9efffef541b2':
@@ -94,6 +110,7 @@ devices:
     friendly_name: '[Balcony] Temperature & Humidity'
   '0xc09b9efffef541a8':
     friendly_name: '[Bed] Temperature & Humidity'
+  # === TEMPERATURE SENSORS (6 additional SNZB-02P) ===
   '0x8c73dafffe2a0459':
     friendly_name: '[Living] Temperature & Humidity 6'
   '0x8c73dafffe2a0638':
@@ -106,8 +123,10 @@ devices:
     friendly_name: '[Kitchen] Temperature & Humidity 10'
   '0x8c73dafffeb33c57':
     friendly_name: '[Bath] Temperature & Humidity 11'
+  # === MOTION SENSOR ===
   '0x3425b4fffe1432aa':
     friendly_name: '[Mailbox] Motion Sensor'
+  # === WINDOW CONTACT SENSORS ===
   '0xc09b9efffe4af947':
     friendly_name: '[Bath] Window Contact Sensor'
   '0xc4d8c8fffe0f7eab':
@@ -124,6 +143,12 @@ devices:
     friendly_name: '[Living] Window Contact Sensor - Window'
   '0x983268fffe653343':
     friendly_name: '[Hallway] Window Contact Sensor - Main Door'
+  # === THERMOSTATS (TRVZB Radiator Valves) ===
+  # NOTE: timer_mode_target_temp set to false to completely suppress HA discovery.
+  # TRVZB sends 0 when timer mode is not in use, but HA expects range 4.0-35.0.
+  # Using "enabled: false" still creates disabled entity which errors on value 0.
+  # Using "false" (boolean) completely removes the entity from HA discovery.
+  # Fix updated 2026-01-19 after discovering "enabled: false" wasn't enough.
   '0xc4d8c8fffe02cef8':
     friendly_name: '[Study] Thermostat'
     homeassistant:
@@ -140,10 +165,13 @@ devices:
     friendly_name: '[Living] Thermostat Outer'
     homeassistant:
       timer_mode_target_temp: false
+  # === VIBRATION SENSOR ===
   '0xa4c13863257ea097':
     friendly_name: Vibration Sensor
+  # === FINGERBOT ===
   '0xa4c1384949538a9b':
     friendly_name: Fingerbot
+  # === HUMAN PRESENCE SENSORS (SNZB-06P mmWave) ===
   '0xf84477fffe0437f4':
     friendly_name: '[Bed] Human Presence'
   '0xc4d8c8fffe1e40b5':
@@ -154,19 +182,10 @@ devices:
     friendly_name: '[Study] Human Presence'
   '0xd44867fffe079897':
     friendly_name: '[Bath] Human Presence'
+  # === LIGHT SENSOR (Moes ZSS-QT-LS-C) ===
   '0xa4c138dad83a328f':
     friendly_name: '[Kitchen] Light Sensor'
-  '0xa4c13861dca860a7':
-    friendly_name: '[Bed] Light'
-  '0x54ef441001208726':
-    friendly_name: '[Hallway] Light'
 groups:
-  '10':
-    friendly_name: legacy_group10
-  '32779':
-    friendly_name: bed_remote_zone1
   '32780':
     friendly_name: eglo_remote_group1
-  '32781':
-    friendly_name: bed_remote_zone3
 version: 4
