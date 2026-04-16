@@ -3653,8 +3653,15 @@
               state: "on"
       then:
         - variables:
-            current_brightness_w: "{{ state_attr('light.0x54ef441001208726_white', 'brightness') | default(255) | int }}"
-            current_color_temp_w: "{{ state_attr('light.0x54ef441001208726_white', 'color_temp_kelvin') | default(4000) | int }}"
+            # Read from whichever endpoint is on (prefer white as primary)
+            active_entity: >
+              {% if is_state('light.0x54ef441001208726_white', 'on') %}
+                light.0x54ef441001208726_white
+              {% else %}
+                light.0x54ef441001208726_rgb
+              {% endif %}
+            current_brightness_w: "{{ state_attr(active_entity, 'brightness') | default(255) | int }}"
+            current_color_temp_w: "{{ state_attr(active_entity, 'color_temp_kelvin') | default(4000) | int }}"
             final_brightness: >
               {% if phase == 'Sunrise' %}
                 {{ brightness_value | int }}
@@ -4225,8 +4232,17 @@
                   state: "on"
           then:
             - variables:
-                current_brightness: "{{ state_attr('light.0x54ef441001208726_white', 'brightness') | default(255) | int }}"
-                current_color_temp: "{{ state_attr('light.0x54ef441001208726_white', 'color_temp_kelvin') | default(4000) | int }}"
+                # Read from whichever endpoint is on. If both are on, prefer
+                # the white ring (primary). If only RGB is on, read from it
+                # so the golden rule compares against actual strip state.
+                active_entity: >
+                  {% if is_state('light.0x54ef441001208726_white', 'on') %}
+                    light.0x54ef441001208726_white
+                  {% else %}
+                    light.0x54ef441001208726_rgb
+                  {% endif %}
+                current_brightness: "{{ state_attr(active_entity, 'brightness') | default(255) | int }}"
+                current_color_temp: "{{ state_attr(active_entity, 'color_temp_kelvin') | default(4000) | int }}"
                 final_brightness: >
                   {% if phase == 'Sunrise' %}
                     {{ brightness_value | int }}
@@ -4365,6 +4381,8 @@
           - input_boolean.circadian_study_override
           - input_boolean.circadian_living_override
           - input_boolean.circadian_bath_override
+          - input_boolean.circadian_bed_override
+          - input_boolean.circadian_hallway_override
 
     # Notification
     - service: notify.all_phones
@@ -6051,6 +6069,10 @@
     - service: switch.turn_off
       target:
         entity_id: switch.bed_light_switch
+    # Clear circadian override so next occupancy cycle gets fresh schedule
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.circadian_bed_override
 
 # -----------------------------------------------------------------------------
 # LIVING - IKEA Light OFF when unoccupied
