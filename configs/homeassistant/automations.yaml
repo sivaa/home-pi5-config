@@ -3613,6 +3613,16 @@
   mode: parallel
   max: 3
 
+  # NOTE: light.bed_light (EGLO Rovito-Z) and light.hallway_light (Aqara T1M) are
+  # intentionally NOT in this trigger list. Adding them requires a matching set
+  # of per-room helpers (input_boolean circadian_{room}_override + input_datetime
+  # circadian_{room}_override_expires), per-room blocks in circadian_schedule_update,
+  # and override-detection/expired automations. That is a feature expansion, not
+  # a gap fix. For bed_light, circadian would only engage while the wall switch
+  # is closed (most of the day the switch is off). For hallway_light, there is
+  # no presence sensor so auto-on/off is manual anyway. If/when circadian is
+  # expanded to these rooms, update CLAUDE.md device table and the MQTT dashboard
+  # exposure block in configuration.yaml as well.
   trigger:
     - platform: state
       entity_id:
@@ -5731,6 +5741,12 @@
 - id: bed_presence_light_off
   alias: "[Bed] Light Off When Unoccupied"
   description: "Turn off bedroom light when no human presence"
+  # NOTE: Targets switch.bed_light_switch (relay), NOT light.bed_light (EGLO Rovito-Z).
+  # Same pattern as Study/Living: the SONOFF wall switch is upstream of the bulb
+  # and cuts mains power. Power restore → EGLO defaults to ON (hardware behavior),
+  # which is exactly what we want for the next occupancy cycle. See
+  # configs/homeassistant/CLAUDE.md "Bathroom Presence Lighting" for the pattern
+  # rationale and why bathroom (which has no upstream switch) is the exception.
   mode: single
 
   trigger:

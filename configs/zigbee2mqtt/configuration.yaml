@@ -63,6 +63,15 @@ devices:
     friendly_name: '[Bath] Light'
   '0xa4c138963338c36c':
     friendly_name: '[Bath] Light Remote'
+  # === EGLO ROVITO-Z (Bedroom, dual CCT main + RGB backlight) ===
+  # Model 900087 / AwoX EBF_RGB_Zm. Requires BLE firmware >= 3.0.1
+  # before Zigbee pairing will succeed (see root CLAUDE.md lessons).
+  '0xa4c13861dca860a7':
+    friendly_name: '[Bed] Light'
+  # === AQARA T1M (Hallway, dual-endpoint CCT + RGB) ===
+  # lumi.light.acn032, two endpoints exposed as white + rgb in Z2M.
+  '0x54ef441001208726':
+    friendly_name: '[Hallway] Light'
   # === IKEA REMOTES ===
   '0x90fd9ffffef4cebf':
     friendly_name: '[Study] IKEA Remote'

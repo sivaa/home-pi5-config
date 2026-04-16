@@ -3406,7 +3406,7 @@
                   <path class="floor-light-icon" transform="scale(0.25)"
                         d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
-                <!-- Bedroom (0,40,45,36.65) - has switch, no smart bulb -->
+                <!-- Bedroom (0,40,45,36.65) - has bed_light (EGLO Rovito-Z) + wall switch fallback -->
                 <g transform="translate(2, 43)" :class="getRoomLightClass('bedroom')">
                   <path class="floor-light-icon" transform="scale(0.25)"
                         d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
@@ -5457,6 +5457,7 @@
         _colorTempTimeout: null,
         _hueTimeout: null,
         _backlightBrightnessTimeout: null,
+        _intensityTimeout: null,
 
         get anyLightSyncing() {
           return this.list.some(l => l.syncing);
@@ -5730,29 +5731,6 @@
           };
         },
 
-        // Convert a mired color temperature to CIE 1931 xy chromaticity on the
-        // black-body (Planckian) locus. Used to make the backlight's RGB LEDs
-        // emit the same white point as the main ring's CCT LEDs.
-        // Formula: Kim, Weyrich, Kautz 2002 approximation.
-        _miredToXy(mired) {
-          const K = 1e6 / mired;
-          let x;
-          if (K <= 4000) {
-            x = -0.2661239e9 / Math.pow(K, 3) - 0.2343580e6 / Math.pow(K, 2) + 0.8776956e3 / K + 0.179910;
-          } else {
-            x = -3.0258469e9 / Math.pow(K, 3) + 2.1070379e6 / Math.pow(K, 2) + 0.2226347e3 / K + 0.240390;
-          }
-          let y;
-          if (K <= 2222) {
-            y = -1.1063814 * Math.pow(x, 3) - 1.34811020 * Math.pow(x, 2) + 2.18555832 * x - 0.20219683;
-          } else if (K <= 4000) {
-            y = -0.9549476 * Math.pow(x, 3) - 1.37418593 * Math.pow(x, 2) + 2.09137015 * x - 0.16748867;
-          } else {
-            y =  3.0817580 * Math.pow(x, 3) - 5.87338670 * Math.pow(x, 2) + 3.75112997 * x - 0.37001483;
-          }
-          return { x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 };
-        },
-
         setHue(light, value) {
           if (!light.supportsColor) return;
           const hue = parseInt(value);
@@ -5871,8 +5849,9 @@
             light.saturation = 100;
             this.publishCommand(light, { color: { hue: light.hue, saturation: 100 } });
           } else {
-            // Blend the backlight to visually match the main ring.
-            // See _applyBacklightBlend for the empirical hue/sat calibration.
+            // Single-endpoint lamp (EGLO Rovito-Z): the magic {x:0,y:0} command
+            // turns off just the RGB backlight without touching the main ring.
+            // See _applyBacklightBlend.
             this._applyBacklightBlend(light, light.colorTemp);
           }
         },

@@ -958,6 +958,10 @@ ssh pi@pi "docker exec mosquitto mosquitto_sub -t 'zigbee2mqtt/[DEVICE_NAME]' -C
 
 | Date | Change |
 |------|--------|
+| 2026-04-15 | Added 1x Aqara T1M hallway ceiling light (lumi.light.acn032, CCT + RGB dual-endpoint, router) |
+| 2026-04-15 | Added 1x EGLO Rovito-Z bed light (900087 / AwoX EBF_RGB_Zm, CCT main ring + RGB backlight, router) |
+| 2026-04-15 | Updated device count: 47 → 49 devices |
+| 2026-04-15 | EGLO Rovito-Z lesson: BLE firmware ≥ 3.0.1 required before Z2M interview succeeds |
 | 2026-02-04 | Added 1x Moes ZSS-QT-LS-C light sensor in Kitchen (battery-powered illuminance) |
 | 2026-02-04 | Updated device count: 46 → 47 devices |
 | 2026-02-03 | Added 2 devices: 1x AwoX 33955 Bath Light (router), 1x EGLO 99099 Bath Remote |

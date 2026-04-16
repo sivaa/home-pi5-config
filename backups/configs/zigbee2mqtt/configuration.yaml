@@ -55,6 +55,10 @@ devices:
     friendly_name: '[Living] IKEA Light'
   '0xa4c1384bd2ed5c7e':
     friendly_name: '[Bath] Light'
+  '0xa4c13861dca860a7':
+    friendly_name: '[Bed] Light'
+  '0x54ef441001208726':
+    friendly_name: '[Hallway] Light'
   '0xa4c138963338c36c':
     friendly_name: '[Bed] Light Remote'
   '0x90fd9ffffef4cebf':
