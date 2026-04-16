@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2026-01-21
-> **Total Automations:** 49
+> **Last Updated:** 2026-04-16
+> **Total Automations:** 77
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -26,6 +26,16 @@
 | [Circadian Lighting](#-circadian-lighting) | 8 | Schedule-based brightness/color temp with override detection |
 | [Sensor Offline Alerts](#-sensor-offline-alerts) | 3 | Alert when contact sensors go unavailable |
 | [Presence Light Reminders](#-presence-light-reminders) | 2 | Repeating TTS for lights left on |
+| [Presence Light Control](#-presence-light-control) | 5 | Auto on/off lights by room presence |
+| [CO2 Episode Tracking](#-co2-monitoring) | 3 | Track CO2 episode duration for TTS |
+| [Zigbee Device Alerts](#-sensor-offline-alerts) | 4 | Device join/leave and router offline alerts |
+| [Thermostat Boost Expiry](#-heater-safety-limits) | 6 | Per-TRV boost, global boost, CO2 override timers |
+| [Thermostat Recovery](#-watchdog-recovery) | 4 | Zombie state, stuck-idle, anomalous setpoint guard |
+| [Energy Cap](#-heater-safety-limits) | 2 | Auto-lower setpoint when room reaches 21C |
+| [Bedroom Night Override](#-bedroom-night-mode) | 1 | Dashboard 90-min night mode override expiry |
+| [Outdoor Temp Adjust](#-heater-safety-limits) | 1 | Auto-adjust setpoints based on outdoor temp |
+| [Mobile Notification MQTT](#-tts-logging) | 1 | Publish mobile notifications to MQTT for dashboard |
+| [Daily Valve Exercise](#-watchdog-recovery) | 1 | Prevent TRV valve seizure from extended OFF |
 
 ---
 
@@ -694,14 +704,14 @@ These automations manage automatic brightness and color temperature adjustments 
 | **Trigger** | Every 10 minutes (time pattern) |
 | **Condition** | `input_boolean.circadian_enabled` is ON |
 | **Action** | Apply scheduled brightness/color temp to ON lights (not overridden) |
-| **Lights** | Study IKEA Light, Living IKEA Light |
+| **Lights** | Study IKEA Light, Living IKEA Light, Bath Light (AwoX), Bed Light (EGLO Rovito-Z), Hallway Light (Aqara T1M - dual endpoint) |
 | **Transition** | 30 seconds |
 
 #### 35. Circadian - Light Power On
 | Property | Value |
 |----------|-------|
 | **ID** | `circadian_power_on` |
-| **Trigger** | Study or Living light turns on |
+| **Trigger** | Any of the 5 circadian lights turns on |
 | **Condition** | Circadian enabled, light not overridden |
 | **Action** | Set to 2200K (warmest) + scheduled brightness |
 | **Purpose** | Gentle warm start when light is turned on |

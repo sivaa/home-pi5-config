@@ -32,22 +32,21 @@ Every configuration is documented and backed up. The system can be fully rebuilt
 
 | Metric | Count | Source File | Verify Command |
 |--------|-------|-------------|----------------|
-| Zigbee Devices | 35 | `configs/zigbee2mqtt/configuration.yaml` | `grep -c "friendly_name:"` |
-| Automations | 57 | `configs/homeassistant/automations.yaml` | `grep -c "alias:"` |
+| Zigbee Devices | 49 | `configs/zigbee2mqtt/configuration.yaml` | `grep -c "friendly_name:"` |
+| Automations | 77 | `configs/homeassistant/automations.yaml` | `grep -c "alias:"` |
 | Docker Services | 9 | `configs/zigbee2mqtt/docker-compose.yml` + `services/data-scraper/` | `grep -c "container_name:"` |
-| Systemd Services | 14 | `configs/**/*.service` | `find configs -name "*.service" \| wc -l` |
-| Systemd Timers | 5 | `configs/**/*.timer` | `find configs -name "*.timer" \| wc -l` |
-| Classic Dashboard Views | 10 | `services/dashboard/www/views/*.js` | `ls \| wc -l` |
-| React Dashboard Views | 9 active (10 files) | `services/dashboard-react/src/routes/*Page.tsx` | `ls \| wc -l` |
+| Systemd Services | 18 | `configs/**/*.service` | `find configs -name "*.service" \| wc -l` |
+| Systemd Timers | 6 | `configs/**/*.timer` | `find configs -name "*.timer" \| wc -l` |
+| Dashboard Views | 15 | `services/dashboard/www/views/*.js` | `ls \| wc -l` |
 
 ### Device Categories (Summary)
 
 | Category | Count | Notes |
 |----------|-------|-------|
-| Temperature Sensors | 12 | SNZB-02P (6x), SNZB-02WD (6x) |
+| Temperature Sensors | 12 | SNZB-02P (11x), SNZB-02WD (1x) |
 | Contact Sensors | 8 | Windows and doors |
 | Thermostats | 4 | SONOFF TRVZB radiator valves |
-| Lights | 2 | IKEA FLOALT panels |
+| Lights | 5 | 2x IKEA FLOALT, 2x AwoX LED, 1x Aqara T1M ceiling |
 | Smart Plugs | 3 | SONOFF S60ZBTPF |
 | Other Sensors | 6 | CO2, motion, vibration, remotes, switch |
 
@@ -99,7 +98,7 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 │  ├── Sonoff Zigbee 3.0 USB Dongle Plus V2                                   │
 │  └── HDMI Touch Display (Kiosk Mode)                                        │
 │                                                                             │
-│  Zigbee Network: 39 Devices                                                 │
+│  Zigbee Network: 49 Devices                                                 │
 │  ├── Coordinator: USB Dongle                                                │
 │  ├── Routers: Lights, Plugs, CO2 Sensor                                     │
 │  └── End Devices: Sensors, Thermostats                                      │
@@ -170,42 +169,9 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 
 ## 5. Dashboard Architecture
 
-### Dual Dashboard Strategy
+### Dashboard
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     DUAL DASHBOARD SETUP                                     │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Classic Dashboard (Alpine.js)        React Dashboard (Beta)                │
-│  ─────────────────────────────        ─────────────────────                 │
-│  URL:    http://pi:8888/              URL:    http://pi:8888/v2/            │
-│  Stack:  Alpine.js + vanilla JS       Stack:  React 18 + Zustand            │
-│  Status: PRODUCTION (stable)          Status: BETA (testing)                │
-│  Views:  10                           Views:  9 active (missing 2)          │
-│                                                                             │
-│  Both share: MQTT connection, device data, nginx server                     │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### View Parity Status
-
-| View | Classic | React | Notes |
-|------|---------|-------|-------|
-| Home | ✅ | ✅ | Room temperatures, floor plan |
-| Timeline | ✅ | ✅ | Event history |
-| Logs | ✅ | ✅ | System logs |
-| CO2 | ✅ | ✅ | Air quality gauge |
-| Hot Water | ✅ | ✅ | Usage tracking |
-| Network | ✅ | ✅ | Signal strength map |
-| Lights | ✅ | ✅ | IKEA FLOALT controls |
-| Heater | ✅ | ✅ | Thermostat controls |
-| Mailbox | ✅ | ✅ | Motion alerts |
-| **Transport** | ✅ | ❌ | S-Bahn + Bus departures |
-| **Device Health** | ✅ | ❌ | 39 devices status |
-
-**Cutover Criteria:** React must have feature parity + 48 hours stable operation before replacing Classic.
+The classic Alpine.js dashboard is the production UI at `http://pi:8888/` with 15 views. See `services/dashboard/CLAUDE.md` for architecture details.
 
 ---
 
@@ -340,7 +306,7 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 │  • Must use `systemctl restart zigbee2mqtt` (NEVER docker restart)          │
 │  • 60-second wait between operations                                        │
 │                                                                             │
-│  DOCUMENTATION: docs/16-zigbee-network-incident-2026-01-04.md               │
+│  DOCUMENTATION: docs/21-zigbee-network-incident-2026-01-04.md               │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -365,7 +331,7 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 | Topic | Source File | Lines/Notes |
 |-------|-------------|-------------|
 | Device inventory | `configs/zigbee2mqtt/configuration.yaml` | Lines 55-156 |
-| Automation list | `configs/homeassistant/automations.yaml` | 57 automations |
+| Automation list | `configs/homeassistant/automations.yaml` | 77 automations |
 | Docker services | `configs/zigbee2mqtt/docker-compose.yml` | 8 services |
 | HA configuration | `configs/homeassistant/configuration.yaml` | Integrations |
 | HA scripts | `configs/homeassistant/scripts.yaml` | Callable scripts |
@@ -375,7 +341,6 @@ For complete device list with IEEE addresses: `configs/zigbee2mqtt/configuration
 | Service | CLAUDE.md Location |
 |---------|-------------------|
 | Dashboard (Classic) | `services/dashboard/CLAUDE.md` |
-| Dashboard (React) | `services/dashboard-react/CLAUDE.md` |
 | Heater Watchdog | `services/heater-watchdog/CLAUDE.md` |
 | Zigbee Watchdog | `services/zigbee-watchdog/CLAUDE.md` |
 | Data Scraper | `services/data-scraper/CLAUDE.md` |

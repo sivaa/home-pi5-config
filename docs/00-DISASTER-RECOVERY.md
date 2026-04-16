@@ -265,12 +265,12 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 EOF
 ```
 
-**Expected Output:**
+**Expected Output (8 containers from main compose):**
 ```
 NAMES               STATUS              PORTS
 mosquitto           Up 2 minutes        0.0.0.0:1883->1883, 9001
 zigbee2mqtt         Up 2 minutes        0.0.0.0:8080->8080
-homeassistant       Up 2 minutes        0.0.0.0:8123->8123
+homeassistant       Up 2 minutes        (host networking - port 8123)
 influxdb            Up 2 minutes        0.0.0.0:8086->8086
 mqtt-influx-bridge  Up 2 minutes
 dashboard           Up 2 minutes        0.0.0.0:8888->80
@@ -278,27 +278,78 @@ cast-ip-monitor     Up 2 minutes
 heater-watchdog     Up 2 minutes
 ```
 
+**Also start data-scraper (separate compose file, brings total to 9 containers):**
+```bash
+ssh pi@pi << 'EOF'
+cd /opt/data-scraper
+docker compose up -d
+EOF
+```
+
+**Verify data-scraper is running:**
+```
+NAMES               STATUS              PORTS
+data-scraper        Up 1 minute
+```
+
 ### Step 4: Deploy Systemd Services
 
 **System Services (run as root):**
 ```bash
 ssh pi@pi << 'EOF'
-# Zigbee2MQTT systemd service (with validation)
+# --- Zigbee2MQTT (systemd-managed with pre-start validation) ---
 sudo cp ~/pi-setup/configs/systemd/zigbee2mqtt.service /etc/systemd/system/
+
+# --- Zigbee Watchdog (monitors Z2M container, restarts via systemctl) ---
+sudo mkdir -p /opt/zigbee-watchdog
+sudo cp ~/pi-setup/services/zigbee-watchdog/zigbee-watchdog.sh /opt/zigbee-watchdog/
+sudo chmod +x /opt/zigbee-watchdog/zigbee-watchdog.sh
+sudo cp ~/pi-setup/configs/zigbee-watchdog/zigbee-watchdog.service /etc/systemd/system/
+sudo cp ~/pi-setup/configs/zigbee-watchdog/zigbee-watchdog.timer /etc/systemd/system/
+sudo cp ~/pi-setup/configs/zigbee-watchdog/99-zigbee-usb.rules /etc/udev/rules.d/
+
+# --- WiFi Watchdog ---
 sudo cp ~/pi-setup/configs/wifi-watchdog/wifi-watchdog.service /etc/systemd/system/
 sudo cp ~/pi-setup/configs/wifi-watchdog/wifi-watchdog.timer /etc/systemd/system/
 sudo cp ~/pi-setup/configs/wifi-watchdog/wifi-watchdog.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/wifi-watchdog.sh
 
-# Pi System Metrics Collector (publishes to MQTT + InfluxDB)
+# --- Pi Metrics Collector (publishes to MQTT + InfluxDB) ---
 sudo mkdir -p /opt/pi-metrics-collector
 sudo cp ~/pi-setup/services/pi-metrics-collector/pi-metrics-collector.py /opt/pi-metrics-collector/
 sudo cp ~/pi-setup/configs/systemd/pi-metrics-collector.service /etc/systemd/system/
 sudo pip3 install --break-system-packages paho-mqtt influxdb
 
+# --- Daily Reboot (4:30 AM) ---
+sudo cp ~/pi-setup/configs/pi-reboot/daily-reboot.service /etc/systemd/system/
+sudo cp ~/pi-setup/configs/pi-reboot/daily-reboot.timer /etc/systemd/system/
+
+# --- Scraper Cleanup (stops idle data-scraper container) ---
+sudo cp ~/pi-setup/services/scraper-cleanup/scraper-cleanup.sh /usr/local/bin/scraper-cleanup.sh
+sudo chmod +x /usr/local/bin/scraper-cleanup.sh
+sudo cp ~/pi-setup/configs/scraper-cleanup/scraper-cleanup.service /etc/systemd/system/
+sudo cp ~/pi-setup/configs/scraper-cleanup/scraper-cleanup.timer /etc/systemd/system/
+
+# --- Fake Garmin ---
+sudo cp ~/pi-setup/configs/systemd/fake-garmin.service /etc/systemd/system/
+
+# --- Where Is Siva ---
+sudo cp ~/pi-setup/configs/systemd/where-is-siva.service /etc/systemd/system/
+
+# --- Cloudflared (Cloudflare Tunnel for remote access) ---
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb -o /tmp/cloudflared.deb
+sudo dpkg -i /tmp/cloudflared.deb
+sudo cloudflared service install
+sudo systemctl enable cloudflared
+
 sudo systemctl daemon-reload
-sudo systemctl enable zigbee2mqtt wifi-watchdog.timer pi-metrics-collector
-sudo systemctl start wifi-watchdog.timer pi-metrics-collector
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo systemctl enable zigbee2mqtt zigbee-watchdog.timer wifi-watchdog.timer \
+  pi-metrics-collector daily-reboot.timer scraper-cleanup.timer \
+  fake-garmin where-is-siva
+sudo systemctl start zigbee-watchdog.timer wifi-watchdog.timer \
+  pi-metrics-collector daily-reboot.timer scraper-cleanup.timer \
+  fake-garmin where-is-siva
 EOF
 ```
 
@@ -307,7 +358,7 @@ EOF
 ssh pi@pi << 'EOF'
 mkdir -p ~/.config/systemd/user ~/.local/bin
 
-# Display scheduler
+# Display scheduler (on/off timers, boot check, brightness dimmer, swayidle, input wake)
 cp ~/pi-setup/configs/display-scheduler/*.service ~/.config/systemd/user/
 cp ~/pi-setup/configs/display-scheduler/*.timer ~/.config/systemd/user/
 cp ~/pi-setup/configs/display-scheduler/*.sh ~/.local/bin/
@@ -316,8 +367,20 @@ chmod +x ~/.local/bin/*.sh
 # Kiosk browser
 cp ~/pi-setup/configs/kiosk-browser/kiosk-browser.service ~/.config/systemd/user/
 
+# Kiosk control + toggle (scripts first, then service files)
+sudo mkdir -p /opt/kiosk-control /opt/kiosk-toggle
+sudo cp ~/pi-setup/configs/kiosk-control/kiosk-control.py /opt/kiosk-control/kiosk-control.py
+sudo cp ~/pi-setup/configs/kiosk-toggle/kiosk-toggle.py /opt/kiosk-toggle/kiosk-toggle.py
+cp ~/pi-setup/configs/kiosk-control/kiosk-control.service ~/.config/systemd/user/
+cp ~/pi-setup/configs/kiosk-toggle/kiosk-toggle.service ~/.config/systemd/user/
+
+# Squeekboard (on-screen keyboard)
+cp ~/pi-setup/configs/squeekboard/squeekboard.service ~/.config/systemd/user/
+
 systemctl --user daemon-reload
-systemctl --user enable display-on.timer display-off.timer kiosk-browser
+systemctl --user enable display-on.timer display-off.timer display-boot-check \
+  brightness-dimmer input-wake-monitor swayidle-night \
+  kiosk-browser kiosk-control kiosk-toggle squeekboard
 EOF
 ```
 
@@ -325,7 +388,7 @@ EOF
 
 ## Phase 4: Zigbee Network Recovery
 
-**Time Estimate:** 2-3 hours (39 devices)
+**Time Estimate:** 2-3 hours (49 devices - 48 devices + coordinator)
 
 ### Important: Zigbee Network Key
 
@@ -359,7 +422,7 @@ Follow **[docs/05-zigbee-devices.md](05-zigbee-devices.md)** for complete pairin
 4. **Lights & plugs** (7x) - Convenience
 
 **Per-device time:** 3-5 minutes each
-**Total for 39 devices:** 2-3 hours
+**Total for 48 devices:** 2-3 hours
 
 ---
 
@@ -377,7 +440,7 @@ ssh pi@pi "/opt/scripts/verify-recovery.sh"
 
 | Check | Command | Expected |
 |-------|---------|----------|
-| Docker containers | `docker ps` | 8 containers running |
+| Docker containers | `docker ps` | 9 containers running (8 main + data-scraper) |
 | Zigbee coordinator | `curl -s pi:8080/api/health` | `{"status":"ok"}` |
 | Home Assistant | `curl -s pi:8123/api/` | JSON response |
 | Dashboard | `curl -s pi:8888` | HTML response |
@@ -419,6 +482,9 @@ After recovery, these should be accessible:
 │    heater-watchdog ┼── depends on: homeassistant          │         │
 │    cast-ip-monitor ┴── depends on: homeassistant          │         │
 │                                                                     │
+│  Independent (separate compose, no internal dependencies):  │         │
+│    data-scraper ───── standalone (own compose file)         │         │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -456,7 +522,7 @@ After recovery, these should be accessible:
 │  SUBTOTAL: 20 min                                                   │
 │                                                                     │
 │  PHASE 4: Zigbee Recovery                                           │
-│  └── Re-pair 39 devices ............... 2-3 HOURS                   │
+│  └── Re-pair 48 devices ............... 2-3 HOURS                   │
 │  SUBTOTAL: 2-3 hours                                                │
 │                                                                     │
 │  PHASE 5: Verification                                              │

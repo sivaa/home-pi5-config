@@ -32,11 +32,73 @@ Browser-based home dashboard served by nginx. Displays temperature, humidity, CO
 
 | Path | Purpose |
 |------|---------|
-| `www/index.html` | Main dashboard entry |
-| `www/js/stores/*.js` | Alpine.js state stores |
-| `www/components/*.js` | Reusable UI components |
-| `www/styles/*.css` | CSS organized by feature |
+| `www/index.html` | Main dashboard entry (Alpine templates, inline stores for lights/switches/circadian) |
 | `nginx/dashboard.conf` | Nginx proxy configuration |
+
+### Views (`www/views/`)
+
+Each view is an Alpine.js component with `init()`/`destroy()` lifecycle methods.
+
+| File | Purpose |
+|------|---------|
+| `lights.js` | Light control panel - brightness, color temp, presets for smart lights |
+| `thermostat.js` | Heater monitoring/control with event timeline for SONOFF TRVZBs |
+| `co2-monitor.js` | Air quality dashboard - CO2 gauge, history charts, ambient mode |
+| `device-health.js` | Real-time health status of all Zigbee devices with filtering/sorting |
+| `hot-water.js` | Hot water usage tracking via vibration sensor - live indicator, stats, charts |
+| `logs.js` | Activity log viewer for all MQTT messages with filtering and search |
+| `mailbox.js` | Mailbox motion sensor monitor - event timeline, delivery patterns, signal health |
+| `network.js` | 3D Zigbee mesh visualization - Three.js floor plan with device markers |
+| `notification-history.js` | Unified timeline of mobile notifications and TTS announcements |
+| `system.js` | Pi system performance - CPU, memory, fan, temperature with SVG charts |
+| `timeline.js` | Filterable timeline of all Zigbee events (motion, contact, etc.) |
+| `transport.js` | S-Bahn/Bus departure board - train station split-flap aesthetic |
+| `tts.js` | Hidden view (`#tts`) - send TTS announcements to Cast speakers |
+| `tts-log.js` | Hidden view (`#tts-log`) - TTS automation overview and event history |
+| `weather-forecast.js` | 10-day weather forecast with hourly strip and tiered daily rows |
+
+### Stores (`www/js/stores/`)
+
+Alpine.js reactive state stores. Each manages data for one domain.
+
+| File | Purpose |
+|------|---------|
+| `mqtt-store.js` | Central MQTT WebSocket connection, topic dispatch, visibility pause |
+| `rooms-store.js` | Room sensor data (temp, humidity, CO2) with multi-sensor support |
+| `room-detail-store.js` | Room detail modal state and InfluxDB historical chart data |
+| `thermostat-store.js` | SONOFF TRVZB control, setpoint commands, event tracking |
+| `device-health-store.js` | Zigbee device health monitoring with batched UI updates |
+| `events-store.js` | Zigbee event history from InfluxDB and real-time MQTT |
+| `logs-store.js` | Circular buffer of all MQTT messages for debugging/audit |
+| `notifications-store.js` | Toast/notification UI feedback (error, warning, success, info) |
+| `notification-history-store.js` | Notification + TTS history from MQTT and InfluxDB |
+| `sensors-store.js` | Sensor discovery, positions, and live data for config/palette |
+| `system-store.js` | Pi system metrics (CPU, temp, memory, fan) from MQTT + InfluxDB |
+| `theme-store.js` | Dark/light/system theme preference with localStorage persistence |
+| `transport-store.js` | S-Bahn/Bus departures from data-scraper, auto-restart via HA |
+| `tts-store.js` | TTS announcements to Cast speakers via HA REST API |
+| `tts-log-store.js` | TTS automation overview (HA API) and event log (MQTT + InfluxDB) |
+| `weather-store.js` | Current weather from Home Assistant REST API |
+| `weather-forecast-store.js` | 10-day forecast from Open-Meteo API with lazy polling |
+
+### Components (`www/components/`)
+
+| File | Purpose |
+|------|---------|
+| `navigation.js` | Grouped tab navigation with "More" dropdown and mobile support |
+| `room-detail.js` | Shared modal for viewing detailed room data with history charts |
+| `sensor-palette.js` | Sensor list for drag-drop configuration in network view |
+
+### Utilities and Data (`www/utils/`, `www/js/`)
+
+| File | Purpose |
+|------|---------|
+| `utils/idle-refresh.js` | Auto-refreshes page after user inactivity (kiosk self-healing) |
+| `utils/insights.js` | Generates human-readable suggestions from room sensor data |
+| `utils/mqtt-client.js` | MQTT WebSocket client class (legacy, now mostly handled by mqtt-store) |
+| `js/config.js` | Central configuration - hosts, MQTT URLs, rooms, views, floor plan |
+| `js/data/zigbee-devices.js` | Zigbee device layout for 3D network visualization (49 devices) |
+| `js/three/orbit-controls.js` | Three.js camera controls for 3D floor plan view |
 
 ---
 
@@ -218,7 +280,7 @@ border-color: var(--color-danger);
 
 ## Device Health View (2026-01-08)
 
-Real-time monitoring of all 39 Zigbee devices with health status, battery levels, and signal strength.
+Real-time monitoring of all 49 Zigbee devices with health status, battery levels, and signal strength.
 
 ### Architecture
 
@@ -554,7 +616,7 @@ Read-only state tracking for SONOFF smart switches used in floor plan light indi
 
 ### Purpose
 
-The floor plan shows light status for each room. Some rooms (Bedroom) have smart switches but no smart bulbs. This store tracks switch state so the indicator can show ON/OFF based on the switch position.
+The floor plan shows light status for each room. This store tracks smart switch state as a fallback indicator when the smart bulb is offline or unavailable. Currently only `bedroom_switch` is tracked. Note: Study and Living rooms also have physical SONOFF switches, but those are not tracked in this store - their floor plan indicators use the smart light state directly.
 
 ### Architecture
 
@@ -585,13 +647,13 @@ The floor plan shows light status for each room. Some rooms (Bedroom) have smart
 getRoomLightClass(roomId):
   │
   ├─► Priority 1: Smart light available & ON? → 'lit'
-  │   (Study, Living rooms with IKEA FLOALT)
+  │   (Study, Living, Bathroom, Bedroom, Hallway)
   │
   ├─► Priority 2: Smart switch available & ON? → 'lit'
-  │   (Bedroom only - has switch but no smart bulb)
+  │   (Fallback when smart bulb is offline or unavailable)
   │
   └─► Priority 3: Presence sensor illumination 'bright'? → 'lit'
-      (Kitchen, Bathroom - no light or switch)
+      (Kitchen only - no smart light or switch)
 ```
 
 ### Room-to-Switch Mapping
@@ -602,6 +664,7 @@ getRoomLightClass(roomId):
 | Living | ✓ (IKEA FLOALT) | ✓ (SONOFF) | Smart light state |
 | Bedroom | ✓ (EGLO Rovito-Z) | ✓ (SONOFF) | Smart light state |
 | Bathroom | ✓ (AwoX 33955) | ✗ | Smart light state |
+| Hallway | ✓ (Aqara T1M) | ✗ | Smart light state |
 | Kitchen | ✗ | ✗ | Illumination |
 
 ### Switch Configuration
@@ -646,13 +709,13 @@ ssh pi@pi 'docker exec mosquitto mosquitto_pub \
 
 ### Key Code Locations
 
-| Location | Purpose |
-|----------|---------|
-| `index.html:~4910` | Switches store definition |
-| `index.html:~4396` | MQTT subscription for switch topics |
-| `index.html:~4437` | Availability routing (dispatch to switches store) |
-| `index.html:~4463` | State routing (dispatch to switches store) |
-| `index.html:~5870` | `getRoomLightClass()` with switch priority |
+| Search For | Purpose |
+|------------|---------|
+| `Alpine.store('switches',` in `index.html` | Switches store definition |
+| `sw.topic` in MQTT subscription block | MQTT subscription for switch topics |
+| `switches').setAvailability` | Availability routing (dispatch to switches store) |
+| `switches').updateSwitch` | State routing (dispatch to switches store) |
+| `getRoomLightClass(roomId)` | Light indicator priority logic with switch fallback |
 
 ---
 
@@ -839,9 +902,9 @@ No nav entry - accessible only via URL hash. Not persisted to localStorage (kios
 | `js/stores/tts-store.js` | Alpine store - HA API calls, form state, status management |
 | `views/tts.js` | View controller with init/destroy lifecycle |
 | `styles/views/tts.css` | Purple-themed card UI (Pi-safe CSS) |
-| `index.html` (~line 2933) | View HTML with Alpine directives |
-| `index.html` (~line 4375) | Module script with alpine:init registration |
-| `index.html` (~line 6057) | Hash routing in app init |
+| `index.html` (search `x-data="ttsView"`) | View HTML with Alpine directives |
+| `index.html` (search `Alpine.data('ttsView'`) | Module script with alpine:init registration |
+| `index.html` (search `hash routing` or `#tts`) | Hash routing in app init |
 
 ### Features
 
@@ -864,3 +927,114 @@ ssh pi@pi 'curl -X POST http://localhost:8123/api/services/tts/google_translate_
   -H "Content-Type: application/json" \
   -d "{\"entity_id\": \"media_player.kitchen_display\", \"message\": \"Hello from the terminal\", \"language\": \"en\"}"'
 ```
+
+---
+
+## Hallway Light - Aqara T1M Dual-Endpoint (2026-04)
+
+The Aqara T1M (lumi.light.acn032) hallway light has two physically independent LED groups controlled via separate Z2M endpoints on the same topic.
+
+```
++-----------------------------------------------------------------+
+|  AQARA T1M DUAL-ENDPOINT ARCHITECTURE                           |
++-----------------------------------------------------------------+
+|                                                                 |
+|  Z2M Topic: zigbee2mqtt/[Hallway] Light                         |
+|       |                                                         |
+|       +-- 'white' endpoint (propSuffix)                         |
+|       |   Main CCT ceiling ring                                 |
+|       |   Keys: state_white, brightness_white, color_temp_white |
+|       |   Range: 153-370 mired                                  |
+|       |                                                         |
+|       +-- 'rgb' endpoint (colorPropSuffix)                      |
+|           Secondary ambient strip                               |
+|           Keys: state_rgb, brightness_rgb, color_rgb            |
+|                                                                 |
++-----------------------------------------------------------------+
+```
+
+The dashboard light card uses `propSuffix` and `colorPropSuffix` properties to route commands and state to the correct endpoint. This is the same dual-endpoint pattern as the Bed Light (EGLO Rovito-Z) but with explicit Z2M suffix-based addressing rather than single-endpoint color_mode switching.
+
+Key properties in the lights store config:
+- `propSuffix: 'white'` - routes main ring CCT controls
+- `colorPropSuffix: 'rgb'` - routes color picker and backlight toggle
+- `mainOn` / `backlightOn` - independent on/off tracking per endpoint
+- `state` is derived as `mainOn || backlightOn`
+
+---
+
+## Circadian Lighting Store (2026-04)
+
+Tracks and controls automatic daylight-adapted color temperature for smart lights, driven by a Home Assistant automation.
+
+### Architecture
+
+```
++-----------------------------------------------------------------+
+|  CIRCADIAN LIGHTING DATA FLOW                                    |
++-----------------------------------------------------------------+
+|                                                                 |
+|  HA Automation (circadian scheduler)                             |
+|       |                                                         |
+|       +-- Publishes consolidated state via MQTT                 |
+|       |   Topic: homeassistant/circadian/state                  |
+|       |   Payload: { phase, brightness, colorTemp, enabled,     |
+|       |              overrides: { study, living, bath, bed,      |
+|       |                           hallway } }                   |
+|       |                                                         |
+|       v                                                         |
+|  Alpine.store('circadian')                                      |
+|       |                                                         |
+|       +-- Phase display (Night/Sunrise/Day/Sunset with icons)   |
+|       +-- Per-room override tracking (active + expiry countdown)|
+|       +-- Commands back to HA via MQTT                          |
+|           Topic: homeassistant/circadian/command                 |
+|           Actions: toggle, clear_override, apply_circadian      |
+|                                                                 |
++-----------------------------------------------------------------+
+```
+
+### Phase Tracking
+
+| Phase | Icon | Typical Color Temp |
+|-------|------|--------------------|
+| Night | moon | Warm (< 2400K) |
+| Sunrise | sunrise | Warm White (2400-2800K) |
+| Day | sun | Neutral (> 2800K) |
+| Sunset | sunset | Warm White |
+
+### Per-Room Overrides
+
+When a user manually adjusts a light, the circadian system marks that room as overridden with an expiry timer. The store tracks overrides for 5 rooms: `study`, `living`, `bath`, `bed`, `hallway`.
+
+Each override has:
+- `active` - boolean, whether manual override is in effect
+- `expires` - timestamp when override expires and circadian resumes
+
+The UI shows override badges on light cards with countdown timers and a "resume circadian" button.
+
+### Key Commands
+
+| Action | Description |
+|--------|-------------|
+| `toggle` | Enable/disable circadian system globally |
+| `clear_override` | Resume circadian schedule for a specific room |
+| `apply_circadian` | Apply current circadian values to a specific light now |
+
+### Key Code Location
+
+Search for `Alpine.store('circadian',` in `index.html` for the full store definition.
+
+---
+
+## TTS Log View (2026-04)
+
+Hidden view for reviewing TTS announcement history. Accessible via `#tts-log` URL hash.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `js/stores/tts-log-store.js` | Alpine store - fetches TTS history from InfluxDB |
+| `views/tts-log.js` | View controller with lifecycle management |
+| `styles/views/tts-log.css` | View styling |

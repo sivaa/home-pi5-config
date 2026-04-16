@@ -170,5 +170,5 @@ who -b
 
 ## Related
 
-- [Router Maintenance](09-router-maintenance.md) - Daily 4:00 AM router reboot
+- [Router Maintenance](20-router-maintenance.md) - Daily 4:00 AM router reboot
 - [Display Scheduling](10-display-scheduling.md) - Display on/off timers

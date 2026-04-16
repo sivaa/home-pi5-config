@@ -174,19 +174,22 @@ ssh pi@pi "systemctl list-timers zigbee-watchdog.timer"
 
 ```
 Dec 30 20:14:18 pi zigbee-watchdog[87426]: USB device available, restarting zigbee2mqtt
-Dec 30 20:14:19 pi zigbee-watchdog[87427]: zigbee2mqtt
-Dec 30 20:14:19 pi zigbee-watchdog[87528]: Successfully restarted zigbee2mqtt
+Dec 30 20:14:19 pi zigbee-watchdog[87528]: Successfully restarted zigbee2mqtt via systemctl
 ```
 
 ## Testing
 
 ### Test Watchdog Recovery
 
-```bash
-# Stop zigbee2mqtt manually
-ssh pi@pi "docker stop zigbee2mqtt"
+> **Note:** The watchdog uses `systemctl start zigbee2mqtt` (not `docker start`)
+> to trigger pre-start validation. This prevents corrupted databases from causing
+> network loss (see Jan 4, 2026 incident in CLAUDE.md).
 
-# Wait up to 60 seconds
+```bash
+# Stop zigbee2mqtt via systemctl (NEVER use docker stop for Z2M)
+ssh pi@pi "sudo systemctl stop zigbee2mqtt"
+
+# Wait up to 60 seconds for the watchdog timer to fire
 sleep 70
 
 # Verify it restarted

@@ -549,7 +549,7 @@
 │  Factory Reset:                                                 │
 │    Hold button for 10+ seconds until LED flashes rapidly       │
 │                                                                 │
-│  Locations: Study(1), Bed(1), Living(1) = 4 units              │
+│  Locations: Study(1), Bed(1), Living(1) = 3 units              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -740,6 +740,13 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] SONOFF ZBM5 Wall Switch Bed - router!                │
 │    [ ] SONOFF ZBM5 Wall Switch Living - router!             │
 │    [ ] AwoX 33955 Bath Light - router!                      │
+│    [ ] EGLO Rovito-Z Bed Light (900087) - router!           │
+│    [ ] Aqara T1M Hallway Light (lumi.light.acn032) - router!│
+│    [ ] SONOFF SNZB-06P Study Human Presence - USB router!   │
+│    [ ] SONOFF SNZB-06P Living Human Presence - USB router!  │
+│    [ ] SONOFF SNZB-06P Kitchen Human Presence - USB router! │
+│    [ ] SONOFF SNZB-06P Bath Human Presence - USB router!    │
+│    [ ] SONOFF SNZB-06P Bed Human Presence - USB router!     │
 │                                                             │
 │  Step 3: Pair battery devices (end devices)                 │
 │    [ ] SONOFF SNZB-02WD Balcony                             │
@@ -766,11 +773,6 @@ If rebuilding the Zigbee network from scratch:
 │    [ ] EGLO 99099 Bath Light Remote                         │
 │    [ ] HOBEIAN ZG-102ZM Vibration Sensor (optional)         │
 │    [ ] Tuya Fingerbot Plus (TS0001_fingerbot)               │
-│    [ ] SONOFF SNZB-06P Study Human Presence (USB powered)   │
-│    [ ] SONOFF SNZB-06P Living Human Presence (USB powered)  │
-│    [ ] SONOFF SNZB-06P Kitchen Human Presence (USB powered) │
-│    [ ] SONOFF SNZB-06P Bath Human Presence (USB powered)    │
-│    [ ] SONOFF SNZB-06P Bed Human Presence (USB powered)     │
 │    [ ] Moes ZSS-QT-LS-C Kitchen Light Sensor (battery)      │
 │                                                             │
 │  Step 4: Rename all devices with [Room] prefix              │

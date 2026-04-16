@@ -138,6 +138,35 @@ cd ~/arris-tg3442-reboot && python3 arris_tg3442_reboot.py -t http://192.168.0.1
 
 ---
 
+### verify-prd-counts.sh
+Validates that device/service counts in `docs/PRD.md` match the actual config files.
+
+```
++--------------------------------------------------------------------------+
+|  PRD COUNT VERIFICATION                                                  |
++--------------------------------------------------------------------------+
+|                                                                          |
+|  Checks:                                                                 |
+|    - Zigbee devices (friendly_name in Z2M config)                       |
+|    - HA automations (alias in automations.yaml)                         |
+|    - Docker services (container_name in docker-compose.yml)             |
+|    - Systemd services (*.service files in configs/)                     |
+|    - Systemd timers (*.timer files in configs/)                         |
+|    - Classic dashboard views (*.js in views/)                           |
+|    - React dashboard views (*Page.tsx in routes/)                       |
+|                                                                          |
+|  Exit codes: 0 = all match, 1 = counts diverged (update PRD.md)        |
+|                                                                          |
++--------------------------------------------------------------------------+
+```
+
+**Usage:**
+```bash
+./scripts/verify-prd-counts.sh
+```
+
+---
+
 ## Zigbee2MQTT Scripts
 
 ### safe-z2m-restart.sh

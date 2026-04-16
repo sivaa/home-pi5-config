@@ -52,15 +52,39 @@
 
 ## Exposed Devices
 
-### Voice Controllable (On/Off/Brightness)
+> **Source of truth:** `configs/homeassistant/configuration.yaml` - `google_assistant.entity_config`
+
+### Voice Controllable - Lights
 
 | Device | Entity ID | Voice Name | Room |
 |--------|-----------|------------|------|
 | Study IKEA Light | `light.study_ikea_light` | "Study Light" | Study |
 | Living IKEA Light | `light.living_ikea_light` | "Living Room Light" | Living Room |
-| Smart Plug | `switch.smart_plug_1` | "Smart Plug" | Living Room |
+| Bath Light | `light.bath_light` | "Bath Light" | Bathroom |
 
-### Voice Queryable (Temperature/Humidity)
+### Voice Controllable - Switches
+
+| Device | Entity ID | Voice Name | Room |
+|--------|-----------|------------|------|
+| Smart Plug 1 | `switch.smart_plug_1` | "Smart Plug" | Living Room |
+| Smart Plug 2 | `switch.smart_plug_2` | "Smart Plug 2" | Kitchen |
+| Smart Plug 3 | `switch.smart_plug_3` | "Smart Plug 3" | Bedroom |
+| Study Light Switch | `switch.study_light_switch` | "Study Switch" | Study |
+| Bed Light Switch | `switch.bed_light_switch` | "Bedroom Switch" | Bedroom |
+| Living Light Switch | `switch.living_light_switch` | "Living Room Switch" | Living Room |
+| Fingerbot | `switch.fingerbot` | "Fingerbot" | Hallway |
+| Living Room TV | `switch.living_room_tv_power` | "Living Room TV" | Living Room |
+
+### Voice Controllable - Climate
+
+| Device | Entity ID | Voice Name | Room |
+|--------|-----------|------------|------|
+| Study Thermostat | `climate.study_thermostat` | "Study Thermostat" | Study |
+| Living Inner | `climate.living_thermostat_inner` | "Living Inner" | Living Room |
+| Living Outer | `climate.living_thermostat_outer` | "Living Outer" | Living Room |
+| Bedroom Thermostat | `climate.bed_thermostat` | "Bedroom Thermostat" | Bedroom |
+
+### Voice Queryable - Temperature
 
 | Sensor | Entity ID | Voice Name | Room |
 |--------|-----------|------------|------|
@@ -70,7 +94,39 @@
 | Kitchen Temp | `sensor.kitchen_temperature_humidity_temperature` | "Kitchen Temperature" | Kitchen |
 | Bathroom Temp | `sensor.bath_temperature_humidity_temperature` | "Bathroom Temperature" | Bathroom |
 | Balcony Temp | `sensor.balcony_temperature_humidity_temperature` | "Balcony Temperature" | Balcony |
-| CO2 | `sensor.co2_co2` | "Air Quality" | Living Room |
+
+### Voice Queryable - Humidity
+
+| Sensor | Entity ID | Voice Name | Room |
+|--------|-----------|------------|------|
+| Study Humidity | `sensor.study_temperature_humidity_humidity` | "Study Humidity" | Study |
+| Living Humidity | `sensor.living_temperature_humidity_humidity` | "Living Room Humidity" | Living Room |
+| Bedroom Humidity | `sensor.bed_temperature_humidity_sensor_humidity` | "Bedroom Humidity" | Bedroom |
+| Kitchen Humidity | `sensor.kitchen_temperature_humidity_humidity` | "Kitchen Humidity" | Kitchen |
+| Bathroom Humidity | `sensor.bath_temperature_humidity_humidity` | "Bathroom Humidity" | Bathroom |
+| Balcony Humidity | `sensor.balcony_temperature_humidity_humidity` | "Balcony Humidity" | Balcony |
+
+### Voice Queryable - Other Sensors
+
+| Sensor | Entity ID | Voice Name | Room |
+|--------|-----------|------------|------|
+| CO2 | `sensor.hallway_co2_co2` | "Air Quality" | Hallway |
+| Mailbox | `binary_sensor.mailbox_motion_sensor_occupancy` | "Mailbox Sensor" | Entry |
+| Human Presence | `binary_sensor.human_presence_occupancy` | "Human Presence" | Hallway |
+| Hot Water | `binary_sensor.vibration_sensor_vibration` | "Hot Water Sensor" | Bathroom |
+
+### Voice Queryable - Window/Door Contacts (8 sensors)
+
+| Sensor | Entity ID | Voice Name | Room |
+|--------|-----------|------------|------|
+| Study Large Window | `binary_sensor.study_window_contact_sensor_large_contact` | "Study Large Window" | Study |
+| Study Small Window | `binary_sensor.study_window_contact_sensor_small_contact` | "Study Small Window" | Study |
+| Living Window | `binary_sensor.living_window_contact_sensor_window_contact` | "Living Room Window" | Living Room |
+| Balcony Door | `binary_sensor.living_window_contact_sensor_balcony_door_contact` | "Balcony Door" | Living Room |
+| Bedroom Window | `binary_sensor.bed_window_contact_sensor_contact` | "Bedroom Window" | Bedroom |
+| Kitchen Window | `binary_sensor.kitchen_window_contact_sensor_contact` | "Kitchen Window" | Kitchen |
+| Bathroom Window | `binary_sensor.bath_window_contact_sensor_contact` | "Bathroom Window" | Bathroom |
+| Front Door | `binary_sensor.hallway_window_contact_sensor_main_door_contact` | "Front Door" | Entry |
 
 ---
 
@@ -126,8 +182,9 @@ Home Assistant announces events via Google Home speakers using Text-to-Speech.
 | CO2 High Alert | CO2 > 1200 ppm (once when crossing) | "Please ventilate..." | 07:00-23:00 |
 | CO2 Critical | CO2 > 1600 ppm (**every 5 min**) | "Warning! CO2 critical..." | **None (24/7)** |
 | CO2 Good | CO2 < 500 ppm (after high/critical) | "Air quality good..." | 07:00-23:00 |
-| Bath Window Open | Window open > 10 min | "Window open for X min" | None |
-| Bed Window Open | Window open > 10 min | "Window open for X min" | None |
+| Window Open | Any window open > 5-10 min | "Window open for X min" | None |
+
+> **Note:** The separate "Bath Window Open" and "Bed Window Open" automations were consolidated into a single `window_open_too_long` automation that covers all 7 windows + balcony door. Alert timing is temperature-aware: 5 min when freezing, 10 min otherwise.
 
 > **Note:** CO2 Critical alert is safety-critical and runs 24/7. It announces every 5 minutes
 > while CO2 remains above 1600 ppm until you open windows to ventilate.
@@ -164,7 +221,7 @@ All mailbox-related automations have:
 
 ```yaml
 tunnel: 6600ccff-747f-4b92-b6d8-26178c8a5112
-credentials-file: /etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
+credentials-file: /home/pi/.cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json
 
 ingress:
   - hostname: ha.sivaa.in
@@ -173,8 +230,8 @@ ingress:
 ```
 
 **Pi locations:**
-- Config: `/etc/cloudflared/config.yml`
-- Credentials: `/etc/cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json`
+- Config: `~/.cloudflared/config.yml`
+- Credentials: `/home/pi/.cloudflared/6600ccff-747f-4b92-b6d8-26178c8a5112.json`
 - Service: `systemctl status cloudflared`
 
 ### Cloudflare Dashboard Settings

@@ -198,7 +198,7 @@ ssh pi@pi "docker logs homeassistant 2>&1 | grep -i google | tail -5"
 
 ## 4. Cloudflared Tunnel Credentials
 
-**Files:** `~/.cloudflared/cert.pem`, `/etc/cloudflared/config.yml`
+**Files:** `/home/pi/.cloudflared/cert.pem`, `/home/pi/.cloudflared/config.yml`
 **Purpose:** External access to Home Assistant via ha.sivaa.in
 
 ### Step 1: Install Cloudflared
@@ -243,10 +243,10 @@ Note the tunnel UUID (e.g., `abc123-def456-...`)
 
 ```bash
 ssh pi@pi << 'EOF'
-sudo mkdir -p /etc/cloudflared
-sudo tee /etc/cloudflared/config.yml << 'CONFIG'
+mkdir -p /home/pi/.cloudflared
+sudo tee /home/pi/.cloudflared/config.yml << 'CONFIG'
 tunnel: [YOUR_TUNNEL_UUID]
-credentials-file: /root/.cloudflared/[YOUR_TUNNEL_UUID].json
+credentials-file: /home/pi/.cloudflared/[YOUR_TUNNEL_UUID].json
 
 ingress:
   - hostname: ha.sivaa.in
@@ -304,9 +304,9 @@ curl -I https://ha.sivaa.in
 │    JSON file:     /opt/homeassistant/SERVICE_ACCOUNT.json           │
 │                                                                     │
 │  Cloudflared:                                                       │
-│    Certificate:   ~/.cloudflared/cert.pem                           │
-│    Tunnel creds:  ~/.cloudflared/[UUID].json                        │
-│    Config:        /etc/cloudflared/config.yml                       │
+│    Certificate:   /home/pi/.cloudflared/cert.pem                    │
+│    Tunnel creds:  /home/pi/.cloudflared/[UUID].json                 │
+│    Config:        /home/pi/.cloudflared/config.yml                  │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```

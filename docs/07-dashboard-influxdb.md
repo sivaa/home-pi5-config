@@ -167,7 +167,7 @@ In `/opt/homeassistant/configuration.yaml`:
 
 ```yaml
 influxdb:
-  host: influxdb
+  host: localhost
   port: 8086
   database: homeassistant
   default_measurement: state
@@ -176,7 +176,13 @@ influxdb:
       - sensor.*temperature*
       - sensor.*humidity*
       - sensor.*battery*
+      - sensor.*co2*
+      - sensor.*air_quality*
+      - binary_sensor.hot_water_running
+      - sensor.hot_water_*
 ```
+
+> **Note:** Must use `localhost`, not Docker hostname `influxdb`, because HA runs with `--network host`. See `configs/homeassistant/CLAUDE.md` for details on the Jan 17, 2026 incident.
 
 ---
 
@@ -226,51 +232,25 @@ If no data appears at all, Home Assistant MQTT integration may be missing:
 
 ## Dashboard Views & Navigation
 
-The dashboard features **14 different views** organized into a clean navigation system.
+The dashboard features **15 view files** in `services/dashboard/www/views/`:
 
-### Navigation Layout
-
-```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  🎯 Score │ 📊 Compare │ 🏠 Floor Plan │ 💡 Lights │ 🌡️ Ambient │ ••• More ▼│
-└───────────────────────────────────────────────────────────────────────────┘
-                                                                    │
-                                                    ┌───────────────┴───────────────┐
-                                                    │ 📈 MONITOR                    │
-                                                    │    📖 Timeline (5)            │
-                                                    │    💨 CO2 (0)                 │
-                                                    │ 👁️ VISUALIZE                  │
-                                                    │    🏗️ 3D (4)                  │
-                                                    │    🔷 Isometric (I)           │
-                                                    │    📡 Network (N)             │
-                                                    │ 🎛️ CONTROL                    │
-                                                    │    🔥 Heater (H)              │
-                                                    │    📬 Mailbox (M)             │
-                                                    │ 📺 DISPLAY                    │
-                                                    │    🃏 Classic (8)             │
-                                                    │ ⚙️ SETTINGS                   │
-                                                    │    ⚙️ Config (9)              │
-                                                    └───────────────────────────────┘
-```
-
-### All Views & Keyboard Shortcuts
-
-| Key | View | Category | Description |
-|-----|------|----------|-------------|
-| `1` | 🎯 Score | Monitor | Overall comfort score with room breakdown |
-| `2` | 📊 Compare | Monitor | Side-by-side room comparison bars |
-| `3` | 🏠 Floor Plan | Visualize | 2D SVG floor plan with temp overlay |
-| `4` | 🏗️ 3D | Visualize | Three.js 3D floor plan |
-| `5` | 📖 Timeline | Monitor | Event timeline (heating, setpoints, etc.) |
-| `6` | 🌡️ Ambient | Display | Minimal ambient display mode |
-| `7` | 💡 Lights | Control | IKEA FLOALT light controls |
-| `8` | 🃏 Classic | Display | Traditional card-based layout |
-| `9` | ⚙️ Config | Settings | Sensor position configuration |
-| `0` | 💨 CO2 | Monitor | CO2 monitoring with alerts |
-| `I` | 🔷 Isometric | Visualize | Isometric 3D view |
-| `N` | 📡 Network | Visualize | Zigbee network topology |
-| `H` | 🔥 Heater | Control | Thermostat controls (SONOFF TRVZB) |
-| `M` | 📬 Mailbox | Control | Mailbox vibration sensor monitor |
+| # | View File | Description |
+|---|-----------|-------------|
+| 1 | `lights.js` | Light controls (IKEA FLOALT, AwoX, Aqara) |
+| 2 | `co2-monitor.js` | CO2 air quality monitoring |
+| 3 | `timeline.js` | Event timeline (heating, setpoints, etc.) |
+| 4 | `mailbox.js` | Mailbox motion sensor monitor |
+| 5 | `logs.js` | System logs |
+| 6 | `thermostat.js` | Thermostat controls (SONOFF TRVZB) |
+| 7 | `device-health.js` | Device status for all 49 devices |
+| 8 | `hot-water.js` | Hot water usage tracking |
+| 9 | `network.js` | Zigbee network topology |
+| 10 | `system.js` | System metrics and status |
+| 11 | `notification-history.js` | Notification history |
+| 12 | `weather-forecast.js` | Weather forecast display |
+| 13 | `tts.js` | Text-to-speech controls |
+| 14 | `tts-log.js` | TTS event log |
+| 15 | `transport.js` | S-Bahn + Bus departures |
 
 ### View Configuration
 
@@ -335,10 +315,10 @@ find /opt/dashboard/www -type d -exec chmod 755 {} \;
 
 | Date | Change |
 |------|--------|
-| 2024-12-18 | Added navigation UX overhaul with grouped dropdown menu |
-| 2024-12-18 | Documented Pi display requirements (emoji fonts, permissions) |
-| 2024-12-13 | Initial documentation - fixed InfluxDB queries and entity ID mapping |
+| 2025-12-18 | Added navigation UX overhaul with grouped dropdown menu |
+| 2025-12-18 | Documented Pi display requirements (emoji fonts, permissions) |
+| 2025-12-13 | Initial documentation - fixed InfluxDB queries and entity ID mapping |
 
 ---
 
-*Last updated: December 18, 2024*
+*Last updated: December 18, 2025*

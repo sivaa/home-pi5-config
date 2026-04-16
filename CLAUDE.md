@@ -43,14 +43,31 @@ pi-setup/
 ├── configs/            # Source configs (source of truth)
 │   ├── zigbee2mqtt/    # Docker stack configs
 │   ├── homeassistant/  # HA configs & automations
+│   ├── cloudflared/    # Cloudflare tunnel
 │   ├── display-scheduler/
 │   ├── kiosk-browser/
-│   └── cloudflared/
+│   ├── kiosk-control/
+│   ├── kiosk-toggle/
+│   ├── labwc/
+│   ├── pi-reboot/
+│   ├── scraper-cleanup/
+│   ├── squeekboard/
+│   ├── systemd/
+│   ├── touch-udev/
+│   ├── where-is-siva/
+│   ├── wifi-watchdog/
+│   └── zigbee-watchdog/
 ├── services/           # Docker service code
 │   ├── dashboard/      # Custom web dashboard
+│   ├── cast-ip-monitor/
+│   ├── data-scraper/
 │   ├── heater-watchdog/
+│   ├── kiosk-control/
 │   ├── mqtt-influx-bridge/
-│   └── cast-ip-monitor/
+│   ├── pi-metrics-collector/
+│   ├── scraper-cleanup/
+│   ├── where-is-siva/
+│   └── zigbee-watchdog/
 ├── scripts/            # Maintenance scripts
 └── backups/
     └── configs/        # Backed up Pi config files
@@ -98,9 +115,10 @@ Don't know which service? Use: `find . -name CLAUDE.md`
   - 1x Motion sensor (SNZB-03P) - Mailbox
   - 1x Vibration sensor (Hot Water tracking)
   - 1x Fingerbot (Tuya TS0001_fingerbot)
-- **Docker Services:** 8 containers
+- **Docker Services:** 9 containers
   - mosquitto (MQTT), zigbee2mqtt, homeassistant, influxdb
   - dashboard (nginx), mqtt-influx-bridge, cast-ip-monitor, heater-watchdog
+  - data-scraper
 
 ---
 
@@ -235,7 +253,7 @@ All documentation should enable complete system restoration from scratch.
 - Example: `ssh pi@pi "command"` or `scp file pi@pi:/path/`
 - The hostname `pi` alone may resolve to wrong user
 
-### 6. Zigbee2MQTT Operations (CRITICAL - 35 DEVICES AT RISK)
+### 6. Zigbee2MQTT Operations (CRITICAL - 49 DEVICES AT RISK)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -247,6 +265,7 @@ All documentation should enable complete system restoration from scratch.
 │  in 21 seconds, causing USB timeout and database corruption.    │
 │                                                                 │
 │  ALL 35 DEVICES WERE ORPHANED!                                  │
+│  (Current device count: 49)                                     │
 │                                                                 │
 │  Z2M is now managed by SYSTEMD with pre-start validation.       │
 │                                                                 │

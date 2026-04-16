@@ -1,8 +1,23 @@
 # Kiosk Control Service
 
-> **Purpose:** HTTP API for remote control of kiosk display via keyboard simulation
+> **Purpose:** HTTP API for remote control of kiosk display via wlrctl compositor commands
 > **Runtime:** Python 3 (standalone, no Docker)
 > **Port:** 8889 (localhost only)
+
+---
+
+## Canonical Source
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  The CURRENT version of the script lives in:                        │
+│                                                                     │
+│    configs/kiosk-control/kiosk-control.py   <-- SOURCE OF TRUTH     │
+│                                                                     │
+│  The copy at services/kiosk-control/kiosk-control.py is OUTDATED.   │
+│  It uses the old wtype + F11 approach. Do not rely on it.           │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -13,10 +28,21 @@
 │                    KIOSK CONTROL FLOW                               │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  Dashboard ──► GET /api/kiosk/toggle ──► wtype -k F11 ──► labwc    │
-│            ──► GET /api/kiosk/refresh ──► wtype -k F5 ──► Browser  │
+│  Enter fullscreen:                                                  │
+│    Dashboard ──► GET /api/kiosk/toggle ──► wlrctl toplevel          │
+│                                            fullscreen ──► labwc     │
 │                                                                     │
-│  Simulates keyboard input to control Wayland compositor/browser    │
+│  Exit fullscreen:                                                   │
+│    Dashboard ──► GET /api/kiosk/toggle ──► pkill epiphany +         │
+│                                            clear session +          │
+│                                            restart kiosk-browser    │
+│                                                                     │
+│  Refresh:                                                           │
+│    Dashboard ──► GET /api/kiosk/refresh ──► wtype -k F5 ──► Browser │
+│                                                                     │
+│  Status:                                                            │
+│    Dashboard ──► GET /api/kiosk/status ──► wlrctl toplevel find     │
+│                                            state:fullscreen         │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -25,10 +51,12 @@
 
 ## Why This Exists
 
-The kiosk runs in fullscreen mode via labwc (Wayland compositor). Standard browser JavaScript APIs cannot control compositor-level fullscreen. This service provides an HTTP endpoint that simulates keyboard presses to:
+The kiosk runs in fullscreen mode via labwc (Wayland compositor). Standard browser JavaScript APIs cannot control compositor-level fullscreen. This service provides HTTP endpoints that use Wayland tools to:
 
-1. **Toggle fullscreen** (F11) - Enter/exit kiosk mode
-2. **Refresh browser** (F5) - Reload dashboard after updates
+1. **Enter fullscreen** - `wlrctl toplevel fullscreen` (compositor-level command)
+2. **Exit fullscreen** - Kill browser, clear session state, restart service (browser restart clears fullscreen memory)
+3. **Refresh browser** (F5 via wtype) - Reload dashboard after updates
+4. **Query fullscreen status** - `wlrctl toplevel find state:fullscreen`
 
 ---
 
@@ -36,19 +64,29 @@ The kiosk runs in fullscreen mode via labwc (Wayland compositor). Standard brows
 
 ### GET /api/kiosk/toggle
 
-Sends F11 keypress to toggle fullscreen mode.
+Toggles fullscreen mode. Uses `wlrctl toplevel fullscreen` to enter, browser restart to exit.
 
-**Response:**
+**Response (entering fullscreen):**
 ```json
 {
   "success": true,
-  "action": "toggle_fullscreen"
+  "action": "enter_fullscreen",
+  "fullscreen": true
+}
+```
+
+**Response (exiting fullscreen):**
+```json
+{
+  "success": true,
+  "action": "exit_fullscreen",
+  "fullscreen": false
 }
 ```
 
 ### GET /api/kiosk/refresh
 
-Sends F5 keypress to refresh the browser.
+Sends F5 keypress via wtype to refresh the browser.
 
 **Response:**
 ```json
@@ -58,15 +96,14 @@ Sends F5 keypress to refresh the browser.
 }
 ```
 
-### GET /api/kiosk/close
+### GET /api/kiosk/status
 
-Stops the kiosk-browser systemd service (clean shutdown, no auto-restart trigger).
+Returns the current fullscreen state by querying wlrctl.
 
 **Response:**
 ```json
 {
-  "success": true,
-  "action": "close_browser"
+  "fullscreen": true
 }
 ```
 
@@ -85,8 +122,9 @@ Health check endpoint.
 
 | Dependency | Purpose | Install |
 |------------|---------|---------|
-| `wtype` | Wayland keyboard input simulator | `sudo apt install wtype` |
-| `labwc` | Wayland compositor (receives F11) | Pre-installed |
+| `wlrctl` | Wayland compositor window control (fullscreen enter/exit/query) | `sudo apt install wlrctl` |
+| `wtype` | Wayland keyboard input simulator (F5 refresh) | `sudo apt install wtype` |
+| `labwc` | Wayland compositor (receives fullscreen commands) | Pre-installed |
 | Python 3 | Runtime | Pre-installed |
 
 ---
@@ -100,20 +138,22 @@ The service **requires** these environment variables to communicate with labwc:
 | `WAYLAND_DISPLAY` | `wayland-0` | Connect to Wayland compositor |
 | `XDG_RUNTIME_DIR` | `/run/user/1000` | Wayland socket directory |
 
-**Without these, wtype cannot send keypresses and the service will fail silently.**
+**Without these, wlrctl/wtype cannot communicate with the compositor and the service will fail silently.**
 
 ---
 
 ## Files
 
 ```
-Source files:
+Source files (canonical):
+├── configs/kiosk-control/
+│   ├── kiosk-control.py       <- CURRENT script (source of truth, ~158 lines)
+│   └── kiosk-control.service  <- Systemd service file (source of truth)
+
+Outdated copy (do not use):
 ├── services/kiosk-control/
 │   ├── CLAUDE.md              <- This file
-│   └── kiosk-control.py       <- Main script (109 lines)
-│
-├── configs/kiosk-control/
-│   └── kiosk-control.service  <- Systemd service file (source of truth)
+│   └── kiosk-control.py       <- OLD script (wtype F11 approach, ~131 lines)
 
 Pi deployment:
 ├── /opt/kiosk-control/
@@ -161,9 +201,9 @@ WantedBy=default.target
 
 **Installation:**
 ```bash
-# Copy script to Pi
+# Copy script to Pi (use canonical source from configs/)
 sudo mkdir -p /opt/kiosk-control
-sudo cp services/kiosk-control/kiosk-control.py /opt/kiosk-control/
+sudo cp configs/kiosk-control/kiosk-control.py /opt/kiosk-control/
 
 # Copy service file
 cp configs/kiosk-control/kiosk-control.service ~/.config/systemd/user/
@@ -204,7 +244,12 @@ systemctl --user restart kiosk-control
 // Toggle fullscreen from dashboard
 fetch('http://localhost:8889/api/kiosk/toggle')
   .then(r => r.json())
-  .then(data => console.log('Toggled:', data.success));
+  .then(data => console.log('Fullscreen:', data.fullscreen));
+
+// Check current fullscreen status
+fetch('http://localhost:8889/api/kiosk/status')
+  .then(r => r.json())
+  .then(data => console.log('Is fullscreen:', data.fullscreen));
 
 // Refresh after deploy
 fetch('http://localhost:8889/api/kiosk/refresh')
@@ -216,21 +261,21 @@ fetch('http://localhost:8889/api/kiosk/refresh')
 
 | Service | Relationship |
 |---------|--------------|
-| `kiosk-browser.service` | Browser that receives the key presses |
+| `kiosk-browser.service` | Browser controlled by this service (restart for fullscreen exit) |
 | `kiosk-toggle.service` | GTK4 floating button that calls this API |
-| `labwc` | Compositor that handles F11 fullscreen |
+| `labwc` | Compositor that handles wlrctl fullscreen commands |
 
 ---
 
 ## Troubleshooting
 
-### wtype not found
+### wlrctl or wtype not found
 
 ```bash
-sudo apt install wtype
+sudo apt install wlrctl wtype
 ```
 
-### Key press not working
+### Fullscreen toggle not working
 
 1. Check environment variables are set in service:
    ```bash
@@ -238,12 +283,17 @@ sudo apt install wtype
    # Should show WAYLAND_DISPLAY and XDG_RUNTIME_DIR
    ```
 
-2. Test wtype manually:
+2. Test wlrctl manually:
+   ```bash
+   WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 wlrctl toplevel find state:fullscreen
+   ```
+
+3. Test wtype manually:
    ```bash
    WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 wtype -k F5
    ```
 
-3. Verify service is running:
+4. Verify service is running:
    ```bash
    curl http://localhost:8889/health
    ```
@@ -258,7 +308,7 @@ journalctl --user -u kiosk-control --since "5 min ago"
 Common issues:
 - Missing environment variables (check service file)
 - Wrong path to script (should be `/opt/kiosk-control/kiosk-control.py`)
-- wtype not installed
+- wlrctl or wtype not installed
 
 ---
 

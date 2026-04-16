@@ -1,7 +1,7 @@
 # Zigbee2MQTT Setup via Docker
 
-> **Last Updated:** December 30, 2025
-> **Status:** Running and verified (8 Docker services)
+> **Last Updated:** April 16, 2026
+> **Status:** Running and verified (9 Docker services)
 
 ---
 
@@ -34,7 +34,7 @@ We're using **Docker** to run Zigbee2MQTT because:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          DOCKER STACK ON PI (8 SERVICES)                    │
+│                          DOCKER STACK ON PI (9 SERVICES)                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                   │
@@ -159,7 +159,9 @@ ssh pi@pi "curl -s http://localhost:8080 | head -5"
 
 Location: `configs/zigbee2mqtt/docker-compose.yml`
 
-> **Note:** This example shows 5 core services. The actual stack has 8 services - see `configs/zigbee2mqtt/docker-compose.yml` for the full configuration.
+> **Note:** This example shows 5 core services. The full stack has 8 services in this compose file
+> (plus data-scraper in its own compose at `services/data-scraper/docker-compose.yml` = 9 total).
+> See `configs/zigbee2mqtt/docker-compose.yml` for the complete configuration.
 
 ```yaml
 services:
@@ -178,7 +180,11 @@ services:
   zigbee2mqtt:
     image: koenkk/zigbee2mqtt
     container_name: zigbee2mqtt
-    restart: unless-stopped
+    # IMPORTANT: Systemd manages restarts with pre-start validation
+    # See: configs/systemd/zigbee2mqtt.service
+    # DO NOT change to "unless-stopped" - it bypasses corruption protection!
+    restart: "no"
+    stop_grace_period: 30s
     depends_on:
       - mosquitto
     ports:
@@ -196,10 +202,13 @@ services:
     restart: unless-stopped
     depends_on:
       - mosquitto
-    ports:
-      - "8123:8123"
+    # Host networking required for HA to control Docker via socket API.
+    # ports: directive is IGNORED with network_mode: host.
+    # HA binds directly to host port 8123.
+    network_mode: host
     volumes:
       - /opt/homeassistant:/config
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TZ=Europe/Berlin
     privileged: true
@@ -237,9 +246,10 @@ services:
 Location: `configs/zigbee2mqtt/configuration.yaml`
 
 ```yaml
-homeassistant: true
-permit_join: false
+homeassistant:
+  enabled: true
 frontend:
+  enabled: true
   port: 8080
 mqtt:
   base_topic: zigbee2mqtt
@@ -293,8 +303,16 @@ ssh pi@pi "docker logs -f mosquitto"
 
 ### Restart Services
 
+> **WARNING:** NEVER use `docker restart zigbee2mqtt` or `docker compose restart` for Z2M.
+> On Jan 4, 2026, rapid docker restart commands caused complete Zigbee network loss
+> (all 49 devices orphaned). Z2M is now managed by systemd with pre-start validation.
+
 ```bash
-ssh pi@pi "cd /opt/zigbee2mqtt && docker compose restart"
+# Restart Zigbee2MQTT (MUST use systemctl - triggers validation)
+ssh pi@pi "sudo systemctl restart zigbee2mqtt"
+
+# Restart other services (docker compose is fine for non-Z2M services)
+ssh pi@pi "cd /opt/zigbee2mqtt && docker compose restart mosquitto homeassistant influxdb"
 ```
 
 ### Update to Latest Version
@@ -378,7 +396,7 @@ To rebuild this setup from scratch:
 
 **Important:** The Zigbee network key is auto-generated on first run. After devices are paired, backup the `configuration.yaml` from the Pi which contains the actual network key.
 
-> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 39 devices with pairing procedures.
+> **Device Inventory:** See `docs/05-zigbee-devices.md` for all 49 devices (48 + coordinator) with pairing procedures.
 
 ---
 
@@ -386,6 +404,7 @@ To rebuild this setup from scratch:
 
 | Date | Change |
 |------|--------|
+| 2026-04-16 | Updated device count to 49, Z2M restart to systemctl, docker-compose to match actual (network_mode:host, restart:"no", docker.sock), configuration.yaml example updated |
 | 2025-12-30 | Updated to 8-service stack (added mqtt-influx-bridge, cast-ip-monitor, heater-watchdog) |
 | 2025-12-30 | Updated device count to 35, fixed timezone to Europe/Berlin |
 | 2025-12-16 | Updated docker-compose to show full 5-service stack |

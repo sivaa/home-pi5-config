@@ -1,6 +1,6 @@
 # Raspberry Pi 5 Setup Documentation
 
-> **Last Updated:** January 13, 2026
+> **Last Updated:** April 2026
 > **Purpose:** Complete documentation for disaster recovery and reproducibility
 
 ---
@@ -30,21 +30,25 @@
 │    Zigbee:  Sonoff 3.0 USB Dongle Plus V2                   │
 │    Path:    /dev/serial/by-id/usb-Itead_Sonoff_...          │
 ├─────────────────────────────────────────────────────────────┤
-│  Services (Docker - 8 containers):                          │
+│  Docker Services (9 containers):                            │
 │    Dashboard:     http://pi:8888 (Classic)                  │
-│    Dashboard v2:  http://pi:8888/v2/ (React - Beta)         │
 │    Home Assistant:http://pi:8123 (ext: ha.sivaa.in)         │
 │    Zigbee2MQTT:   http://pi:8080                            │
 │    InfluxDB:      http://pi:8086                            │
 │    MQTT Broker:   mqtt://pi:1883 (WS: 9001)                 │
-│    Cloudflared:   Tunnel to ha.sivaa.in                     │
-│    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog   │
+│    + mqtt-influx-bridge, cast-ip-monitor, heater-watchdog,  │
+│      data-scraper                                           │
 ├─────────────────────────────────────────────────────────────┤
-│  Zigbee Devices: 48 total                                   │
-│    Sensors: 28 (12x temp, 1x CO2, 1x PIR, 8x contact,       │
-│             1x vib, 5x presence)                            │
+│  Systemd Services:                                          │
+│    Cloudflared:   Tunnel to ha.sivaa.in                     │
+│    where-is-siva: http://pi:8000 (location tracker)         │
+│    fake-garmin:   http://pi:9000 (test mock)                │
+├─────────────────────────────────────────────────────────────┤
+│  Zigbee Devices: 49 total (including coordinator)            │
+│    Sensors: 29 (12x temp, 1x CO2, 1x light, 1x PIR,         │
+│             8x contact, 1x vib, 5x presence)                │
 │    Thermostats: 4 (SONOFF TRVZB radiator valves)            │
-│    Lights:  4 (2x IKEA FLOALT, AwoX Bath, EGLO Rovito-Z Bed)│
+│    Lights:  5 (2x IKEA FLOALT, 2x AwoX, 1x Aqara T1M)      │
 │    Remotes: 3 (2x IKEA TRADFRI, 1x EGLO 99099 Bath)         │
 │    Plugs:   3 (SONOFF S60ZBTPF smart plugs)                 │
 │    Switches: 3 (SONOFF ZBM5 wall switches)                  │
@@ -68,7 +72,7 @@
 | 6 | [WiFi Troubleshooting](docs/06-wifi-troubleshooting.md) | Metal case WiFi issues & power save fix |
 | 7 | [Dashboard & InfluxDB](docs/07-dashboard-influxdb.md) | Custom dashboard InfluxDB integration |
 | 8 | [Google Home Integration](docs/08-google-home-integration.md) | Voice control via Google Assistant |
-| 9 | [Router Maintenance](docs/09-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
+| 9 | [Security Hardening](docs/09-security-hardening.md) | Pi security hardening |
 | 10 | [Display Scheduling](docs/10-display-scheduling.md) | Auto off at 22:00, on at 06:00, 5-min night idle |
 | 11 | [On-Screen Keyboard](docs/11-onscreen-keyboard.md) | Tablet-like touch keyboard (squeekboard) |
 | 12 | [Pi Maintenance](docs/12-pi-maintenance.md) | Daily 4:30 AM reboot for unattended reliability |
@@ -76,9 +80,13 @@
 | 14 | [Brightness Control](docs/14-brightness-control.md) | Adaptive DDC/CI dimming (80% wake, 25% idle) |
 | 15 | [HA Automations](docs/15-ha-automations.md) | Home Assistant automation configurations |
 | 16 | [Touch Monitor](docs/16-touch-monitor.md) | Touch gestures (scroll, pinch-zoom) setup |
+| 20 | [Router Maintenance](docs/20-router-maintenance.md) | Automated daily router reboot to prevent WiFi issues |
+| 21 | [Zigbee Network Incident](docs/21-zigbee-network-incident-2026-01-04.md) | 2026-01-04 network loss post-mortem |
 | 17 | [Heater Watchdog](docs/17-heater-watchdog.md) | Poll-based safety monitor for heater-window violations |
 | 18 | [Kiosk Browser](docs/18-kiosk-browser.md) | Auto-launch dashboard in fullscreen on boot |
 | 19 | [Zigbee Watchdog](docs/19-zigbee-watchdog.md) | Auto-restart zigbee2mqtt after USB disconnect |
+| - | [Secrets Recovery](docs/secrets-recovery.md) | How to recover secrets and credentials |
+| - | [Securing Pi5](docs/securing-pi5.md) | Pi 5 security configuration guide |
 
 ---
 
@@ -95,7 +103,10 @@
 | `system-info.txt` | OS version, hostname, network info |
 | `zigbee-dongle-info.txt` | Zigbee dongle USB device details |
 | `sshd_config` | SSH server configuration (locale fix applied) |
+| `sshd_config.original` | Original SSH server configuration (before changes) |
 | `wifi-powersave-off.conf` | NetworkManager WiFi power save disable config |
+| `journal-persistent.md` | Persistent journal storage setup notes |
+| `zigbee2mqtt/` | Zigbee2MQTT database and coordinator backups |
 
 ### Service Configs (`configs/`)
 
@@ -103,12 +114,26 @@
 |------|-------------|-------------|
 | `zigbee2mqtt/docker-compose.yml` | All Docker services | `/opt/zigbee2mqtt/` |
 | `zigbee2mqtt/configuration.yaml` | Zigbee2MQTT config | `/opt/zigbee2mqtt/data/` |
+| `zigbee2mqtt/mosquitto.conf` | MQTT broker config | `/opt/zigbee2mqtt/` |
+| `zigbee2mqtt/NETWORK_KEYS.md` | Zigbee network key recovery | `/opt/zigbee2mqtt/` |
 | `homeassistant/configuration.yaml` | Home Assistant config | `/opt/homeassistant/` |
+| `homeassistant/automations.yaml` | HA automation definitions | `/opt/homeassistant/` |
+| `homeassistant/scripts.yaml` | HA script definitions | `/opt/homeassistant/` |
 | `homeassistant/SERVICE_ACCOUNT.json` | GCP credentials (gitignored) | `/opt/homeassistant/` |
 | `cloudflared/config.yml` | Cloudflare tunnel config | `/etc/cloudflared/` |
 | `display-scheduler/*` | Display power management | `~/.config/systemd/user/` + `~/.local/bin/` |
 | `kiosk-browser/*` | Auto-launch dashboard browser | `~/.config/systemd/user/` |
+| `kiosk-control/*` | Kiosk display control | `/opt/kiosk-control/` |
+| `kiosk-toggle/*` | Kiosk toggle service | `/opt/kiosk-toggle/` |
 | `labwc/rc.xml` | Touch gestures + kiosk fullscreen | `~/.config/labwc/` |
+| `pi-reboot/*` | Daily Pi reboot (4:30 AM) | `/etc/systemd/system/` |
+| `scraper-cleanup/*` | Scraper data cleanup | `/etc/systemd/system/` |
+| `squeekboard/*` | On-screen keyboard config | `~/.config/systemd/user/` |
+| `systemd/*` | Systemd unit files | `/etc/systemd/system/` |
+| `touch-udev/*` | Touch input udev rules | `/etc/udev/rules.d/` |
+| `where-is-siva/*` | Location tracking config | `/opt/where-is-siva/` |
+| `wifi-watchdog/*` | WiFi connection watchdog | `/etc/systemd/system/` + `/opt/wifi-watchdog/` |
+| `zigbee-watchdog/*` | Z2M USB disconnect watchdog | `/etc/systemd/system/` + `/etc/udev/rules.d/` |
 
 ### Sensitive Files (Not in Git)
 
@@ -294,24 +319,27 @@ When ready to switch to React as default:
 pi-setup/
 ├── README.md              <- You are here (main index)
 ├── CLAUDE.md              <- Instructions for AI assistants
+├── AGENTS.md              <- Agent guidelines
+├── start-dashboard.sh     <- Local dashboard dev server launcher
 ├── configs/
 │   ├── zigbee2mqtt/       <- Source of truth for Pi configs
-│   │   ├── docker-compose.yml
-│   │   ├── configuration.yaml
-│   │   └── mosquitto.conf
+│   ├── homeassistant/     <- HA configs & automations
+│   ├── cloudflared/       <- Cloudflare tunnel config
 │   ├── display-scheduler/ <- Display power & brightness
-│   │   ├── display-scheduler.sh
-│   │   ├── brightness-dimmer.sh
-│   │   ├── input-wake-monitor.sh
-│   │   └── *.service/*.timer files
 │   ├── kiosk-browser/     <- Auto-launch dashboard browser
-│   │   └── kiosk-browser.service
+│   ├── kiosk-control/     <- Kiosk display control
+│   ├── kiosk-toggle/      <- Kiosk toggle service
 │   ├── labwc/             <- Wayland compositor config
-│   │   └── rc.xml         <- Touch gestures + kiosk fullscreen
-│   └── pi-reboot/         <- Daily Pi reboot (4:30 AM)
-│       ├── daily-reboot.timer
-│       └── daily-reboot.service
+│   ├── pi-reboot/         <- Daily Pi reboot (4:30 AM)
+│   ├── scraper-cleanup/   <- Scraper data cleanup
+│   ├── squeekboard/       <- On-screen keyboard config
+│   ├── systemd/           <- Systemd unit files
+│   ├── touch-udev/        <- Touch input udev rules
+│   ├── where-is-siva/     <- Location tracking config
+│   ├── wifi-watchdog/     <- WiFi connection watchdog
+│   └── zigbee-watchdog/   <- Z2M watchdog config
 ├── docs/
+│   ├── 00-DISASTER-RECOVERY.md
 │   ├── 01-nvme-boot-setup.md
 │   ├── 02-sd-card-storage.md
 │   ├── 03-zigbee-dongle.md
@@ -320,7 +348,7 @@ pi-setup/
 │   ├── 06-wifi-troubleshooting.md
 │   ├── 07-dashboard-influxdb.md
 │   ├── 08-google-home-integration.md
-│   ├── 09-router-maintenance.md
+│   ├── 09-security-hardening.md
 │   ├── 10-display-scheduling.md
 │   ├── 11-onscreen-keyboard.md
 │   ├── 12-pi-maintenance.md
@@ -328,27 +356,36 @@ pi-setup/
 │   ├── 14-brightness-control.md
 │   ├── 15-ha-automations.md
 │   ├── 16-touch-monitor.md
+│   ├── 20-router-maintenance.md
+│   ├── 21-zigbee-network-incident-2026-01-04.md
 │   ├── 17-heater-watchdog.md
 │   ├── 18-kiosk-browser.md
-│   └── 19-zigbee-watchdog.md
+│   ├── 19-zigbee-watchdog.md
+│   ├── PRD.md
+│   ├── secrets-recovery.md
+│   └── securing-pi5.md
 ├── scripts/                   <- Maintenance scripts
+│   ├── check-pi-health.sh     <- Pi health check
+│   ├── disaster-recovery.sh   <- Disaster recovery automation
+│   ├── lint-css-performance.sh <- CSS performance linting
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
-│   └── .env                   <- Router credentials (gitignored)
+│   ├── safe-z2m-restart.sh    <- Safe Z2M restart with validation
+│   ├── verify-prd-counts.sh   <- Verify PRD device counts
+│   ├── verify-recovery.sh     <- Verify recovery procedures
+│   ├── z2m-backup.sh          <- Z2M database backup
+│   ├── z2m-validate.sh        <- Z2M database validation
+│   └── hooks/                 <- Git hooks
 ├── services/                  <- Docker service configs (source of truth)
 │   ├── dashboard/             <- Classic dashboard (Alpine.js)
-│   │   ├── www/index.html
-│   │   └── nginx/dashboard.conf
-│   ├── dashboard-react/       <- React dashboard v2 (Beta)
-│   │   ├── src/               <- React source code
-│   │   └── dist/              <- Built static files → /v2/
+│   ├── cast-ip-monitor/       <- Chromecast IP monitor
+│   ├── data-scraper/          <- Data scraping service
 │   ├── heater-watchdog/       <- Poll-based heater safety monitor
-│   │   ├── heater-watchdog.py
-│   │   └── Dockerfile
-│   ├── zigbee-watchdog/       <- Auto-restart Z2M after USB disconnect
-│   │   └── zigbee-watchdog.sh
-│   ├── homeassistant/
-│   ├── mosquitto/
-│   └── zigbee2mqtt/
+│   ├── kiosk-control/         <- Kiosk display control service
+│   ├── mqtt-influx-bridge/    <- MQTT to InfluxDB bridge
+│   ├── pi-metrics-collector/  <- Pi system metrics collector
+│   ├── scraper-cleanup/       <- Scraper data cleanup service
+│   ├── where-is-siva/         <- Location tracking service
+│   └── zigbee-watchdog/       <- Auto-restart Z2M after USB disconnect
 └── backups/
     └── configs/
         ├── fstab
@@ -356,7 +393,12 @@ pi-setup/
         ├── eeprom-config.txt
         ├── disk-info.txt
         ├── system-info.txt
-        └── zigbee-dongle-info.txt
+        ├── zigbee-dongle-info.txt
+        ├── sshd_config
+        ├── sshd_config.original
+        ├── wifi-powersave-off.conf
+        ├── journal-persistent.md
+        └── zigbee2mqtt/
 ```
 
 ---

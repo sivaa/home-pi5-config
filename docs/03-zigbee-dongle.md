@@ -2,6 +2,8 @@
 
 > **Last Updated:** December 12, 2025
 > **Status:** Hardware detected and ready for Zigbee coordinator software
+>
+> **Note:** The network now has 49 devices (48 + coordinator). This doc covers the dongle hardware setup only. For the full device inventory, see [docs/05-zigbee-devices.md](05-zigbee-devices.md).
 
 ---
 
@@ -173,19 +175,21 @@ usbserial              81920  1 cp210x
 │  │Vibration│                                                            │
 │  └─────────┘                                                            │
 │                                                                          │
-│  Total: 10 devices (6 sensors + 1 TRV + 2 lights + 2 remotes)          │
+│  Total: 49 devices (48 + coordinator) - see docs/05 for full list      │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **Note:** This table reflects the initial setup (Dec 2025). For the current full device list (49 devices), see [docs/05-zigbee-devices.md](05-zigbee-devices.md).
 
 ### Device List
 
 | # | Device | Brand | Type | Purpose | Status |
 |---|--------|-------|------|---------|--------|
-| 1 | Temperature & Humidity Sensor | Sonoff | SNZB-02 (likely) | Climate monitoring | Pending setup |
+| 1 | Temperature & Humidity Sensor | Sonoff | SNZB-02P / SNZB-02WD | Climate monitoring | Pending setup |
 | 2 | Door/Window Sensor | Sonoff | SNZB-04 (likely) | Entry detection | Pending setup |
 | 3 | Motion Sensor | Sonoff | SNZB-03 (likely) | Presence detection | Pending setup |
-| 4 | CO2 Monitor | Nous | E6 (likely) | Air quality monitoring | Pending setup |
+| 4 | CO2 Monitor | Nous | NOUS E10 | Air quality monitoring | Pending setup |
 | 5 | Vibration Sensor | Sonoff | DW2 / Other | Vibration/tilt detection | Pending setup |
 | 6 | Thermostatic Radiator Valve | Sonoff | TRVZB | Heater control | Pending setup |
 | 7 | Ceiling Light #1 | IKEA | TRADFRI | Lighting | Pending setup |
@@ -263,6 +267,8 @@ When disaster strikes and you need to re-pair all devices:
 
 3. **After pairing:** Update device names and assign to rooms
 4. **Re-create automations** that depend on these devices
+
+> **Note:** This table only covers the original 10 devices. Pairing procedures for all 49 devices (including ZBM5 wall switches, SNZB-06P presence sensors, AwoX/EGLO lights, Aqara T1M, and more) are documented in [docs/05-zigbee-devices.md](05-zigbee-devices.md).
 
 ---
 

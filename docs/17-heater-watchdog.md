@@ -74,7 +74,7 @@ On the Pi, create/edit `/opt/zigbee2mqtt/.env`:
 
 ```bash
 ssh pi@pi
-echo "HEATER_WATCHDOG_HA_TOKEN=your_token_here" >> /opt/zigbee2mqtt/.env
+echo "HA_TOKEN=your_token_here" >> /opt/zigbee2mqtt/.env
 ```
 
 ### Step 3: Deploy
@@ -87,7 +87,7 @@ scp -r services/heater-watchdog pi@pi:/opt/pi-setup/services/
 scp configs/zigbee2mqtt/docker-compose.yml pi@pi:/opt/zigbee2mqtt/
 
 # Build and start
-ssh pi@pi "cd /opt/zigbee2mqtt && docker compose up -d --build heater-watchdog"
+ssh pi@pi "cd ~/pi-setup/configs/zigbee2mqtt && docker compose up -d --build heater-watchdog"
 ```
 
 ### Step 4: Verify
@@ -213,7 +213,7 @@ docker exec heater-watchdog wget -O- http://homeassistant:8123/api/ 2>&1
 After Pi rebuild:
 
 1. Create new HA access token (Step 1 above)
-2. Set `HEATER_WATCHDOG_HA_TOKEN` in `/opt/zigbee2mqtt/.env`
+2. Set `HA_TOKEN` in `/opt/zigbee2mqtt/.env`
 3. Run: `docker compose up -d --build heater-watchdog`
 
 ## Testing

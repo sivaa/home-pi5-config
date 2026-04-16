@@ -370,7 +370,7 @@ Host Network (--network host):
 │  ─────────────────────────────────────────────────────────────────────────── │
 │                                                                              │
 │  CREDENTIALS:                                                                │
-│  secrets.yaml is NOT in git (gitignored).                                    │
+│  secrets.yaml is NOT in git (gitignored by configs/**/secrets.yaml).         │
 │  If recreating from scratch:                                                 │
 │    1. Log into zoobave@gmail.com                                             │
 │    2. Enable 2FA → Create App Password → name "Pi Home Assistant"            │

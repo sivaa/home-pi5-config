@@ -86,7 +86,7 @@ Environment variables (set in docker-compose.yml):
 5. **Copy immediately** (cannot view again)
 6. Add to `/opt/zigbee2mqtt/.env`:
    ```
-   HEATER_WATCHDOG_HA_TOKEN=your_token_here
+   HA_TOKEN=your_token_here
    ```
 
 ## Logs
