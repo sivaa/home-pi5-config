@@ -429,6 +429,66 @@ The exploratory probe converter is kept at `configs/zigbee2mqtt/external_convert
 
 ---
 
+### Re-pairing IKEA TRADFRI / FLOALT Lights Remotely via Smart Switch (2026-04-17)
+
+**Incident:** `[Study] IKEA Light` (FLOALT L1528, IEEE `0xd0cf5efffe25ab28`) dropped off the Zigbee network. Needed to re-pair without physically touching the light (recessed ceiling panel).
+
+**Key insight:** IKEA bulbs reset via 6x power cycles. We can drive those cycles remotely through the Zigbee smart switch that feeds the bulb's mains (`[Study] Light Switch`, SONOFF ZBM5-1C) - no ladder needed.
+
+**Timing is critical.** Only the 1s/1s cadence worked:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  CADENCE TRIED         →  RESULT                             │
+├──────────────────────────────────────────────────────────────┤
+│  1.2s OFF + 1.2s ON    →  FAIL (too slow, bulb resets       │
+│                            its pulse counter)                │
+│  0.5s OFF + 0.5s ON    →  FAIL (switch MQTT+Zigbee latency  │
+│                            eats the window)                  │
+│  1.0s OFF + 1.0s ON    →  SUCCESS ✓                         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Why 1.0s works and the others don't:** there's ~300-500ms MQTT→Zigbee→relay latency per command, so the bulb sees its power cut/restored roughly every 1.3-1.5s. IKEA's reset detector wants 6 cycles inside a ~15s window with each ON phase ≤~2s. 1.2s command-to-command overshoots that; 0.5s doesn't give the relay time to actually switch.
+
+**Procedure (copy-paste ready):**
+
+```bash
+# 1. Verify Z2M config still has the device (preserves friendly_name + HA entity_id)
+ssh pi@pi "sudo grep -B1 'IKEA Light' /opt/zigbee2mqtt/data/configuration.yaml"
+
+# 2. Open pairing window (254s max)
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/permit_join' -m '{\"time\": 254}'"
+
+# 3. Drive 6x OFF/ON cycles through the upstream smart switch.
+#    Replace [Study] Light Switch with the switch feeding THIS bulb.
+ssh pi@pi 'for i in 1 2 3 4 5 6; do
+  docker exec mosquitto mosquitto_pub -h localhost \
+    -t "zigbee2mqtt/[Study] Light Switch/set" -m "{\"state\":\"OFF\"}"
+  sleep 1
+  docker exec mosquitto mosquitto_pub -h localhost \
+    -t "zigbee2mqtt/[Study] Light Switch/set" -m "{\"state\":\"ON\"}"
+  sleep 1
+done'
+
+# 4. Watch for the join+interview (should appear within ~10-30s after last cycle)
+ssh pi@pi "timeout 90 docker logs -f zigbee2mqtt --since 5s 2>&1 \
+  | grep --line-buffered -iE 'joined|interview|FLOALT|successfully'"
+
+# 5. Close pairing window when interview completes
+ssh pi@pi "docker exec mosquitto mosquitto_pub -h localhost \
+  -t 'zigbee2mqtt/bridge/request/permit_join' -m '{\"time\": 0}'"
+```
+
+**Notes & gotchas:**
+- `mosquitto_pub` is NOT installed on the Pi host - always wrap via `docker exec mosquitto mosquitto_pub ...`.
+- Do NOT `force-remove` the device from Z2M first. Keeping the existing `configuration.yaml` entry means the rejoined bulb lights up with the same `friendly_name`, IEEE, and Home Assistant entity_id (`light.[study]_ikea_light`) - no HA re-configuration needed.
+- This works because the FLOALT draws power through the SONOFF switch relay. If a bulb is wired directly to mains (no Zigbee switch upstream), you'll need physical toggling.
+- Applicable to other IKEA/TRADFRI lights (bulbs, FLOALT panels, drivers) since they all share the same 6x power-cycle reset behavior.
+
+---
+
 ### Dashboard Network View - Wall Index Tracing
 
 **Rule:** Do not cache wall indices in memory or documentation. They change when the floor plan is refactored.
