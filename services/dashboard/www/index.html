@@ -5688,37 +5688,32 @@
           console.log(`[lights] Pre-pulse: ${sw.topic} ON`);
         },
 
-        toggleLight(light) {
-          // Kill any pending delayed ON from a previous tap. Handles the
-          // rapid-tap race: ON -> (switch pre-pulse scheduled) -> OFF must
-          // land on OFF, not have the delayed ON overwrite it.
+        // Shared per-light toggle path used by both toggleLight (single
+        // card tap) and toggleAllLights (bulk toggle). Handles:
+        //  - cancelling any pending delayed ON from a prior tap
+        //    (race cancellation: rapid ON -> OFF must land on OFF)
+        //  - defensive switch pre-pulse if the light has a linked switch
+        //    that isn't confirmed ON (OFF or stale/never-seen state).
+        //    Switch ON is idempotent - an extra frame is free insurance.
+        //  - 3000 ms delay before the bulb ON command, giving IKEA
+        //    FLOALT / AwoX / EGLO Rovito-Z enough time to boot their
+        //    Zigbee radio and rejoin after mains restore.
+        //  - bailing inside the timer if the bulb already came back ON
+        //    via a normal MQTT state update during the wait.
+        _togglePerLight(light, newState) {
           if (light._pendingOnTimer) {
             clearTimeout(light._pendingOnTimer);
             light._pendingOnTimer = null;
           }
 
-          const newState = light.state === 'ON' ? 'OFF' : 'ON';
           const sw = this.getLightSwitch(light);
-
-          // Defensive pre-pulse: if we have a linked switch and it is
-          // available but not confirmed ON (OFF or undefined/stale),
-          // publish switch ON first. Switch ON is idempotent, so the
-          // extra frame costs nothing when state is actually already ON.
           const needsPrePulse =
             newState === 'ON' && sw && sw.available && sw.state !== 'ON';
 
           if (needsPrePulse) {
             this._publishSwitchOn(sw);
-
-            // IKEA FLOALT / AwoX / EGLO Rovito-Z need ~2-5 s to boot
-            // their Zigbee radio and rejoin the mesh after mains restore.
-            // 3000 ms balances reliability vs. UI responsiveness. If this
-            // misses, the user taps ON again and it hits a live bulb.
             light._pendingOnTimer = setTimeout(() => {
               light._pendingOnTimer = null;
-              // Bail if the bulb already came back ON via a normal MQTT
-              // state update during the wait - no point sending a redundant
-              // ON that would just re-trigger a syncing cycle on the card.
               if (light.state === 'ON') return;
               this._sendBulbCommand(light, 'ON');
             }, 3000);
@@ -5727,32 +5722,15 @@
           }
         },
 
+        toggleLight(light) {
+          const newState = light.state === 'ON' ? 'OFF' : 'ON';
+          this._togglePerLight(light, newState);
+        },
+
         toggleAllLights() {
           const allOn = this.list.every(l => l.state === 'ON');
           const newState = allOn ? 'OFF' : 'ON';
-          this.list.forEach(light => {
-            // Per-light: cancel any pending delayed ON from a prior tap.
-            if (light._pendingOnTimer) {
-              clearTimeout(light._pendingOnTimer);
-              light._pendingOnTimer = null;
-            }
-
-            const sw = this.getLightSwitch(light);
-            const needsPrePulse =
-              newState === 'ON' && sw && sw.available && sw.state !== 'ON';
-
-            if (needsPrePulse) {
-              this._publishSwitchOn(sw);
-              light._pendingOnTimer = setTimeout(() => {
-                light._pendingOnTimer = null;
-                // Bail if the bulb already came back ON during the wait.
-                if (light.state === 'ON') return;
-                this._sendBulbCommand(light, 'ON');
-              }, 3000);
-            } else {
-              this._sendBulbCommand(light, newState);
-            }
-          });
+          this.list.forEach(light => this._togglePerLight(light, newState));
         },
 
         setBrightness(light, value) {
