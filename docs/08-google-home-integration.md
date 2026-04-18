@@ -1,6 +1,6 @@
 # Google Home Integration & External Access
 
-> **Last Updated:** December 19, 2025
+> **Last Updated:** April 18, 2026
 > **Status:** Active
 > **Purpose:** Voice control via Google Home/Nest speakers
 
@@ -165,9 +165,16 @@ Voice invocation: "Hey Google, **activate** bedroom backlight red" (scenes use "
 | Sensor | Entity ID | Voice Name | Room |
 |--------|-----------|------------|------|
 | CO2 | `sensor.hallway_co2_co2` | "Air Quality" | Hallway |
-| Mailbox | `binary_sensor.mailbox_motion_sensor_occupancy` | "Mailbox Sensor" | Entry |
-| Human Presence | `binary_sensor.human_presence_occupancy` | "Human Presence" | Hallway |
-| Hot Water | `binary_sensor.vibration_sensor_vibration` | "Hot Water Sensor" | Bathroom |
+
+> **Not exposed to Google:** motion/occupancy/vibration `binary_sensor`s have
+> no Google smart-home trait. See the `device_class → trait` mapping table in
+> `configs/homeassistant/CLAUDE.md` for the complete support matrix. The
+> entities below still live in HA (dashboards, automations) but `expose: false`
+> in `configuration.yaml`:
+>
+> - `binary_sensor.mailbox_motion_sensor_occupancy` (occupancy)
+> - `binary_sensor.vibration_sensor_vibration` (vibration — hot water)
+> - Per-room human presence sensors (`binary_sensor.{study,living,kitchen,bath,bed}_human_presence_occupancy`)
 
 ### Voice Queryable - Window/Door Contacts (8 sensors)
 
@@ -434,6 +441,155 @@ Saying "Hey Google, turn off the bedroom backlight" resyncs the state (idempoten
 
 ---
 
+## Drift Detection & Monitoring (Apr 18, 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  THREE-LAYER DEFENSE AGAINST SILENT HOMEGRAPH DRIFT                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Layer 1: Live alert                                                        │
+│    automations.yaml → google_assistant_integration_error                    │
+│    Fires email on any ERROR log from google_assistant.*                     │
+│    Throttled to 1 email per 24h via input_datetime.google_assistant_alert_last │
+│                                                                             │
+│  Layer 2: On-demand audit                                                   │
+│    ./scripts/google-home-audit.sh                                           │
+│    Compares HA expose:true set against HomeGraph devices:query results.     │
+│    Exit code 2 on drift so it can feed a cron monitor if desired.           │
+│                                                                             │
+│  Layer 3: CLAUDE.md device_class → trait mapping table                      │
+│    configs/homeassistant/CLAUDE.md                                          │
+│    Prevents the "cool, let me expose this new sensor" → 404-loop cycle.     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Running the audit
+
+```bash
+# From repo root on laptop
+./scripts/google-home-audit.sh
+
+# Expected clean output:
+#   cloudflared tunnel       active / ha.sivaa.in HTTP 405
+#   HA logs (24h)            google_assistant ERROR lines: 0
+#   HomeGraph per-entity     Exposed=46 OK=46 MissingHA=0 MissingGoogle=0
+#   === Audit clean. No drift. ===
+```
+
+The script auto-creates `/tmp/homegraph-venv/` on the Pi with `google-auth +
+requests` on first run. Subsequent runs reuse the venv.
+
+### How the alert automation works
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Any ERROR log line from homeassistant.components.google_assistant.* │
+│                              │                                       │
+│                              ▼                                       │
+│       system_log_event fires with level=ERROR                        │
+│                              │                                       │
+│                              ▼                                       │
+│     template: 'google_assistant' in event.data.name?                 │
+│                              │                                       │
+│                              ▼ yes                                   │
+│     throttle: last-sent-datetime > 24h ago? (sentinel = never sent)  │
+│                              │                                       │
+│                              ▼ yes                                   │
+│   stamp input_datetime.google_assistant_alert_last = now()           │
+│                              │                                       │
+│                              ▼                                       │
+│   script.send_alert_email with severity=WARNING + log details        │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Rate-limit floor: if the helper ever resets to epoch (1970-01-01), the
+first error post-reset triggers immediately. The condition template checks
+`ts < 86400` as the sentinel.
+
+---
+
+## Service Account Key Rotation
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  WHEN:   Every 90 days (Google best practice)                               │
+│  WHY:    Reduces blast radius of leaked keys. Service accounts with long-   │
+│          lived keys are a common cloud security finding.                    │
+│  RISK:   Wrong key = HomeGraph report_state breaks → voice control keeps    │
+│          working (SYNC uses OAuth) but state staleness in Google Home app.  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Procedure
+
+```bash
+# 1. Verify gcloud is authenticated as the project owner
+gcloud config set account sivasubramaniam.a@gmail.com
+gcloud projects describe siva-home-assistant-1
+
+# 2. List existing keys (note the oldest one's KEY_ID)
+gcloud iam service-accounts keys list \
+  --iam-account=id-home-assistant@siva-home-assistant-1.iam.gserviceaccount.com \
+  --project=siva-home-assistant-1
+
+# 3. Create new key
+mkdir -p /tmp/sa-rotation
+gcloud iam service-accounts keys create /tmp/sa-rotation/SERVICE_ACCOUNT.new.json \
+  --iam-account=id-home-assistant@siva-home-assistant-1.iam.gserviceaccount.com \
+  --project=siva-home-assistant-1
+
+# 4. Smoke-test the new key from the Pi (proves HomeGraph accepts it)
+scp /tmp/sa-rotation/SERVICE_ACCOUNT.new.json pi@pi:/tmp/
+ssh pi@pi '/tmp/homegraph-venv/bin/python3 -c "
+from google.oauth2 import service_account
+from google.auth.transport.requests import Request
+import requests
+c = service_account.Credentials.from_service_account_file(\"/tmp/SERVICE_ACCOUNT.new.json\", scopes=[\"https://www.googleapis.com/auth/homegraph\"])
+c.refresh(Request())
+r = requests.post(\"https://homegraph.googleapis.com/v1/devices:query\",
+  headers={\"Authorization\": f\"Bearer {c.token}\"},
+  json={\"requestId\":\"test\",\"agentUserId\":\"352c46b91d924bc8940435a5cb73c9bb\",
+        \"inputs\":[{\"payload\":{\"devices\":[{\"id\":\"light.study_ikea_light\"}]}}]}, timeout=10)
+print(\"new key devices:query:\", r.status_code)
+"'
+
+# 5. Atomic swap on Pi (keeps timestamped backup as rollback)
+ssh pi@pi "sudo cp /opt/homeassistant/SERVICE_ACCOUNT.json /opt/homeassistant/SERVICE_ACCOUNT.json.bak.\$(date +%Y%m%d-%H%M%S) \
+  && sudo cp /tmp/SERVICE_ACCOUNT.new.json /opt/homeassistant/SERVICE_ACCOUNT.json \
+  && sudo chown root:root /opt/homeassistant/SERVICE_ACCOUNT.json \
+  && sudo chmod 644 /opt/homeassistant/SERVICE_ACCOUNT.json \
+  && rm /tmp/SERVICE_ACCOUNT.new.json"
+
+# 6. Restart HA and verify
+ssh pi@pi "docker restart homeassistant"
+# Wait for HA to come back (~10s)
+./scripts/google-home-audit.sh
+
+# 7. After a day or two of clean operation, delete old keys
+#    (requires user confirmation per CLAUDE.md rule 1b)
+gcloud iam service-accounts keys delete OLD_KEY_ID \
+  --iam-account=id-home-assistant@siva-home-assistant-1.iam.gserviceaccount.com \
+  --project=siva-home-assistant-1
+
+# 8. Clean up local temp
+rm -rf /tmp/sa-rotation
+```
+
+### Rotation history
+
+| Date | Action | Key ID |
+|------|--------|--------|
+| 2025-12-14 12:03 | Initial creation | `431e59954e84b45007106335cd2995d6aac5a099` |
+| 2025-12-14 12:04 | Second key (live until 2026-04-18) | `19f866dbeb8b32bdb1af712981acb4ba78ce8d1c` |
+| 2026-04-18 22:05 | Rotation — new key now live | `42ba10ee02a7f7efd93fd977767e34bb6bb4f25e` |
+
+Old keys are retained in GCP until manually deleted (rollback window).
+Pi-local backup: `/opt/homeassistant/SERVICE_ACCOUNT.json.bak.<timestamp>`.
+
+---
+
 ## Troubleshooting
 
 ### "Unable to connect to Home Assistant" (WebSocket Error)
@@ -558,12 +714,47 @@ trusted_proxies:
 ### SERVICE_ACCOUNT.json Errors
 
 ```bash
-# Check file exists
+# Check file exists + age
 ssh pi@pi "ls -la /opt/homeassistant/SERVICE_ACCOUNT.json"
 
 # Verify file is valid JSON
 ssh pi@pi "python3 -m json.tool /opt/homeassistant/SERVICE_ACCOUNT.json > /dev/null && echo 'Valid JSON'"
+
+# Print private_key_id to cross-check against GCP console
+ssh pi@pi "sudo cat /opt/homeassistant/SERVICE_ACCOUNT.json | python3 -c \
+  'import json,sys; print(json.load(sys.stdin)[\"private_key_id\"])'"
+
+# If key is > 90 days old, rotate (see "Service Account Key Rotation" above)
 ```
+
+### Silent reportStateAndNotification 404 Loop
+
+**Symptom:** `docker logs homeassistant | grep google_assistant` shows many
+entries like:
+```
+ERROR Request for https://homegraph.googleapis.com/v1/devices:reportStateAndNotification failed: 404
+```
+but voice control still works and devices show up in Google Home.
+
+**Root cause:** An entity has `expose: true` in `configuration.yaml`, but
+Google has no smart-home trait for its domain/device_class combo. HA's
+`google_assistant` component silently drops it at SYNC time, but the
+`report_state: true` setting keeps pushing every state change → 404 on
+each one.
+
+**Fix:**
+1. Run `./scripts/google-home-audit.sh` — it identifies the offenders
+2. For each entity it flags, either:
+   - Set `expose: false` in `configuration.yaml` entity_config, OR
+   - Remove the entity_config block entirely (if the entity doesn't exist
+     in HA either, it's just stale config)
+3. Restart HA: `ssh pi@pi "docker restart homeassistant"`
+4. Re-run the audit to confirm zero drift
+
+The 404 loop is functionally harmless (voice control still works) but
+pollutes logs and makes real errors harder to spot. The
+`google_assistant_integration_error` automation now catches the first
+occurrence and emails within 24h.
 
 ---
 

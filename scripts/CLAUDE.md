@@ -346,6 +346,58 @@ Verifies Pi kiosk is running efficiently after CSS/dashboard changes.
 
 ---
 
+## Google Home Audit
+
+### google-home-audit.sh
+Compares HA's exposed entities against Google HomeGraph state to detect
+drift: entities HA pushes but Google rejects, stale entity_configs, or
+entities with no Google trait mapping.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  CHECKS                                                          │
+├──────────────────────────────────────────────────────────────────┤
+│  1. cloudflared tunnel health (systemd + HTTP 405 on ha.sivaa.in)│
+│  2. google_assistant ERROR lines in last 24h of HA logs          │
+│  3. Every expose:true entity in configuration.yaml:              │
+│     - HA REST API returns 200?                                   │
+│     - HomeGraph devices:query returns 200?                       │
+│  4. Summary: exposed, OK, unavailable, missing-from-HA,          │
+│     missing-from-HomeGraph                                       │
+├──────────────────────────────────────────────────────────────────┤
+│  EXIT CODES                                                      │
+│    0  Clean. No drift.                                           │
+│    2  Drift detected (stale or no-trait entities)                │
+│    *  Setup / network failure                                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Usage:**
+```bash
+./scripts/google-home-audit.sh           # Full audit
+./scripts/google-home-audit.sh --quiet   # Only drift summary
+```
+
+**Requires:**
+- SSH access as `pi@pi`
+- `HA_TOKEN` in `/opt/zigbee2mqtt/.env` on Pi
+- `/opt/homeassistant/SERVICE_ACCOUNT.json` on Pi (HomeGraph service account)
+- Python venv at `/tmp/homegraph-venv` on Pi (auto-created on first run)
+
+**When to run:**
+- After editing `google_assistant.entity_config` in `configuration.yaml`
+- After HA upgrades (SYNC behaviour can change between versions)
+- On-demand when debugging voice-control issues
+- Optionally via cron (the `exit 2` signals drift for alerting pipelines)
+
+**Related:**
+- `configs/homeassistant/CLAUDE.md` — device_class → Google trait table
+- `configs/homeassistant/automations.yaml` —
+  `google_assistant_integration_error` automation (live alert layer)
+- `docs/08-google-home-integration.md` — full integration architecture
+
+---
+
 ## Git Hooks
 
 ### hooks/pre-commit

@@ -312,6 +312,7 @@ pi-setup/
 ├── scripts/                   <- Maintenance scripts
 │   ├── check-pi-health.sh     <- Pi health check
 │   ├── disaster-recovery.sh   <- Disaster recovery automation
+│   ├── google-home-audit.sh   <- HA ↔ Google HomeGraph drift detector
 │   ├── lint-css-performance.sh <- CSS performance linting
 │   ├── router-reboot.sh       <- Daily router reboot (cron 4 AM)
 │   ├── safe-z2m-restart.sh    <- Safe Z2M restart with validation
