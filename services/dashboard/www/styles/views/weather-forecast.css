@@ -257,6 +257,9 @@
 
 .wx-10day-chart-wrap {
   position: relative;
+  /* MUST match SVG viewBox aspect (0 0 808 130) - see dailyCurve() H=130
+     in views/weather-forecast.js. Mismatch would cause 'meet' to
+     letterbox the chart and misalign curve endpoints vs day columns. */
   aspect-ratio: 808 / 130;
   width: 100%;
 }

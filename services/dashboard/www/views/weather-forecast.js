@@ -104,7 +104,10 @@ export function weatherForecastView() {
       // Columns are in a `repeat(N, 1fr)` grid with NO gap, so column i
       // spans [i/N, (i+1)/N] of the chart width and its center is at
       // (i + 0.5) / N. First point x = W/(2N); last = W - W/(2N).
-      const W = 808, H = 180, padTop = 24, padBottom = 36;
+      // CRITICAL: viewBox aspect (W/H) must match .wx-10day-chart-wrap
+      // aspect-ratio or `preserveAspectRatio=meet` will letterbox the
+      // chart and misalign curves with columns. Keep these in sync.
+      const W = 808, H = 130, padTop = 16, padBottom = 26;
       const N = d.length;
       const padX = W / (2 * N);  // = 40.4 at N=10
       const allTemps = d.flatMap(x => [x.tempMax, x.tempMin]);
