@@ -5971,6 +5971,10 @@
 
         getSwitchForRoom(roomId) {
           return this.list.find(s => s.roomId === roomId && s.available);
+        },
+
+        byId(id) {
+          return this.list.find(s => s.id === id) || null;
         }
       });
 
