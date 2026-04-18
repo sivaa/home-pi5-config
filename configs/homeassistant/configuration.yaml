@@ -422,9 +422,12 @@ google_assistant:
         - "Air Quality Sensor"
 
     # === MOTION SENSOR (Mailbox) ===
+    # Google has no trait for device_class=occupancy/motion, so SYNC
+    # silently drops this but report_state still 404s on every state change.
+    # Kept in entity_config (aliases preserved) but expose:false to stop noise.
     binary_sensor.mailbox_motion_sensor_occupancy:
       name: "Mailbox Sensor"
-      expose: true
+      expose: false
       room: "Entry"
       aliases:
         - "Mail Sensor"
@@ -479,19 +482,18 @@ google_assistant:
         - "Bedroom Plug"
         - "Plug Three"
 
-    # === PRESENCE SENSOR (Queryable) ===
-    binary_sensor.human_presence_occupancy:
-      name: "Human Presence"
-      expose: true
-      room: "Hallway"
-      aliases:
-        - "Presence Sensor"
-        - "Motion Detector"
+    # === PRESENCE SENSOR ===
+    # Removed 2026-04-18: stale entity_id. The real presence sensors are
+    # per-room (binary_sensor.{study,living,kitchen,bath,bed}_human_presence_occupancy).
+    # Not re-added per-room because device_class=occupancy has no Google trait
+    # mapping (same as mailbox above).
 
-    # === VIBRATION SENSOR - Hot Water (Queryable) ===
+    # === VIBRATION SENSOR - Hot Water ===
+    # device_class=vibration has no Google trait mapping, same failure mode as
+    # mailbox above. Exposed as false to stop report_state 404s.
     binary_sensor.vibration_sensor_vibration:
       name: "Hot Water Sensor"
-      expose: true
+      expose: false
       room: "Bathroom"
       aliases:
         - "Vibration Sensor"
@@ -770,6 +772,14 @@ input_datetime:
     has_date: true
     has_time: true
     icon: mdi:timer-sand
+
+  # Rate-limits the Google Assistant error alert to one email per 24h.
+  # See automation 'google_assistant_integration_error' + docs 2026-04-18 audit.
+  google_assistant_alert_last:
+    name: "Google Assistant Alert Last Sent"
+    has_date: true
+    has_time: true
+    icon: mdi:google-assistant
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration

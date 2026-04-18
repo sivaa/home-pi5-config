@@ -6809,3 +6809,76 @@
                   entity_id: "{{ repeat.item.saved_temp }}"
                 data:
                   value: "{{ target_setpoint | float }}"
+
+# -----------------------------------------------------------------------------
+# GOOGLE ASSISTANT INTEGRATION ERROR ALERT
+# Trigger:   Any ERROR-level log line from google_assistant.*
+# Rate:      Max 1 email per 24h (throttled via input_datetime.google_assistant_alert_last)
+# Context:   Added 2026-04-18 after audit found ~11 silent 404s/day on
+#            reportStateAndNotification that accumulated unnoticed for days.
+#            Root cause was entities exposed to Google that had no device
+#            trait mapping (occupancy/vibration binary_sensors). Future
+#            drift of the same shape is caught instantly.
+# -----------------------------------------------------------------------------
+- id: google_assistant_integration_error
+  alias: "Google Assistant Integration Error"
+  description: "Email on any google_assistant ERROR log entry (throttled 1/day)"
+  mode: single
+
+  trigger:
+    - platform: event
+      event_type: system_log_event
+      event_data:
+        level: ERROR
+
+  condition:
+    # Filter: only google_assistant logger lines
+    - condition: template
+      value_template: >-
+        {{ 'google_assistant' in (trigger.event.data.name | default('')) }}
+    # Throttle: sentinel 1970-01-01 = never-sent; otherwise need > 24h gap
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.google_assistant_alert_last') %}
+        {% if last in ['unknown', 'unavailable', ''] %}
+          true
+        {% else %}
+          {% set ts = as_timestamp(last) | default(0) %}
+          {{ ts < 86400 or (as_timestamp(now()) - ts) > 86400 }}
+        {% endif %}
+
+  action:
+    # Stamp the throttle timer BEFORE sending (fail-safe: even if email fails,
+    # we don't spam on subsequent errors in the same 24h).
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.google_assistant_alert_last
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+    - service: script.send_alert_email
+      data:
+        severity: "WARNING"
+        title: "Google Assistant Integration Error"
+        subtitle: "HomeGraph rejecting state reports"
+        description: >-
+          Home Assistant is hitting errors from Google's HomeGraph API. Most
+          common cause is an entity exposed to Google that has no matching
+          device trait (e.g. binary_sensor with device_class=occupancy /
+          vibration / motion). Other causes: account unlinked in Google
+          Home app, cloudflared tunnel down, service account key expired.
+        actions: >-
+          Check docker logs homeassistant | grep google_assistant|Review
+          entity_config in configs/homeassistant/configuration.yaml|Verify
+          https://ha.sivaa.in returns HTTP 405 (webhook alive)|See trait
+          mapping table in configs/homeassistant/CLAUDE.md
+        details: >-
+          Logger:  {{ trigger.event.data.name }}
+          Level:   {{ trigger.event.data.level }}
+          Message: {{ trigger.event.data.message | default('(no message)') }}
+          Time:    {{ trigger.event.data.timestamp | default(now().isoformat()) }}
+
+          This alert is rate-limited to 1 email per 24h.
+        plain_text: >-
+          Google Assistant integration error:
+          {{ trigger.event.data.message | default('(no message)') }}

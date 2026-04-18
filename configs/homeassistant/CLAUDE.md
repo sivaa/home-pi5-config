@@ -708,7 +708,77 @@ Rooms: `study`, `living_inner`, `living_outer`, `bedroom`
 
 ---
 
+## Google Assistant — device_class → Trait Mapping (Apr 18, 2026)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DO NOT expose binary_sensors to Google unless their device_class maps      │
+│  to a Google smart-home trait. HA's google_assistant component silently     │
+│  drops untyped entities at SYNC, but report_state keeps pushing → 404s.    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Mapping table
+
+| device_class                    | Google trait           | Supported? | Notes                          |
+|---------------------------------|------------------------|------------|--------------------------------|
+| `door` / `window` / `garage_door` / `opening` | `OpenClose` | ✓ Yes  | Maps to `SENSOR` with open percent |
+| `smoke` / `gas` / `co` / `co2`  | `SensorState`          | ✓ Yes      | Reports hazard on/off           |
+| `moisture` / `leak`             | `SensorState`          | ✓ Yes      | Water leak detection            |
+| `lock`                          | `LockUnlock`           | ✓ Yes      | Bi-directional lock control     |
+| `battery` (numeric sensor)      | `EnergyStorage`        | ✓ Yes      | Sensor domain only              |
+| `temperature` / `humidity`      | `TemperatureSetting` / `HumiditySetting` | ✓ Yes | Query-only sensors     |
+| `occupancy`                     | — **no trait**         | ✗ NO       | → 404 loop in report_state      |
+| `motion`                        | — **no trait**         | ✗ NO       | → 404 loop in report_state      |
+| `vibration`                     | — **no trait**         | ✗ NO       | → 404 loop in report_state      |
+| `presence`                      | — **no trait**         | ✗ NO       | → 404 loop in report_state      |
+| `sound`                         | — **no trait**         | ✗ NO       |                                |
+| `tamper`                        | — **no trait**         | ✗ NO       |                                |
+| `running` / `update` / `plug`   | — **no trait**         | ✗ NO       |                                |
+
+### Rule
+
+- **Before** adding `expose: true` for a `binary_sensor` in `configuration.yaml`, check its
+  `device_class` against the table above.
+- If the class is in the "no trait" rows, set `expose: false` — keep it in the
+  entity_config block for aliases/documentation, but HA won't try to push it.
+- The "good" classes generally get `action.devices.types.SENSOR` with the listed
+  trait. Sensor domain entities (`sensor.*`) follow a similar table but are
+  trait-richer (temperature, humidity, CO2, air quality all work).
+
+### Detecting silent drift
+
+If the 404s ever resurface, the automation `google_assistant_integration_error`
+(in `automations.yaml`) fires an email within seconds of the first error and
+then throttles itself for 24h. The email lists the offending log line so you
+can trace it back to a specific entity.
+
+### Incident history
+
+On 2026-04-18 an audit found 3 entities stuck in this trap:
+- `binary_sensor.mailbox_motion_sensor_occupancy` (occupancy — no trait)
+- `binary_sensor.vibration_sensor_vibration` (vibration — no trait)
+- `binary_sensor.human_presence_occupancy` (stale entity_id, didn't even exist
+  in HA; legacy config from before per-room presence sensor rename)
+
+All three had been silently 404-ing for days. Fixed by flipping `expose: false`
+(first two) and removing the stale block (third). Zero 404s in the 5 min after
+the HA restart that applied the config.
+
+---
+
 ## History
+
+- **Apr 18, 2026**: Google Home integration audit + drift fix
+  - Found 3 entities (mailbox occupancy, hot-water vibration, stale presence)
+    causing ~11 silent `reportStateAndNotification` 404s/day
+  - Flipped `expose: false` for the 2 unsupported device_classes, removed
+    the 1 stale entity_config block
+  - New automation: `google_assistant_integration_error` (email on any
+    google_assistant ERROR log, throttled 1/day)
+  - New helper: `input_datetime.google_assistant_alert_last`
+  - New doc: device_class → Google trait mapping table (this file)
+  - New tool: `scripts/google-home-audit.sh` for repeat audits
 
 - **Mar 20, 2026**: Added outdoor temperature-based setpoint adjustment
   - Rule: >10°C=16°C, 5-10°C=17°C, <5°C=18°C
