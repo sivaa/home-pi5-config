@@ -18,7 +18,7 @@ export function navigationComponent() {
     // State
     moreMenuOpen: false,
     mobileMenuOpen: false,
-    currentView: 'classic',
+    currentView: 'weather',
 
     // Data from config
     primaryViews: PRIMARY_VIEWS,
@@ -26,11 +26,8 @@ export function navigationComponent() {
     allViews: ALL_VIEWS,
 
     init() {
-      // Restore last view from localStorage
-      const saved = localStorage.getItem('dashboard-view');
-      if (saved && ALL_VIEWS.find(v => v.id === saved)) {
-        this.currentView = saved;
-      }
+      // No localStorage restore: dashboard always lands on weather
+      // after restart/reload. Sync below picks up hash-routed views.
 
       // Sync with app component if it exists
       if (this.$root && this.$root._x_dataStack) {
