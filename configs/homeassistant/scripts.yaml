@@ -1064,3 +1064,94 @@ send_alert_email:
             </table>
             </body>
             </html>
+
+# -----------------------------------------------------------------------------
+# BED BACKLIGHT COLOR PRESETS
+# Purpose: Voice-selectable backlight colors on the EGLO Rovito-Z 900087.
+# Why scripts (not light.turn_on with hs_color): each script publishes the
+# hue/saturation payload DIRECTLY via MQTT. That keeps HA's color_mode on
+# light.bed_light as color_temp (preserving color_temp_kelvin in state),
+# whereas HA's light.turn_on with hs_color converts to xy and flips the
+# tracker to color_mode=xy / color_temp_kelvin=None. Physical result is
+# identical either way (see CLAUDE.md lesson 2026-04-18), but direct
+# hue/sat keeps HA's view consistent with the main ring actually being CCT.
+#
+# Voice: "Hey Google, activate bedroom backlight red" etc.
+# -----------------------------------------------------------------------------
+bed_backlight_red:
+  alias: "Bedroom Backlight Red"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":0,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state
+
+bed_backlight_orange:
+  alias: "Bedroom Backlight Orange"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":30,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state
+
+bed_backlight_green:
+  alias: "Bedroom Backlight Green"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":120,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state
+
+bed_backlight_blue:
+  alias: "Bedroom Backlight Blue"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":240,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state
+
+bed_backlight_purple:
+  alias: "Bedroom Backlight Purple"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":280,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state
+
+bed_backlight_pink:
+  alias: "Bedroom Backlight Pink"
+  icon: mdi:palette
+  mode: single
+  sequence:
+    - action: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/[Bed] Light/set"
+        payload: '{"color":{"hue":320,"saturation":100}}'
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.bed_backlight_state

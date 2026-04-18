@@ -56,16 +56,55 @@
 
 ### Voice Controllable - Lights
 
-| Device | Entity ID | Voice Name | Room |
-|--------|-----------|------------|------|
-| Study IKEA Light | `light.study_ikea_light` | "Study Light" | Study |
-| Living IKEA Light | `light.living_ikea_light` | "Living Room Light" | Living Room |
-| Bath Light | `light.bath_light` | "Bath Light" | Bathroom |
+| Device | Entity ID | Voice Name | Room | Notes |
+|--------|-----------|------------|------|-------|
+| Study IKEA Light | `light.study_ikea_light` | "Study Light" | Study | CCT only |
+| Living IKEA Light | `light.living_ikea_light` | "Living Room Light" | Living Room | CCT only |
+| Bath Light | `light.bath_light` | "Bath Light" | Bathroom | CCT only |
+| Bed Light | `light.bed_light` | "Bedroom Light" | Bedroom | CCT main + HS backlight (single entity) |
+| Hallway Light | `light.hallway_light` | "Hallway Light" | Hallway | Aqara T1M white ring (CCT) |
+| Hallway Side Light | `light.hallway_side_light` | "Hallway Side Light" | Hallway | Aqara T1M RGB strip (color accent) |
+
+**How multi-LED lights map to voice commands:**
+
+The Bed Light is a single `light.bed_light` entity that drives two physical LED elements (main CCT ring + RGB backlight on the EGLO Rovito-Z 900087). Verified end-to-end 2026-04-18 via MQTT capture + visual A/B with direct MQTT hue/sat:
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  "Set bedroom light to 4000K"       →  {"color_temp":250}                │
+│                                     →  MAIN RING only                     │
+│                                                                           │
+│  "Set bedroom light to purple"      →  {"color":{"x":0.272,"y":0.103}}   │
+│                                     →  BACKLIGHT only, main ring kept    │
+│                                        (HA converts hs_color → xy, but   │
+│                                        the EGLO firmware routes any      │
+│                                        color payload to the backlight)   │
+│                                                                           │
+│  "Dim bedroom light to 30%"         →  {"brightness":76}                 │
+│                                     →  both LEDs dim together            │
+│                                                                           │
+│  "Turn off the bedroom light"       →  {"state":"OFF"}                   │
+│                                     →  both LEDs off                     │
+│                                                                           │
+│  "Turn on the bedroom backlight"    →  switch.bed_backlight ON →         │
+│                                     {"color":{"hue":280,"saturation":80}}│
+│                                     →  BACKLIGHT purple default          │
+│                                                                           │
+│  "Turn off the bedroom backlight"   →  switch.bed_backlight OFF →        │
+│                                     {"color":{"x":0,"y":0}}              │
+│                                     →  BACKLIGHT off, main ring kept     │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+⚠️ **Misleading HA state — don't trust it.** After a voice color command, HA reports `light.bed_light` with `color_mode: xy` and `color_temp_kelvin: None` — as if the main ring lost its CCT setting. That's only HA's state tracking (sourced from Z2M's device report), not physical reality. The EGLO firmware keeps the main ring on whatever CCT it was, regardless of what HA thinks. If you want to re-sync HA's view, say "Set bedroom light to 4000K" (or any CCT) and HA's color_mode flips back to `color_temp`.
+
+The Hallway is split into two separate Zigbee endpoints, so each gets its own entity and voice name — no tricks needed. Color voice commands on `light.hallway_side_light` work cleanly since there's no main ring sharing the entity.
 
 ### Voice Controllable - Switches
 
 | Device | Entity ID | Voice Name | Room |
 |--------|-----------|------------|------|
+| Bedroom Backlight | `switch.bed_backlight` | "Bedroom Backlight" | Bedroom |
 | Smart Plug 1 | `switch.smart_plug_1` | "Smart Plug" | Living Room |
 | Smart Plug 2 | `switch.smart_plug_2` | "Smart Plug 2" | Kitchen |
 | Smart Plug 3 | `switch.smart_plug_3` | "Smart Plug 3" | Bedroom |
@@ -74,6 +113,21 @@
 | Living Light Switch | `switch.living_light_switch` | "Living Room Switch" | Living Room |
 | Fingerbot | `switch.fingerbot` | "Fingerbot" | Hallway |
 | Living Room TV | `switch.living_room_tv_power` | "Living Room TV" | Living Room |
+
+### Voice Controllable - Backlight Color Presets (Scripts)
+
+Exposed as Google Home scenes. Each publishes `{color:{hue,saturation}}` directly via MQTT (bypasses HA's hs_color→xy conversion so HA's `color_mode` stays consistent with the main CCT ring).
+
+| Script | Voice Name | Payload |
+|--------|------------|---------|
+| `script.bed_backlight_red` | "Bedroom Backlight Red" | hue=0, sat=100 |
+| `script.bed_backlight_orange` | "Bedroom Backlight Orange" | hue=30, sat=100 |
+| `script.bed_backlight_green` | "Bedroom Backlight Green" | hue=120, sat=100 |
+| `script.bed_backlight_blue` | "Bedroom Backlight Blue" | hue=240, sat=100 |
+| `script.bed_backlight_purple` | "Bedroom Backlight Purple" | hue=280, sat=100 |
+| `script.bed_backlight_pink` | "Bedroom Backlight Pink" | hue=320, sat=100 |
+
+Voice invocation: "Hey Google, **activate** bedroom backlight red" (scenes use "activate", not "turn on").
 
 ### Voice Controllable - Climate
 
@@ -143,6 +197,18 @@
 │  "Hey Google, dim the study light to 50%"                                       │
 │  "Hey Google, set living room light to warm"                                    │
 │  "Hey Google, turn off all lights"                                              │
+│                                                                                  │
+│  BED LIGHT (dual-LED, single entity)                                             │
+│  "Hey Google, set bedroom light to 4000K"       → main CCT ring                │
+│  "Hey Google, set bedroom light to purple"      → backlight color              │
+│  "Hey Google, dim bedroom light to 30%"         → both LEDs                    │
+│  "Hey Google, turn off the bedroom backlight"   → backlight-only off           │
+│  "Hey Google, turn on the bedroom backlight"    → purple backlight (default)   │
+│                                                                                  │
+│  HALLWAY (dual-endpoint, two entities)                                           │
+│  "Hey Google, turn on the hallway light"        → white ring                   │
+│  "Hey Google, set hallway side light to orange" → RGB strip accent             │
+│  "Hey Google, dim hallway side light to 20%"    → RGB strip only               │
 │                                                                                  │
 │  SMART PLUG                                                                      │
 │  "Hey Google, turn on the smart plug"                                           │
@@ -320,6 +386,51 @@ google_assistant:
 2. Go to Settings > Works with Google > Home Assistant
 3. Unlink, then re-link
 4. Say "Hey Google, sync my devices"
+
+### Entity ID Renames (Performed 2026-04-18)
+
+Bed and Hallway lights were originally paired to Z2M before friendly_names were set, so HA's entity registry cached IEEE-based entity IDs. These were renamed directly in `/opt/homeassistant/.storage/core.entity_registry` while HA was stopped:
+
+| Old entity_id | New entity_id |
+|---------------|---------------|
+| `light.0xa4c13861dca860a7` | `light.bed_light` |
+| `light.0x54ef441001208726_white` | `light.hallway_light` |
+| `light.0x54ef441001208726_rgb` | `light.hallway_side_light` |
+
+**For disaster recovery (fresh Pi rebuild):**
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  AFTER RE-PAIRING THESE 3 DEVICES TO Z2M ON A FRESH HA INSTALL      │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Z2M friendly_names '[Bed] Light' / '[Hallway] Light' let HA         │
+│  auto-generate new entity_ids. For the Bed light this may be         │
+│  light.bed_light directly (good), but for the dual-endpoint          │
+│  Hallway it generates light.hallway_light_white / _rgb.              │
+│                                                                      │
+│  To match the repo config, rename via:                               │
+│                                                                      │
+│  Option A — HA UI:                                                   │
+│    Settings → Devices & Services → Entities → search each →          │
+│    edit Entity ID                                                    │
+│                                                                      │
+│  Option B — Direct registry edit (what we did):                      │
+│    1. sudo docker stop homeassistant                                 │
+│    2. sudo cp .storage/core.entity_registry{,.bak-\$(date +%s)}      │
+│    3. sudo python3 script to rewrite entity_id fields                │
+│    4. sudo docker start homeassistant                                │
+│                                                                      │
+│  After rename: verify new entity_ids resolve, then                   │
+│  "Hey Google, sync my devices"                                       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Bed Backlight Switch Out-of-Sync with Dashboard
+
+The dashboard's "🎨 OFF pill" sends `{color:{x:0,y:0}}` directly via MQTT, bypassing `input_boolean.bed_backlight_state`. So after pressing the dashboard OFF pill, `switch.bed_backlight` still reports ON.
+
+Saying "Hey Google, turn off the bedroom backlight" resyncs the state (idempotent - safe to repeat).
 
 ---
 

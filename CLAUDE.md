@@ -367,6 +367,14 @@ shell_command:
 │                                unchanged)                    │
 │  {"color":{"hue":X,"sat":Y}}→ backlight only (main          │
 │                                unchanged)                    │
+│  {"color":{"x":X,"y":Y}}    → backlight only (main          │
+│  non-zero xy                   physically unchanged). HA     │
+│                                *reports* color_mode=xy and  │
+│                                loses color_temp_kelvin, but │
+│                                that's HA's state tracker,   │
+│                                not reality. Verified via     │
+│                                A/B against hue/sat on       │
+│                                2026-04-18.                   │
 │  {"color":{"x":0,"y":0}}    → backlight OFF only (main      │
 │                                ring preserved) [see below]   │
 │  {"state":"ON"/"OFF"}       → both                           │
@@ -398,6 +406,48 @@ The exploratory probe converter is kept at `configs/zigbee2mqtt/external_convert
   - Bed (EGLO Rovito-Z, single-endpoint): "🎨 Backlight Color" + "🔅 Intensity" slider — drives the true backlight (RGB strip behind the main ring).
   - Hallway (Aqara T1M, dual-endpoint): "🎨 Side Light Color" + "🔅 Side Light Dim" slider — drives the side light (outer RGB ring on the fixture rim). Per Aqara's own product copy this is a "side light" / "ambient light", NOT a backlight.
 - For CCT-only lights (IKEA FLOALT, AwoX 33955), labels remain the generic "Color Temp" with no color picker section.
+
+---
+
+### Google Voice Color Commands on EGLO Rovito-Z — xy Path Works, HA State Lies (2026-04-18)
+
+**Context:** Exposed `light.bed_light` (EGLO Rovito-Z 900087) to Google Assistant. Wanted to verify that "Hey Google, set bedroom light to purple" would route to the backlight only, preserving the main ring's CCT setting.
+
+**HA pipeline (captured via `mosquitto_sub` on `zigbee2mqtt/[Bed] Light/set`):**
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│  Voice:  "Hey Google, set bedroom light to purple"                    │
+│    →  Google:  hs_color=[280, 100]                                    │
+│    →  HA:      light.turn_on with hs_color attribute                  │
+│    →  MQTT:    {"state":"ON","color":{"x":0.272,"y":0.103}}           │
+│                (HA always converts hs_color → xy. No hue/sat keys.)   │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+**A/B eyes-on verification (same day):**
+- Direct MQTT `{"color":{"hue":280,"saturation":100}}`: **warm white main + purple backlight** ✓
+- HA hs_color (→ xy payload above): **warm white main + purple backlight** ✓
+
+Both paths look physically identical. The main ring is NOT hijacked by non-zero xy — the EGLO firmware treats any `color` payload (hue/sat OR xy) as "backlight command" and leaves the main CCT ring alone.
+
+**Trap: HA's own state tracking is misleading.** After the xy command, HA reports:
+
+```
+light.bed_light:
+  color_mode: xy              ← was color_temp before
+  color_temp_kelvin: None     ← lost
+  xy_color: [0.272, 0.103]    ← set
+```
+
+That state comes from Z2M's device report, which per the device table above "only reflects the *last command type*, not the active output state." So HA thinks the main ring lost its CCT, but physically it didn't. If a later automation reads `color_temp_kelvin` expecting the main ring setting, it will see None — a real bug surface for anything that tries to preserve+restore CCT around a color change.
+
+**Implications:**
+1. Voice color commands work fine on `light.bed_light`. Don't dissuade users.
+2. `switch.bed_backlight` (template switch, uses direct hue/sat payload) is functionally equivalent to voice color for the backlight, plus gives a clean ON/OFF affordance.
+3. Automations that care about the main ring CCT should NOT rely on `state_attr('light.bed_light', 'color_temp_kelvin')` after a color change — that value will be None until HA gets a fresh CCT command. Re-send the last known CCT explicitly if you need HA's tracker in sync.
+
+**Prior wrong conclusion (corrected):** An earlier version of this lesson claimed the voice command hijacks the main ring ("cold white + purple"). That observation was wrong — likely misidentifying a dimmed warm ring next to bright purple as "cold". A clean A/B against the direct hue/sat path proved both look the same. Kept for documentation discipline: the MQTT evidence was right, the eyes were not.
 
 ---
 

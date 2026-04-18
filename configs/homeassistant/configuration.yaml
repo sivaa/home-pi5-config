@@ -193,6 +193,7 @@ google_assistant:
     - climate
     - binary_sensor
     - media_player
+    - script
   entity_config:
     # === LIGHTS (Voice controllable) ===
     light.study_ikea_light:
@@ -217,6 +218,95 @@ google_assistant:
       room: "Bathroom"
       aliases:
         - "Bathroom Light"
+
+    # EGLO Rovito-Z 900087 — single entity, dual LEDs (main ring + backlight).
+    # Google maps: color_temp cmd → main ring, hue/sat cmd → backlight
+    # (see root CLAUDE.md lesson 2026-04-15). "Bedroom Backlight" switch below
+    # gives explicit backlight on/off without affecting main ring.
+    light.bed_light:
+      name: "Bedroom Light"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Light"
+        - "Master Bedroom Light"
+
+    # Aqara T1M endpoint 1 — white ring (CCT). Primary ceiling light.
+    light.hallway_light:
+      name: "Hallway Light"
+      expose: true
+      room: "Hallway"
+      aliases:
+        - "Corridor Light"
+        - "Entry Light"
+
+    # Aqara T1M endpoint 2 — RGB side strip (rim/edge accent).
+    light.hallway_side_light:
+      name: "Hallway Side Light"
+      expose: true
+      room: "Hallway"
+      aliases:
+        - "Hallway Accent"
+        - "Hallway Strip"
+        - "Corridor Accent"
+
+    # === BACKLIGHT CONTROL SWITCH (Voice workaround) ===
+    # Google Home can't target the EGLO Rovito-Z backlight independently
+    # because both LEDs live on one light entity. This template switch
+    # sends {color:{x:0,y:0}} on OFF to power down backlight LEDs only
+    # (main ring preserved), and restores saved hue/sat on ON.
+    switch.bed_backlight:
+      name: "Bedroom Backlight"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight"
+        - "Bedroom Back Light"
+
+    # === BACKLIGHT COLOR PRESETS (scripts, exposed as scenes) ===
+    # Each script publishes {color:{hue,saturation}} directly to MQTT,
+    # bypassing HA's hs_color→xy conversion so HA's color_mode stays
+    # consistent with the main ring being CCT. Voice invocation pattern:
+    #   "Hey Google, activate bedroom backlight red"
+    script.bed_backlight_red:
+      name: "Bedroom Backlight Red"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Red"
+    script.bed_backlight_orange:
+      name: "Bedroom Backlight Orange"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Orange"
+        - "Bedroom Backlight Amber"
+    script.bed_backlight_green:
+      name: "Bedroom Backlight Green"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Green"
+    script.bed_backlight_blue:
+      name: "Bedroom Backlight Blue"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Blue"
+    script.bed_backlight_purple:
+      name: "Bedroom Backlight Purple"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Purple"
+        - "Bedroom Backlight Violet"
+    script.bed_backlight_pink:
+      name: "Bedroom Backlight Pink"
+      expose: true
+      room: "Bedroom"
+      aliases:
+        - "Bed Backlight Pink"
+        - "Bedroom Backlight Magenta"
 
     # === SMART PLUG (Voice controllable) ===
     switch.smart_plug_1:
@@ -561,6 +651,15 @@ input_boolean:
   circadian_hallway_override:
     name: Hallway Light Override
     icon: mdi:hand-back-right
+  # =========================================================================
+  # BED BACKLIGHT VOICE STATE HOLDER
+  # Tracks desired on/off state for the EGLO Rovito-Z backlight LEDs.
+  # Drives switch.bed_backlight (template switch below) so Google Home can
+  # say "turn off the bedroom backlight" without affecting the main ring.
+  # =========================================================================
+  bed_backlight_state:
+    name: Bed Backlight State
+    icon: mdi:led-strip-variant
 
 # =============================================================================
 # INPUT DATETIMES - Override Expiration Timestamps
@@ -992,6 +1091,39 @@ template:
           action: media_player.turn_off
           target:
             entity_id: media_player.living_room_tv
+
+      # =========================================================================
+      # BED BACKLIGHT CONTROL SWITCH
+      # Google Home can't address the EGLO Rovito-Z backlight separately from
+      # the main ring (both LEDs share one light entity). This switch gives
+      # voice access to backlight-only power control via the xy(0,0) trick
+      # (see root CLAUDE.md lesson 2026-04-15).
+      #
+      # OFF: sends {color:{x:0,y:0}} → RGB backlight LEDs power down,
+      #      main CCT ring preserved
+      # ON:  sends {color:{hue:280,sat:80}} → restores a warm purple backlight
+      #      (user can pick any color via dashboard after turn-on)
+      # =========================================================================
+      - name: "Bed Backlight"
+        unique_id: bed_backlight
+        icon: mdi:led-strip-variant
+        state: "{{ is_state('input_boolean.bed_backlight_state', 'on') }}"
+        turn_on:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.bed_backlight_state
+          - action: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/[Bed] Light/set"
+              payload: '{"color":{"hue":280,"saturation":80}}'
+        turn_off:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.bed_backlight_state
+          - action: mqtt.publish
+            data:
+              topic: "zigbee2mqtt/[Bed] Light/set"
+              payload: '{"color":{"x":0,"y":0}}'
 
   - sensor:
       - name: "Circadian Phase"
