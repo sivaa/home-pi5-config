@@ -3138,8 +3138,64 @@
 
           <!-- Left column -->
           <div class="wx-left-col" x-show="current">
-            <section class="wx-panel wx-hero"></section>
-            <section class="wx-panel wx-hourly"></section>
+            <section class="wx-panel wx-hero">
+              <div class="wx-hero-main">
+                <div class="wx-hero-temp">
+                  <span x-text="heroTemp"></span><span class="wx-hero-unit">°</span>
+                </div>
+                <div class="wx-hero-desc" x-text="heroDescription"></div>
+                <div class="wx-hero-hilo" x-text="heroHiLoLine"></div>
+              </div>
+              <div class="wx-hero-right">
+                <div class="wx-hero-emoji" x-text="heroEmoji"></div>
+                <div class="wx-hero-precip">
+                  <div class="wx-hero-precip-label">
+                    <span>Precip next 6h</span>
+                    <span x-text="precipSummary.label"></span>
+                  </div>
+                  <div class="wx-hero-precip-track">
+                    <div class="wx-hero-precip-fill" :style="'width: ' + precipSummary.pct + '%'"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="wx-panel wx-hourly">
+              <div class="wx-panel-title">Next 24h</div>
+
+              <!-- SVG area curve -->
+              <template x-if="hourly.length >= 2">
+                <div class="wx-hourly-chart">
+                  <svg :viewBox="'0 0 ' + hourlyCurve().width + ' ' + hourlyCurve().height"
+                       preserveAspectRatio="xMidYMid meet"
+                       class="wx-hourly-svg">
+                    <defs>
+                      <linearGradient id="wx-hourly-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <!-- Area under curve -->
+                    <path :d="hourlyCurve().d + ' L ' + hourlyCurve().width + ' ' + hourlyCurve().baseline + ' L 0 ' + hourlyCurve().baseline + ' Z'"
+                          fill="url(#wx-hourly-fill)"/>
+                    <!-- Curve line -->
+                    <path :d="hourlyCurve().d"
+                          fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </template>
+
+              <!-- Hourly cards strip -->
+              <div class="wx-hourly-cards">
+                <template x-for="(h, i) in hourly.slice(0, 12)" :key="'hr-' + i">
+                  <div class="wx-hourly-card">
+                    <div class="wx-hourly-card-time" x-text="h.hour + ':00'"></div>
+                    <div class="wx-hourly-card-emoji" x-text="h.emoji"></div>
+                    <div class="wx-hourly-card-temp"><span x-text="h.temp"></span>°</div>
+                    <div class="wx-hourly-card-precip" x-text="h.precipProb + '%'"></div>
+                  </div>
+                </template>
+              </div>
+            </section>
             <section class="wx-panel wx-10day"></section>
           </div>
 

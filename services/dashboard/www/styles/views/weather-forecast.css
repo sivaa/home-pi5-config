@@ -149,3 +149,80 @@
 }
 
 /* Individual component styles are appended in tasks 6-12. */
+
+/* ---------- Hero ---------- */
+.wx-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  padding: 28px 32px;
+}
+.wx-hero-main { display: flex; flex-direction: column; gap: 8px; }
+.wx-hero-temp {
+  font-size: 72px; font-weight: 800; line-height: 1;
+  letter-spacing: -0.03em;
+}
+.wx-hero-unit { font-weight: 500; opacity: 0.6; }
+.wx-hero-desc { font-size: 18px; color: var(--wx-text-muted); }
+.wx-hero-hilo { font-size: 13px; color: var(--wx-text-dim); }
+.wx-hero-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 16px;
+}
+.wx-hero-emoji { font-size: 96px; line-height: 1; }
+.wx-hero-precip {
+  min-width: 220px;
+  background: var(--wx-panel-bg);
+  border: 1px solid var(--wx-panel-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.wx-hero-precip-label {
+  display: flex; justify-content: space-between;
+  font-size: 11px; font-weight: 700;
+  color: var(--wx-text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.wx-hero-precip-track {
+  height: 6px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.wx-hero-precip-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--wx-accent-lo-a), var(--wx-accent-lo-b));
+  transition: width 0.4s ease;
+}
+
+/* ---------- Hourly ---------- */
+.wx-hourly-chart {
+  height: 140px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+.wx-hourly-svg { width: 100%; height: 100%; display: block; }
+
+.wx-hourly-cards {
+  display: flex; gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 4px 2px 8px;
+  scrollbar-width: none;
+}
+.wx-hourly-cards::-webkit-scrollbar { display: none; }
+.wx-hourly-card {
+  flex: 0 0 64px;
+  scroll-snap-align: start;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 4px;
+  background: var(--wx-panel-bg);
+  border: 1px solid var(--wx-panel-border);
+  border-radius: 12px;
+  gap: 4px;
+}
+.wx-hourly-card-time { font-size: 10px; color: var(--wx-text-dim); font-weight: 600; }
+.wx-hourly-card-emoji { font-size: 18px; }
+.wx-hourly-card-temp { font-size: 13px; font-weight: 700; }
+.wx-hourly-card-precip { font-size: 10px; color: var(--wx-accent-lo-a); font-weight: 700; }
