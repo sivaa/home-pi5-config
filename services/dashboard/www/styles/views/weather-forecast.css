@@ -226,3 +226,122 @@
 .wx-hourly-card-emoji { font-size: 18px; }
 .wx-hourly-card-temp { font-size: 13px; font-weight: 700; }
 .wx-hourly-card-precip { font-size: 10px; color: var(--wx-accent-lo-a); font-weight: 700; }
+
+/* ---------- 10-day chart ---------- */
+.wx-10day-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 16px; margin-bottom: 12px;
+}
+.wx-10day-subtitle { font-size: 11px; color: var(--wx-text-dim); margin-top: 2px; }
+.wx-10day-legend {
+  display: flex; gap: 16px;
+  font-size: 11px; color: var(--wx-text-muted);
+}
+.wx-legend-chip {
+  display: inline-block; width: 12px; height: 3px; border-radius: 999px;
+  vertical-align: middle; margin-right: 4px;
+}
+.wx-legend-hi { background: linear-gradient(90deg, #fbbf24, #f97316); }
+.wx-legend-lo { background: linear-gradient(90deg, #38bdf8, #22d3ee); }
+
+.wx-10day-chart-wrap {
+  position: relative;
+  aspect-ratio: 808 / 180;
+  width: 100%;
+}
+.wx-10day-svg { width: 100%; height: 100%; display: block; }
+
+/* Selection overlay: width = 10% (1 of 10 cols), left driven by Alpine-set var */
+.wx-10day-sel-overlay {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 10%;
+  left: calc(var(--wx-sel-i, 0) * 10%);
+  background: var(--wx-selected-tint);
+  border-left: 1px solid var(--wx-panel-border);
+  border-right: 1px solid var(--wx-panel-border);
+  transition: left 0.2s ease;
+  pointer-events: none;
+}
+
+/* One-shot stroke-draw gate (see spec §6) */
+.wx-curve {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+}
+.wx-drawn .wx-curve-high { animation: wx-draw 1.2s ease-out forwards; }
+.wx-drawn .wx-curve-low  { animation: wx-draw 1.2s 0.2s ease-out forwards; }
+@keyframes wx-draw { to { stroke-dashoffset: 0; } }
+
+/* ---------- Day columns ---------- */
+.wx-daycols {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 16px;
+}
+.wx-daycol {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  min-height: 92px;
+  padding: 10px 4px;
+  background: var(--wx-panel-bg);
+  border: 1px solid var(--wx-panel-border);
+  border-radius: 14px;
+  color: var(--wx-text-primary);
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.15s ease, background 0.15s ease;
+  touch-action: manipulation;
+}
+.wx-daycol:active { transform: scale(0.98); }
+.wx-daycol.is-selected {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.wx-daycol.is-weekend:not(.is-selected) {
+  background: rgba(251, 191, 36, 0.05);
+  border-color: rgba(251, 191, 36, 0.15);
+}
+.wx-daycol-badge {
+  position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; font-weight: 800;
+  padding: 2px 6px; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.wx-daycol-badge-today { background: #2563eb; color: white; }
+.wx-daycol-badge-wknd  { background: rgba(251, 191, 36, 0.9); color: #451a03; }
+
+.wx-daycol-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.wx-daycol-date { font-size: 9px; color: var(--wx-text-dim); }
+.wx-daycol-emoji { font-size: 20px; line-height: 1; }
+.wx-daycol-precip { font-size: 10px; font-weight: 700; color: var(--wx-accent-lo-a); }
+
+/* ---------- Selected day detail strip ---------- */
+.wx-selday {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--wx-panel-bg);
+  border: 1px solid var(--wx-panel-border);
+  border-radius: 16px;
+  min-height: 56px;
+  display: flex; align-items: center;
+}
+.wx-selday-hint {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: var(--wx-text-dim);
+}
+.wx-selday-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+.wx-selday-cell { display: flex; align-items: center; gap: 10px; }
+.wx-selday-icon { font-size: 18px; }
+.wx-selday-label { font-size: 10px; font-weight: 700; color: var(--wx-text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.wx-selday-value { font-size: 13px; font-weight: 700; }

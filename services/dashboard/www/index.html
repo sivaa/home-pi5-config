@@ -3196,7 +3196,162 @@
                 </template>
               </div>
             </section>
-            <section class="wx-panel wx-10day"></section>
+            <section class="wx-panel wx-10day">
+              <div class="wx-10day-header">
+                <div>
+                  <div class="wx-panel-title">10-Day Forecast</div>
+                  <div class="wx-10day-subtitle">Trend · Weekend highlighted</div>
+                </div>
+                <div class="wx-10day-legend">
+                  <span><span class="wx-legend-chip wx-legend-hi"></span> High</span>
+                  <span><span class="wx-legend-chip wx-legend-lo"></span> Low</span>
+                </div>
+              </div>
+
+              <div class="wx-10day-chart-wrap">
+                <!-- Static SVG chart -->
+                <template x-if="dailyCurve()">
+                  <svg viewBox="0 0 808 180"
+                       preserveAspectRatio="xMidYMid meet"
+                       class="wx-10day-svg"
+                       x-ref="curve10d"
+                       x-init="$nextTick(() => $refs.curve10d && $refs.curve10d.classList.add('wx-drawn'))">
+                    <defs>
+                      <linearGradient id="wx-hi-grad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#fbbf24"/>
+                        <stop offset="100%" stop-color="#f97316"/>
+                      </linearGradient>
+                      <linearGradient id="wx-lo-grad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#22d3ee"/>
+                      </linearGradient>
+                      <linearGradient id="wx-area-grad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.22"/>
+                        <stop offset="50%" stop-color="#a78bfa" stop-opacity="0.12"/>
+                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.22"/>
+                      </linearGradient>
+                    </defs>
+
+                    <!-- Weekend column tints -->
+                    <template x-for="(d, i) in daily" :key="'wk-' + i">
+                      <rect x-show="d.isWeekend"
+                            :x="dailyCurve().padX + i * dailyCurve().colW - dailyCurve().colW / 2"
+                            y="0"
+                            :width="dailyCurve().colW"
+                            height="180"
+                            fill="rgba(251, 191, 36, 0.05)"
+                            stroke="rgba(251, 191, 36, 0.12)"
+                            stroke-dasharray="2 4"/>
+                    </template>
+
+                    <!-- Horizontal gridlines -->
+                    <template x-for="y in dailyCurve().gridY" :key="'g-' + y">
+                      <line :x1="dailyCurve().padX" :x2="808 - dailyCurve().padX"
+                            :y1="y" :y2="y"
+                            stroke="rgba(255,255,255,0.06)" stroke-dasharray="3 6"/>
+                    </template>
+
+                    <!-- Filled area between high and low -->
+                    <path :d="dailyCurve().areaPath" fill="url(#wx-area-grad)"/>
+
+                    <!-- High curve (one-shot draw) -->
+                    <path :d="dailyCurve().hiPath"
+                          fill="none" stroke="url(#wx-hi-grad)"
+                          stroke-width="2.5" stroke-linecap="round"
+                          class="wx-curve wx-curve-high"/>
+
+                    <!-- Low curve (one-shot draw) -->
+                    <path :d="dailyCurve().loPath"
+                          fill="none" stroke="url(#wx-lo-grad)"
+                          stroke-width="2.5" stroke-linecap="round"
+                          class="wx-curve wx-curve-low"/>
+
+                    <!-- Per-day dots + temp labels -->
+                    <template x-for="(p, i) in dailyCurve().hiPts" :key="'hi-' + i">
+                      <g>
+                        <circle :cx="p.x" :cy="p.y" r="4"
+                                fill="#0a0c10" stroke="#f97316" stroke-width="2"/>
+                        <text :x="p.x" :y="p.y - 10" text-anchor="middle"
+                              fill="white" font-size="12" font-weight="700"
+                              x-text="daily[i].tempMax + '°'"></text>
+                      </g>
+                    </template>
+                    <template x-for="(p, i) in dailyCurve().loPts" :key="'lo-' + i">
+                      <g>
+                        <circle :cx="p.x" :cy="p.y" r="4"
+                                fill="#0a0c10" stroke="#38bdf8" stroke-width="2"/>
+                        <text :x="p.x" :y="p.y + 20" text-anchor="middle"
+                              fill="rgba(255,255,255,0.65)" font-size="11" font-weight="600"
+                              x-text="daily[i].tempMin + '°'"></text>
+                      </g>
+                    </template>
+                  </svg>
+                </template>
+
+                <!-- Selection overlay (sibling div, only updates this element on selection) -->
+                <div class="wx-10day-sel-overlay"
+                     :style="'--wx-sel-i: ' + selectedDayIndex"></div>
+              </div>
+
+              <!-- Day columns -->
+              <div class="wx-daycols">
+                <template x-for="(d, i) in daily" :key="'dc-' + i">
+                  <button class="wx-daycol"
+                          :class="{ 'is-selected': selectedDayIndex === i, 'is-weekend': d.isWeekend, 'is-today': i === 0 }"
+                          @click="selectDay(i)"
+                          type="button">
+                    <span x-show="i === 0" class="wx-daycol-badge wx-daycol-badge-today">Today</span>
+                    <span x-show="i !== 0 && d.isWeekend" class="wx-daycol-badge wx-daycol-badge-wknd">Wknd</span>
+                    <span class="wx-daycol-name" x-text="d.dayName"></span>
+                    <span class="wx-daycol-date" x-text="d.dateStr"></span>
+                    <span class="wx-daycol-emoji" x-text="d.emoji"></span>
+                    <span class="wx-daycol-precip" x-text="d.precipProb + '%'"></span>
+                  </button>
+                </template>
+              </div>
+
+              <!-- Selected day detail strip -->
+              <div class="wx-selday">
+                <template x-if="!showSelectedDetail">
+                  <div class="wx-selday-hint">Tap any day above for details</div>
+                </template>
+                <template x-if="showSelectedDetail && selectedDay">
+                  <div class="wx-selday-grid">
+                    <div class="wx-selday-cell">
+                      <span class="wx-selday-icon" x-text="selectedDay.emoji"></span>
+                      <div>
+                        <div class="wx-selday-label">Selected</div>
+                        <div class="wx-selday-value" x-text="selectedDay.dayName + ' · ' + selectedDay.dateStr"></div>
+                      </div>
+                    </div>
+                    <div class="wx-selday-cell">
+                      <span class="wx-selday-icon">🌡️</span>
+                      <div>
+                        <div class="wx-selday-label">High / Low</div>
+                        <div class="wx-selday-value">
+                          <span x-text="selectedDay.tempMax"></span>° /
+                          <span x-text="selectedDay.tempMin"></span>°
+                        </div>
+                      </div>
+                    </div>
+                    <div class="wx-selday-cell">
+                      <span class="wx-selday-icon">💧</span>
+                      <div>
+                        <div class="wx-selday-label">Precipitation</div>
+                        <div class="wx-selday-value"><span x-text="selectedDay.precipProb"></span>%</div>
+                      </div>
+                    </div>
+                    <div class="wx-selday-cell">
+                      <span class="wx-selday-icon">🌬</span>
+                      <div>
+                        <div class="wx-selday-label">UV Index</div>
+                        <div class="wx-selday-value"><span x-text="selectedDay.uvIndex"></span></div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </section>
           </div>
 
           <!-- Right column -->
