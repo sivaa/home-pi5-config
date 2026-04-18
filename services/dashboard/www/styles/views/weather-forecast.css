@@ -53,26 +53,28 @@
   /* Sidebar stretches to fill the viewport height. */
   align-self: stretch;
 }
-/* Topbar keeps its natural height; data panels share the remaining space. */
-.weather-forecast-view .wx-right-col > .wx-topbar { flex: 0 0 auto; }
+/* Right sidebar sizing — content-driven with Highlights absorbing extra
+   vertical space so the sidebar fills the full column height without
+   inflating Conditions/Daylight into empty rectangles. */
+.weather-forecast-view .wx-right-col > .wx-topbar,
 .weather-forecast-view .wx-right-col > .wx-stats,
-.weather-forecast-view .wx-right-col > .wx-sun,
+.weather-forecast-view .wx-right-col > .wx-sun {
+  flex: 0 0 auto;
+}
 .weather-forecast-view .wx-right-col > .wx-highlights {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-/* Inside each, the title sticks to the top; content body grows to fill. */
 .weather-forecast-view .wx-right-col > .wx-panel > .wx-panel-title {
   flex: 0 0 auto;
 }
-/* Stats grid fills the card vertically */
-.weather-forecast-view .wx-stats-grid { flex: 1 1 auto; align-content: stretch; }
-/* Highlights list spaces rows evenly through remaining height */
-.weather-forecast-view .wx-highlights-list { flex: 1 1 auto; justify-content: space-between; }
-/* Sun card stacks its times + track with the track near the bottom */
-.weather-forecast-view .wx-sun { justify-content: space-between; }
+/* Highlights list spreads its 4 rows through the remaining height */
+.weather-forecast-view .wx-highlights-list {
+  flex: 1 1 auto;
+  justify-content: space-between;
+}
 
 @media (max-width: 1023px) {
   .weather-forecast-view {
