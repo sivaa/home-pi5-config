@@ -5731,14 +5731,26 @@
           const allOn = this.list.every(l => l.state === 'ON');
           const newState = allOn ? 'OFF' : 'ON';
           this.list.forEach(light => {
-            if (light.colorPropSuffix) {
-              this._publishRaw(light, this._togglePayload(light, newState));
-              light.mainOn = (newState === 'ON');
-              light.sidelightOn = (newState === 'ON');
-              light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
+            // Per-light: cancel any pending delayed ON from a prior tap.
+            if (light._pendingOnTimer) {
+              clearTimeout(light._pendingOnTimer);
+              light._pendingOnTimer = null;
+            }
+
+            const sw = this.getLightSwitch(light);
+            const needsPrePulse =
+              newState === 'ON' && sw && sw.available && sw.state !== 'ON';
+
+            if (needsPrePulse) {
+              this._publishSwitchOn(sw);
+              light._pendingOnTimer = setTimeout(() => {
+                light._pendingOnTimer = null;
+                // Bail if the bulb already came back ON during the wait.
+                if (light.state === 'ON') return;
+                this._sendBulbCommand(light, 'ON');
+              }, 3000);
             } else {
-              this.publishCommand(light, { state: newState });
-              light.state = newState;
+              this._sendBulbCommand(light, newState);
             }
           });
         },
