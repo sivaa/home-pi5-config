@@ -100,17 +100,23 @@ export function weatherForecastView() {
     dailyCurve() {
       const d = this.daily || [];
       if (d.length < 2) return null;
-      const W = 808, H = 180, padX = 40, padTop = 24, padBottom = 36;
+      // Align curve endpoints with day-column CENTERS below.
+      // Columns are in a `repeat(N, 1fr)` grid with NO gap, so column i
+      // spans [i/N, (i+1)/N] of the chart width and its center is at
+      // (i + 0.5) / N. First point x = W/(2N); last = W - W/(2N).
+      const W = 808, H = 180, padTop = 24, padBottom = 36;
+      const N = d.length;
+      const padX = W / (2 * N);  // = 40.4 at N=10
       const allTemps = d.flatMap(x => [x.tempMax, x.tempMin]);
       const tMin = Math.min(...allTemps) - 2;
       const tMax = Math.max(...allTemps) + 2;
-      const colW = (W - padX * 2) / (d.length - 1);
+      const colW = (W - padX * 2) / (N - 1);
       const hiPts = d.map((x, i) => ({
-        x: xScale(i, d.length, W, padX),
+        x: xScale(i, N, W, padX),
         y: yScale(x.tempMax, tMin, tMax, H, padTop, padBottom)
       }));
       const loPts = d.map((x, i) => ({
-        x: xScale(i, d.length, W, padX),
+        x: xScale(i, N, W, padX),
         y: yScale(x.tempMin, tMin, tMax, H, padTop, padBottom)
       }));
       const hiPath = smoothPath(hiPts);

@@ -284,11 +284,16 @@
 .wx-drawn .wx-curve-low  { animation: wx-draw 1.2s 0.2s ease-out forwards; }
 @keyframes wx-draw { to { stroke-dashoffset: 0; } }
 
-/* ---------- Day columns ---------- */
+/* ---------- Day columns ----------
+ * NOTE: gap is 0 so the column grid spans the exact same horizontal
+ * extent as the SVG chart above. Each column's CENTER aligns with its
+ * corresponding curve point (padX = W/(2N) in dailyCurve()).
+ * Visual breathing room between cells comes from transparent inner
+ * margin on .wx-daycol instead. */
 .wx-daycols {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 4px;
+  gap: 0;
   margin-top: 16px;
 }
 .wx-daycol {
@@ -297,6 +302,7 @@
   gap: 2px;
   min-height: 72px;
   padding: 6px 2px;
+  margin: 0 2px;
   background: var(--wx-panel-bg);
   border: 1px solid var(--wx-panel-border);
   border-radius: 12px;
