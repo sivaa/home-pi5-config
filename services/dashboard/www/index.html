@@ -701,7 +701,7 @@
                       </div>
                     </div>
                     <button class="light-toggle" :class="{ 'toggle-on': light.state === 'ON' && light.available, 'toggle-syncing': light.syncing, 'toggle-unavailable': !light.available }"
-                            @click="$store.lights.toggleLight(light)" :disabled="light.syncing || !light.available">
+                            @click="$store.lights.toggleLight(light)" :disabled="light.syncing || (!light.available && !$store.lights.canPowerCycle(light))">
                       <div class="toggle-track">
                         <div class="toggle-thumb">
                           <span class="loading-indicator loading-sm" x-show="light.syncing"></span>
