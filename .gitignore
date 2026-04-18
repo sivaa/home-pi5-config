@@ -30,3 +30,9 @@ services/dashboard/www/prototypes/
 test-results/
 services/dashboard/www/test-results/
 .playwright-mcp/
+
+# MCP tool state (per-machine, not portable)
+.serena/
+
+# Scratch / ephemeral workspace
+temp/
