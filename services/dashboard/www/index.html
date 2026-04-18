@@ -5716,6 +5716,10 @@
             // misses, the user taps ON again and it hits a live bulb.
             light._pendingOnTimer = setTimeout(() => {
               light._pendingOnTimer = null;
+              // Bail if the bulb already came back ON via a normal MQTT
+              // state update during the wait - no point sending a redundant
+              // ON that would just re-trigger a syncing cycle on the card.
+              if (light.state === 'ON') return;
               this._sendBulbCommand(light, 'ON');
             }, 3000);
           } else {
