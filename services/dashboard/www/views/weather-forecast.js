@@ -149,13 +149,33 @@ export function weatherForecastView() {
       return d?.sunset ? new Date(d.sunset).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     },
 
+    /** Position of the sun along its day arc as a 0..1 fraction.
+     *  Before sunrise returns 0; after sunset returns 1; clamped in between. */
+    get sunFraction() {
+      const d = this.daily?.[0];
+      if (!d?.sunrise || !d?.sunset) return null;
+      const rise = new Date(d.sunrise).getTime();
+      const set = new Date(d.sunset).getTime();
+      const now = Date.now();
+      if (now <= rise) return 0;
+      if (now >= set) return 1;
+      return (now - rise) / (set - rise);
+    },
+
     // ----- UV description -----
     uvDescription(uv) {
-      if (uv <= 2) return 'Low. Minimal sun protection needed.';
-      if (uv <= 5) return 'Moderate. Sunscreen advised.';
-      if (uv <= 7) return 'High. Cover up and use sunscreen.';
-      if (uv <= 10) return 'Very high. Limit midday exposure.';
-      return 'Extreme. Avoid sun exposure.';
+      if (uv <= 2) return 'Low';
+      if (uv <= 5) return 'Moderate';
+      if (uv <= 7) return 'High — cover up';
+      if (uv <= 10) return 'Very high';
+      return 'Extreme';
+    },
+
+    // ----- Wind compass direction -----
+    windCompass(deg) {
+      if (deg == null) return '--';
+      const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+      return dirs[Math.round(((deg % 360) / 45)) % 8];
     }
   };
 }

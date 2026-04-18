@@ -358,9 +358,10 @@ export function initWeatherForecastStore(Alpine) {
       };
     },
 
-    _dayName(date, index) {
-      if (index === 0) return 'Today';
-      if (index === 1) return 'Tomorrow';
+    _dayName(date, _index) {
+      // Always 3-char weekday so column labels stay aligned across the 10 columns.
+      // "Today" / "Tomorrow" identity is conveyed via the Today badge on the
+      // day-column button, not by changing label length (which breaks layout).
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     }
   });

@@ -42,7 +42,7 @@
   <link rel="stylesheet" href="styles/views/device-health.css">
   <link rel="stylesheet" href="styles/views/notification-history.css">
   <link rel="stylesheet" href="styles/views/system.css?v=8">
-  <link rel="stylesheet" href="styles/views/weather-forecast.css?v=20260418-bignums">
+  <link rel="stylesheet" href="styles/views/weather-forecast.css?v=20260418-cardsfix">
   <link rel="stylesheet" href="styles/views/tts.css">
   <link rel="stylesheet" href="styles/views/tts-log.css">
   <link rel="stylesheet" href="styles/notifications.css">
@@ -3120,7 +3120,13 @@
                   <span x-text="heroTemp"></span><span class="wx-hero-unit">°</span>
                 </div>
                 <div class="wx-hero-desc" x-text="heroDescription"></div>
-                <div class="wx-hero-hilo" x-text="heroHiLoLine"></div>
+                <div class="wx-hero-hilo">
+                  <span>H <b x-text="daily[0]?.tempMax + '°'"></b></span>
+                  <span class="wx-hero-hilo-sep">·</span>
+                  <span>L <b x-text="daily[0]?.tempMin + '°'"></b></span>
+                  <span class="wx-hero-hilo-sep">·</span>
+                  <span>Feels <b x-text="current?.feelsLike + '°'"></b></span>
+                </div>
               </div>
               <div class="wx-hero-right">
                 <div class="wx-hero-emoji" x-text="heroEmoji"></div>
@@ -3318,7 +3324,7 @@
                       </div>
                     </div>
                     <div class="wx-selday-cell">
-                      <span class="wx-selday-icon">🌬</span>
+                      <span class="wx-selday-icon">☀️</span>
                       <div>
                         <div class="wx-selday-label">UV Index</div>
                         <div class="wx-selday-value"><span x-text="selectedDay.uvIndex"></span></div>
@@ -3363,7 +3369,7 @@
                   <div class="wx-stat-value">
                     <span x-text="current?.wind ?? '--'"></span><span class="wx-stat-unit">km/h</span>
                   </div>
-                  <div class="wx-stat-desc">From <span x-text="current?.windDir ?? '--'"></span>°</div>
+                  <div class="wx-stat-desc">From <span x-text="windCompass(current?.windDir)"></span></div>
                 </div>
                 <div class="wx-stat">
                   <div class="wx-stat-icon wx-stat-icon-feels">🌡️</div>
@@ -3404,13 +3410,14 @@
                   <span x-text="sunsetText"></span>
                 </div>
               </div>
-              <svg viewBox="0 0 200 40" class="wx-sun-arc" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                <path d="M 10 40 Q 100 -10 190 40"
-                      fill="none"
-                      stroke="rgba(251, 191, 36, 0.35)"
-                      stroke-width="1.5"
-                      stroke-dasharray="3 4"/>
-              </svg>
+              <template x-if="sunFraction !== null">
+                <div class="wx-sun-track">
+                  <div class="wx-sun-track-bar"></div>
+                  <div class="wx-sun-track-dot"
+                       :style="'left: ' + (sunFraction * 100) + '%'"
+                       :class="{ 'is-past': sunFraction >= 1 }"></div>
+                </div>
+              </template>
             </section>
             <section class="wx-panel wx-highlights" x-show="store.weeklyHighlights">
               <div class="wx-panel-title">Week Highlights</div>
@@ -4769,8 +4776,8 @@
 
   <!-- Weather Forecast View Module - loads store and view -->
   <script type="module">
-    import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js?v=20260418-bignums';
-    import { weatherForecastView } from './views/weather-forecast.js?v=20260418-bignums';
+    import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js?v=20260418-cardsfix';
+    import { weatherForecastView } from './views/weather-forecast.js?v=20260418-cardsfix';
 
     // Expose view globally for Alpine x-data
     window.weatherForecastView = weatherForecastView;
