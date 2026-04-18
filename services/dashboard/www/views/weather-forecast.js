@@ -1,255 +1,166 @@
 /**
- * Weather Forecast View Controller — Redesign
- * Combined top strip (hero + alert + 24h hourly with change detection)
- * Tiered daily rows (large → medium → compact)
+ * Weather Forecast View - Redesign (2026-04-18)
+ * See docs/superpowers/specs/2026-04-18-weather-redesign-design.md
  *
- * Lifecycle:
- *   init() → activate store (starts fetching)
- *   destroy() → deactivate store (stops polling)
+ * View controller. Reads from Alpine.store('weatherForecast').
+ * Owns UI-only state: selectedDayIndex. Exposes helpers for the template.
+ *
+ * Selected day resets to 0 on view re-entry by design - the Highlights
+ * panel is the persistent summary.
  */
+
+import { smoothPath, xScale, yScale } from '../utils/svg-curve.js';
 
 export function weatherForecastView() {
   return {
+    // ----- UI state -----
+    selectedDayIndex: 0,
     _initialized: false,
 
-    // ========================================
-    // LIFECYCLE
-    // ========================================
-
+    // ----- Lifecycle -----
     init() {
       if (this._initialized) return;
       this._initialized = true;
-      console.log('[weather-forecast-view] Initializing...');
-      if (!this.$store.weatherForecast) {
-        console.error('[weather-forecast-view] Store not found! Check script loading order.');
-        return;
-      }
-      this.$store.weatherForecast.activate();
+      this.store.activate();
     },
 
     destroy() {
-      console.log('[weather-forecast-view] Destroying...');
-      this.$store.weatherForecast?.deactivate();
+      if (!this._initialized) return;
       this._initialized = false;
+      this.store.deactivate();
     },
 
-    // ========================================
-    // STORE ACCESS
-    // ========================================
+    // ----- Store proxy -----
+    get store() { return Alpine.store('weatherForecast'); },
+    get current() { return this.store.current; },
+    get hourly() { return this.store.hourly; },
+    get daily() { return this.store.daily; },
+    get isLoading() { return this.store.loading; },
+    get hasError() { return !!this.store.error && !this.store.daily?.length; },
+    get isStale() { return !!this.store.error && this.store.daily?.length > 0; },
 
-    get store() { return this.$store.weatherForecast; },
-    get current() { return this.store?.current; },
-    get hourly() { return this.store?.hourly || []; },
-    get daily() { return this.store?.daily || []; },
-    get alertText() { return this.store?.alertText; },
-    get isLoading() { return this.store?.loading; },
-    get hasError() { return this.store?.error && !this.store?.daily?.length; },
-    get isStale() { return this.store?.error && this.store?.daily?.length > 0; },
-
-    // Stub - redefined as proper method in Batch 4 (weather-forecast.js rewrite)
+    // ----- Freshness / refresh -----
     getFreshnessClass() {
-      const last = this.store?.lastUpdate;
+      const last = this.store.lastUpdate;
       if (!last) return 'stale';
       const ageMin = (Date.now() - last) / 60000;
       if (ageMin < 10) return '';
       if (ageMin < 60) return 'warn';
       return 'stale';
     },
-
-    // ========================================
-    // HERO (Now column)
-    // ========================================
-
-    get heroTemp() {
-      return this.current ? String(this.current.temp) : '--';
-    },
-
-    get heroDescription() {
-      return this.current?.description || 'Loading...';
-    },
-
-    get heroEmoji() {
-      return this.current?.emoji || '...';
-    },
-
-    get heroSub() {
-      if (!this.daily.length) return '';
-      const today = this.daily[0];
-      const hi = Number.isFinite(today.tempMax) ? today.tempMax : '--';
-      const lo = Number.isFinite(today.tempMin) ? today.tempMin : '--';
-      return `H: ${hi}\u00B0 \u00B7 L: ${lo}\u00B0`;
-    },
-
-    // ========================================
-    // ALERT BADGE
-    // ========================================
-
-    _ALERT_MAP: {
-      rain:  { match: ['\u{1F327}'],              icon: '\u{1F327}\uFE0F', title: 'Rain Expected' },
-      cold:  { match: ['\u2744', '\u{1F328}'],    icon: '\u2744\uFE0F',    title: 'Freezing' },
-      heat:  { match: ['\u{1F525}'],              icon: '\u{1F525}',       title: 'Heat Alert' },
-    },
-
-    get alertInfo() {
-      const text = this.alertText || '';
-      for (const [type, cfg] of Object.entries(this._ALERT_MAP)) {
-        if (cfg.match.some(ch => text.includes(ch))) {
-          return { type, icon: cfg.icon, title: cfg.title };
-        }
-      }
-      return {
-        type: 'clear',
-        icon: this.current?.emoji || '\u2600\uFE0F',
-        title: 'Clear'
-      };
-    },
-
-    getAlertType() { return this.alertInfo.type; },
-    getAlertIcon() { return this.alertInfo.icon; },
-    getAlertTitle() { return this.alertInfo.title; },
-
-    /** Compact sub-text for alert badge (e.g. "Low: 0°C") */
-    getAlertSub() {
-      if (!this.alertText) return '';
-      return this.alertText.replace(/^[\u{1F300}-\u{1F9FF}\u2600-\u26FF\u2744\uFE0F\u{1F525}]+\s*/u, '');
-    },
-
-    // ========================================
-    // HOURLY STRIP — 24h with change detection
-    //
-    // "Change" = temp differs from previous hour
-    // Only change hours show their temperature
-    // First hour is always a "change" (shows temp)
-    // ========================================
-
-    /**
-     * Returns array of 24 hour objects with display flags:
-     *   { hour, emoji, temp, label, isChange, isMidnight }
-     */
-    getHourlyDisplay() {
-      const hours = this.hourly.slice(0, 24);
-      if (!hours.length) return [];
-
-      return hours.map((h, i) => {
-        const prevTemp = i > 0 ? hours[i - 1].temp : null;
-        const isChange = i === 0 || h.temp !== prevTemp;
-        const isMidnight = h.hour === 0;
-        return {
-          temp: h.temp,
-          emoji: h.emoji,
-          label: this.formatHourCompact(h, i),
-          isChange,
-          isMidnight
-        };
-      });
-    },
-
-    /** Compact hour label: "1p", "12a", "Now" for index 0 */
-    formatHourCompact(h, index) {
-      if (index === 0) return 'Now';
-      const hr = h.hour;
-      if (hr === 0) return '12a';
-      if (hr === 12) return '12p';
-      return hr > 12 ? `${hr - 12}p` : `${hr}a`;
-    },
-
-    // ========================================
-    // DAILY — Tiered rows
-    //
-    // tier-1: indices 0-2 (Today, Tomorrow, day after)
-    // tier-2: indices 3-5
-    // tier-3: indices 6-9
-    // ========================================
-
-    getDailyTier(index) {
-      if (index < 3) return 'tier-1';
-      if (index < 6) return 'tier-2';
-      return 'tier-3';
-    },
-
-    getDailyRowClasses(index) {
-      const tier = this.getDailyTier(index);
-      return index === 0 ? `${tier} today` : tier;
-    },
-
-    // ========================================
-    // DAILY TEMP BAR (Ruler Style)
-    // ========================================
-
-    get globalTempRange() {
-      if (!this.daily.length) return { min: 0, max: 20 };
-      const mins = this.daily.map(d => d.tempMin).filter(Number.isFinite);
-      const maxs = this.daily.map(d => d.tempMax).filter(Number.isFinite);
-      if (!mins.length || !maxs.length) return { min: 0, max: 20 };
-      return {
-        min: Math.min(...mins),
-        max: Math.max(...maxs)
-      };
-    },
-
-    getTempBarStyle(day) {
-      if (!Number.isFinite(day.tempMin) || !Number.isFinite(day.tempMax)) return 'display: none';
-      const range = this.globalTempRange;
-      const totalRange = range.max - range.min || 1;
-      const left = Math.max(0, Math.min(100, ((day.tempMin - range.min) / totalRange) * 100));
-      const rawWidth = ((day.tempMax - day.tempMin) / totalRange) * 100;
-      const width = Math.max(4, Math.min(100 - left, rawWidth));
-      const bgPos = Math.round(left);
-      return `left: ${left.toFixed(1)}%; width: ${width.toFixed(1)}%; background-position: ${bgPos}% 0`;
-    },
-
-    getRulerTicks() {
-      const range = this.globalTempRange;
-      const totalRange = range.max - range.min;
-      if (!Number.isFinite(totalRange) || totalRange <= 0) return [];
-
-      const step = 5;
-      const startTick = Math.ceil(range.min / step) * step;
-      const ticks = [];
-
-      for (let val = startTick; val <= range.max && ticks.length < 20; val += step) {
-        const pct = ((val - range.min) / totalRange) * 100;
-        ticks.push({
-          value: `${val}\u00B0`,
-          left: `${pct.toFixed(1)}%`,
-          isFreezing: val === 0
-        });
-      }
-      return ticks;
-    },
-
-    // ========================================
-    // PRECIPITATION
-    // ========================================
-
-    getPrecipText(day) {
-      if (day.precipProb <= 5) return '';
-      return `${day.precipProb}%`;
-    },
-
-    isPrecipRainy(day) {
-      return day.precipProb >= 50;
-    },
-
-    // ========================================
-    // FOOTER
-    // ========================================
-
     getLastUpdateText() {
-      const ts = this.store?.lastUpdate;
-      if (!ts) return 'Never';
-      const secs = Math.floor((Date.now() - ts) / 1000);
-      if (secs < 60) return 'just now';
-      if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-      return `${Math.floor(secs / 3600)}h ago`;
+      const last = this.store.lastUpdate;
+      if (!last) return 'never';
+      const ageMin = Math.floor((Date.now() - last) / 60000);
+      if (ageMin < 1) return 'just now';
+      if (ageMin < 60) return `${ageMin}m ago`;
+      return `${Math.floor(ageMin / 60)}h ago`;
+    },
+    refresh() { this.store.fetchForecast(); },
+
+    // ----- Hero -----
+    get heroTemp() { return this.current?.temp ?? '--'; },
+    get heroEmoji() { return this.current?.emoji ?? '❓'; },
+    get heroDescription() { return this.current?.description ?? ''; },
+    get heroHiLoLine() {
+      const d = this.daily?.[0];
+      if (!d) return '';
+      const feels = this.current?.feelsLike;
+      return `H ${d.tempMax}° · L ${d.tempMin}°` + (feels != null ? ` · Feels ${feels}°` : '');
     },
 
-    // ========================================
-    // ACTIONS
-    // ========================================
+    // ----- Precipitation summary (next 6 hours) -----
+    get precipSummary() {
+      const next6 = (this.hourly || []).slice(0, 6);
+      if (next6.length === 0) return { pct: 0, label: 'No data' };
+      const peak = next6.reduce((a, b) => (b.precipProb > a.precipProb ? b : a));
+      if (peak.precipProb < 20) return { pct: 0, label: 'Dry next 6h' };
+      const hr = peak.time instanceof Date
+        ? peak.time.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }).toLowerCase()
+        : `${peak.hour}:00`;
+      return { pct: peak.precipProb, label: `${peak.precipProb}% · peak ${hr}` };
+    },
 
-    refresh() {
-      this.store?.fetchForecast();
+    // ----- Hourly curve (SVG) -----
+    hourlyCurve() {
+      const h = this.hourly || [];
+      if (h.length < 2) return { d: '', points: [], width: 0, height: 0 };
+      const W = 808, H = 140, padX = 16, padTop = 16, padBottom = 24;
+      const temps = h.map(x => x.temp);
+      const tMin = Math.min(...temps) - 1;
+      const tMax = Math.max(...temps) + 1;
+      const pts = h.map((x, i) => ({
+        x: xScale(i, h.length, W, padX),
+        y: yScale(x.temp, tMin, tMax, H, padTop, padBottom)
+      }));
+      return { d: smoothPath(pts), points: pts, width: W, height: H, baseline: H - padBottom };
+    },
+
+    // ----- 10-day curve (SVG) -----
+    dailyCurve() {
+      const d = this.daily || [];
+      if (d.length < 2) return null;
+      const W = 808, H = 180, padX = 40, padTop = 24, padBottom = 36;
+      const allTemps = d.flatMap(x => [x.tempMax, x.tempMin]);
+      const tMin = Math.min(...allTemps) - 2;
+      const tMax = Math.max(...allTemps) + 2;
+      const colW = (W - padX * 2) / (d.length - 1);
+      const hiPts = d.map((x, i) => ({
+        x: xScale(i, d.length, W, padX),
+        y: yScale(x.tempMax, tMin, tMax, H, padTop, padBottom)
+      }));
+      const loPts = d.map((x, i) => ({
+        x: xScale(i, d.length, W, padX),
+        y: yScale(x.tempMin, tMin, tMax, H, padTop, padBottom)
+      }));
+      const hiPath = smoothPath(hiPts);
+      const loPath = smoothPath(loPts);
+      const areaPath = hiPath + ' L ' +
+        loPts.slice().reverse().map(p => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L ') + ' Z';
+      return {
+        width: W, height: H, padX, padTop, padBottom, colW,
+        hiPts, loPts, hiPath, loPath, areaPath,
+        gridY: [0.25, 0.5, 0.75].map(p => padTop + p * (H - padTop - padBottom))
+      };
+    },
+
+    // ----- Day column selection -----
+    selectDay(i) { this.selectedDayIndex = i; },
+    get selectedDay() { return this.daily?.[this.selectedDayIndex] ?? null; },
+    get showSelectedDetail() { return this.selectedDayIndex !== 0; },
+
+    // ----- Sun card -----
+    get daylightLabel() {
+      const d = this.daily?.[0];
+      if (!d?.sunrise || !d?.sunset) return '';
+      const rise = new Date(d.sunrise);
+      const set = new Date(d.sunset);
+      const mins = Math.round((set - rise) / 60000);
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h}h ${m}m of daylight`;
+    },
+    get sunriseText() {
+      const d = this.daily?.[0];
+      return d?.sunrise ? new Date(d.sunrise).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    },
+    get sunsetText() {
+      const d = this.daily?.[0];
+      return d?.sunset ? new Date(d.sunset).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    },
+
+    // ----- UV description -----
+    uvDescription(uv) {
+      if (uv <= 2) return 'Low. Minimal sun protection needed.';
+      if (uv <= 5) return 'Moderate. Sunscreen advised.';
+      if (uv <= 7) return 'High. Cover up and use sunscreen.';
+      if (uv <= 10) return 'Very high. Limit midday exposure.';
+      return 'Extreme. Avoid sun exposure.';
     }
   };
 }
+
+// Alpine component registration (matches sibling views)
+document.addEventListener('alpine:init', () => {
+  window.weatherForecastView = weatherForecastView;
+});
