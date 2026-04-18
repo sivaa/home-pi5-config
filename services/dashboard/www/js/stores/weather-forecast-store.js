@@ -57,6 +57,9 @@ export function initWeatherForecastStore(Alpine) {
     // Contextual alert text (derived from hourly data)
     alertText: null,
 
+    // Derived highlights (computed once per fetch, see _computeHighlights)
+    weeklyHighlights: null,
+
     // Status
     loading: false,
     error: null,
@@ -107,9 +110,26 @@ export function initWeatherForecastStore(Alpine) {
         longitude: this.LONGITUDE,
         timezone: this.TIMEZONE,
         forecast_days: 10,
-        current: 'temperature_2m,weather_code,is_day',
+        current: [
+          'temperature_2m',
+          'weather_code',
+          'is_day',
+          'wind_speed_10m',
+          'wind_direction_10m',
+          'relative_humidity_2m',
+          'apparent_temperature'
+        ].join(','),
         hourly: 'temperature_2m,precipitation_probability,weather_code,is_day',
-        daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset'
+        daily: [
+          'weather_code',
+          'temperature_2m_max',
+          'temperature_2m_min',
+          'precipitation_probability_max',
+          'precipitation_sum',
+          'sunrise',
+          'sunset',
+          'uv_index_max'
+        ].join(',')
       });
 
       const controller = new AbortController();
@@ -140,6 +160,7 @@ export function initWeatherForecastStore(Alpine) {
           this.hourly = newHourly;
           this.daily = newDaily;
           this.alertText = newAlert;
+          this.weeklyHighlights = this._computeHighlights(newDaily);
         } catch (parseErr) {
           console.error('[weather-forecast] Parse error:', parseErr.message, 'Data keys:', Object.keys(data));
           this.error = `Forecast parse error: ${parseErr.message}`;
@@ -179,7 +200,11 @@ export function initWeatherForecastStore(Alpine) {
         temp: Math.round(current.temperature_2m),
         emoji: info.emoji,
         description: info.desc,
-        isDay
+        isDay,
+        wind: Math.round(current.wind_speed_10m || 0),
+        windDir: current.wind_direction_10m ?? null,
+        humidity: Math.round(current.relative_humidity_2m || 0),
+        feelsLike: Math.round(current.apparent_temperature ?? current.temperature_2m)
       };
     },
 
@@ -216,6 +241,7 @@ export function initWeatherForecastStore(Alpine) {
         const date = new Date(t);
         const code = daily.weather_code[i];
         const info = this._weatherInfo(code, true);
+        const dayOfWeek = date.getDay();
 
         return {
           date,
@@ -228,7 +254,9 @@ export function initWeatherForecastStore(Alpine) {
           precipProb: Math.round(daily.precipitation_probability_max[i] || 0),
           precipSum: Math.round((daily.precipitation_sum[i] || 0) * 10) / 10,
           sunrise: daily.sunrise[i],
-          sunset: daily.sunset[i]
+          sunset: daily.sunset[i],
+          uvIndex: Math.round(daily.uv_index_max?.[i] ?? 0),
+          isWeekend: dayOfWeek === 0 || dayOfWeek === 6
         };
       });
     },
@@ -286,6 +314,32 @@ export function initWeatherForecastStore(Alpine) {
       }
 
       return null;
+    },
+
+    // ========================================
+    // WEEKLY HIGHLIGHTS
+    // Eager compute, called once per fetch (see fetchForecast).
+    // NOT a getter - getters run on every Alpine reactive read.
+    // ========================================
+
+    _computeHighlights(daily) {
+      if (!daily || daily.length === 0) return null;
+
+      const warmest = daily.reduce((a, b) => (b.tempMax > a.tempMax ? b : a));
+      const coldest = daily.reduce((a, b) => (b.tempMin < a.tempMin ? b : a));
+      const wettest = daily.reduce((a, b) => (b.precipProb > a.precipProb ? b : a));
+
+      const weekends = daily.filter(d => d.isWeekend);
+      let bestWeekend = null;
+      if (weekends.length > 0) {
+        // Highest tempMax, tiebreak lowest precipProb
+        bestWeekend = weekends.reduce((a, b) => {
+          if (b.tempMax !== a.tempMax) return b.tempMax > a.tempMax ? b : a;
+          return b.precipProb < a.precipProb ? b : a;
+        });
+      }
+
+      return { warmest, coldest, wettest, bestWeekend };
     },
 
     // ========================================
