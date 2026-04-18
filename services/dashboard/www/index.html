@@ -683,7 +683,7 @@
             <!-- Light Cards -->
             <div class="lights-grid" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
               <template x-for="light in $store.lights.list" :key="light.id">
-                <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available }">
+                <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available, 'light-switch-off': $store.lights.getLightSwitch(light) && $store.lights.getLightSwitch(light).available && $store.lights.getLightSwitch(light).state === 'OFF' }">
                   <!-- Syncing overlay -->
                   <div class="light-syncing-overlay" x-show="light.syncing && light.available" x-transition.opacity>
                     <span class="loading-indicator"></span>
@@ -694,6 +694,11 @@
                       <span class="light-icon" x-text="light.icon"></span>
                       <div class="light-details">
                         <span class="light-name" x-text="light.name"></span>
+                        <span class="light-switch-badge"
+                              x-show="$store.lights.getLightSwitch(light) && $store.lights.getLightSwitch(light).available && $store.lights.getLightSwitch(light).state === 'OFF'"
+                              x-cloak>
+                          🔌 Switch off
+                        </span>
                         <span class="light-status">
                           <span x-show="light.available && light.syncing" class="syncing-text">Syncing...</span>
                           <span x-show="light.available && !light.syncing" x-text="light.state === 'ON' ? 'On' : 'Off'"></span>
