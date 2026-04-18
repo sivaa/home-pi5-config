@@ -209,7 +209,10 @@
 
 /* ---------- Hourly ---------- */
 .wx-hourly-chart {
-  height: 90px;
+  /* MUST match SVG viewBox aspect (0 0 808 90) - see hourlyCurve() H=90
+     in views/weather-forecast.js. Mismatch triggers 'meet' letterboxing
+     which bleeds dead space on the left/right of the curve. */
+  aspect-ratio: 808 / 90;
   width: 100%;
   margin-bottom: 10px;
 }

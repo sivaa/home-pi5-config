@@ -82,10 +82,12 @@ export function weatherForecastView() {
     },
 
     // ----- Hourly curve (SVG) -----
+    // CRITICAL: viewBox aspect (W/H) must match .wx-hourly-chart aspect
+    // or `preserveAspectRatio=meet` letterboxes the chart. Keep in sync.
     hourlyCurve() {
       const h = this.hourly || [];
       if (h.length < 2) return { d: '', points: [], width: 0, height: 0 };
-      const W = 808, H = 140, padX = 16, padTop = 16, padBottom = 24;
+      const W = 808, H = 90, padX = 0, padTop = 8, padBottom = 10;
       const temps = h.map(x => x.temp);
       const tMin = Math.min(...temps) - 1;
       const tMax = Math.max(...temps) + 1;

@@ -42,7 +42,7 @@
   <link rel="stylesheet" href="styles/views/device-health.css">
   <link rel="stylesheet" href="styles/views/notification-history.css">
   <link rel="stylesheet" href="styles/views/system.css?v=8">
-  <link rel="stylesheet" href="styles/views/weather-forecast.css?v=20260418-h130">
+  <link rel="stylesheet" href="styles/views/weather-forecast.css?v=20260418-hourvb">
   <link rel="stylesheet" href="styles/views/tts.css">
   <link rel="stylesheet" href="styles/views/tts-log.css">
   <link rel="stylesheet" href="styles/notifications.css">
@@ -3147,7 +3147,7 @@
               <!-- SVG area curve -->
               <template x-if="hourly.length >= 2">
                 <div class="wx-hourly-chart">
-                  <svg :viewBox="'0 0 ' + hourlyCurve().width + ' ' + hourlyCurve().height"
+                  <svg viewBox="0 0 808 90"
                        preserveAspectRatio="xMidYMid meet"
                        class="wx-hourly-svg">
                     <defs>
@@ -4776,8 +4776,8 @@
 
   <!-- Weather Forecast View Module - loads store and view -->
   <script type="module">
-    import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js?v=20260418-h130';
-    import { weatherForecastView } from './views/weather-forecast.js?v=20260418-h130';
+    import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js?v=20260418-hourvb';
+    import { weatherForecastView } from './views/weather-forecast.js?v=20260418-hourvb';
 
     // Expose view globally for Alpine x-data
     window.weatherForecastView = weatherForecastView;
