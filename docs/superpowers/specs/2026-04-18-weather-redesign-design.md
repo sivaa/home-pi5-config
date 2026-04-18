@@ -151,7 +151,7 @@ services/dashboard/www/
 
 ### 4.3 10-day forecast (`.wx-curve-10d`)
 - The hero move. Split into a STATIC SVG chart + a thin absolute-positioned overlay div for the selected-column highlight. This avoids re-rasterizing the entire ~60-node SVG on every day-column tap (see perf review, P1 SVG layer repaint).
-- **Static SVG** (`<svg viewBox="0 0 W H" preserveAspectRatio="xMidYMid meet">` where `W` and `H` are the actual pixel dimensions of the panel, recomputed on resize via a `ResizeObserver`, or fixed at `viewBox="0 0 808 180"` for the kiosk baseline and `meet` for other viewports). `preserveAspectRatio="none"` is FORBIDDEN here: it triggers WebKit's path-rendering slow path on non-uniformly stretched strokes.
+- **Static SVG:** `<svg viewBox="0 0 808 180" preserveAspectRatio="xMidYMid meet">`. The viewBox is locked to the kiosk baseline pixel dimensions; `meet` lets it scale cleanly on desktop (1440) and phone (375) fallback widths without introducing non-uniform stroke rendering. `preserveAspectRatio="none"` is FORBIDDEN (WebKit path-rendering slow path). No `ResizeObserver` on the viewBox — mutating the viewBox attribute would invalidate the static-chart/overlay-div split from this same section by triggering a full SVG repaint.
   - Weekend column tint rects (amber 5% fill + dashed border).
   - 3 horizontal dashed gridlines at 25/50/75%.
   - Filled area between high and low curves (vertical gradient: amber → muted purple → sky).
@@ -159,7 +159,7 @@ services/dashboard/www/
   - Low curve (sky→cyan gradient stroke, 2.5px).
   - Per-day dots (2 per day: high + low), temperature labels above/below each dot.
   - **Dropped** (per UX P1 — avoid visual soup): per-day vertical connector lines. The filled area between the two curves already communicates the range. Two range-visualization devices would compete.
-- **Selection overlay** (sibling div, positioned absolutely over the chart): a single rounded rect the width of one column, with `left: calc((selectedDayIndex / 9) * 100%)` updated via Alpine's `:style` binding. Alpine only re-renders the div, not the SVG.
+- **Selection overlay** (sibling div, positioned absolutely over the chart): a rounded rect with `width: 10%` (one of ten columns) and `left: calc(var(--wx-sel-i, 0) * 10%)` where `--wx-sel-i` is bound via Alpine `:style="'--wx-sel-i: ' + selectedDayIndex"`. At index 0 the overlay sits at `left: 0%`; at index 9 it sits at `left: 90%` with `width: 10%`, ending exactly at 100%. Alpine only updates the inline CSS custom property on the div — the SVG is never re-rendered.
 - Below the SVG: 10 day-column buttons in a `grid-template-columns: repeat(10, minmax(0, 1fr));`.
   - Each shows day short name, date, emoji, precip%.
   - "Today" badge on index 0 (blue pill).
@@ -364,6 +364,8 @@ The `@keyframes wx-draw` used to stroke-on the two 10-day curves is a one-shot a
 ```
 
 Path `d` attribute changes (e.g. data refresh) do NOT retrigger the animation since `.wx-drawn` stays applied.
+
+**DOM-persistence dependency note:** this gate relies on the weather view using `x-show` (not `x-if`) at the top-level view container — `x-show` keeps the SVG node in the DOM across tab switches, so `.wx-drawn` persists. The current pattern in `index.html` (`<div x-show="currentView === 'weather'">`) already does this. Do NOT refactor to `x-if` without also moving the `.wx-drawn` gate to survive re-mount.
 
 ### Entrance fade: staggered, not wrapper-wide
 
