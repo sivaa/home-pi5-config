@@ -3091,7 +3091,7 @@
           </div>
         </div>
 
-        <!-- Weather Forecast View — Mock D Design -->
+        <!-- Weather Forecast View - Redesign (2026-04-18) -->
         <div x-show="currentView === 'weather'"
              x-cloak
              x-data="weatherForecastView()"
@@ -3099,133 +3099,61 @@
              @view-changed.window="if ($event.detail.view !== 'weather') destroy()"
              class="view weather-forecast-view">
 
-          <!-- Loading (first load only) -->
+          <!-- Loading -->
           <template x-if="isLoading && !daily.length">
-            <div class="weather-loading">
-              <div class="weather-loading-text">Loading forecast...</div>
-            </div>
+            <div class="wx-loading">Loading forecast...</div>
           </template>
 
           <!-- Error (no cached data) -->
           <template x-if="hasError">
-            <div class="weather-error">
+            <div class="wx-error">
               <strong>Cannot load forecast</strong><br>
               <span x-text="store.error"></span>
             </div>
           </template>
 
-          <!-- ═══ SECTION 1: Combined Top Strip (Hero + Alert + 24h Hourly) ═══ -->
-          <template x-if="current">
-            <div class="weather-top">
-              <!-- Current conditions -->
-              <div class="weather-now">
-                <div class="weather-now-emoji" x-text="heroEmoji"></div>
-                <div class="weather-now-info">
-                  <div class="weather-now-temp"><span x-text="heroTemp"></span><span class="unit">&deg;</span></div>
-                  <div class="weather-now-desc" x-text="heroDescription"></div>
-                  <div class="weather-now-hilo" x-text="heroSub"></div>
-                </div>
-              </div>
-
-              <!-- Alert badge -->
-              <div class="weather-alert-badge" :class="getAlertType()" x-show="alertText">
-                <div class="alert-icon" x-text="getAlertIcon()"></div>
-                <div>
-                  <div class="alert-text" x-text="getAlertTitle()"></div>
-                  <div class="alert-sub" x-text="getAlertSub()"></div>
-                </div>
-              </div>
-
-              <!-- 24h hourly strip — temp shown only when it changes -->
-              <div class="weather-hourly" x-show="hourly.length > 0">
-                <template x-for="(h, i) in getHourlyDisplay()" :key="'h-' + i">
-                  <div class="hourly-col"
-                       :class="{ 'change': h.isChange, 'midnight': h.isMidnight }">
-                    <div class="hourly-time" x-text="h.label"></div>
-                    <div class="hourly-emoji" x-text="h.emoji"></div>
-                    <template x-if="h.isChange">
-                      <div class="hourly-temp" x-text="h.temp + '\u00B0'"></div>
-                    </template>
-                    <template x-if="!h.isChange">
-                      <div class="hourly-temp-spacer"></div>
-                    </template>
-                  </div>
-                </template>
+          <!-- Header -->
+          <header class="wx-header">
+            <div class="wx-header-title">
+              <div class="wx-header-icon">🌦</div>
+              <div>
+                <h1 class="wx-header-h1">Weather</h1>
+                <div class="wx-header-location">📍 Zehlendorf, DE</div>
               </div>
             </div>
-          </template>
-
-          <!-- ═══ SECTION 2: 10-Day Forecast (Tiered Rows) ═══ -->
-          <template x-if="daily.length > 0">
-            <div class="weather-daily">
-              <!-- Scale header -->
-              <div class="weather-daily-header">
-                <div class="weather-daily-header-label">10-Day</div>
-                <div></div>
-                <div class="weather-daily-scale">
-                  <template x-for="tick in getRulerTicks()" :key="tick.value">
-                    <span class="weather-daily-scale-tick"
-                          :class="{ 'freezing': tick.isFreezing }"
-                          :style="'left: ' + tick.left"
-                          x-text="tick.value"></span>
-                  </template>
-                </div>
-                <div class="weather-daily-rain-label">Rain</div>
+            <div class="wx-header-actions">
+              <div class="wx-freshness" :class="getFreshnessClass()">
+                <span class="wx-freshness-dot"></span>
+                <span x-text="getLastUpdateText()"></span>
               </div>
-
-              <!-- Vertical gridlines -->
-              <div class="weather-ruler-gridlines">
-                <div></div><div></div>
-                <div class="weather-gridlines-area">
-                  <template x-for="line in getRulerTicks()" :key="'grid-' + line.value">
-                    <div class="weather-gridline"
-                         :class="{ 'freezing': line.isFreezing }"
-                         :style="'left: ' + line.left"></div>
-                  </template>
-                </div>
-                <div></div>
-              </div>
-
-              <!-- Tiered daily rows -->
-              <div class="weather-daily-rows">
-                <template x-for="(day, i) in daily" :key="day.dateStr + '-' + i">
-                  <div class="weather-daily-row" :class="getDailyRowClasses(i)">
-                    <div>
-                      <div class="weather-day-name" x-text="day.dayName"></div>
-                      <div class="weather-day-date" x-text="day.dateStr"></div>
-                    </div>
-                    <div class="weather-day-emoji" x-text="day.emoji"></div>
-                    <div class="weather-ruler-bar">
-                      <div class="weather-ruler-track">
-                        <div class="weather-ruler-fill" :style="getTempBarStyle(day)">
-                          <span class="weather-ruler-lo" x-text="day.tempMin + '\u00B0'"></span>
-                          <span class="weather-ruler-hi" x-text="day.tempMax + '\u00B0'"></span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="weather-day-precip"
-                         :class="{ 'rainy': isPrecipRainy(day) }"
-                         x-text="getPrecipText(day)"></div>
-                  </div>
-                </template>
-              </div>
+              <button class="wx-refresh-btn"
+                      @click="refresh()"
+                      :disabled="isLoading"
+                      aria-label="Refresh forecast">
+                <span x-show="!isLoading">🔄</span>
+                <span x-show="isLoading">...</span>
+              </button>
             </div>
-          </template>
+          </header>
 
-          <!-- Stale data warning -->
-          <div x-show="isStale" class="weather-stale-warning">
-            Data may be outdated &middot; <span x-text="store.error"></span>
+          <!-- Left column -->
+          <div class="wx-left-col" x-show="current">
+            <section class="wx-panel wx-hero"></section>
+            <section class="wx-panel wx-hourly"></section>
+            <section class="wx-panel wx-10day"></section>
+          </div>
+
+          <!-- Right column -->
+          <div class="wx-right-col" x-show="current">
+            <section class="wx-panel wx-stats"></section>
+            <section class="wx-panel wx-sun"></section>
+            <section class="wx-panel wx-highlights"></section>
           </div>
 
           <!-- Footer -->
-          <div class="weather-footer">
-            <span>Updated <span x-text="getLastUpdateText()"></span> &middot; Open-Meteo</span>
-            <button class="weather-refresh-btn" @click="refresh()" :disabled="isLoading">
-              <span x-show="!isLoading">Refresh</span>
-              <span x-show="isLoading">...</span>
-            </button>
-          </div>
-
+          <footer class="wx-footer" x-show="current">
+            Updated <span x-text="getLastUpdateText()"></span> · Open-Meteo
+          </footer>
         </div>
 
         <!-- TTS Announce (hidden - URL hash #tts only) -->

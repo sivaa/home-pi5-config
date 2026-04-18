@@ -46,6 +46,16 @@ export function weatherForecastView() {
     get hasError() { return this.store?.error && !this.store?.daily?.length; },
     get isStale() { return this.store?.error && this.store?.daily?.length > 0; },
 
+    // Stub - redefined as proper method in Batch 4 (weather-forecast.js rewrite)
+    getFreshnessClass() {
+      const last = this.store?.lastUpdate;
+      if (!last) return 'stale';
+      const ageMin = (Date.now() - last) / 60000;
+      if (ageMin < 10) return '';
+      if (ageMin < 60) return 'warn';
+      return 'stale';
+    },
+
     // ========================================
     // HERO (Now column)
     // ========================================
