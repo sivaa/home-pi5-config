@@ -683,7 +683,7 @@
             <!-- Light Cards -->
             <div class="lights-grid" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
               <template x-for="light in $store.lights.list" :key="light.id">
-                <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available, 'light-switch-off': $store.lights.getLightSwitch(light) && $store.lights.getLightSwitch(light).available && $store.lights.getLightSwitch(light).state === 'OFF' }">
+                <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available, 'light-switch-off': $store.lights.isSwitchOff(light) }">
                   <!-- Syncing overlay -->
                   <div class="light-syncing-overlay" x-show="light.syncing && light.available" x-transition.opacity>
                     <span class="loading-indicator"></span>
@@ -695,7 +695,7 @@
                       <div class="light-details">
                         <span class="light-name" x-text="light.name"></span>
                         <span class="light-switch-badge"
-                              x-show="$store.lights.getLightSwitch(light) && $store.lights.getLightSwitch(light).available && $store.lights.getLightSwitch(light).state === 'OFF'"
+                              x-show="$store.lights.isSwitchOff(light)"
                               x-cloak>
                           🔌 Switch off
                         </span>
@@ -5656,6 +5656,18 @@
         canPowerCycle(light) {
           const sw = this.getLightSwitch(light);
           return !!(sw && sw.available && sw.state !== 'ON');
+        },
+
+        // True when this light has a linked upstream switch that is
+        // reachable AND is currently OFF. Used by the card template to
+        // show a "switch off" badge and to tag the card with the
+        // light-switch-off modifier class. Differs from canPowerCycle:
+        // isSwitchOff is strictly state === 'OFF' (we know it's off);
+        // canPowerCycle is state !== 'ON' (includes unknown/stale state,
+        // because sending a redundant switch-ON is safe).
+        isSwitchOff(light) {
+          const sw = this.getLightSwitch(light);
+          return !!(sw && sw.available && sw.state === 'OFF');
         },
 
         // Existing publish branch extracted from toggleLight so it can

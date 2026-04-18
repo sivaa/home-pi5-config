@@ -986,9 +986,9 @@
       padding: 2px 6px;
       margin-top: 2px;
       border-radius: 4px;
-      background: var(--color-bg-muted, rgba(0, 0, 0, 0.05));
-      color: var(--color-text-muted, #666);
-      border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+      background: rgba(0, 0, 0, 0.05);
+      color: #666;
+      border: 1px solid var(--color-border);
       white-space: nowrap;
     }
 
