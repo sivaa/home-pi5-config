@@ -219,18 +219,16 @@
 .wx-hourly-svg { width: 100%; height: 100%; display: block; }
 
 .wx-hourly-cards {
-  display: flex; gap: 8px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding: 4px 2px 8px;
-  scrollbar-width: none;
+  display: flex; gap: 4px;
+  padding: 4px 0 8px;
+  /* Cards stretch to span the same width as the chart above.
+     No scroll - all 12 hours visible in one row. */
 }
-.wx-hourly-cards::-webkit-scrollbar { display: none; }
 .wx-hourly-card {
-  flex: 0 0 52px;
-  scroll-snap-align: start;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex; flex-direction: column; align-items: center;
-  padding: 6px 4px;
+  padding: 6px 2px;
   background: transparent;
   border: none;
   border-radius: 10px;
