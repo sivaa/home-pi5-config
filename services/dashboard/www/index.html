@@ -5353,6 +5353,7 @@
             name: 'Study Room',
             icon: '📚',
             topic: '[Study] IKEA Light',
+            switchId: 'study_switch',
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
@@ -5371,6 +5372,7 @@
             name: 'Living Room',
             icon: '🛋️',
             topic: '[Living] IKEA Light',
+            switchId: 'living_switch',
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
@@ -5407,6 +5409,7 @@
             name: 'Bedroom',
             icon: '🛏️',
             topic: '[Bed] Light',
+            switchId: 'bedroom_switch',
             state: 'OFF',
             brightness: 254,
             colorTemp: 370,
@@ -5631,6 +5634,23 @@
               }, 3000);
             }
           });
+        },
+
+        // Returns the switch record linked to this light, or null.
+        // Handles missing switchId, missing store entry, etc.
+        getLightSwitch(light) {
+          if (!light?.switchId) return null;
+          return Alpine.store('switches').byId(light.switchId);
+        },
+
+        // True when the light has a linked switch that is online AND
+        // not currently ON - i.e. we can pre-pulse it to re-energise
+        // an offline bulb. Used for both the pre-pulse decision and
+        // for keeping the ON button enabled when light.available is
+        // false because the switch killed the bulb's power.
+        canPowerCycle(light) {
+          const sw = this.getLightSwitch(light);
+          return !!(sw && sw.available && sw.state !== 'ON');
         },
 
         toggleLight(light) {
