@@ -3356,9 +3356,105 @@
 
           <!-- Right column -->
           <div class="wx-right-col" x-show="current">
-            <section class="wx-panel wx-stats"></section>
-            <section class="wx-panel wx-sun"></section>
-            <section class="wx-panel wx-highlights"></section>
+            <section class="wx-panel wx-stats">
+              <div class="wx-panel-title">Conditions</div>
+              <div class="wx-stats-grid">
+                <div class="wx-stat">
+                  <div class="wx-stat-icon wx-stat-icon-wind">🌬</div>
+                  <div class="wx-stat-label">Wind</div>
+                  <div class="wx-stat-value">
+                    <span x-text="current?.wind ?? '--'"></span><span class="wx-stat-unit">km/h</span>
+                  </div>
+                  <div class="wx-stat-desc">From <span x-text="current?.windDir ?? '--'"></span>°</div>
+                </div>
+                <div class="wx-stat">
+                  <div class="wx-stat-icon wx-stat-icon-feels">🌡️</div>
+                  <div class="wx-stat-label">Feels like</div>
+                  <div class="wx-stat-value">
+                    <span x-text="current?.feelsLike ?? '--'"></span><span class="wx-stat-unit">°</span>
+                  </div>
+                  <div class="wx-stat-desc">Apparent temperature</div>
+                </div>
+                <div class="wx-stat">
+                  <div class="wx-stat-icon wx-stat-icon-humid">💧</div>
+                  <div class="wx-stat-label">Humidity</div>
+                  <div class="wx-stat-value">
+                    <span x-text="current?.humidity ?? '--'"></span><span class="wx-stat-unit">%</span>
+                  </div>
+                  <div class="wx-stat-desc">Relative humidity</div>
+                </div>
+                <div class="wx-stat">
+                  <div class="wx-stat-icon wx-stat-icon-uv">☀️</div>
+                  <div class="wx-stat-label">UV Index</div>
+                  <div class="wx-stat-value">
+                    <span x-text="daily[0]?.uvIndex ?? '--'"></span>
+                  </div>
+                  <div class="wx-stat-desc" x-text="uvDescription(daily[0]?.uvIndex ?? 0)"></div>
+                </div>
+              </div>
+            </section>
+            <section class="wx-panel wx-sun">
+              <div class="wx-panel-title">Daylight</div>
+              <div class="wx-sun-times">
+                <div class="wx-sun-time">
+                  <span class="wx-sun-emoji">🌅</span>
+                  <span x-text="sunriseText"></span>
+                </div>
+                <div class="wx-sun-duration" x-text="daylightLabel"></div>
+                <div class="wx-sun-time">
+                  <span class="wx-sun-emoji">🌇</span>
+                  <span x-text="sunsetText"></span>
+                </div>
+              </div>
+              <svg viewBox="0 0 200 40" class="wx-sun-arc" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                <path d="M 10 40 Q 100 -10 190 40"
+                      fill="none"
+                      stroke="rgba(251, 191, 36, 0.35)"
+                      stroke-width="1.5"
+                      stroke-dasharray="3 4"/>
+              </svg>
+            </section>
+            <section class="wx-panel wx-highlights" x-show="store.weeklyHighlights">
+              <div class="wx-panel-title">Week Highlights</div>
+              <template x-if="store.weeklyHighlights">
+                <div class="wx-highlights-list">
+                  <div class="wx-hl-row wx-hl-warm">
+                    <div class="wx-hl-icon">☀️</div>
+                    <div class="wx-hl-body">
+                      <div class="wx-hl-label">Warmest day</div>
+                      <div class="wx-hl-day" x-text="store.weeklyHighlights.warmest.dayName + ', ' + store.weeklyHighlights.warmest.dateStr"></div>
+                    </div>
+                    <div class="wx-hl-value"><span x-text="store.weeklyHighlights.warmest.tempMax"></span>°</div>
+                  </div>
+                  <div class="wx-hl-row wx-hl-cold">
+                    <div class="wx-hl-icon">❄️</div>
+                    <div class="wx-hl-body">
+                      <div class="wx-hl-label">Coldest night</div>
+                      <div class="wx-hl-day" x-text="store.weeklyHighlights.coldest.dayName + ', ' + store.weeklyHighlights.coldest.dateStr"></div>
+                    </div>
+                    <div class="wx-hl-value"><span x-text="store.weeklyHighlights.coldest.tempMin"></span>°</div>
+                  </div>
+                  <div class="wx-hl-row wx-hl-wet">
+                    <div class="wx-hl-icon">🌧️</div>
+                    <div class="wx-hl-body">
+                      <div class="wx-hl-label">Wettest day</div>
+                      <div class="wx-hl-day" x-text="store.weeklyHighlights.wettest.dayName + ', ' + store.weeklyHighlights.wettest.dateStr"></div>
+                    </div>
+                    <div class="wx-hl-value"><span x-text="store.weeklyHighlights.wettest.precipProb"></span>%</div>
+                  </div>
+                  <template x-if="store.weeklyHighlights.bestWeekend">
+                    <div class="wx-hl-row wx-hl-wknd">
+                      <div class="wx-hl-icon">🌤️</div>
+                      <div class="wx-hl-body">
+                        <div class="wx-hl-label">Best weekend</div>
+                        <div class="wx-hl-day" x-text="store.weeklyHighlights.bestWeekend.dayName + ', ' + store.weeklyHighlights.bestWeekend.dateStr"></div>
+                      </div>
+                      <div class="wx-hl-value" x-text="store.weeklyHighlights.bestWeekend.tempMax + '°'"></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </section>
           </div>
 
           <!-- Footer -->
