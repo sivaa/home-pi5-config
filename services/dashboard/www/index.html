@@ -5653,12 +5653,15 @@
           return !!(sw && sw.available && sw.state !== 'ON');
         },
 
-        toggleLight(light) {
-          const newState = light.state === 'ON' ? 'OFF' : 'ON';
+        // Existing publish branch extracted from toggleLight so it can
+        // be invoked either immediately or after a delay (when a switch
+        // pre-pulse was needed). No behaviour change vs. the inline code
+        // that was in toggleLight before.
+        _sendBulbCommand(light, newState) {
           if (light.colorPropSuffix) {
             this._publishRaw(light, this._togglePayload(light, newState));
-            // Optimistic: both endpoints flip together. light.state stays a
-            // pure derivation of mainOn || sidelightOn.
+            // Optimistic: both endpoints flip together. light.state stays
+            // a pure derivation of mainOn || sidelightOn.
             light.mainOn = (newState === 'ON');
             light.sidelightOn = (newState === 'ON');
             light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
@@ -5666,6 +5669,28 @@
             this.publishCommand(light, { state: newState });
             light.state = newState;
           }
+        },
+
+        // Publish {state: 'ON'} to an upstream SONOFF wall switch, so an
+        // offline bulb can be re-energised from the dashboard. Mirrors
+        // the client/qos/error pattern used by _publishRaw. Does NOT
+        // mark anything as syncing - the switch isn't the light.
+        _publishSwitchOn(sw) {
+          const client = Alpine.store('mqtt').client;
+          if (!client || !Alpine.store('mqtt').connected) {
+            console.error('MQTT not connected (switch pre-pulse skipped)');
+            return;
+          }
+          const topic = `zigbee2mqtt/${sw.topic}/set`;
+          client.publish(topic, JSON.stringify({ state: 'ON' }), { qos: 0 }, (err) => {
+            if (err) console.error('Failed to publish switch ON:', err);
+          });
+          console.log(`[lights] Pre-pulse: ${sw.topic} ON`);
+        },
+
+        toggleLight(light) {
+          const newState = light.state === 'ON' ? 'OFF' : 'ON';
+          this._sendBulbCommand(light, newState);
         },
 
         toggleAllLights() {
