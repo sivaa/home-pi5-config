@@ -36,7 +36,7 @@
 /* ---------- Top-level grid ---------- */
 .weather-forecast-view {
   display: grid;
-  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: var(--wx-gap);
   padding: 12px 16px;
   color: var(--wx-text-primary);
@@ -345,20 +345,20 @@
   gap: 8px;
 }
 .wx-stat {
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: var(--wx-panel-bg);
   border: 1px solid var(--wx-panel-border);
-  border-radius: 12px;
+  border-radius: 10px;
   display: grid;
   grid-template-rows: auto auto auto;
   align-content: start;
-  gap: 2px;
+  gap: 1px;
   position: relative;
 }
 .wx-stat-icon {
-  position: absolute; top: 10px; right: 10px;
-  font-size: 14px;
-  opacity: 0.55;
+  position: absolute; top: 8px; right: 8px;
+  font-size: 13px;
+  opacity: 0.5;
 }
 /* Remove pill backgrounds on icons — tokens kept for potential reuse but not applied */
 .wx-stat-icon-wind, .wx-stat-icon-feels, .wx-stat-icon-humid, .wx-stat-icon-uv {
