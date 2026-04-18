@@ -411,3 +411,28 @@
 .wx-hl-day { font-size: 12px; font-weight: 700; }
 .wx-hl-value { font-size: 16px; font-weight: 800; }
 .wx-selday-value { font-size: 13px; font-weight: 700; }
+
+/* ---------- Staggered entrance ---------- */
+@keyframes wx-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Group 1: header, hero, and panel titles */
+.weather-forecast-view .wx-header,
+.weather-forecast-view .wx-hero {
+  animation: wx-fade 0.3s ease-out both;
+  animation-delay: 0ms;
+}
+/* Group 2: hourly + 10-day */
+.weather-forecast-view .wx-hourly,
+.weather-forecast-view .wx-10day {
+  animation: wx-fade 0.3s ease-out both;
+  animation-delay: 100ms;
+}
+/* Group 3: sidebar */
+.weather-forecast-view .wx-stats,
+.weather-forecast-view .wx-sun,
+.weather-forecast-view .wx-highlights {
+  animation: wx-fade 0.3s ease-out both;
+  animation-delay: 200ms;
+}
