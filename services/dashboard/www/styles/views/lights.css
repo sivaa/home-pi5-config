@@ -976,3 +976,32 @@
   cursor: not-allowed;
 }
 
+    /* Switch-off badge on light cards - shown when a light's
+       upstream SONOFF wall switch is known-off. Pi-safe CSS:
+       no backdrop-filter, no infinite animations, simple colours. */
+    .light-switch-badge {
+      display: inline-block;
+      font-size: 11px;
+      line-height: 1.2;
+      padding: 2px 6px;
+      margin-top: 2px;
+      border-radius: 4px;
+      background: var(--color-bg-muted, rgba(0, 0, 0, 0.05));
+      color: var(--color-text-muted, #666);
+      border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+      white-space: nowrap;
+    }
+
+    [data-theme="dark"] .light-switch-badge {
+      background: rgba(255, 255, 255, 0.06);
+      color: #aaa;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* When switch is off, dial back the unavailable opacity a bit -
+       the card is recoverable (user can tap ON to re-energise),
+       so it shouldn't look as dead as true light-unavailable. */
+    .light-card.light-unavailable.light-switch-off {
+      opacity: 0.7;
+    }
+
