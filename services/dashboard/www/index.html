@@ -776,43 +776,46 @@
                     </div>
                   </div>
 
-                  <!-- Backlight Color (only on dual-LED lamps like EGLO Rovito-Z).
-                       color_temp affects main ring; color (hs) affects backlight.
-                       Both LEDs run simultaneously - see CLAUDE.md lessons learned.
-                       The backlight OFF toggle sends {color:{x:0,y:0}} to truly
-                       power down the RGB LEDs without affecting the main ring
-                       CCT (commit a324145). The EGLO 99099 remote still can't
-                       do this - it toggles both elements together. -->
+                  <!-- Accent-LED color control. On Bed (EGLO Rovito-Z) this drives
+                       the backlight (RGB strip behind the main ring). On Hallway
+                       (Aqara T1M) this drives the side light (outer RGB rim).
+                       color_temp affects the main ring; color (hs) affects the
+                       accent LED. On Bed both LEDs share one endpoint and run
+                       simultaneously (see CLAUDE.md lessons). The OFF toggle
+                       on Bed sends {color:{x:0,y:0}} to truly power down the
+                       RGB LEDs without affecting the main ring CCT (commit
+                       a324145). On Hallway the rgb endpoint is independent so
+                       OFF is a real state flip. -->
                   <div class="light-control"
                        x-show="light.supportsColor"
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
                     <div class="control-row">
                       <label class="control-label">
                         <span class="control-icon">🎨</span>
-                        Backlight Color
+                        <span x-text="light.colorPropSuffix ? 'Side Light Color' : 'Backlight Color'"></span>
                       </label>
                       <span class="control-value">
                         <span x-show="light.syncing" class="control-syncing">⟳</span>
                         <span class="color-swatch"
-                              :style="light.backlightOn ? ('background: hsl(' + light.hue + ',100%,50%)') : 'background: #f0f0f0'"></span>
-                        <button class="backlight-toggle"
-                                :class="{ 'backlight-off': !light.backlightOn }"
+                              :style="(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) ? ('background: hsl(' + light.hue + ',100%,50%)') : 'background: #f0f0f0'"></span>
+                        <button class="accent-toggle"
+                                :class="{ 'accent-off': !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }"
                                 :disabled="light.state !== 'ON' || !light.available"
-                                @click="$store.lights.setBacklightOn(light, !light.backlightOn)"
-                                x-text="light.backlightOn ? 'ON' : 'OFF'"></button>
+                                @click="$store.lights.setAccentOn(light, !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn))"
+                                x-text="(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) ? 'ON' : 'OFF'"></button>
                       </span>
                     </div>
                     <input type="range" class="slider hue-slider" min="0" max="360"
                            x-model="light.hue"
-                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
+                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn)"
                            @input="$store.lights.setHue(light, $event.target.value)">
                     <!-- Pseudo-dim via saturation for single-endpoint dual-LED
-                         lamps (EGLO Rovito-Z). Real brightness is shared with
-                         the main ring so we can't physically dim just the
-                         backlight — lowering saturation fades the color
-                         toward the main ring's white instead, which visually
-                         reads as "softer/less prominent backlight". -->
-                    <div class="backlight-brightness-control"
+                         lamps (EGLO Rovito-Z backlight). Real brightness is
+                         shared with the main ring so we can't physically dim
+                         just the backlight — lowering saturation fades the
+                         color toward the main ring's white instead, which
+                         visually reads as "softer/less prominent backlight". -->
+                    <div class="accent-brightness-control"
                          x-show="light.supportsColor && !light.colorPropSuffix"
                          :class="{ 'control-disabled': !light.backlightOn }">
                       <div class="control-row">
@@ -827,25 +830,26 @@
                              :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
                              @input="$store.lights.setBacklightIntensity(light, $event.target.value)">
                     </div>
-                    <!-- Independent brightness for the rgb strip on dual-endpoint
-                         devices (Aqara T1M). Hidden for single-endpoint lamps
-                         where main-ring brightness already applies to both LEDs. -->
-                    <div class="backlight-brightness-control"
+                    <!-- Independent brightness for the side-light rgb rim on
+                         dual-endpoint devices (Aqara T1M). Hidden for single-
+                         endpoint lamps where main-ring brightness already
+                         applies to both LEDs. -->
+                    <div class="accent-brightness-control"
                          x-show="light.colorPropSuffix"
-                         :class="{ 'control-disabled': !light.backlightOn }">
+                         :class="{ 'control-disabled': !light.sidelightOn }">
                       <div class="control-row">
                         <label class="control-label">
                           <span class="control-icon">🔅</span>
-                          Backlight Dim
+                          Side Light Dim
                         </label>
-                        <span class="control-value" x-text="Math.round(light.backlightBrightness / 254 * 100) + '%'"></span>
+                        <span class="control-value" x-text="Math.round(light.sidelightBrightness / 254 * 100) + '%'"></span>
                       </div>
                       <input type="range" class="slider brightness-slider" min="1" max="254"
-                             x-model="light.backlightBrightness"
-                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
-                             @input="$store.lights.setBacklightBrightness(light, $event.target.value)">
+                             x-model="light.sidelightBrightness"
+                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.sidelightOn"
+                             @input="$store.lights.setSidelightBrightness(light, $event.target.value)">
                     </div>
-                    <div class="color-presets" :class="{ 'control-disabled': !light.backlightOn }">
+                    <div class="color-presets" :class="{ 'control-disabled': !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }">
                       <button class="color-preset-btn" style="background:#ff4444" title="Red"
                               @click="$store.lights.setColorPreset(light, 0, 100)"
                               :disabled="light.state !== 'ON' || !light.available"></button>
@@ -5425,10 +5429,13 @@
             topic: '[Hallway] Light',
             // Aqara T1M (lumi.light.acn032) has two independent endpoints:
             //   - 'white' = main CCT ceiling ring (state/brightness/color_temp)
-            //   - 'rgb'   = secondary ambient strip (state/brightness/color)
+            //   - 'rgb'   = side light: an outer RGB ring on the rim of the
+            //              fixture (state/brightness/color). Per Aqara's own
+            //              terminology this is a "side light", NOT a backlight
+            //              — it emits from the edge, not from behind a panel.
             // Z2M publishes suffixed keys on the parent topic. propSuffix drives
             // the main ring controls; colorPropSuffix routes the color picker
-            // and backlight toggle to the rgb endpoint.
+            // and side-light toggle to the rgb endpoint.
             propSuffix: 'white',
             colorPropSuffix: 'rgb',
             state: 'OFF',
@@ -5438,11 +5445,11 @@
             colorTempMax: 370,
             supportsColor: true,
             // Dual-endpoint state tracking: each endpoint has its own on/off,
-            // and `state` is derived as (mainOn || backlightOn) so the card
+            // and `state` is derived as (mainOn || sidelightOn) so the card
             // reads ON whenever any part of the fixture is glowing.
             mainOn: false,
-            backlightOn: true,
-            backlightBrightness: 254, // independent brightness for the rgb strip
+            sidelightOn: true,
+            sidelightBrightness: 254, // independent brightness for the rgb rim
             hue: 0,
             saturation: 100,
             linkquality: null,
@@ -5456,7 +5463,7 @@
         _brightnessTimeout: null,
         _colorTempTimeout: null,
         _hueTimeout: null,
-        _backlightBrightnessTimeout: null,
+        _sidelightBrightnessTimeout: null,
         _intensityTimeout: null,
 
         get anyLightSyncing() {
@@ -5486,7 +5493,7 @@
           if (light) {
             // Multi-endpoint devices (e.g. Aqara T1M) publish suffixed keys
             // on the parent topic: state_white, brightness_white, etc. The
-            // main ring uses propSuffix; the backlight / color picker uses
+            // main ring uses propSuffix; the side light / color picker uses
             // colorPropSuffix (falls back to propSuffix for single-endpoint).
             const s = light.propSuffix;
             const cs = light.colorPropSuffix || s;
@@ -5494,18 +5501,18 @@
             const ctKey = s ? `color_temp_${s}` : 'color_temp';
             const colorKey = cs ? `color_${cs}` : 'color';
             if (s && cs && cs !== s) {
-              // Dual-endpoint device: track each endpoint's on/off EXPLICITLY
-              // and only update the field we actually heard about. light.state
-              // is a pure derivation of (mainOn || backlightOn) — never a
-              // self-referential fallback — so half-state echoes during a tab
-              // resume or optimistic/publish races can't poison it.
+              // Dual-endpoint device (Aqara T1M): track each endpoint's on/off
+              // EXPLICITLY and only update the field we actually heard about.
+              // light.state is a pure derivation of (mainOn || sidelightOn) —
+              // never a self-referential fallback — so half-state echoes during
+              // a tab resume or optimistic/publish races can't poison it.
               if (data[`state_${s}`] !== undefined) {
                 light.mainOn = data[`state_${s}`] === 'ON';
               }
               if (data[`state_${cs}`] !== undefined) {
-                light.backlightOn = data[`state_${cs}`] === 'ON';
+                light.sidelightOn = data[`state_${cs}`] === 'ON';
               }
-              light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
+              light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
             } else if (s && data[`state_${s}`] !== undefined) {
               light.state = data[`state_${s}`];
             } else if (data.state !== undefined) {
@@ -5519,13 +5526,13 @@
               if (data[colorKey].hue !== undefined) light.hue = data[colorKey].hue;
               if (data[colorKey].saturation !== undefined) light.saturation = data[colorKey].saturation;
             }
-            // Dual-endpoint devices expose an independent brightness for the
-            // rgb strip — read it into backlightBrightness so the dedicated
-            // slider stays in sync with the actual device state.
+            // Dual-endpoint devices (Aqara T1M) expose an independent brightness
+            // for the rgb rim — read it into sidelightBrightness so the
+            // dedicated slider stays in sync with the actual device state.
             if (light.colorPropSuffix) {
-              const backlightBrightKey = `brightness_${light.colorPropSuffix}`;
-              if (data[backlightBrightKey] !== undefined) {
-                light.backlightBrightness = data[backlightBrightKey];
+              const sidelightBrightKey = `brightness_${light.colorPropSuffix}`;
+              if (data[sidelightBrightKey] !== undefined) {
+                light.sidelightBrightness = data[sidelightBrightKey];
               }
             }
             light.lastSeen = Date.now();
@@ -5631,10 +5638,10 @@
           if (light.colorPropSuffix) {
             this._publishRaw(light, this._togglePayload(light, newState));
             // Optimistic: both endpoints flip together. light.state stays a
-            // pure derivation of mainOn || backlightOn.
+            // pure derivation of mainOn || sidelightOn.
             light.mainOn = (newState === 'ON');
-            light.backlightOn = (newState === 'ON');
-            light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
+            light.sidelightOn = (newState === 'ON');
+            light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
           } else {
             this.publishCommand(light, { state: newState });
             light.state = newState;
@@ -5648,8 +5655,8 @@
             if (light.colorPropSuffix) {
               this._publishRaw(light, this._togglePayload(light, newState));
               light.mainOn = (newState === 'ON');
-              light.backlightOn = (newState === 'ON');
-              light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
+              light.sidelightOn = (newState === 'ON');
+              light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
             } else {
               this.publishCommand(light, { state: newState });
               light.state = newState;
@@ -5731,34 +5738,42 @@
           };
         },
 
+        // Which accent-LED on/off flag this light uses: dual-endpoint lamps
+        // (Aqara T1M) have a physical side light → `sidelightOn`; single-endpoint
+        // dual-LED lamps (EGLO Rovito-Z) have a physical backlight → `backlightOn`.
+        _accentOnKey(light) {
+          return light.colorPropSuffix ? 'sidelightOn' : 'backlightOn';
+        },
+
         setHue(light, value) {
           if (!light.supportsColor) return;
           const hue = parseInt(value);
           light.hue = hue;
           // Preserve current saturation so the user's intensity setting
           // sticks when they drag the hue slider. Only default to 100 if
-          // the backlight was OFF (turning it back on should be vivid).
-          if (!light.backlightOn || light.saturation === 0) {
+          // the accent LED was OFF (turning it back on should be vivid).
+          const accentKey = this._accentOnKey(light);
+          if (!light[accentKey] || light.saturation === 0) {
             light.saturation = 100;
           }
-          light.backlightOn = true; // adjusting color implies backlight on
+          light[accentKey] = true; // adjusting color implies the accent LED is on
           // Debounce: rapid drags shouldn't flood Z2M
           clearTimeout(this._hueTimeout);
           this._hueTimeout = setTimeout(() => {
             if (light.colorPropSuffix) {
-              // Dual-endpoint (T1M): Z2M does not convert hue/saturation when
-              // the color property is endpoint-suffixed, so we convert to xy
-              // client-side and send that directly. Also ensure the RGB strip
-              // is on and routed to the rgb endpoint.
+              // Dual-endpoint (Aqara T1M side light): Z2M does not convert
+              // hue/saturation when the color property is endpoint-suffixed,
+              // so we convert to xy client-side and send that directly. Also
+              // ensure the RGB rim is on and routed to the rgb endpoint.
               const xy = this._hueToXy(hue);
               this.publishCommand(light, {
                 state: 'ON',
                 color: { x: xy.x, y: xy.y }
               }, light.colorPropSuffix);
             } else {
-              // Single-endpoint dual-LED (EGLO Rovito-Z): include color_temp
-              // in the same message so the AwoX firmware doesn't auto-drift
-              // the main ring when a color command arrives.
+              // Single-endpoint dual-LED (EGLO Rovito-Z backlight): include
+              // color_temp in the same message so the AwoX firmware doesn't
+              // auto-drift the main ring when a color command arrives.
               this.publishCommand(light, {
                 color: { hue, saturation: light.saturation },
                 color_temp: light.colorTemp
@@ -5805,7 +5820,8 @@
           if (!light.supportsColor) return;
           light.hue = hue;
           light.saturation = saturation;
-          light.backlightOn = true; // clicking a color preset implies backlight on
+          // Clicking a color preset implies the accent LED is on.
+          light[this._accentOnKey(light)] = true;
           if (light.colorPropSuffix) {
             // Dual-endpoint devices need xy not hue/saturation (see setHue).
             const xy = this._hueToXy(hue);
@@ -5822,36 +5838,44 @@
           }
         },
 
-        setBacklightBrightness(light, value) {
-          if (!light.colorPropSuffix) return; // slider only exists for dual-endpoint devices
+        // Hallway-only: brightness for the Aqara T1M side light (rgb rim).
+        // Slider is only rendered for dual-endpoint devices, but we guard
+        // defensively in case the handler is wired up elsewhere.
+        setSidelightBrightness(light, value) {
+          if (!light.colorPropSuffix) return;
           const brightness = parseInt(value);
-          light.backlightBrightness = brightness;
-          clearTimeout(this._backlightBrightnessTimeout);
-          this._backlightBrightnessTimeout = setTimeout(() => {
+          light.sidelightBrightness = brightness;
+          clearTimeout(this._sidelightBrightnessTimeout);
+          this._sidelightBrightnessTimeout = setTimeout(() => {
             this.publishCommand(light, { brightness }, light.colorPropSuffix);
           }, 150);
         },
 
-        setBacklightOn(light, enabled) {
+        // Toggle the accent LED on/off. On Hallway (Aqara T1M, dual-endpoint)
+        // this flips the rgb side light on/off. On Bed (EGLO Rovito-Z,
+        // single-endpoint) this applies the empirical backlight-off blend
+        // (xy 0,0) or restores the vivid hue.
+        setAccentOn(light, enabled) {
           if (!light.supportsColor) return;
-          light.backlightOn = enabled;
           if (light.colorPropSuffix) {
-            // Dual-endpoint: the RGB strip really can be turned on/off.
+            // Dual-endpoint (Aqara T1M): the RGB rim really can be turned on/off.
+            light.sidelightOn = enabled;
             this.publishCommand(light, { state: enabled ? 'ON' : 'OFF' }, light.colorPropSuffix);
-            // Re-derive light.state now that backlightOn changed. Without
-            // this, turning off the backlight while the main ring is already
+            // Re-derive light.state now that sidelightOn changed. Without
+            // this, turning off the side light while the main ring is already
             // off would leave the card stuck on ON until the echo arrives.
-            light.state = (light.mainOn || light.backlightOn) ? 'ON' : 'OFF';
+            light.state = (light.mainOn || light.sidelightOn) ? 'ON' : 'OFF';
             return;
           }
+          // Single-endpoint dual-LED (EGLO Rovito-Z backlight):
+          light.backlightOn = enabled;
           if (enabled) {
             // Restore backlight to the last selected hue at full saturation
             light.saturation = 100;
             this.publishCommand(light, { color: { hue: light.hue, saturation: 100 } });
           } else {
-            // Single-endpoint lamp (EGLO Rovito-Z): the magic {x:0,y:0} command
-            // turns off just the RGB backlight without touching the main ring.
-            // See _applyBacklightBlend.
+            // The magic {x:0,y:0} command turns off just the RGB backlight
+            // without touching the main ring. See _applyBacklightBlend.
             this._applyBacklightBlend(light, light.colorTemp);
           }
         },
@@ -6722,7 +6746,7 @@
     // ========================================
     function app() {
       return {
-        currentView: 'home',
+        currentView: 'weather',
         currentDateTime: '',
         now: Date.now(),
         panelOpen: localStorage.getItem('panel-open') !== 'false',
@@ -6737,11 +6761,10 @@
         },
 
         init() {
-          // Restore last view
-          const saved = localStorage.getItem('dashboard-view');
-          if (saved) this.currentView = saved;
-
-          // URL hash routing for hidden views (e.g., #tts)
+          // Always land on the weather page after restart/reload.
+          // Why: kiosk owner wants the dashboard to default to the weather
+          // forecast on every page load, regardless of what was last viewed.
+          // URL hash still wins so hidden views (#tts, #tts-log) remain accessible.
           if (window.location.hash) {
             const hashView = window.location.hash.slice(1);
             if (hashView) this.currentView = hashView;
@@ -7058,7 +7081,7 @@
       return {
         moreMenuOpen: false,
         mobileMenuOpen: false,
-        currentView: 'home',
+        currentView: 'weather',
         primaryViews: PRIMARY_VIEWS,
         overflowCategories: OVERFLOW_CATEGORIES,
         allViews: ALL_VIEWS,
@@ -7075,13 +7098,9 @@
         })(),
 
         init() {
-          // Restore last view from localStorage
-          const saved = localStorage.getItem('dashboard-view');
-          if (saved && ALL_VIEWS.find(v => v.id === saved)) {
-            this.currentView = saved;
-          }
-
-          // Sync with app component
+          // No localStorage restore here: app() defaults to 'weather' on every
+          // load so the kiosk lands on the weather page after restart/reload.
+          // Sync with app component (picks up hash-routed views like #tts)
           const appEl = document.querySelector('[x-data="app()"]');
           if (appEl && appEl._x_dataStack && appEl._x_dataStack[0]) {
             this.currentView = appEl._x_dataStack[0].currentView || this.currentView;

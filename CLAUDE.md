@@ -393,7 +393,10 @@ The exploratory probe converter is kept at `configs/zigbee2mqtt/external_convert
 **Software pseudo-dim:** the Bed Light dashboard card has an 🔅 Intensity slider (`setBacklightIntensity` in `services/dashboard/www/index.html`) that linearly interpolates between the user's vivid color (at 100%) and a neutral hue/sat blend (at 0%). At 0% the slider sends `{color:{hue,sat}, color_temp}` to match the main ring - this is *visual fade*, not a power-off. The 🎨 OFF pill is different: it sends `{color:{x:0,y:0}}` to truly power down the backlight LEDs (see breakthrough note above). Intensity=0 and OFF pill are NOT equivalent - one blends, one powers off. Keep them as two distinct UI affordances.
 
 **Dashboard label convention (services/dashboard/www/index.html):**
-- For lights with `supportsColor: true`, the CCT slider is labeled "🌡️ Main Ring" and the color picker is labeled "🎨 Backlight Color".
+- For lights with `supportsColor: true`, the CCT slider is labeled "🌡️ Main Ring".
+- The color picker label depends on the physical secondary LED element (selected via `light.colorPropSuffix`):
+  - Bed (EGLO Rovito-Z, single-endpoint): "🎨 Backlight Color" + "🔅 Intensity" slider — drives the true backlight (RGB strip behind the main ring).
+  - Hallway (Aqara T1M, dual-endpoint): "🎨 Side Light Color" + "🔅 Side Light Dim" slider — drives the side light (outer RGB ring on the fixture rim). Per Aqara's own product copy this is a "side light" / "ambient light", NOT a backlight.
 - For CCT-only lights (IKEA FLOALT, AwoX 33955), labels remain the generic "Color Temp" with no color picker section.
 
 ---

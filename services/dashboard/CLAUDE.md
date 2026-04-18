@@ -934,6 +934,13 @@ ssh pi@pi 'curl -X POST http://localhost:8123/api/services/tts/google_translate_
 
 The Aqara T1M (lumi.light.acn032) hallway light has two physically independent LED groups controlled via separate Z2M endpoints on the same topic.
 
+> **Terminology:** Aqara's own product copy calls the secondary RGB ring a
+> **"side light"** (also "ambient light" or "RGB ring light"). It is an outer
+> rim element, NOT a backlight - it emits from the edge of the fixture, not
+> from behind a panel. Do not call it a backlight. The Bed light (EGLO
+> Rovito-Z) has a true backlight (RGB strip behind the main CCT ring), so the
+> two fixtures use different terminology in the codebase.
+
 ```
 +-----------------------------------------------------------------+
 |  AQARA T1M DUAL-ENDPOINT ARCHITECTURE                           |
@@ -947,7 +954,7 @@ The Aqara T1M (lumi.light.acn032) hallway light has two physically independent L
 |       |   Range: 153-370 mired                                  |
 |       |                                                         |
 |       +-- 'rgb' endpoint (colorPropSuffix)                      |
-|           Secondary ambient strip                               |
+|           Side light: outer RGB ring on the fixture rim         |
 |           Keys: state_rgb, brightness_rgb, color_rgb            |
 |                                                                 |
 +-----------------------------------------------------------------+
@@ -957,9 +964,12 @@ The dashboard light card uses `propSuffix` and `colorPropSuffix` properties to r
 
 Key properties in the lights store config:
 - `propSuffix: 'white'` - routes main ring CCT controls
-- `colorPropSuffix: 'rgb'` - routes color picker and backlight toggle
-- `mainOn` / `backlightOn` - independent on/off tracking per endpoint
-- `state` is derived as `mainOn || backlightOn`
+- `colorPropSuffix: 'rgb'` - routes color picker and side-light toggle
+- `mainOn` / `sidelightOn` - independent on/off tracking per endpoint
+- `sidelightBrightness` - independent brightness for the rgb rim
+- `state` is derived as `mainOn || sidelightOn`
+
+The Bed light keeps its own `backlightOn` / `backlightIntensity` properties for the EGLO Rovito-Z backlight, which is physically distinct. Shared setter methods use `_accentOnKey(light)` to route to the correct property; `setAccentOn(light, enabled)` is the single entry point the UI calls for either lamp's accent LED.
 
 ---
 
