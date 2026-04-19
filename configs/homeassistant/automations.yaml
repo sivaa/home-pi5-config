@@ -3639,6 +3639,11 @@
     # Both endpoints support color_temp, so circadian sets matching warmth on
     # both for a unified glow. RGB strip gets same brightness + color_temp so
     # it acts as supplementary warm/cool white rather than colored ambient.
+    #
+    # HALLWAY CAP: brightness capped at 60% by circadian. 100% is too bright
+    # for this space. Manual override (via dashboard/voice/remote) bypasses
+    # the cap — override_detect pauses circadian for 30 min, then override
+    # expiry will re-apply the cap.
     - if:
         - condition: state
           entity_id: input_boolean.circadian_hallway_override
@@ -3653,6 +3658,8 @@
               state: "on"
       then:
         - variables:
+            hallway_brightness_pct: "{{ [brightness_pct | int, 60] | min }}"
+            hallway_brightness_value: "{{ (hallway_brightness_pct | int / 100 * 255) | round(0) }}"
             # Read from whichever endpoint is on (prefer white as primary)
             active_entity: >
               {% if is_state('light.hallway_light', 'on') %}
@@ -3664,14 +3671,14 @@
             current_color_temp_w: "{{ state_attr(active_entity, 'color_temp_kelvin') | default(4000) | int }}"
             final_brightness: >
               {% if phase == 'Sunrise' %}
-                {{ brightness_value | int }}
+                {{ hallway_brightness_value | int }}
               {% else %}
-                {{ [brightness_value | int, current_brightness_w] | min }}
+                {{ [hallway_brightness_value | int, current_brightness_w] | min }}
               {% endif %}
             final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp_w] | min }}"
             should_apply: >
               {% if phase == 'Sunrise' %}
-                {{ brightness_value | int != current_brightness_w or color_temp_kelvin | int != current_color_temp_w }}
+                {{ hallway_brightness_value | int != current_brightness_w or color_temp_kelvin | int != current_color_temp_w }}
               {% else %}
                 {{ final_brightness < current_brightness_w or final_color_temp < current_color_temp_w }}
               {% endif %}
@@ -3758,7 +3765,14 @@
     # Power-on floor: minimum 5% brightness so users can see the light turned on
     # At night (1% scheduled), this ensures light is visible on power-on
     brightness_pct_floored: "{{ [brightness_pct | int, 5] | max }}"
-    brightness_value: "{{ (brightness_pct_floored / 100 * 255) | round(0) }}"
+    # Hallway cap: 60% max via automation. Manual override still allows 100%.
+    brightness_pct_final: >
+      {% if room == 'hallway' %}
+        {{ [brightness_pct_floored | int, 60] | min }}
+      {% else %}
+        {{ brightness_pct_floored | int }}
+      {% endif %}
+    brightness_value: "{{ (brightness_pct_final | int / 100 * 255) | round(0) }}"
     phase: "{{ states('sensor.circadian_phase') }}"
 
   action:
@@ -4232,6 +4246,9 @@
                   state: "on"
           then:
             - variables:
+                # Hallway 60% cap — see circadian_schedule_update for rationale.
+                hallway_brightness_pct: "{{ [brightness_pct | int, 60] | min }}"
+                hallway_brightness_value: "{{ (hallway_brightness_pct | int / 100 * 255) | round(0) }}"
                 # Read from whichever endpoint is on. If both are on, prefer
                 # the white ring (primary). If only RGB is on, read from it
                 # so the golden rule compares against actual strip state.
@@ -4245,14 +4262,14 @@
                 current_color_temp: "{{ state_attr(active_entity, 'color_temp_kelvin') | default(4000) | int }}"
                 final_brightness: >
                   {% if phase == 'Sunrise' %}
-                    {{ brightness_value | int }}
+                    {{ hallway_brightness_value | int }}
                   {% else %}
-                    {{ [brightness_value | int, current_brightness] | min }}
+                    {{ [hallway_brightness_value | int, current_brightness] | min }}
                   {% endif %}
                 final_color_temp: "{{ [color_temp_kelvin | int, current_color_temp] | min }}"
                 should_apply: >
                   {% if phase == 'Sunrise' %}
-                    {{ brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
+                    {{ hallway_brightness_value | int != current_brightness or color_temp_kelvin | int != current_color_temp }}
                   {% else %}
                     {{ final_brightness < current_brightness or final_color_temp < current_color_temp }}
                   {% endif %}
