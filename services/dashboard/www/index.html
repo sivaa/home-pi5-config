@@ -613,12 +613,15 @@
         </div>
 
         <!-- Vision 7: Lights Control -->
-        <div x-show="currentView === 'lights'" x-cloak x-data="lightsView()">
-          <div class="lights-view">
+        <div class="lights-view" x-show="currentView === 'lights'" x-cloak x-data="lightsView()">
             <!-- LIGHTS VIEW v3 (vertical sliders, Pi kiosk 1280x800 no-scroll).
                  Iterated through two Opus UX+brutality review passes.
                  44px+ touch targets throughout.
-                 Original horizontal-slider version replaced 2026-04-19. -->
+                 Original horizontal-slider version replaced 2026-04-19.
+                 x-show+x-data live on .lights-view itself; extra wrapper
+                 removed (it was display:block with no flex growth, which
+                 collapsed the view to content height and left ~166px
+                 dead space at the bottom of the page). -->
 
             <!-- ═══════════════ TOP BAR (circadian + master) ═══════════════ -->
             <div class="lights-topbar">
@@ -803,6 +806,33 @@
                     </template>
                   </div>
 
+                  <!-- Color Preset Swatches (color lights only).
+                       2×4 grid of 44-ish px swatches — restored per user
+                       feedback after v3 dropped them. They feed
+                       setColorPreset(hue, saturation), which routes to the
+                       correct endpoint for both single-endpoint (Bed
+                       backlight) and dual-endpoint (Hallway side light)
+                       lamps. Disabled when the accent LED is OFF. -->
+                  <div class="color-presets" x-show="light.supportsColor"
+                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }">
+                    <button class="color-preset-btn" style="background:#ff4444" title="Red"
+                            @click="$store.lights.setColorPreset(light, 0, 100)"></button>
+                    <button class="color-preset-btn" style="background:#ff8800" title="Orange"
+                            @click="$store.lights.setColorPreset(light, 30, 100)"></button>
+                    <button class="color-preset-btn" style="background:#ffee00" title="Yellow"
+                            @click="$store.lights.setColorPreset(light, 60, 100)"></button>
+                    <button class="color-preset-btn" style="background:#44dd44" title="Green"
+                            @click="$store.lights.setColorPreset(light, 120, 100)"></button>
+                    <button class="color-preset-btn" style="background:#00ccff" title="Cyan"
+                            @click="$store.lights.setColorPreset(light, 180, 100)"></button>
+                    <button class="color-preset-btn" style="background:#3366ff" title="Blue"
+                            @click="$store.lights.setColorPreset(light, 240, 100)"></button>
+                    <button class="color-preset-btn" style="background:#cc44ff" title="Purple"
+                            @click="$store.lights.setColorPreset(light, 280, 100)"></button>
+                    <button class="color-preset-btn" style="background:#ff44aa" title="Pink"
+                            @click="$store.lights.setColorPreset(light, 320, 100)"></button>
+                  </div>
+
                   <!-- Quick Presets. Fifth slot toggles between circadian-resume
                        (✋ when override active) and apply-circadian (🔄). -->
                   <div class="light-presets"
@@ -855,7 +885,6 @@
                 <span class="scene-icon">😴</span><span class="scene-name">Goodnight</span>
               </button>
             </div>
-          </div>
         </div>
 
         <!-- Vision 10: Heater Control - CPU OPTIMIZATION: x-if removes heavy DOM when hidden -->

@@ -165,9 +165,11 @@
 }
 .light-toggle:disabled { cursor: not-allowed; }
 
+/* Per-card toggles: 60x44 to leave the header room for the room name.
+   Master toggle keeps 76x44. Both still meet the 44px touch minimum. */
 .toggle-track {
   position: relative;
-  width: 72px;
+  width: 60px;
   height: 44px;
   border-radius: 44px;
   background: var(--color-border);
@@ -190,7 +192,7 @@
   justify-content: center;
 }
 .toggle-on .toggle-track { background: var(--color-warning); }
-.toggle-on .toggle-thumb { left: 32px; background: #1a1a1c; }
+.toggle-on .toggle-thumb { left: 20px; background: #1a1a1c; }
 .master-toggle.toggle-on .toggle-thumb { left: 36px; }
 
 .toggle-syncing .toggle-thumb { opacity: 0.7; }
@@ -207,9 +209,13 @@
   min-height: 0;
 }
 
+/* Card grid: header, sliders (flex), color-presets (auto — 0 for non-color
+   lights, ~88px for color lights), quick-presets, meta.
+   Two absolute overlays (syncing, unavailable) sit on top and don't
+   consume any row. */
 .light-card {
   display: grid;
-  grid-template-rows: 44px 1fr 44px 16px;
+  grid-template-rows: 44px 1fr auto 44px 16px;
   gap: 8px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -274,11 +280,12 @@
 .light-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+  flex: 1;
 }
 .light-icon {
-  font-size: 26px;
+  font-size: 20px;
   filter: saturate(1.2);
   flex-shrink: 0;
 }
@@ -287,11 +294,19 @@
   flex-direction: column;
   min-width: 0;
   line-height: 1.1;
+  flex: 1;
 }
+/* Room name: 12px/700 with tight tracking fits "Living Room" (the
+   longest label at ~64px) in the ~78px details column. Header budget
+   inside a 174px card is:
+     icon(20) + gap(6) + details + header-gap(8) + toggle(60) = 174
+     → details ≈ 80px. The store uses "Study Room" / "Living Room",
+     not bare "Study"/"Living", so the name must be sized against
+     those longer strings. */
 .light-name {
-  font-size: 17px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -505,6 +520,35 @@
   border-color: rgba(255, 210, 122, 0.5);
 }
 .accent-pill:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================
+   COLOR PRESET SWATCHES (color lights only)
+   2 rows × 4 swatches. Explicit 40px rows — relying on
+   aspect-ratio or grid-auto-rows:1fr collapsed to 4px tall
+   earlier because the parent grid track had no intrinsic
+   minimum. Hue vertical slider still covers continuous control;
+   swatches are for one-tap primary colors.
+   ============================================ */
+.color-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 40px 40px;
+  gap: 3px;
+  min-height: 83px;
+}
+.color-preset-btn {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+.color-preset-btn:hover { border-color: rgba(255, 255, 255, 0.3); }
+.color-preset-btn:active { transform: scale(0.92); }
+.color-presets.control-disabled { opacity: 0.35; pointer-events: none; }
 
 /* ============================================
    QUICK PRESET BUTTONS
