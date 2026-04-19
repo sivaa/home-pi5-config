@@ -6225,47 +6225,6 @@
         entity_id: input_boolean.circadian_study_override
 
 # -----------------------------------------------------------------------------
-# KITCHEN - TTS reminder if lights appear on when unoccupied
-# Uses illumination sensor (no smart lights in kitchen)
-# Repeats every 3 minutes until light is turned off
-# Only during non-quiet hours (07:00-23:00) and after sunset
-# -----------------------------------------------------------------------------
-- id: kitchen_presence_light_reminder
-  alias: "[Kitchen] Light Reminder When Unoccupied"
-  description: "Repeating TTS reminder every 3 min if kitchen light on with no presence"
-  enabled: false
-  mode: single
-
-  trigger:
-    # Check every 3 minutes
-    - platform: time_pattern
-      minutes: "/3"
-
-  condition:
-    # No human presence in kitchen
-    - condition: state
-      entity_id: binary_sensor.kitchen_human_presence_occupancy
-      state: "off"
-    # Light is on (illumination sensor reads bright)
-    - condition: state
-      entity_id: sensor.kitchen_human_presence_illumination
-      state: "bright"
-    # Non-quiet hours (07:00-23:00)
-    - condition: time
-      after: "07:00:00"
-      before: "23:00:00"
-    # After sunset (avoid false positives from sunlight)
-    - condition: state
-      entity_id: sun.sun
-      state: "below_horizon"
-
-  action:
-    - service: script.smart_tts_announce
-      data:
-        message: "Kitchen light is still on"
-        title: "💡 Kitchen Light"
-
-# -----------------------------------------------------------------------------
 # BATHROOM - AwoX Light ON when occupied (presence detected)
 # ┌────────────────────────────────────────────────────────────────┐
 # │  WHY THIS EXISTS:                                              │
