@@ -87,7 +87,9 @@ export function weatherForecastView() {
     hourlyCurve() {
       const h = this.hourly || [];
       if (h.length < 2) return { d: '', points: [], width: 0, height: 0 };
-      const W = 808, H = 90, padX = 0, padTop = 8, padBottom = 10;
+      // padX reserves horizontal room so edge temp labels aren't clipped by
+      // the viewBox (text-anchor=middle overflows half its width past each end).
+      const W = 808, H = 90, padX = 18, padTop = 8, padBottom = 10;
       const temps = h.map(x => x.temp);
       const tMin = Math.min(...temps) - 1;
       const tMax = Math.max(...temps) + 1;
@@ -96,6 +98,42 @@ export function weatherForecastView() {
         y: yScale(x.temp, tMin, tMax, H, padTop, padBottom)
       }));
       return { d: smoothPath(pts), points: pts, width: W, height: H, baseline: H - padBottom };
+    },
+
+    // Inline SVG string for 10-day hi/lo dots + temp labels. Same reason as
+    // hourlyPointsSvg() — <template x-for> doesn't render inside <svg>.
+    dailyPointsSvg() {
+      const c = this.dailyCurve();
+      const d = this.daily || [];
+      if (!c || !d.length) return '';
+      const hi = c.hiPts.map((p, i) => {
+        const t = d[i]?.tempMax;
+        if (t == null) return '';
+        return `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4" fill="#0a0c10" stroke="#f97316" stroke-width="2"/>` +
+               `<text x="${p.x.toFixed(2)}" y="${(p.y - 10).toFixed(2)}" text-anchor="middle" fill="white" font-size="12" font-weight="700">${t}°</text>`;
+      }).join('');
+      const lo = c.loPts.map((p, i) => {
+        const t = d[i]?.tempMin;
+        if (t == null) return '';
+        return `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="4" fill="#0a0c10" stroke="#38bdf8" stroke-width="2"/>` +
+               `<text x="${p.x.toFixed(2)}" y="${(p.y + 20).toFixed(2)}" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="11" font-weight="600">${t}°</text>`;
+      }).join('');
+      return hi + lo;
+    },
+
+    // Inline SVG string for hourly dots + temp labels. Returned via x-html
+    // because <template x-for> doesn't render inside <svg> (Alpine only
+    // recognizes HTMLTemplateElement, which <template> in SVG namespace is not).
+    hourlyPointsSvg() {
+      const h = this.hourly || [];
+      const { points } = this.hourlyCurve();
+      if (!points || !points.length) return '';
+      return points.map((p, i) => {
+        const t = h[i]?.temp;
+        if (t == null) return '';
+        return `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="2.5" fill="#0a0c10" stroke="#3b82f6" stroke-width="1.5"/>` +
+               `<text x="${p.x.toFixed(2)}" y="${(p.y - 7).toFixed(2)}" text-anchor="middle" fill="white" font-size="10" font-weight="600">${t}°</text>`;
+      }).join('');
     },
 
     // ----- 10-day curve (SVG) -----

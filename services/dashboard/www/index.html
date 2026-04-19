@@ -3162,13 +3162,16 @@
                     <!-- Curve line -->
                     <path :d="hourlyCurve().d"
                           fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Per-hour dots + temp labels (x-html so SVG children parse in SVG namespace;
+                         <template x-for> doesn't work inside <svg>) -->
+                    <g x-html="hourlyPointsSvg()"></g>
                   </svg>
                 </div>
               </template>
 
               <!-- Hourly cards strip -->
               <div class="wx-hourly-cards">
-                <template x-for="(h, i) in hourly.slice(0, 12)" :key="'hr-' + i">
+                <template x-for="(h, i) in hourly.slice(0, 24)" :key="'hr-' + i">
                   <div class="wx-hourly-card">
                     <div class="wx-hourly-card-time" x-text="h.hour + ':00'"></div>
                     <div class="wx-hourly-card-emoji" x-text="h.emoji"></div>
@@ -3248,25 +3251,8 @@
                           stroke-width="2.5" stroke-linecap="round"
                           class="wx-curve wx-curve-low"/>
 
-                    <!-- Per-day dots + temp labels -->
-                    <template x-for="(p, i) in dailyCurve().hiPts" :key="'hi-' + i">
-                      <g>
-                        <circle :cx="p.x" :cy="p.y" r="4"
-                                fill="#0a0c10" stroke="#f97316" stroke-width="2"/>
-                        <text :x="p.x" :y="p.y - 10" text-anchor="middle"
-                              fill="white" font-size="12" font-weight="700"
-                              x-text="daily[i].tempMax + '°'"></text>
-                      </g>
-                    </template>
-                    <template x-for="(p, i) in dailyCurve().loPts" :key="'lo-' + i">
-                      <g>
-                        <circle :cx="p.x" :cy="p.y" r="4"
-                                fill="#0a0c10" stroke="#38bdf8" stroke-width="2"/>
-                        <text :x="p.x" :y="p.y + 20" text-anchor="middle"
-                              fill="rgba(255,255,255,0.65)" font-size="11" font-weight="600"
-                              x-text="daily[i].tempMin + '°'"></text>
-                      </g>
-                    </template>
+                    <!-- Per-day dots + temp labels (x-html; <template x-for> doesn't render inside <svg>) -->
+                    <g x-html="dailyPointsSvg()"></g>
                   </svg>
                 </template>
 
@@ -4777,7 +4763,7 @@
   <!-- Weather Forecast View Module - loads store and view -->
   <script type="module">
     import { initWeatherForecastStore } from './js/stores/weather-forecast-store.js?v=20260418-tight';
-    import { weatherForecastView } from './views/weather-forecast.js?v=20260418-tight';
+    import { weatherForecastView } from './views/weather-forecast.js?v=20260419-hr24';
 
     // Expose view globally for Alpine x-data
     window.weatherForecastView = weatherForecastView;
