@@ -274,6 +274,37 @@ persistence_location /mosquitto/data/
 log_dest stdout
 ```
 
+### External Converters
+
+Location on Pi: `/opt/zigbee2mqtt/data/external_converters/`
+Source of truth: `configs/zigbee2mqtt/external_converters/`
+
+Z2M auto-loads every `.js` file in this directory at startup. Use external converters to add support for devices zigbee-herdsman-converters doesn't ship with yet, or to extend a built-in definition with attributes the upstream author chose not to expose. An external converter with a `zigbeeModel` matching a built-in one fully replaces the built-in definition (no merge), so patch via the require+spread pattern to preserve features.
+
+| File | Purpose |
+|------|---------|
+| `sonoff-s60zbtpf-network-indicator.js` | Adds `network_indicator` binary toggle to SONOFF S60ZBTPF smart plugs. Wraps the built-in definition (preserving on/off, metering, inching control, overload protection) and appends a `modernExtend.binary` that writes attribute `networkLed` on cluster 0xFC11. Used to physically turn off the blue network-status LED so it doesn't emit light in the bedroom at night. See the file header for deployment + verification commands. |
+| `eglo-rovito-probe.js` | Exploratory converter for the EGLO Rovito-Z (model 900087) bed light. Kept on disk but not relied on by any dashboard feature. Safe to delete when no longer experimenting. |
+
+Deploying a new external converter:
+
+```bash
+# Source-first: place file in configs/zigbee2mqtt/external_converters/ in the repo
+scp configs/zigbee2mqtt/external_converters/<name>.js pi@pi:/tmp/
+ssh pi@pi "sudo mv /tmp/<name>.js /opt/zigbee2mqtt/data/external_converters/ \
+  && sudo chown root:root /opt/zigbee2mqtt/data/external_converters/<name>.js"
+
+# Validate the file loads in the container (catches syntax/require errors early)
+ssh pi@pi "docker exec zigbee2mqtt node -e \
+  'const d = require(\"/app/data/external_converters/<name>.js\"); console.log(d.model)'"
+
+# Restart Z2M via systemctl (triggers pre-start validation - see Golden Rule #6)
+ssh pi@pi "sudo systemctl restart zigbee2mqtt"
+
+# Confirm loaded
+ssh pi@pi "docker logs zigbee2mqtt --since 30s 2>&1 | grep 'external converter'"
+```
+
 ---
 
 ## Access Points
@@ -404,6 +435,7 @@ To rebuild this setup from scratch:
 
 | Date | Change |
 |------|--------|
+| 2026-04-19 | Documented `external_converters/` directory, auto-load behavior, override-by-zigbeeModel semantics, and a deploy+validate recipe. Inventoried current converters (S60ZBTPF network LED, EGLO Rovito probe). |
 | 2026-04-16 | Updated device count to 49, Z2M restart to systemctl, docker-compose to match actual (network_mode:host, restart:"no", docker.sock), configuration.yaml example updated |
 | 2025-12-30 | Updated to 8-service stack (added mqtt-influx-bridge, cast-ip-monitor, heater-watchdog) |
 | 2025-12-30 | Updated device count to 35, fixed timezone to Europe/Berlin |

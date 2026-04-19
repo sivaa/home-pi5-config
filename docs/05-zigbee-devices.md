@@ -331,6 +331,7 @@
 │    - Daily/Monthly energy tracking                         │
 │    - Overload protection                                   │
 │    - Power-on behavior (ON/OFF/RESTORE)                    │
+│    - Network LED control (via external converter)          │
 ├─────────────────────────────────────────────────────────────┤
 │  Pairing Procedure:                                         │
 │    1. Press and hold button for 5 seconds                   │
@@ -341,6 +342,8 @@
 │        improving mesh network coverage                      │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**Network LED (blue) disabled at deploy time.** The built-in zigbee-herdsman-converters definition for S60ZBTPF does NOT expose the `networkLed` attribute (cluster 0xFC11, ID 0x0001), even though the firmware supports it. A local external converter at `configs/zigbee2mqtt/external_converters/sonoff-s60zbtpf-network-indicator.js` wraps the built-in definition and adds a `network_indicator` binary toggle. All 3 plugs are configured with `network_indicator: false` so the blue LED does not emit light in the bedroom at night. The HA automation `smart_plug_disable_network_led_on_reconnect` re-writes OFF every time a plug rejoins the network (guards against a firmware default-ON on power cycle).
 
 **Example MQTT Payload:**
 ```json

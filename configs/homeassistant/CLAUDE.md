@@ -767,7 +767,65 @@ the HA restart that applied the config.
 
 ---
 
+## Smart Plug Network LED Management (Apr 2026)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  SMART PLUG BLUE LED: DISABLE + RECONNECT SAFETY NET                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  PROBLEM: SONOFF S60ZBTPF smart plugs have a bright blue network-status      │
+│  LED that disturbs sleep in the bedroom at night. The built-in Z2M           │
+│  converter does not expose a control for it.                                 │
+│                                                                              │
+│  FIX (two parts):                                                            │
+│                                                                              │
+│  1. Z2M external converter at configs/zigbee2mqtt/external_converters/       │
+│     sonoff-s60zbtpf-network-indicator.js wraps the built-in definition       │
+│     and appends a `network_indicator` binary toggle that writes the          │
+│     `networkLed` attribute (cluster 0xFC11, ID 0x0001). Setting OFF          │
+│     persists in firmware.                                                    │
+│                                                                              │
+│  2. HA automation `smart_plug_disable_network_led_on_reconnect` triggers     │
+│     when any of switch.smart_plug_1/2/3 transitions from `unavailable`       │
+│     back to a real state. After a 5s settle delay it re-writes               │
+│     `{"network_indicator": false}` over MQTT. This guards against the        │
+│     unverified risk of firmware defaulting to ON after a power cycle.        │
+│                                                                              │
+│  TRADE-OFF: also fires on every Z2M restart. Harmless - it just re-writes    │
+│  the same value the firmware already holds.                                  │
+│                                                                              │
+│  Template trick: plug_num is derived from trigger.entity_id.split('_')|last │
+│  to build the Z2M topic `zigbee2mqtt/Smart Plug [{{plug_num}}]/set` without  │
+│  hard-coding three per-plug copies of the same action.                       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Related Files
+
+| File | Purpose |
+|------|---------|
+| `configs/zigbee2mqtt/external_converters/sonoff-s60zbtpf-network-indicator.js` | Exposes `network_indicator` on S60ZBTPF |
+| `automations.yaml` - `smart_plug_disable_network_led_on_reconnect` | Re-writes OFF on reconnect |
+| `docs/15-ha-automations.md` - Smart Plug LED Management | User-facing reference |
+
+---
+
 ## History
+
+- **Apr 19, 2026**: Smart plug blue network LED disable + reconnect safety net
+  - New Z2M external converter exposes `network_indicator` on SONOFF S60ZBTPF
+    (the built-in converter omits it; sibling ZBMINIR2 has it natively)
+  - Wraps built-in definition via `require(...).definitions` + spread pattern
+    so all existing features (metering, inching control, overload protection)
+    are preserved
+  - New automation `smart_plug_disable_network_led_on_reconnect` (parallel,
+    max: 10) re-writes OFF after 5s settle whenever a plug transitions from
+    `unavailable` → real state
+  - All 3 plugs verified: device read-back returns `network_indicator=false`
+    from firmware; blue LEDs physically off
+  - Total automations: 77 -> 78
 
 - **Apr 18, 2026**: Google Home integration audit + drift fix
   - Found 3 entities (mailbox occupancy, hot-water vibration, stale presence)

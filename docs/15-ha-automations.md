@@ -1,7 +1,7 @@
 # Home Assistant Automations
 
-> **Last Updated:** 2026-04-16
-> **Total Automations:** 77
+> **Last Updated:** 2026-04-19
+> **Total Automations:** 78
 > **File:** `configs/homeassistant/automations.yaml`
 
 ---
@@ -36,6 +36,7 @@
 | [Outdoor Temp Adjust](#-heater-safety-limits) | 1 | Auto-adjust setpoints based on outdoor temp |
 | [Mobile Notification MQTT](#-tts-logging) | 1 | Publish mobile notifications to MQTT for dashboard |
 | [Daily Valve Exercise](#-watchdog-recovery) | 1 | Prevent TRV valve seizure from extended OFF |
+| [Smart Plug LED](#-smart-plug-led-management) | 1 | Re-disable blue network LED on plug reconnect |
 
 ---
 
@@ -930,6 +931,50 @@ These automations provide **repeating TTS reminders** when lights are left on in
 
 ---
 
+### 🔌 Smart Plug LED Management
+
+The 3 SONOFF S60ZBTPF smart plugs have a bright blue network-status LED that disturbs sleep in the bedroom at night. The LED is controlled via the `networkLed` attribute on the eWeLink cluster 0xFC11, exposed to HA by a custom Z2M external converter (see `configs/zigbee2mqtt/external_converters/sonoff-s60zbtpf-network-indicator.js`).
+
+Setting the LED off once persists in firmware. This automation acts as a safety net: if a plug loses power (unplugged, breaker flip) and the firmware defaults to ON on boot, the LED gets re-disabled within ~5 seconds of the plug rejoining the Zigbee mesh.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      SMART PLUG LED RECONNECT FLOW                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  Plug loses power                          HA automation fires                    │
+│        │                                        │                                 │
+│        ▼                                        ▼                                 │
+│  switch.smart_plug_N = unavailable   →   switch.smart_plug_N = on/off            │
+│                                                 │                                 │
+│                                                 ▼ delay 5s (settle)               │
+│                                     mqtt.publish                                  │
+│                                     zigbee2mqtt/Smart Plug [N]/set               │
+│                                     {"network_indicator": false}                  │
+│                                                 │                                 │
+│                                                 ▼                                 │
+│                                          Blue LED off                             │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 78. Smart Plug: disable blue LED on reconnect
+| Property | Value |
+|----------|-------|
+| **ID** | `smart_plug_disable_network_led_on_reconnect` |
+| **Trigger** | `switch.smart_plug_1/2/3` transitions FROM `unavailable` |
+| **Condition** | New state is not `unavailable` or `unknown` |
+| **Mode** | Parallel (max: 10) |
+| **Action** | Wait 5s, then MQTT publish `network_indicator: false` to the matching plug |
+| **Purpose** | Keep LED off across power cycles in case firmware loses the setting |
+
+**Fires on every Z2M restart** (plugs briefly go unavailable → available). This is harmless: it re-writes the same value the device already holds.
+
+**Related files:**
+- `configs/zigbee2mqtt/external_converters/sonoff-s60zbtpf-network-indicator.js` - extends the built-in S60ZBTPF definition with the `network_indicator` binary toggle (the built-in converter omits it; sibling ZBMINIR2 has it natively).
+
+---
+
 ## Entity Reference
 
 ### Contact Sensors (8 total)
@@ -1162,6 +1207,7 @@ If user sets mode=heat via dashboard while window open:
 
 | Date | Change |
 |------|--------|
+| 2026-04-19 | **Added Smart Plug LED re-disable automation:** The 3 SONOFF S60ZBTPF smart plugs have a bright blue network LED that disturbs sleep. New Z2M external converter exposes `network_indicator` (the built-in converter omits it); new HA automation `smart_plug_disable_network_led_on_reconnect` re-writes OFF every time a plug transitions from unavailable, guarding against a potential firmware default-ON on power cycle. Total count: 77 to 78. |
 | 2026-01-21 | **Uniform TTS Fallback Hierarchy:** Implemented consistent TTS fallback cascade across ALL notifications. Priority: (1) kitchen_display, (2) broken_display + master_bedroom_clock, (3) phone notification. Updated 3 smart_tts scripts (`smart_tts_announce`, `smart_tts_co2_alert`, `smart_tts_window_alert`) and converted 16 direct TTS calls in automations to use `script.smart_tts_announce`. CO2 override scripts now also use the cascade. This ensures no notification is silently lost if primary speaker is offline. |
 | 2026-01-07 | **Unified temperature-aware window alerts:** Replaced `bath_window_open_too_long` and `bed_window_open_too_long` with single `window_open_too_long` automation. Now covers ALL 7 windows + balcony door. **Key change:** 5-minute alert when temp ≤0°C (freezing), 10-minute when >0°C. Uses balcony sensor for outdoor temp. If sensor unavailable, defaults to freezing behavior (safer). Main door unchanged at 3-min (security). Cold weather alert (15min, <18°C) provides backup for edge cases. |
 | 2026-01-04 | **Added Sensor Offline Alert system:** After a 34-hour power outage, 2 contact sensors stayed offline blocking heater resume (unavailable ≠ off). Added 3 automations: (1) `contact_sensor_offline_alert` - immediate notification after 5 min offline, (2) `contact_sensor_offline_repeat` - repeat every 4 hours, (3) `contact_sensor_back_online` - recovery notification. Also increased Z2M passive timeout 1500→2400 for better short-outage recovery. Documented 8 Circadian Lighting automations. Total count: 33→47 automations. |
