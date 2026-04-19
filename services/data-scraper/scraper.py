@@ -56,6 +56,11 @@ WRONG_DIRECTIONS = ["teltow", "stahnsdorf", "lankwitz", "andréezeile", "steglit
 # Filter settings for S-Bahn (directions to exclude)
 WRONG_SBAHN_DIRECTIONS = ["wannsee"]
 
+# S-Bahn line name pattern (S1, S2, S25, S45, ...). HAFAS stop 900049201 also
+# serves buses (115, X10, 623, ...), so we must filter by line name; direction
+# alone is not enough. Tolerates whitespace/case variants from HAFAS.
+SBAHN_LINE_PATTERN = re.compile(r"^\s*S\d+\s*$", re.IGNORECASE)
+
 # Cancellation/strike detection pattern (shared by Bus + S-Bahn scrapers)
 #
 #   ┌───────────────────────────────────────────────────────────────┐
@@ -401,9 +406,12 @@ def filter_bus_departures(departures):
 
 
 def filter_sbahn_departures(departures):
-    """Filter S-Bahn departures to exclude wrong directions."""
+    """Filter S-Bahn departures: only S-prefixed lines, exclude wrong directions."""
     filtered = []
     for dep in departures:
+        line = dep.get("line", "")
+        if not SBAHN_LINE_PATTERN.match(line):
+            continue
         direction_lower = dep["direction"].lower()
         if not any(x in direction_lower for x in WRONG_SBAHN_DIRECTIONS):
             filtered.append(dep)
@@ -529,7 +537,9 @@ async def scrape_sbahn_departures():
         page = await context.new_page()
 
         log(f"[S-BAHN] Navigating to bahnhof.de...")
-        await page.goto(SBAHN_URL, wait_until='networkidle', timeout=30000)
+        # Use domcontentloaded, not networkidle - bahnhof.de has background
+        # telemetry/ads that prevent network from going idle, causing 100% timeout.
+        await page.goto(SBAHN_URL, wait_until='domcontentloaded', timeout=30000)
 
         # Wait for Next.js hydration
         await page.wait_for_timeout(3000)
