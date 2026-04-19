@@ -1,1007 +1,603 @@
-    /* ========================================
-       LIGHTS CONTROL VIEW (Vision 7)
-       ======================================== */
-    .lights-view {
-      padding: var(--space-md) var(--space-lg);
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    /* Loading states */
-    .lights-initializing,
-    .lights-warning {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-md);
-      padding: var(--space-2xl);
-      color: var(--color-text-secondary);
-      font-size: var(--font-size-md);
-    }
-
-    .loading-lg {
-      width: 24px;
-      height: 24px;
-      border-width: 3px;
-    }
-
-    .loading-sm {
-      width: 8px;
-      height: 8px;
-      border-width: 1.5px;
-    }
-
-    .syncing-text {
-      color: var(--color-primary);
-      font-style: italic;
-    }
-
-    /* Master Control Toggle */
-    .master-control {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--space-sm) var(--space-lg);
-      margin-bottom: var(--space-md);
-      background: var(--color-surface);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-md);
-      transition: all var(--transition-normal);
-      max-width: 400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .master-control.master-on {
-      background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      /* Multi-layer glow removed for CPU efficiency */
-    }
-
-    .master-control.master-syncing {
-      opacity: 0.7;
-    }
-
-    .master-control.master-disabled {
-      opacity: 0.4;
-      pointer-events: none;
-    }
-
-    .master-info {
-      display: flex;
-      align-items: center;
-      gap: var(--space-md);
-    }
-
-    .master-icon {
-      font-size: 32px;
-    }
-
-    .master-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .master-label {
-      font-size: var(--font-size-lg);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text);
-    }
-
-    .master-status {
-      font-size: var(--font-size-sm);
-      color: var(--color-text-secondary);
-    }
-
-    .master-toggle {
-      transform: scale(1.5);
-      margin-right: var(--space-sm);
-    }
-
-    /* Disabled state for all lights controls */
-    .lights-disabled {
-      opacity: 0.35;
-      pointer-events: none;
-      /* grayscale removed for CPU efficiency */
-    }
-
-    /* Light Cards Grid — fixed 5-column layout so all rooms stay in one row
-       on the kiosk. `minmax(0, 1fr)` lets each card shrink below its content
-       width (otherwise grid tracks default to min-content and overflow). */
-    .lights-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: var(--space-sm);
-      margin-bottom: var(--space-md);
-    }
-
-    .light-card {
-      background: var(--color-surface);
-      border-radius: var(--radius-xl);
-      padding: var(--space-md);
-      box-shadow: var(--shadow-sm);
-      transition: all var(--transition-normal);
-      border: 2px solid transparent;
-      min-width: 0; /* allow flex/grid shrink inside the card */
-    }
-
-    .light-card.light-on {
-      border-color: var(--color-warning);
-      box-shadow: 0 0 20px rgba(255, 200, 0, 0.15);
-    }
-
-    .light-card.light-off {
-      opacity: 0.8;
-    }
-
-    .light-card.light-syncing {
-      position: relative;
-    }
-
-    .light-card.light-unavailable {
-      opacity: 0.5;
-      /* grayscale removed for CPU efficiency */
-      border-color: var(--color-border);
-      position: relative;
-    }
-
-    .light-unavailable-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: var(--radius-xl);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      gap: var(--space-sm);
-    }
-
-    .unavailable-icon {
-      font-size: 32px;
-      opacity: 0.7;
-    }
-
-    .unavailable-text {
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text-secondary);
-      background: rgba(255, 255, 255, 0.9);
-      padding: var(--space-xs) var(--space-md);
-      border-radius: var(--radius-full);
-    }
-
-    .unavailable-status {
-      color: var(--color-error, #dc3545);
-      font-weight: var(--font-weight-medium);
-    }
-
-    .toggle-unavailable {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .toggle-unavailable .toggle-track {
-      background: var(--color-text-tertiary);
-    }
-
-    .light-syncing-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: var(--radius-xl);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-    }
-
-    .light-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--space-lg);
-    }
-
-    .light-info {
-      display: flex;
-      align-items: center;
-      gap: var(--space-md);
-    }
-
-    .light-icon {
-      font-size: 32px;
-    }
-
-    .light-details {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .light-name {
-      font-size: var(--font-size-lg);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .light-status {
-      font-size: var(--font-size-sm);
-      color: var(--color-text-secondary);
-    }
-
-    /* Toggle Switch */
-    .light-toggle {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-    }
-
-    .toggle-track {
-      width: 56px;
-      height: 32px;
-      background: var(--color-border);
-      border-radius: var(--radius-full);
-      position: relative;
-      transition: background var(--transition-fast);
-    }
-
-    .toggle-on .toggle-track {
-      background: #34C759;  /* Apple iOS green */
-    }
-
-    .toggle-thumb {
-      width: 28px;
-      height: 28px;
-      background: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      transition: transform var(--transition-fast);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .toggle-on .toggle-thumb {
-      transform: translateX(24px);
-    }
-
-    .toggle-syncing {
-      opacity: 0.6;
-      pointer-events: none;
-    }
-
-    .toggle-thumb .loading-indicator {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
-    /* Controls */
-    .light-control {
-      margin-bottom: var(--space-md);
-    }
-
-    .control-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--space-sm);
-    }
-
-    .control-label {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      font-size: var(--font-size-sm);
-      color: var(--color-text-secondary);
-    }
-
-    .control-icon {
-      font-size: var(--font-size-md);
-    }
-
-    .control-value {
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-text);
-    }
-
-    /* Sliders - Large touch-friendly */
-    .slider {
-      width: 100%;
-      height: 40px;
-      border-radius: 20px;
-      background: var(--color-bg);
-      outline: none;
-      -webkit-appearance: none;
-      appearance: none;
-    }
-
-    .slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: white;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      transition: transform var(--transition-fast);
-      border: 2px solid rgba(0,0,0,0.1);
-    }
-
-    .slider::-webkit-slider-thumb:hover {
-      transform: scale(1.1);
-    }
-
-    .slider::-moz-range-thumb {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: white;
-      cursor: pointer;
-      border: 2px solid rgba(0,0,0,0.1);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-
-    .slider-wrapper {
-      position: relative;
-    }
-
-    .slider-percent {
-      position: absolute;
-      top: 50%;
-      left: 16px;
-      transform: translateY(-50%);
-      font-size: 13px;
-      font-weight: 600;
-      color: rgba(120,90,50,0.6);
-      pointer-events: none;
-    }
-
-    .brightness-slider {
-      /* Default - will be overridden by inline style */
-      background: linear-gradient(90deg,
-        rgba(255,220,180,0.8) 0%,
-        rgba(245,245,247,1) 100%
-      );
-    }
-
-    .colortemp-slider {
-      background: linear-gradient(90deg,
-        #F0F4FF 0%,           /* Cool: very subtle blue-white */
-        #FAFBFF 30%,          /* Cool white */
-        #FFFFFF 50%,          /* Pure white (neutral) */
-        #FFF8E7 70%,          /* Warm white */
-        #FFE4B5 100%          /* Warm: soft amber/cream */
-      );  /* Cool white to warm cream */
-    }
-
-    .colortemp-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: var(--font-size-xs);
-      color: var(--color-text-tertiary);
-      margin-top: var(--space-xs);
-    }
-
-    /* Disabled control state */
-    .control-disabled {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-
-    .control-disabled .slider {
-      cursor: not-allowed;
-    }
-
-    .slider:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .slider:disabled::-webkit-slider-thumb {
-      background: var(--color-text-tertiary);
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .slider:disabled::-moz-range-thumb {
-      background: var(--color-text-tertiary);
-      cursor: not-allowed;
-    }
-
-    /* Syncing indicator */
-    .control-syncing {
-      display: inline-block;
-      animation: spin 1s linear 60;
-      margin-right: var(--space-xs);
-      font-size: var(--font-size-sm);
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    /* Presets */
-    .light-presets {
-      display: flex;
-      gap: var(--space-sm);
-      margin-bottom: var(--space-md);
-      padding-top: var(--space-md);
-      border-top: 1px solid var(--color-border);
-    }
-
-    .preset-btn {
-      flex: 1;
-      padding: var(--space-sm);
-      font-size: var(--font-size-lg);
-      background: var(--color-bg);
-      border: none;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-    }
-
-    .preset-btn:hover {
-      background: var(--color-border);
-      transform: scale(1.05);
-    }
-
-    /* Light Meta */
-    .light-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: var(--font-size-xs);
-      color: var(--color-text-tertiary);
-      padding-top: var(--space-sm);
-      border-top: 1px solid var(--color-border);
-      gap: var(--space-sm);
-    }
-
-    .light-availability {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .light-availability.available {
-      color: #34C759;
-    }
-
-    .light-availability.unavailable {
-      color: var(--color-error, #dc3545);
-    }
-
-    /* Scenes */
-    .lights-scenes {
-      background: var(--color-surface);
-      border-radius: var(--radius-xl);
-      padding: var(--space-lg);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .scenes-title {
-      font-size: var(--font-size-md);
-      font-weight: var(--font-weight-semibold);
-      margin-bottom: var(--space-md);
-      text-align: center;
-    }
-
-    .scenes-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: var(--space-md);
-    }
-
-    .scene-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-md);
-      background: var(--color-bg);
-      border: none;
-      border-radius: var(--radius-lg);
-      cursor: pointer;
-      transition: all var(--transition-fast);
-    }
-
-    .scene-btn:hover {
-      background: var(--color-border);
-      transform: translateY(-2px);
-    }
-
-    .scene-icon {
-      font-size: 28px;
-    }
-
-    .scene-name {
-      font-size: var(--font-size-sm);
-      font-weight: var(--font-weight-medium);
-    }
-
-    @media (max-width: 600px) {
-      .lights-top-row {
-        flex-direction: column;
-        gap: var(--space-md);
-      }
-
-      .lights-top-row .lights-header {
-        text-align: center;
-      }
-
-      .lights-top-row .lights-subtitle {
-        justify-content: center;
-      }
-
-      .lights-top-row .master-control {
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-      }
-
-      /* Keep all 5 light cards on one row at every width. */
-      .lights-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: var(--space-xs);
-      }
-
-      .scenes-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .btn-all {
-        width: 100%;
-        justify-content: center;
-      }
-    }
-
-/* ============================================
-   DARK MODE
-   ============================================ */
-
-/* Master control "on" state */
-[data-theme="dark"] .master-control.master-on {
-  background: linear-gradient(135deg, #3D3520 0%, #4A4025 100%);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  /* Multi-layer glow removed for CPU efficiency */
-}
-
-/* Unavailable text overlay */
-[data-theme="dark"] .unavailable-text {
-  background: rgba(44, 44, 46, 0.95);
-  color: var(--color-text-secondary);
-}
-
-/* Syncing overlay */
-[data-theme="dark"] .light-syncing-overlay {
-  background: rgba(28, 28, 30, 0.8);
-}
-
-/* Toggle switch thumb */
-[data-theme="dark"] .toggle-thumb {
-  background: var(--color-text);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-}
-
-/* Slider thumbs - WebKit */
-[data-theme="dark"] .slider::-webkit-slider-thumb {
-  background: var(--color-text);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-/* Slider thumbs - Firefox */
-[data-theme="dark"] .slider::-moz-range-thumb {
-  background: var(--color-text);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-/* Slider percent label */
-[data-theme="dark"] .slider-percent {
-  color: rgba(200, 180, 130, 0.8);
-}
-
-/* Light card "on" state */
-[data-theme="dark"] .light-card.light-on {
-  border-color: var(--color-warning);
-  box-shadow: 0 0 20px rgba(255, 200, 0, 0.1);
-}
-
-/* Brightness slider - warm glow for dark mode */
-[data-theme="dark"] .brightness-slider {
-  background: linear-gradient(90deg,
-    rgba(100, 80, 50, 0.6) 0%,
-    rgba(60, 60, 65, 1) 100%
-  );
-}
-
-/* Color temp slider - adjusted for dark */
-[data-theme="dark"] .colortemp-slider {
-  background: linear-gradient(90deg,
-    #2A3040 0%,
-    #353540 50%,
-    #4A4030 100%
-  );
-}
-
 /* ========================================
-   CIRCADIAN LIGHTING STATUS BAR
-   Performance: No blur, simple shadows, 44px touch targets
+   LIGHTS VIEW (v3) — vertical sliders, Pi kiosk 1280x800 no-scroll
+   Iterated through two Opus UX+brutality review passes (v1→v2→v3).
+   All interactive elements >=44px touch target.
+   No backdrop-filter, no infinite animations, single shadows
+   (see dashboard CLAUDE.md "CSS Performance Guidelines").
    ======================================== */
 
-.circadian-status {
+.lights-view {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 64px 1fr 76px;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 0;
+}
+
+/* Initializing / not-connected overlays */
+.lights-initializing,
+.lights-warning {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+}
+.loading-lg { width: 24px; height: 24px; border-width: 3px; }
+.loading-sm { width: 8px; height: 8px; border-width: 1.5px; }
+.syncing-text { color: var(--color-primary); font-style: italic; }
+
+.lights-disabled { opacity: 0.35; pointer-events: none; }
+
+/* ============================================
+   TOP BAR: circadian strip + master control
+   ============================================ */
+.lights-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  min-height: 0;
+}
+
+.circadian-status,
+.circadian-disabled-banner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-lg);
+  gap: 18px;
   background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-md);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  border-radius: 12px;
+  padding: 0 18px;
+  margin: 0;
+}
+
+.circadian-disabled-banner {
+  justify-content: space-between;
+  border-style: dashed;
+  color: var(--color-text-secondary);
+}
+.circadian-disabled-banner button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  min-height: 44px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .circadian-phase {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 10px;
+  padding-right: 18px;
+  border-right: 1px solid var(--color-border);
 }
-
-.phase-icon {
-  font-size: 1.5rem;
-}
-
-.phase-name {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
+.phase-icon { font-size: 26px; }
+.phase-name { font-size: 17px; font-weight: 600; letter-spacing: 0.3px; }
 
 .circadian-stats {
   display: flex;
-  gap: var(--space-lg);
+  align-items: center;
+  gap: 16px;
 }
-
 .circadian-stats .stat {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-sm);
+  gap: 6px;
+  font-size: 15px;
   color: var(--color-text-secondary);
 }
-
-.stat-icon {
-  font-size: var(--font-size-md);
+.circadian-stats .stat strong {
+  color: var(--color-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
+.stat-icon { font-size: 16px; }
 
 .circadian-toggle {
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
-  border: none;
+  margin-left: auto;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;
-  min-width: 44px;
+  min-width: 80px;
   min-height: 44px;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: 13px;
+  font-weight: 600;
   touch-action: manipulation;
   transition: background var(--transition-fast);
 }
-
 .circadian-toggle.active {
   background: rgba(52, 199, 89, 0.15);
   color: #34C759;
+  border-color: rgba(52, 199, 89, 0.4);
 }
 
-.circadian-toggle:hover {
+/* Master control block (right side of top bar) */
+.master-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0 18px;
+  min-width: 260px;
+  margin: 0;
+}
+.master-control.master-disabled { opacity: 0.4; pointer-events: none; }
+
+.master-info { display: flex; align-items: center; gap: 14px; }
+.master-icon { font-size: 26px; }
+.master-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.master-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+.master-status { font-size: 19px; font-weight: 700; color: var(--color-text); }
+.master-status strong { color: var(--color-warning); font-size: 22px; }
+
+/* ============================================
+   TOGGLE SWITCH (master + per-card)
+   ============================================ */
+.light-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.light-toggle:disabled { cursor: not-allowed; }
+
+.toggle-track {
+  position: relative;
+  width: 72px;
+  height: 44px;
+  border-radius: 44px;
   background: var(--color-border);
+  transition: background 0.2s ease;
+}
+.master-toggle .toggle-track { width: 76px; height: 44px; }
+
+.toggle-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-text);
+  transition: left 0.2s ease, background 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.toggle-on .toggle-track { background: var(--color-warning); }
+.toggle-on .toggle-thumb { left: 32px; background: #1a1a1c; }
+.master-toggle.toggle-on .toggle-thumb { left: 36px; }
+
+.toggle-syncing .toggle-thumb { opacity: 0.7; }
+.toggle-unavailable .toggle-track { background: rgba(239, 68, 68, 0.3); }
+.toggle-unavailable .toggle-thumb { background: #666; }
+
+/* ============================================
+   LIGHTS GRID: 5 columns, fills vertical space
+   ============================================ */
+.lights-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
 }
 
-.circadian-toggle.active:hover {
-  background: rgba(52, 199, 89, 0.25);
+.light-card {
+  display: grid;
+  grid-template-rows: 44px 1fr 44px 16px;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 8px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+  min-height: 0;
 }
+.light-card.light-on {
+  border-color: rgba(255, 210, 122, 0.4);
+  background:
+    radial-gradient(ellipse 140% 60% at 50% -20%, rgba(255, 210, 122, 0.08), transparent 60%),
+    var(--color-surface);
+}
+.light-card.light-off { opacity: 0.75; }
+.light-card.light-unavailable { opacity: 0.5; }
+.light-card.light-syncing { opacity: 0.85; }
 
-/* Circadian Disabled Banner */
-.circadian-disabled-banner {
+/* Syncing + unavailable overlays */
+.light-syncing-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(28, 28, 30, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 12px;
+}
+.light-unavailable-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(28, 28, 30, 0.8);
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 8px;
+  text-align: center;
+}
+.unavailable-icon { font-size: 22px; }
+.unavailable-text { font-weight: 600; font-size: 12px; }
+.unavailable-status { font-size: 11px; color: var(--color-text-tertiary); }
+
+/* Card header */
+.light-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
-  background: var(--color-bg);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-lg);
+  gap: 8px;
+  min-width: 0;
+}
+.light-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.light-icon {
+  font-size: 26px;
+  filter: saturate(1.2);
+  flex-shrink: 0;
+}
+.light-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.1;
+}
+.light-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+}
+.light-status {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
   color: var(--color-text-secondary);
-  border: 1px dashed var(--color-border);
+  font-weight: 700;
+  margin-top: 2px;
+}
+.light-card.light-on .light-status { color: var(--color-warning); }
+.light-card.light-off .light-status { color: var(--color-text-tertiary); }
+.light-card.light-off .light-name { color: var(--color-text-secondary); }
+.light-card.light-off .light-icon { filter: saturate(0.4) brightness(0.8); }
+
+.light-switch-badge {
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  margin-top: 2px;
+  width: fit-content;
 }
 
-.circadian-disabled-banner button {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-md);
-  border: none;
-  background: var(--color-primary);
-  color: white;
-  cursor: pointer;
-  min-height: 44px;
-  font-weight: var(--font-weight-medium);
-  touch-action: manipulation;
-  transition: opacity var(--transition-fast);
-}
-
-.circadian-disabled-banner button:hover {
-  opacity: 0.9;
-}
-
-/* ========================================
-   OVERRIDE BANNER (Per-Light)
-   ======================================== */
-
+/* ============================================
+   OVERRIDE BANNER (replaces sliders region for one card row)
+   ============================================ */
 .override-banner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
-  margin-bottom: var(--space-md);
+  gap: 6px;
+  padding: 6px 8px;
   background: rgba(255, 159, 10, 0.1);
-  border-radius: var(--radius-md);
-  border-left: 3px solid #FF9F0A;
+  border: 1px solid rgba(255, 159, 10, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #FF9F0A;
+  grid-column: 1 / -1;
 }
-
 .override-info {
   display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.override-icon {
-  font-size: 1.25rem;
-}
-
-.override-text {
-  display: flex;
   flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+  flex: 1;
 }
-
-.override-title {
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-}
-
-.override-expiry {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-
+.override-icon { font-size: 14px; margin-right: 4px; }
+.override-title { font-weight: 700; font-size: 11px; }
+.override-expiry { font-size: 10px; opacity: 0.9; }
 .override-clear {
-  padding: var(--space-xs) var(--space-md);
-  border-radius: var(--radius-sm);
-  border: 1px solid #FF9F0A;
   background: transparent;
+  border: 1px solid rgba(255, 159, 10, 0.4);
   color: #FF9F0A;
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  min-width: 44px;
-  min-height: 44px;
-  touch-action: manipulation;
-  transition: background var(--transition-fast);
-}
-
-.override-clear:hover,
-.override-clear:active {
-  background: rgba(255, 159, 10, 0.15);
-}
-
-/* Circadian preset button */
-.preset-btn.circadian-preset {
-  background: rgba(0, 122, 255, 0.1);
-  border: 1px solid rgba(0, 122, 255, 0.3);
-}
-
-.preset-btn.circadian-preset:hover {
-  background: rgba(0, 122, 255, 0.2);
-}
-
-/* ========================================
-   DARK MODE - CIRCADIAN
-   ======================================== */
-
-[data-theme="dark"] .circadian-status {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-}
-
-[data-theme="dark"] .circadian-toggle.active {
-  background: rgba(48, 209, 88, 0.2);
-  color: #30D158;
-}
-
-[data-theme="dark"] .circadian-toggle.active:hover {
-  background: rgba(48, 209, 88, 0.3);
-}
-
-[data-theme="dark"] .circadian-disabled-banner {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-}
-
-[data-theme="dark"] .override-banner {
-  background: rgba(255, 159, 10, 0.15);
-}
-
-[data-theme="dark"] .override-clear:hover,
-[data-theme="dark"] .override-clear:active {
-  background: rgba(255, 159, 10, 0.25);
-}
-
-[data-theme="dark"] .preset-btn.circadian-preset {
-  background: rgba(10, 132, 255, 0.15);
-  border-color: rgba(10, 132, 255, 0.4);
-}
-
-[data-theme="dark"] .preset-btn.circadian-preset:hover {
-  background: rgba(10, 132, 255, 0.25);
-}
-
-/* ========================================
-   RESPONSIVE - CIRCADIAN
-   ======================================== */
-
-@media (max-width: 600px) {
-  .circadian-status {
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-  }
-
-  .circadian-phase {
-    flex: 1 1 100%;
-    justify-content: center;
-    margin-bottom: var(--space-xs);
-  }
-
-  .circadian-stats {
-    flex: 1;
-    justify-content: center;
-  }
-
-  .circadian-toggle {
-    flex: 1;
-    text-align: center;
-  }
-}
-
-/* ========================================
-   HUE / COLOR PICKER (RGB-capable lights)
-   ======================================== */
-.hue-slider {
-  background: linear-gradient(
-    to right,
-    hsl(0, 100%, 50%),
-    hsl(60, 100%, 50%),
-    hsl(120, 100%, 50%),
-    hsl(180, 100%, 50%),
-    hsl(240, 100%, 50%),
-    hsl(300, 100%, 50%),
-    hsl(360, 100%, 50%)
-  );
-}
-
-.color-swatch {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid var(--color-border, #ddd);
-  vertical-align: middle;
-}
-
-/* Accent-LED brightness / intensity control. Used for both the Bed (EGLO
-   Rovito-Z) backlight-intensity pseudo-dim and the Hallway (Aqara T1M) side
-   light brightness slider. Full-card-width slider with stacked header row. */
-.accent-brightness-control {
-  margin-top: var(--space-sm);
-}
-
-.color-presets {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.color-preset-btn {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  border-radius: 50%;
-  border: 2px solid var(--color-border, #ddd);
-  cursor: pointer;
-  padding: 0;
-  touch-action: manipulation;
-  transition: transform 0.15s ease;
-}
-
-.color-preset-btn:hover:not(:disabled) {
-  transform: scale(1.1);
-}
-
-.color-preset-btn:active:not(:disabled) {
-  transform: scale(0.95);
-}
-
-.color-preset-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Accent-LED ON/OFF pill. Styles the toggle next to the accent color
-   picker — labels "Backlight Color" (Bed) or "Side Light Color" (Hallway). */
-.accent-toggle {
-  margin-left: var(--space-sm);
-  padding: 4px 12px;
+  border-radius: 4px;
+  padding: 4px 8px;
   font-size: 11px;
   font-weight: 600;
-  border-radius: 12px;
-  border: 1.5px solid var(--color-border, #ddd);
-  background: var(--color-warning, #ffa500);
-  color: white;
   cursor: pointer;
-  min-width: 44px;
+  min-height: 28px;
   touch-action: manipulation;
-  transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.accent-toggle.accent-off {
-  background: var(--color-bg, #f0f0f0);
-  color: var(--color-text-secondary, #888);
+/* ============================================
+   VERTICAL SLIDERS ROW
+   ============================================ */
+.sliders-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: stretch;
+  min-height: 0;
+}
+.sliders-row.four { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+.v-slider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 2px;
+  min-width: 0;
+  min-height: 0;
+}
+.v-slider-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.1;
+  text-align: center;
+}
+.v-slider-label .icon { font-size: 18px; }
+.v-slider-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  text-align: center;
+  min-height: 18px;
 }
 
-.accent-toggle:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.v-track {
+  position: relative;
+  flex: 1;
+  width: 36px;
+  min-height: 120px;
+  border-radius: 18px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.v-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  border-radius: 18px 18px 0 0;
+  pointer-events: none;
+  transition: height 0.12s ease;
+  background: linear-gradient(to top, #7a5a22, var(--color-warning));
+}
+.v-track.brightness .v-fill { background: linear-gradient(to top, #6b5a2a, #fff1c9); }
+.v-track.cct .v-fill { background: linear-gradient(to top, #3a6fa8, #ffe7b8, #ff8844); }
+.v-track.hue .v-fill {
+  background: linear-gradient(to top,
+    #ff4444, #ff8800, #ffee00, #44dd44, #00ccff, #3366ff, #cc44ff, #ff44aa);
+}
+.v-track.intensity .v-fill { background: linear-gradient(to top, #5a3060, #e091f0); }
+
+.v-thumb {
+  position: absolute;
+  left: 50%;
+  width: 48px;
+  height: 22px;
+  background: #fff;
+  border: 2px solid #1a1a1c;
+  border-radius: 11px;
+  transform: translate(-50%, 50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+  pointer-events: none;
+  z-index: 2;
 }
 
-    /* Switch-off badge on light cards - shown when a light's
-       upstream SONOFF wall switch is known-off. Pi-safe CSS:
-       no backdrop-filter, no infinite animations, simple colours. */
-    .light-switch-badge {
-      display: inline-block;
-      font-size: 11px;
-      line-height: 1.2;
-      padding: 2px 6px;
-      margin-top: 2px;
-      border-radius: 4px;
-      background: rgba(0, 0, 0, 0.05);
-      color: #666;
-      border: 1px solid var(--color-border);
-      white-space: nowrap;
-    }
+/* Native range input sits on top, transparent, catches touch. */
+.v-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  cursor: pointer;
+  touch-action: manipulation;
+  z-index: 3;
+  opacity: 0;
+}
+.v-input:disabled { cursor: not-allowed; }
 
-    [data-theme="dark"] .light-switch-badge {
-      background: rgba(255, 255, 255, 0.06);
-      color: #aaa;
-      border-color: rgba(255, 255, 255, 0.1);
-    }
+/* Off / disabled states for fills */
+.light-card.light-off .v-fill,
+.v-slider.control-disabled .v-fill {
+  background: linear-gradient(to top, #2e2e32, #5a5a5f) !important;
+  opacity: 0.55;
+}
+.light-card.light-off .v-thumb,
+.v-slider.control-disabled .v-thumb {
+  background: #6a6a6e;
+}
+.light-card.light-off .v-slider-value,
+.v-slider.control-disabled .v-slider-value {
+  color: var(--color-text-tertiary);
+}
 
-    /* When switch is off, dial back the unavailable opacity a bit -
-       the card is recoverable (user can tap ON to re-energise),
-       so it shouldn't look as dead as true light-unavailable. */
-    .light-card.light-unavailable.light-switch-off {
-      opacity: 0.7;
-    }
+/* Accent pill below accent slider (replaces value slot when shown) */
+.accent-pill {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  border-radius: 8px;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  padding: 0 4px;
+  touch-action: manipulation;
+}
+.accent-pill.on {
+  background: rgba(255, 210, 122, 0.18);
+  color: var(--color-warning);
+  border-color: rgba(255, 210, 122, 0.5);
+}
+.accent-pill:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ============================================
+   QUICK PRESET BUTTONS
+   ============================================ */
+.light-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+  min-height: 44px;
+}
+.preset-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-height: 44px;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--color-text);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  padding: 0;
+}
+.preset-btn:hover { background: rgba(255,255,255,0.04); }
+.preset-btn:active { transform: scale(0.96); }
+.preset-btn.circadian-preset {
+  background: rgba(255, 210, 122, 0.1);
+  border-color: rgba(255, 210, 122, 0.3);
+}
+.light-presets.control-disabled { opacity: 0.4; pointer-events: none; }
+
+/* ============================================
+   CARD META
+   ============================================ */
+.light-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.3px;
+  padding-top: 2px;
+  border-top: 1px solid var(--color-border);
+}
+.meta-item { display: flex; align-items: center; gap: 5px; }
+.light-availability { display: flex; align-items: center; gap: 5px; }
+.light-availability.available { color: #34d399; }
+.light-availability.unavailable { color: #ef4444; }
+.light-linkquality { font-variant-numeric: tabular-nums; }
+
+/* ============================================
+   SCENE BAR
+   ============================================ */
+.lights-scenes {
+  display: grid;
+  grid-template-columns: auto repeat(4, 1fr);
+  gap: 8px;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 8px 16px;
+  margin: 0;
+}
+.scenes-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  padding-right: 14px;
+  border-right: 1px solid var(--color-border);
+  margin: 0;
+}
+.scene-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  min-height: 56px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
+}
+.scene-btn:hover { background: rgba(255,255,255,0.04); }
+.scene-btn:active { transform: scale(0.98); }
+.scene-icon { font-size: 26px; }
+.scene-name { font-weight: 600; }

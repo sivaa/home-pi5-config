@@ -615,321 +615,245 @@
         <!-- Vision 7: Lights Control -->
         <div x-show="currentView === 'lights'" x-cloak x-data="lightsView()">
           <div class="lights-view">
-            <!-- Circadian Status Bar -->
-            <div class="circadian-status" x-show="$store.circadian.enabled" x-cloak>
-              <div class="circadian-phase">
-                <span class="phase-icon" x-text="$store.circadian.phaseIcon"></span>
-                <span class="phase-name" x-text="$store.circadian.phase"></span>
-              </div>
-              <div class="circadian-stats">
-                <span class="stat">
-                  <span class="stat-icon">🔆</span>
-                  <span x-text="$store.circadian.brightness + '%'"></span>
-                </span>
-                <span class="stat">
-                  <span class="stat-icon">🌡️</span>
-                  <span x-text="$store.circadian.colorTemp + 'K'"></span>
-                </span>
-              </div>
-              <button class="circadian-toggle active"
-                      @click="$store.circadian.toggle()"
-                      title="Disable Circadian Auto">
-                <span>🔄 Auto</span>
-              </button>
-            </div>
+            <!-- LIGHTS VIEW v3 (vertical sliders, Pi kiosk 1280x800 no-scroll).
+                 Iterated through two Opus UX+brutality review passes.
+                 44px+ touch targets throughout.
+                 Original horizontal-slider version replaced 2026-04-19. -->
 
-            <!-- Circadian Disabled Banner -->
-            <div class="circadian-disabled-banner" x-show="!$store.circadian.enabled" x-cloak>
-              <span>🌙 Circadian lighting is disabled</span>
-              <button @click="$store.circadian.toggle()">Enable</button>
-            </div>
-
-            <!-- Master Control Toggle -->
-            <div class="master-control"
-                 :class="{
-                   'master-on': $store.lights.list.every(l => l.state === 'ON'),
-                   'master-syncing': $store.lights.syncing,
-                   'master-disabled': !$store.mqtt.connected || $store.lights.initializing
-                 }">
-              <div class="master-info">
-                <span class="master-icon">💡</span>
-                <div class="master-text">
-                  <span class="master-label">Master Control</span>
-                  <span class="master-status" x-text="$store.lights.lightsOnCount + ' of ' + $store.lights.list.length + ' lights on'"></span>
+            <!-- ═══════════════ TOP BAR (circadian + master) ═══════════════ -->
+            <div class="lights-topbar">
+              <div class="circadian-status" x-show="$store.circadian.enabled" x-cloak>
+                <div class="circadian-phase">
+                  <span class="phase-icon" x-text="$store.circadian.phaseIcon"></span>
+                  <span class="phase-name" x-text="$store.circadian.phase"></span>
                 </div>
-              </div>
-              <button class="light-toggle master-toggle"
-                      :class="{ 'toggle-on': $store.lights.list.every(l => l.state === 'ON'), 'toggle-syncing': $store.lights.syncing }"
-                      @click="$store.lights.toggleAllLights()"
-                      :disabled="$store.lights.syncing || !$store.mqtt.connected || $store.lights.initializing">
-                <div class="toggle-track">
-                  <div class="toggle-thumb"></div>
+                <div class="circadian-stats">
+                  <span class="stat"><span class="stat-icon">🔆</span><strong x-text="$store.circadian.brightness + '%'"></strong></span>
+                  <span class="stat"><span class="stat-icon">🌡️</span><strong x-text="$store.circadian.colorTemp + 'K'"></strong></span>
                 </div>
-              </button>
+                <button class="circadian-toggle active"
+                        @click="$store.circadian.toggle()"
+                        title="Disable Circadian Auto">🔄 Auto</button>
+              </div>
+
+              <div class="circadian-disabled-banner" x-show="!$store.circadian.enabled" x-cloak>
+                <span>🌙 Circadian lighting is disabled</span>
+                <button @click="$store.circadian.toggle()">Enable</button>
+              </div>
+
+              <div class="master-control"
+                   :class="{ 'master-disabled': !$store.mqtt.connected || $store.lights.initializing }">
+                <div class="master-info">
+                  <span class="master-icon">💡</span>
+                  <div class="master-text">
+                    <span class="master-label">Master</span>
+                    <span class="master-status">
+                      <strong x-text="$store.lights.lightsOnCount"></strong>
+                      of <span x-text="$store.lights.list.length"></span> on
+                    </span>
+                  </div>
+                </div>
+                <button class="light-toggle master-toggle"
+                        :class="{ 'toggle-on': $store.lights.list.every(l => l.state === 'ON'), 'toggle-syncing': $store.lights.syncing }"
+                        @click="$store.lights.toggleAllLights()"
+                        :disabled="$store.lights.syncing || !$store.mqtt.connected || $store.lights.initializing">
+                  <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                </button>
+              </div>
             </div>
 
-            <!-- Initializing overlay -->
+            <!-- Initializing / not-connected overlays (replace the grid area) -->
             <div class="lights-initializing" x-show="$store.lights.initializing && $store.mqtt.connected" x-transition>
               <span class="loading-indicator loading-lg"></span>
               <span>Loading light states...</span>
             </div>
-
-            <!-- Not connected warning -->
             <div class="lights-warning" x-show="!$store.mqtt.connected">
               <span class="loading-indicator"></span>
               <span>Connecting to MQTT...</span>
             </div>
 
-            <!-- Light Cards -->
-            <div class="lights-grid" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
+            <!-- ═══════════════ LIGHT CARDS (5 columns) ═══════════════ -->
+            <div class="lights-grid"
+                 x-show="!$store.lights.initializing && $store.mqtt.connected"
+                 :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
               <template x-for="light in $store.lights.list" :key="light.id">
-                <div class="light-card" :class="{ 'light-on': light.state === 'ON' && light.available, 'light-off': light.state === 'OFF' && light.available, 'light-syncing': light.syncing, 'light-unavailable': !light.available, 'light-switch-off': $store.lights.isSwitchOff(light) }">
-                  <!-- Syncing overlay -->
+                <div class="light-card"
+                     :class="{
+                       'light-on': light.state === 'ON' && light.available,
+                       'light-off': light.state === 'OFF' && light.available,
+                       'light-syncing': light.syncing,
+                       'light-unavailable': !light.available,
+                       'light-switch-off': $store.lights.isSwitchOff(light)
+                     }">
+
                   <div class="light-syncing-overlay" x-show="light.syncing && light.available" x-transition.opacity>
                     <span class="loading-indicator"></span>
                   </div>
+                  <div class="light-unavailable-overlay" x-show="!light.available">
+                    <span class="unavailable-icon">📵</span>
+                    <span class="unavailable-text">Offline</span>
+                    <span class="unavailable-status" x-show="$store.lights.isSwitchOff(light)">🔌 Switch is off</span>
+                  </div>
 
+                  <!-- Header -->
                   <div class="light-header">
                     <div class="light-info">
                       <span class="light-icon" x-text="light.icon"></span>
                       <div class="light-details">
                         <span class="light-name" x-text="light.name"></span>
-                        <span class="light-switch-badge"
-                              x-show="$store.lights.isSwitchOff(light)"
-                              x-cloak>
-                          🔌 Switch off
-                        </span>
                         <span class="light-status">
-                          <span x-show="light.available && light.syncing" class="syncing-text">Syncing...</span>
-                          <span x-show="light.available && !light.syncing" x-text="light.state === 'ON' ? 'On' : 'Off'"></span>
+                          <span x-show="light.syncing" class="syncing-text">Syncing…</span>
+                          <span x-show="!light.syncing" x-text="light.state === 'ON' ? 'On' : 'Off'"></span>
                         </span>
                       </div>
                     </div>
-                    <button class="light-toggle" :class="{ 'toggle-on': light.state === 'ON' && light.available, 'toggle-syncing': light.syncing, 'toggle-unavailable': !light.available }"
-                            @click="$store.lights.toggleLight(light)" :disabled="light.syncing || (!light.available && !$store.lights.canPowerCycle(light))">
-                      <div class="toggle-track">
-                        <div class="toggle-thumb">
-                          <span class="loading-indicator loading-sm" x-show="light.syncing"></span>
+                    <button class="light-toggle"
+                            :class="{ 'toggle-on': light.state === 'ON' && light.available, 'toggle-syncing': light.syncing, 'toggle-unavailable': !light.available }"
+                            @click="$store.lights.toggleLight(light)"
+                            :disabled="light.syncing || (!light.available && !$store.lights.canPowerCycle(light))">
+                      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                    </button>
+                  </div>
+
+                  <!-- Vertical Sliders -->
+                  <div class="sliders-row" :class="{ 'four': light.supportsColor }">
+
+                    <!-- Brightness -->
+                    <div class="v-slider"
+                         :class="{ 'control-disabled': light.state !== 'ON' || !light.available || light.syncing }">
+                      <span class="v-slider-label"><span class="icon">🔆</span>Bright</span>
+                      <div class="v-track brightness">
+                        <div class="v-fill" :style="'height: ' + (light.brightness / 254 * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + (light.brightness / 254 * 100) + '%'"></div>
+                        <input type="range" class="v-input" min="1" max="254"
+                               x-model.number="light.brightness"
+                               :disabled="light.state !== 'ON' || !light.available || light.syncing"
+                               @input="$store.lights.setBrightness(light, $event.target.value)">
+                      </div>
+                      <span class="v-slider-value" x-text="Math.round(light.brightness / 254 * 100) + '%'"></span>
+                    </div>
+
+                    <!-- CCT -->
+                    <div class="v-slider"
+                         :class="{ 'control-disabled': light.state !== 'ON' || !light.available || light.syncing }">
+                      <span class="v-slider-label"><span class="icon">🌡️</span>CCT</span>
+                      <div class="v-track cct">
+                        <div class="v-fill" :style="'height: ' + ((light.colorTemp - light.colorTempMin) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + ((light.colorTemp - light.colorTempMin) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
+                        <input type="range" class="v-input"
+                               :min="light.colorTempMin" :max="light.colorTempMax"
+                               x-model.number="light.colorTemp"
+                               :disabled="light.state !== 'ON' || !light.available || light.syncing"
+                               @input="$store.lights.setColorTemp(light, $event.target.value)">
+                      </div>
+                      <span class="v-slider-value" x-text="getColorTempLabel(light.colorTemp)"></span>
+                    </div>
+
+                    <!-- Hue (color lights only) -->
+                    <template x-if="light.supportsColor">
+                      <div class="v-slider"
+                           :class="{ 'control-disabled': light.state !== 'ON' || !light.available || light.syncing || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }">
+                        <span class="v-slider-label"><span class="icon">🎨</span>Hue</span>
+                        <div class="v-track hue">
+                          <div class="v-fill" :style="'height: ' + (light.hue / 360 * 100) + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + (light.hue / 360 * 100) + '%'"></div>
+                          <input type="range" class="v-input" min="0" max="360"
+                                 x-model.number="light.hue"
+                                 :disabled="light.state !== 'ON' || !light.available || light.syncing || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn)"
+                                 @input="$store.lights.setHue(light, $event.target.value)">
                         </div>
+                        <span class="v-slider-value" x-text="light.hue + '°'"></span>
                       </div>
-                    </button>
-                  </div>
+                    </template>
 
-                  <!-- Circadian Override Banner -->
-                  <div class="override-banner"
-                       x-show="$store.circadian.enabled && $store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active"
-                       x-cloak>
-                    <div class="override-info">
-                      <span class="override-icon">✋</span>
-                      <div class="override-text">
-                        <span class="override-title">Manual Override</span>
-                        <span class="override-expiry"
-                              x-text="'Expires in ' + $store.circadian.formatExpiry($store.circadian.getRoom(light.id))">
-                        </span>
-                      </div>
-                    </div>
-                    <button class="override-clear"
-                            @click="$store.circadian.clearOverride($store.circadian.getRoom(light.id))"
-                            title="Resume circadian schedule">
-                      Clear
-                    </button>
-                  </div>
+                    <!-- Accent (backlight intensity OR sidelight brightness — depends
+                         on light.colorPropSuffix; see services/dashboard/CLAUDE.md
+                         "Hallway Light - Aqara T1M Dual-Endpoint") -->
+                    <template x-if="light.supportsColor">
+                      <div class="v-slider"
+                           :class="{ 'control-disabled': light.state !== 'ON' || !light.available || light.syncing }">
+                        <span class="v-slider-label"><span class="icon">🔅</span>Accent</span>
 
-                  <!-- Brightness Slider -->
-                  <div class="light-control"
-                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
-                    <div class="control-row">
-                      <label class="control-label">
-                        <span class="control-icon">🔆</span>
-                        Brightness
-                      </label>
-                      <span class="control-value">
-                        <span x-show="light.syncing" class="control-syncing">⟳</span>
-                      </span>
-                    </div>
-                    <div class="slider-wrapper">
-                      <input type="range" class="slider brightness-slider" min="1" max="254"
-                             x-model="light.brightness"
-                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
-                             @input="$store.lights.setBrightness(light, $event.target.value)"
-                             :style="'background: linear-gradient(90deg, rgba(255,220,180,0.8) 0%, rgba(255,240,210,0.6) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) ' + (light.brightness / 254 * 100) + '%, rgba(245,245,247,1) 100%)'">
-                      <span class="slider-percent" x-text="Math.round(light.brightness / 254 * 100) + '%'"></span>
-                    </div>
-                  </div>
+                        <!-- Single-endpoint (Bed, EGLO Rovito-Z) -->
+                        <div class="v-track intensity" x-show="!light.colorPropSuffix">
+                          <div class="v-fill" :style="'height: ' + light.backlightIntensity + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + light.backlightIntensity + '%'"></div>
+                          <input type="range" class="v-input" min="0" max="100"
+                                 x-model.number="light.backlightIntensity"
+                                 :disabled="light.state !== 'ON' || !light.available || light.syncing || !light.backlightOn"
+                                 @input="$store.lights.setBacklightIntensity(light, $event.target.value)">
+                        </div>
 
-                  <!-- Color Temperature Slider (main ring on dual-LED lamps) -->
-                  <div class="light-control"
-                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
-                    <div class="control-row">
-                      <label class="control-label">
-                        <span class="control-icon">🌡️</span>
-                        <span x-text="light.supportsColor ? 'Main Ring' : 'Color Temp'"></span>
-                      </label>
-                      <span class="control-value">
-                        <span x-show="light.syncing" class="control-syncing">⟳</span>
-                        <span x-text="getColorTempLabel(light.colorTemp)"></span>
-                      </span>
-                    </div>
-                    <input type="range" class="slider colortemp-slider"
-                           :min="light.colorTempMin" :max="light.colorTempMax"
-                           x-model="light.colorTemp"
-                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing"
-                           @input="$store.lights.setColorTemp(light, $event.target.value)">
-                    <div class="colortemp-labels">
-                      <span>Cool</span>
-                      <span>Warm</span>
-                    </div>
-                  </div>
+                        <!-- Dual-endpoint (Hallway, Aqara T1M) -->
+                        <div class="v-track intensity" x-show="light.colorPropSuffix">
+                          <div class="v-fill" :style="'height: ' + (light.sidelightBrightness / 254 * 100) + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + (light.sidelightBrightness / 254 * 100) + '%'"></div>
+                          <input type="range" class="v-input" min="1" max="254"
+                                 x-model.number="light.sidelightBrightness"
+                                 :disabled="light.state !== 'ON' || !light.available || light.syncing || !light.sidelightOn"
+                                 @input="$store.lights.setSidelightBrightness(light, $event.target.value)">
+                        </div>
 
-                  <!-- Accent-LED color control. On Bed (EGLO Rovito-Z) this drives
-                       the backlight (RGB strip behind the main ring). On Hallway
-                       (Aqara T1M) this drives the side light (outer RGB rim).
-                       color_temp affects the main ring; color (hs) affects the
-                       accent LED. On Bed both LEDs share one endpoint and run
-                       simultaneously (see CLAUDE.md lessons). The OFF toggle
-                       on Bed sends {color:{x:0,y:0}} to truly power down the
-                       RGB LEDs without affecting the main ring CCT (commit
-                       a324145). On Hallway the rgb endpoint is independent so
-                       OFF is a real state flip. -->
-                  <div class="light-control"
-                       x-show="light.supportsColor"
-                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || light.syncing }">
-                    <div class="control-row">
-                      <label class="control-label">
-                        <span class="control-icon">🎨</span>
-                        <span x-text="light.colorPropSuffix ? 'Side Light Color' : 'Backlight Color'"></span>
-                      </label>
-                      <span class="control-value">
-                        <span x-show="light.syncing" class="control-syncing">⟳</span>
-                        <span class="color-swatch"
-                              :style="(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) ? ('background: hsl(' + light.hue + ',100%,50%)') : 'background: #f0f0f0'"></span>
-                        <button class="accent-toggle"
-                                :class="{ 'accent-off': !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }"
-                                :disabled="light.state !== 'ON' || !light.available"
+                        <button class="accent-pill"
+                                :class="{ 'on': light.colorPropSuffix ? light.sidelightOn : light.backlightOn }"
+                                :disabled="light.state !== 'ON' || !light.available || light.syncing"
                                 @click="$store.lights.setAccentOn(light, !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn))"
                                 x-text="(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) ? 'ON' : 'OFF'"></button>
-                      </span>
-                    </div>
-                    <input type="range" class="slider hue-slider" min="0" max="360"
-                           x-model="light.hue"
-                           :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn)"
-                           @input="$store.lights.setHue(light, $event.target.value)">
-                    <!-- Pseudo-dim via saturation for single-endpoint dual-LED
-                         lamps (EGLO Rovito-Z backlight). Real brightness is
-                         shared with the main ring so we can't physically dim
-                         just the backlight — lowering saturation fades the
-                         color toward the main ring's white instead, which
-                         visually reads as "softer/less prominent backlight". -->
-                    <div class="accent-brightness-control"
-                         x-show="light.supportsColor && !light.colorPropSuffix"
-                         :class="{ 'control-disabled': !light.backlightOn }">
-                      <div class="control-row">
-                        <label class="control-label">
-                          <span class="control-icon">🔅</span>
-                          Intensity
-                        </label>
-                        <span class="control-value" x-text="light.backlightIntensity + '%'"></span>
                       </div>
-                      <input type="range" class="slider" min="0" max="100"
-                             x-model="light.backlightIntensity"
-                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.backlightOn"
-                             @input="$store.lights.setBacklightIntensity(light, $event.target.value)">
-                    </div>
-                    <!-- Independent brightness for the side-light rgb rim on
-                         dual-endpoint devices (Aqara T1M). Hidden for single-
-                         endpoint lamps where main-ring brightness already
-                         applies to both LEDs. -->
-                    <div class="accent-brightness-control"
-                         x-show="light.colorPropSuffix"
-                         :class="{ 'control-disabled': !light.sidelightOn }">
-                      <div class="control-row">
-                        <label class="control-label">
-                          <span class="control-icon">🔅</span>
-                          Side Light Dim
-                        </label>
-                        <span class="control-value" x-text="Math.round(light.sidelightBrightness / 254 * 100) + '%'"></span>
-                      </div>
-                      <input type="range" class="slider brightness-slider" min="1" max="254"
-                             x-model="light.sidelightBrightness"
-                             :disabled="light.state !== 'ON' || !light.available || !$store.mqtt.connected || $store.lights.initializing || !light.sidelightOn"
-                             @input="$store.lights.setSidelightBrightness(light, $event.target.value)">
-                    </div>
-                    <div class="color-presets" :class="{ 'control-disabled': !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }">
-                      <button class="color-preset-btn" style="background:#ff4444" title="Red"
-                              @click="$store.lights.setColorPreset(light, 0, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#ff8800" title="Orange"
-                              @click="$store.lights.setColorPreset(light, 30, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#ffee00" title="Yellow"
-                              @click="$store.lights.setColorPreset(light, 60, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#44dd44" title="Green"
-                              @click="$store.lights.setColorPreset(light, 120, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#00ccff" title="Cyan"
-                              @click="$store.lights.setColorPreset(light, 180, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#3366ff" title="Blue"
-                              @click="$store.lights.setColorPreset(light, 240, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#cc44ff" title="Purple"
-                              @click="$store.lights.setColorPreset(light, 280, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                      <button class="color-preset-btn" style="background:#ff44aa" title="Pink"
-                              @click="$store.lights.setColorPreset(light, 320, 100)"
-                              :disabled="light.state !== 'ON' || !light.available"></button>
-                    </div>
+                    </template>
                   </div>
 
-                  <!-- Quick Presets -->
-                  <div class="light-presets" :class="{ 'control-disabled': light.state !== 'ON' || !light.available }">
+                  <!-- Quick Presets. Fifth slot toggles between circadian-resume
+                       (✋ when override active) and apply-circadian (🔄). -->
+                  <div class="light-presets"
+                       :class="{ 'control-disabled': light.state !== 'ON' || !light.available }">
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'reading')" title="Reading">📖</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
                     <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
                     <button class="preset-btn circadian-preset"
                             x-show="$store.circadian.enabled"
-                            @click="$store.circadian.applySchedule($store.circadian.getRoom(light.id))"
-                            title="Follow Circadian Schedule">🔄</button>
+                            @click="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active
+                                      ? $store.circadian.clearOverride($store.circadian.getRoom(light.id))
+                                      : $store.circadian.applySchedule($store.circadian.getRoom(light.id))"
+                            :title="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active
+                                      ? 'Manual override — tap to resume circadian'
+                                      : 'Follow Circadian Schedule'"
+                            x-text="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active ? '✋' : '🔄'"></button>
                   </div>
 
-                  <!-- Link Quality -->
+                  <!-- Meta -->
                   <div class="light-meta">
-                    <span class="light-availability" :class="{ 'available': light.available, 'unavailable': !light.available }">
+                    <span class="light-availability meta-item"
+                          :class="{ 'available': light.available, 'unavailable': !light.available }">
                       <span x-text="light.available ? '🟢' : '🔴'"></span>
                       <span x-text="light.available ? 'Online' : 'Offline'"></span>
                     </span>
-                    <span class="light-linkquality" x-show="light.available" :title="'Link Quality: ' + light.linkquality">
+                    <span class="light-linkquality meta-item" x-show="light.available"
+                          :title="'Link Quality: ' + light.linkquality">
                       📶 <span x-text="light.linkquality || '--'"></span>
                     </span>
-                    <span class="light-update" x-text="formatLastUpdate(light.lastSeen)"></span>
                   </div>
                 </div>
               </template>
             </div>
 
-            <!-- Scene Buttons -->
-            <div class="lights-scenes" :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
-              <h3 class="scenes-title">Quick Scenes</h3>
-              <div class="scenes-grid">
-                <button class="scene-btn" @click="$store.lights.applyScene('movie')">
-                  <span class="scene-icon">🎬</span>
-                  <span class="scene-name">Movie</span>
-                </button>
-                <button class="scene-btn" @click="$store.lights.applyScene('work')">
-                  <span class="scene-icon">💼</span>
-                  <span class="scene-name">Work</span>
-                </button>
-                <button class="scene-btn" @click="$store.lights.applyScene('evening')">
-                  <span class="scene-icon">🌆</span>
-                  <span class="scene-name">Evening</span>
-                </button>
-                <button class="scene-btn" @click="$store.lights.applyScene('goodnight')">
-                  <span class="scene-icon">😴</span>
-                  <span class="scene-name">Goodnight</span>
-                </button>
-              </div>
+            <!-- ═══════════════ SCENE BAR ═══════════════ -->
+            <div class="lights-scenes"
+                 :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
+              <span class="scenes-title">Scenes</span>
+              <button class="scene-btn" @click="$store.lights.applyScene('movie')">
+                <span class="scene-icon">🎬</span><span class="scene-name">Movie</span>
+              </button>
+              <button class="scene-btn" @click="$store.lights.applyScene('work')">
+                <span class="scene-icon">💼</span><span class="scene-name">Work</span>
+              </button>
+              <button class="scene-btn" @click="$store.lights.applyScene('evening')">
+                <span class="scene-icon">🌆</span><span class="scene-name">Evening</span>
+              </button>
+              <button class="scene-btn" @click="$store.lights.applyScene('goodnight')">
+                <span class="scene-icon">😴</span><span class="scene-name">Goodnight</span>
+              </button>
             </div>
           </div>
         </div>
