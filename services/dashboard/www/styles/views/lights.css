@@ -217,7 +217,13 @@
      5. quick presets (44)
      6. meta (16)
    Two absolute overlays (syncing, unavailable) sit on top and don't
-   consume any row. */
+   consume any row.
+   NOTE: explicit `grid-row` on each child below is load-bearing. Alpine's
+   x-show sets display:none on the override banner, which removes it from
+   flow. Without explicit rows, auto-placement shifts every subsequent
+   child up one row — `.light-meta` then lands in the 44px quick-presets
+   track and inflates, leaving the last 16px row empty and creating
+   visible dead space at the bottom of the card. */
 .light-card {
   display: grid;
   grid-template-rows: 44px auto 1fr auto 44px 16px;
@@ -231,6 +237,12 @@
   transition: border-color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
   min-height: 0;
 }
+.light-card > .light-header          { grid-row: 1; }
+.light-card > .light-override-banner { grid-row: 2; }
+.light-card > .sliders-row           { grid-row: 3; }
+.light-card > .color-presets         { grid-row: 4; }
+.light-card > .light-presets         { grid-row: 5; }
+.light-card > .light-meta            { grid-row: 6; }
 .light-card.light-on {
   border-color: rgba(255, 210, 122, 0.4);
   background:
