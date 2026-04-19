@@ -644,6 +644,32 @@
 }
 .light-switch-info.switch-off { color: #FF9F0A; font-weight: 700; }
 
+/* Tappable switch-info (whole thing is a <button>). Keeps the meta-row
+   visual weight minimal but gives a real touch target. Uses min-height
+   at 28 — we can't hit 44 without inflating the meta row, so the modal
+   is the primary large-target surface for switch control. */
+.light-switch-info.meta-item-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  min-height: 22px;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.light-switch-info.meta-item-btn:hover { background: rgba(255,255,255,0.04); }
+.light-switch-info.meta-item-btn:active { transform: scale(0.96); }
+.light-switch-info.switch-on {
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.3);
+}
+.light-switch-info.switch-off {
+  border-color: rgba(255, 159, 10, 0.4);
+  background: rgba(255, 159, 10, 0.08);
+}
+
 /* ============================================
    SCENE BAR
    ============================================ */
@@ -688,3 +714,326 @@
 .scene-btn:active { transform: scale(0.98); }
 .scene-icon { font-size: 26px; }
 .scene-name { font-weight: 600; }
+
+/* ============================================
+   LIGHT DETAIL MODAL
+   Full-screen popup with oversized controls. Opened by tapping a
+   card outside the sliders/buttons. Closed by backdrop tap or ✕.
+   Kiosk-sized: 1280x800 → modal is ~1100x720, centred.
+   ============================================ */
+.light-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.light-modal-overlay { padding: 12px; }
+.light-modal {
+  width: min(1200px, 100%);
+  height: 100%;
+  max-height: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  display: grid;
+  grid-template-rows: 84px auto 1fr auto auto auto 28px;
+  gap: 14px;
+  padding: 18px 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  overflow: hidden;
+  min-height: 0;
+}
+.light-modal.light-on {
+  border-color: rgba(255, 210, 122, 0.45);
+  background:
+    radial-gradient(ellipse 90% 30% at 50% -5%, rgba(255, 210, 122, 0.08), transparent 60%),
+    var(--color-surface);
+}
+.light-modal.light-off { opacity: 0.92; }
+.light-modal.light-unavailable { opacity: 0.85; }
+
+.modal-header {
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 10px;
+}
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.modal-icon {
+  font-size: 40px;
+  filter: saturate(1.2);
+  flex-shrink: 0;
+}
+.modal-title-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.modal-name {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.modal-status {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+}
+.light-modal.light-on .modal-status { color: var(--color-warning); }
+.light-modal.light-off .modal-status { color: var(--color-text-tertiary); }
+
+/* Oversized header toggle (100x52) for primary light on/off */
+.modal-toggle .toggle-track {
+  width: 100px;
+  height: 52px;
+  border-radius: 52px;
+}
+.modal-toggle .toggle-thumb {
+  width: 44px;
+  height: 44px;
+  top: 4px;
+  left: 4px;
+}
+.modal-toggle.toggle-on .toggle-thumb { left: 52px; }
+
+.modal-close {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.modal-close:hover { background: rgba(255,255,255,0.05); border-color: var(--color-text-secondary); }
+.modal-close:active { transform: scale(0.94); }
+
+/* Override banner (modal) */
+.modal-override {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 159, 10, 0.12);
+  border: 1px solid rgba(255, 159, 10, 0.35);
+  border-radius: 10px;
+  padding: 10px 16px;
+  min-height: 48px;
+}
+.modal-override-icon { font-size: 22px; }
+.modal-override-text {
+  flex: 1;
+  font-size: 15px;
+  color: var(--color-text);
+}
+.modal-override-text strong { color: #FF9F0A; font-variant-numeric: tabular-nums; }
+.modal-override-clear {
+  background: rgba(255, 159, 10, 0.2);
+  border: 1px solid rgba(255, 159, 10, 0.5);
+  color: #FF9F0A;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.modal-override-clear:hover { background: rgba(255, 159, 10, 0.3); }
+.modal-override-clear:active { transform: scale(0.97); }
+
+/* Big vertical sliders (modal) */
+.modal-sliders {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  min-height: 260px;
+}
+.modal-sliders.four { grid-template-columns: repeat(4, 1fr); }
+/* 3-row grid: fixed-label / flex track / fixed bottom. Ensures the
+   four columns line up vertically — value text and accent pill share
+   the same bottom track so tops/bottoms of tracks match across
+   columns regardless of which column shows a pill vs plain number. */
+.modal-v-slider {
+  display: grid;
+  grid-template-rows: 36px 1fr 52px;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+.modal-v-slider .v-slider-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.modal-v-slider .v-slider-label .icon { font-size: 18px; }
+.modal-v-slider .v-track {
+  width: 56px;
+  height: 100%;
+  min-height: 0;
+  border-radius: 28px;
+  align-self: stretch;
+  justify-self: center;
+}
+.modal-v-slider .v-thumb {
+  width: 68px;
+  height: 30px;
+  border-radius: 15px;
+}
+.modal-v-slider .v-slider-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  align-self: center;
+}
+.modal-v-slider .accent-pill {
+  font-size: 15px;
+  min-height: 0;
+  height: 44px;
+  align-self: center;
+  justify-self: stretch;
+  margin-top: 0;
+}
+
+/* Modal color presets: bigger swatches */
+.modal-colors {
+  grid-row: 4;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+}
+.modal-color-btn {
+  min-height: 56px;
+  border-radius: 12px;
+  border-width: 2px;
+}
+
+/* Modal quick presets: icon + label, oversized */
+.modal-presets {
+  grid-row: 5;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.modal-preset-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  min-height: 68px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.modal-preset-btn:hover { background: rgba(255,255,255,0.04); }
+.modal-preset-btn:active { transform: scale(0.97); }
+.modal-preset-btn.circadian-preset {
+  background: rgba(255, 210, 122, 0.08);
+  border-color: rgba(255, 210, 122, 0.3);
+}
+.modal-preset-icon { font-size: 24px; }
+.modal-presets.control-disabled { opacity: 0.45; pointer-events: none; }
+.modal-colors.control-disabled { opacity: 0.35; pointer-events: none; }
+
+/* Wall-switch control strip */
+.modal-switch {
+  grid-row: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 10px 18px;
+  min-height: 60px;
+}
+.modal-switch-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.modal-switch-icon { font-size: 24px; }
+.modal-switch-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.modal-switch-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+.modal-switch-state {
+  font-size: 18px;
+  font-weight: 700;
+}
+.modal-switch-state.on { color: #34d399; }
+.modal-switch-state.off { color: #FF9F0A; }
+
+/* Modal meta row */
+.modal-meta {
+  grid-row: 7;
+  display: flex;
+  gap: 18px;
+  justify-content: flex-end;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.3px;
+}
+.modal-meta .meta-item.available { color: #34d399; }
+.modal-meta .meta-item.unavailable { color: #ef4444; }
+
+/* Light card is now tappable — hint with subtle hover (desktop only) */
+@media (hover: hover) {
+  .light-card { cursor: pointer; }
+  .light-card:hover { border-color: var(--color-text-secondary); }
+}

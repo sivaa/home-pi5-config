@@ -681,6 +681,7 @@
                  :class="{ 'lights-disabled': !$store.mqtt.connected || $store.lights.initializing }">
               <template x-for="light in $store.lights.list" :key="light.id">
                 <div class="light-card"
+                     @click="openLight(light)"
                      :class="{
                        'light-on': light.state === 'ON' && light.available,
                        'light-off': light.state === 'OFF' && light.available,
@@ -712,7 +713,7 @@
                     </div>
                     <button class="light-toggle"
                             :class="{ 'toggle-on': light.state === 'ON' && light.available, 'toggle-syncing': light.syncing, 'toggle-unavailable': !light.available }"
-                            @click="$store.lights.toggleLight(light)"
+                            @click.stop="$store.lights.toggleLight(light)"
                             :disabled="light.syncing || (!light.available && !$store.lights.canPowerCycle(light))">
                       <div class="toggle-track"><div class="toggle-thumb"></div></div>
                     </button>
@@ -725,7 +726,7 @@
                        and the card is only ~172px wide so each extra word
                        wraps the flex row. Auto grid row collapses to 0 when
                        not active. -->
-                  <div class="light-override-banner"
+                  <div class="light-override-banner" @click.stop
                        x-show="$store.circadian.enabled && $store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active"
                        x-cloak
                        :title="'Circadian manually overridden — resumes in ' + $store.circadian.formatExpiry($store.circadian.getRoom(light.id))">
@@ -738,7 +739,7 @@
                   </div>
 
                   <!-- Vertical Sliders -->
-                  <div class="sliders-row" :class="{ 'four': light.supportsColor }">
+                  <div class="sliders-row" @click.stop :class="{ 'four': light.supportsColor }">
 
                     <!-- Brightness -->
                     <div class="v-slider"
@@ -832,37 +833,37 @@
                        correct endpoint for both single-endpoint (Bed
                        backlight) and dual-endpoint (Hallway side light)
                        lamps. Disabled when the accent LED is OFF. -->
-                  <div class="color-presets" x-show="light.supportsColor"
+                  <div class="color-presets" x-show="light.supportsColor" @click.stop
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available || !(light.colorPropSuffix ? light.sidelightOn : light.backlightOn) }">
                     <button class="color-preset-btn" style="background:#ff4444" title="Red"
-                            @click="$store.lights.setColorPreset(light, 0, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 0, 100)"></button>
                     <button class="color-preset-btn" style="background:#ff8800" title="Orange"
-                            @click="$store.lights.setColorPreset(light, 30, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 30, 100)"></button>
                     <button class="color-preset-btn" style="background:#ffee00" title="Yellow"
-                            @click="$store.lights.setColorPreset(light, 60, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 60, 100)"></button>
                     <button class="color-preset-btn" style="background:#44dd44" title="Green"
-                            @click="$store.lights.setColorPreset(light, 120, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 120, 100)"></button>
                     <button class="color-preset-btn" style="background:#00ccff" title="Cyan"
-                            @click="$store.lights.setColorPreset(light, 180, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 180, 100)"></button>
                     <button class="color-preset-btn" style="background:#3366ff" title="Blue"
-                            @click="$store.lights.setColorPreset(light, 240, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 240, 100)"></button>
                     <button class="color-preset-btn" style="background:#cc44ff" title="Purple"
-                            @click="$store.lights.setColorPreset(light, 280, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 280, 100)"></button>
                     <button class="color-preset-btn" style="background:#ff44aa" title="Pink"
-                            @click="$store.lights.setColorPreset(light, 320, 100)"></button>
+                            @click.stop="$store.lights.setColorPreset(light, 320, 100)"></button>
                   </div>
 
                   <!-- Quick Presets. Fifth slot toggles between circadian-resume
                        (✋ when override active) and apply-circadian (🔄). -->
-                  <div class="light-presets"
+                  <div class="light-presets" @click.stop
                        :class="{ 'control-disabled': light.state !== 'ON' || !light.available }">
-                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'reading')" title="Reading">📖</button>
-                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
-                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
-                    <button class="preset-btn" @click="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
+                    <button class="preset-btn" @click.stop="$store.lights.applyPreset(light, 'reading')" title="Reading">📖</button>
+                    <button class="preset-btn" @click.stop="$store.lights.applyPreset(light, 'relax')" title="Relax">🌅</button>
+                    <button class="preset-btn" @click.stop="$store.lights.applyPreset(light, 'bright')" title="Bright">☀️</button>
+                    <button class="preset-btn" @click.stop="$store.lights.applyPreset(light, 'night')" title="Night">🌙</button>
                     <button class="preset-btn circadian-preset"
                             x-show="$store.circadian.enabled"
-                            @click="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active
+                            @click.stop="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active
                                       ? $store.circadian.clearOverride($store.circadian.getRoom(light.id))
                                       : $store.circadian.applySchedule($store.circadian.getRoom(light.id))"
                             :title="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active
@@ -892,6 +893,208 @@
                     <span class="light-linkquality meta-item" x-show="light.available"
                           :title="'Link Quality: ' + light.linkquality">
                       📶 <span x-text="light.linkquality || '--'"></span>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ═══════════════ LIGHT DETAIL MODAL ═══════════════
+                 Tapping a card (outside sliders/buttons) opens this focused
+                 view with bigger controls. All interactive elements mirror
+                 the card's behaviour — same store methods, same payloads —
+                 just at 2× size, with an added direct wall-switch toggle. -->
+            <div class="light-modal-overlay"
+                 x-show="modalLight" x-cloak
+                 @click="closeLight()">
+              <template x-if="modalLight">
+                <div class="light-modal" @click.stop
+                     :class="{
+                       'light-on': modalLight.state === 'ON' && modalLight.available,
+                       'light-off': modalLight.state === 'OFF' && modalLight.available,
+                       'light-unavailable': !modalLight.available
+                     }">
+                  <div class="modal-header">
+                    <div class="modal-title">
+                      <span class="modal-icon" x-text="modalLight.icon"></span>
+                      <div class="modal-title-text">
+                        <span class="modal-name" x-text="modalLight.name"></span>
+                        <span class="modal-status"
+                              x-text="modalLight.syncing ? 'Syncing…' : (modalLight.state === 'ON' ? 'On' : 'Off')"></span>
+                      </div>
+                    </div>
+                    <button class="light-toggle modal-toggle"
+                            :class="{ 'toggle-on': modalLight.state === 'ON' && modalLight.available, 'toggle-syncing': modalLight.syncing, 'toggle-unavailable': !modalLight.available }"
+                            @click.stop="$store.lights.toggleLight(modalLight)"
+                            :disabled="modalLight.syncing || (!modalLight.available && !$store.lights.canPowerCycle(modalLight))">
+                      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                    </button>
+                    <button class="modal-close" @click.stop="closeLight()" title="Close">✕</button>
+                  </div>
+
+                  <div class="modal-override"
+                       x-show="$store.circadian.enabled && $store.circadian.overrides[$store.circadian.getRoom(modalLight.id)]?.active"
+                       x-cloak>
+                    <span class="modal-override-icon">✋</span>
+                    <span class="modal-override-text">
+                      Manual override —
+                      <strong x-text="$store.circadian.formatExpiry($store.circadian.getRoom(modalLight.id))"></strong>
+                    </span>
+                    <button class="modal-override-clear"
+                            @click.stop="$store.circadian.clearOverride($store.circadian.getRoom(modalLight.id))">
+                      Resume Circadian
+                    </button>
+                  </div>
+
+                  <div class="modal-sliders" :class="{ 'four': modalLight.supportsColor }">
+                    <div class="v-slider modal-v-slider"
+                         :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing }">
+                      <span class="v-slider-label"><span class="icon">🔆</span>Bright</span>
+                      <div class="v-track brightness">
+                        <div class="v-fill" :style="'height: ' + (modalLight.brightness / 254 * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + (modalLight.brightness / 254 * 100) + '%'"></div>
+                        <input type="range" class="v-input" min="1" max="254"
+                               x-model.number="modalLight.brightness"
+                               :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing"
+                               @input="$store.lights.setBrightness(modalLight, $event.target.value)">
+                      </div>
+                      <span class="v-slider-value" x-text="Math.round(modalLight.brightness / 254 * 100) + '%'"></span>
+                    </div>
+
+                    <div class="v-slider modal-v-slider"
+                         :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing }">
+                      <span class="v-slider-label"><span class="icon">🌡️</span>CCT</span>
+                      <div class="v-track cct">
+                        <div class="v-fill" :style="'height: ' + ((modalLight.colorTemp - modalLight.colorTempMin) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + ((modalLight.colorTemp - modalLight.colorTempMin) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
+                        <input type="range" class="v-input"
+                               :min="modalLight.colorTempMin" :max="modalLight.colorTempMax"
+                               x-model.number="modalLight.colorTemp"
+                               :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing"
+                               @input="$store.lights.setColorTemp(modalLight, $event.target.value)">
+                      </div>
+                      <span class="v-slider-value" x-text="getColorTempLabel(modalLight.colorTemp)"></span>
+                    </div>
+
+                    <template x-if="modalLight.supportsColor">
+                      <div class="v-slider modal-v-slider"
+                           :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing || !(modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn) }">
+                        <span class="v-slider-label"><span class="icon">🎨</span>Hue</span>
+                        <div class="v-track hue">
+                          <div class="v-fill" :style="'height: ' + (modalLight.hue / 360 * 100) + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + (modalLight.hue / 360 * 100) + '%'"></div>
+                          <input type="range" class="v-input" min="0" max="360"
+                                 x-model.number="modalLight.hue"
+                                 :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing || !(modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn)"
+                                 @input="$store.lights.setHue(modalLight, $event.target.value)">
+                        </div>
+                        <span class="v-slider-value" x-text="modalLight.hue + '°'"></span>
+                      </div>
+                    </template>
+
+                    <template x-if="modalLight.supportsColor">
+                      <div class="v-slider modal-v-slider"
+                           :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing }">
+                        <span class="v-slider-label"><span class="icon">🔅</span>Accent</span>
+                        <div class="v-track intensity" x-show="!modalLight.colorPropSuffix">
+                          <div class="v-fill" :style="'height: ' + modalLight.backlightIntensity + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + modalLight.backlightIntensity + '%'"></div>
+                          <input type="range" class="v-input" min="0" max="100"
+                                 x-model.number="modalLight.backlightIntensity"
+                                 :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing || !modalLight.backlightOn"
+                                 @input="$store.lights.setBacklightIntensity(modalLight, $event.target.value)">
+                        </div>
+                        <div class="v-track intensity" x-show="modalLight.colorPropSuffix">
+                          <div class="v-fill" :style="'height: ' + (modalLight.sidelightBrightness / 254 * 100) + '%'"></div>
+                          <div class="v-thumb" :style="'bottom: ' + (modalLight.sidelightBrightness / 254 * 100) + '%'"></div>
+                          <input type="range" class="v-input" min="1" max="254"
+                                 x-model.number="modalLight.sidelightBrightness"
+                                 :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing || !modalLight.sidelightOn"
+                                 @input="$store.lights.setSidelightBrightness(modalLight, $event.target.value)">
+                        </div>
+                        <button class="accent-pill"
+                                :class="{ 'on': modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn }"
+                                :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing"
+                                @click.stop="$store.lights.setAccentOn(modalLight, !(modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn))"
+                                x-text="(modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn) ? 'ON' : 'OFF'"></button>
+                      </div>
+                    </template>
+                  </div>
+
+                  <div class="modal-colors" x-show="modalLight.supportsColor"
+                       :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || !(modalLight.colorPropSuffix ? modalLight.sidelightOn : modalLight.backlightOn) }">
+                    <button class="color-preset-btn modal-color-btn" style="background:#ff4444" title="Red"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 0, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#ff8800" title="Orange"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 30, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#ffee00" title="Yellow"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 60, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#44dd44" title="Green"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 120, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#00ccff" title="Cyan"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 180, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#3366ff" title="Blue"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 240, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#cc44ff" title="Purple"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 280, 100)"></button>
+                    <button class="color-preset-btn modal-color-btn" style="background:#ff44aa" title="Pink"
+                            @click.stop="$store.lights.setColorPreset(modalLight, 320, 100)"></button>
+                  </div>
+
+                  <div class="modal-presets"
+                       :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available }">
+                    <button class="modal-preset-btn" @click.stop="$store.lights.applyPreset(modalLight, 'reading')">
+                      <span class="modal-preset-icon">📖</span><span>Reading</span>
+                    </button>
+                    <button class="modal-preset-btn" @click.stop="$store.lights.applyPreset(modalLight, 'relax')">
+                      <span class="modal-preset-icon">🌅</span><span>Relax</span>
+                    </button>
+                    <button class="modal-preset-btn" @click.stop="$store.lights.applyPreset(modalLight, 'bright')">
+                      <span class="modal-preset-icon">☀️</span><span>Bright</span>
+                    </button>
+                    <button class="modal-preset-btn" @click.stop="$store.lights.applyPreset(modalLight, 'night')">
+                      <span class="modal-preset-icon">🌙</span><span>Night</span>
+                    </button>
+                    <button class="modal-preset-btn circadian-preset"
+                            x-show="$store.circadian.enabled"
+                            @click.stop="$store.circadian.overrides[$store.circadian.getRoom(modalLight.id)]?.active
+                                      ? $store.circadian.clearOverride($store.circadian.getRoom(modalLight.id))
+                                      : $store.circadian.applySchedule($store.circadian.getRoom(modalLight.id))">
+                      <span class="modal-preset-icon"
+                            x-text="$store.circadian.overrides[$store.circadian.getRoom(modalLight.id)]?.active ? '✋' : '🔄'"></span>
+                      <span x-text="$store.circadian.overrides[$store.circadian.getRoom(modalLight.id)]?.active ? 'Resume' : 'Circadian'"></span>
+                    </button>
+                  </div>
+
+                  <!-- Wall-switch control (only when light has a SONOFF
+                       upstream). Useful when the bulb is off — lets the
+                       user cut or restore mains power directly. -->
+                  <div class="modal-switch" x-show="modalLight.switchId">
+                    <div class="modal-switch-info">
+                      <span class="modal-switch-icon">🔌</span>
+                      <div class="modal-switch-text">
+                        <span class="modal-switch-label">Wall Switch</span>
+                        <span class="modal-switch-state"
+                              :class="{ 'on': (($store.lights.getLightSwitch(modalLight) || {}).state) === 'ON', 'off': (($store.lights.getLightSwitch(modalLight) || {}).state) === 'OFF' }"
+                              x-text="(($store.lights.getLightSwitch(modalLight) || {}).state) === 'ON' ? 'ON' : (($store.lights.getLightSwitch(modalLight) || {}).state) === 'OFF' ? 'OFF' : 'Unknown'"></span>
+                      </div>
+                    </div>
+                    <button class="light-toggle modal-switch-toggle"
+                            :class="{ 'toggle-on': (($store.lights.getLightSwitch(modalLight) || {}).state) === 'ON' }"
+                            @click.stop="$store.lights.toggleLightSwitch(modalLight)"
+                            :disabled="!(($store.lights.getLightSwitch(modalLight) || {}).available)">
+                      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+                    </button>
+                  </div>
+
+                  <div class="modal-meta">
+                    <span class="meta-item"
+                          :class="{ 'available': modalLight.available, 'unavailable': !modalLight.available }">
+                      <span x-text="modalLight.available ? '🟢' : '🔴'"></span>
+                      <span x-text="modalLight.available ? 'Online' : 'Offline'"></span>
+                    </span>
+                    <span class="meta-item" x-show="modalLight.available">
+                      📶 <span x-text="modalLight.linkquality || '--'"></span>
                     </span>
                   </div>
                 </div>
@@ -3572,7 +3775,7 @@
                 <!-- Small rooms: labels at TOP (temps are centered) -->
                 <text class="floor-room-name" x="17.5" y="3">BATH</text>
                 <text class="floor-room-name" x="17.5" y="23">KITCH</text>
-                <text class="floor-room-name" x="45" y="4">FLUR</text>
+                <text class="floor-room-name" x="45" y="33">FLUR</text>
                 <!-- Large rooms: labels at BOTTOM -->
                 <text class="floor-room-name" x="73.5" y="32">STUDY</text>
                 <text class="floor-room-name" x="22.5" y="68">BED</text>
@@ -3597,10 +3800,11 @@
                 <text class="floor-label" x="22" y="58" :class="getRoomTempClass('bedroom')">
                   <tspan x-text="getRoomTempInt('bedroom')"></tspan><tspan class="floor-decimal" x-text="getRoomTempDec('bedroom')"></tspan>
                 </text>
-                <!-- Hallway (vertical corridor 35-55, y=0-40) -->
-                <text class="floor-label" x="45" y="22" :class="getRoomTempClass('hallway')">
+                <!-- Hallway (vertical corridor 35-55, y=0-40). Bulb at top (y=3),
+                     temp mid, FLUR label at bottom (y=36). -->
+                <text class="floor-label" x="45" y="18" :class="getRoomTempClass('hallway')">
                   <tspan style="font-size: 11px" x-text="getRoomTempInt('hallway')"></tspan>
-                  <tspan x="45" dy="10" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
+                  <tspan x="45" dy="9" class="floor-decimal" x-text="getRoomTempDec('hallway')"></tspan>
                 </text>
               </g>
               <!-- Light indicators (bulb icon, matching presence icon style) -->
@@ -3627,6 +3831,12 @@
                 </g>
                 <!-- Living (45,40,47.39,36.65) - has living_light -->
                 <g transform="translate(47, 43)" :class="getRoomLightClass('living')">
+                  <path class="floor-light-icon" transform="scale(0.25)"
+                        d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
+                </g>
+                <!-- Hallway (35,0,20,40) - has hallway_light (Aqara T1M). No presence sensor.
+                     FLUR label sits at the bottom (y=38), so place the bulb at the top. -->
+                <g transform="translate(37, 3)" :class="getRoomLightClass('hallway')">
                   <path class="floor-light-icon" transform="scale(0.25)"
                         d="M9,21c0,0.55 0.45,1 1,1h4c0.55,0 1,-0.45 1,-1v-1H9V21z M12,2C8.14,2 5,5.14 5,9c0,2.38 1.19,4.47 3,5.74V17c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1v-2.26c1.81,-1.27 3,-3.36 3,-5.74C19,5.14 15.86,2 12,2z"/>
                 </g>
@@ -5910,6 +6120,67 @@
           console.log(`[lights] Pre-pulse: ${sw.topic} ON`);
         },
 
+        // User-driven direct toggle of the upstream wall switch. Unlike
+        // _publishSwitchOn (defensive pre-pulse before bulb ON), this is
+        // fired explicitly from the UI when the user wants to control the
+        // switch itself — e.g. bulb is off and they want to cut/restore
+        // mains manually from the card or modal.
+        //
+        // When turning ON, auto-apply the room's circadian schedule after
+        // a short delay so the bulb is re-energised and lands at the
+        // current-time-of-day brightness/CCT instead of whatever stale
+        // values it last held. Delay gives IKEA FLOALT / AwoX / EGLO
+        // enough time to boot their Zigbee radio and rejoin (same 3-4s
+        // window used by _togglePerLight's pre-pulse path).
+        toggleLightSwitch(light) {
+          const sw = this.getLightSwitch(light);
+          if (!sw) return;
+          const client = Alpine.store('mqtt').client;
+          if (!client || !Alpine.store('mqtt').connected) {
+            console.error('MQTT not connected (switch toggle skipped)');
+            return;
+          }
+          const newState = sw.state === 'ON' ? 'OFF' : 'ON';
+          const topic = `zigbee2mqtt/${sw.topic}/set`;
+          client.publish(topic, JSON.stringify({ state: newState }), { qos: 0 }, (err) => {
+            if (err) console.error('Failed to publish switch toggle:', err);
+          });
+          console.log(`[lights] Switch toggle: ${sw.topic} -> ${newState}`);
+
+          // Always cancel a pending circadian-apply (e.g. user flipped
+          // ON then OFF within the 4s window — don't restore circadian
+          // to a bulb whose power the user is actively cutting again).
+          if (light._circadianOnSwitchTimer) {
+            clearTimeout(light._circadianOnSwitchTimer);
+            light._circadianOnSwitchTimer = null;
+          }
+
+          if (newState === 'ON') {
+            const circadian = Alpine.store('circadian');
+            if (!circadian || !circadian.enabled) return;
+            const roomId = circadian.getRoom(light.id);
+            if (!roomId) return;
+            light._circadianOnSwitchTimer = setTimeout(() => {
+              light._circadianOnSwitchTimer = null;
+              // Re-check at fire time — user may have disabled circadian
+              // globally during the wait.
+              const c = Alpine.store('circadian');
+              if (!c || !c.enabled) return;
+              // If a manual override is still active for this room, clear
+              // it first so the UI banner goes away and HA stops blocking
+              // future circadian ticks. Then apply current values now so
+              // the freshly-re-energised bulb doesn't wait for the next
+              // HA tick (which could be minutes away) to look right.
+              if (c.overrides?.[roomId]?.active) {
+                console.log(`[lights] Switch ON -> clear override for room=${roomId}`);
+                c.clearOverride(roomId);
+              }
+              console.log(`[lights] Switch ON -> apply circadian for room=${roomId}`);
+              c.applySchedule(roomId);
+            }, 4000);
+          }
+        },
+
         // Shared per-light toggle path used by both toggleLight (single
         // card tap) and toggleAllLights (bulk toggle). Handles:
         //  - cancelling any pending delayed ON from a prior tap
@@ -7238,15 +7509,13 @@
         getRoomLightClass(roomId) {
           const room = Alpine.store('rooms')?.list?.find(r => r.id === roomId);
 
-          // No presence sensor in this room (e.g., hallway) - hide indicator
-          if (!room?.presenceSensor) return 'no-light';
-
           // Map room IDs to light IDs (rooms with smart lights)
           const roomLightMap = {
             'study': 'study_light',
             'living': 'living_light',
             'bathroom': 'bath_light',
-            'bedroom': 'bed_light'
+            'bedroom': 'bed_light',
+            'hallway': 'hallway_light'
           };
 
           // Priority 1: Check smart light state if room has one
@@ -7259,6 +7528,9 @@
             }
             // Light unavailable - fall through to switch/illumination
           }
+
+          // Rooms without a smart light and without a presence sensor: hide indicator
+          if (!room?.presenceSensor) return 'no-light';
 
           // Priority 2: Check smart switch state (fallback when smart bulb is offline
           // or for rooms whose only controlled device is a wall switch). Currently all
@@ -7814,6 +8086,19 @@
     // ========================================
     function lightsView() {
       return {
+        // Full-screen "expand" modal. Tapping the card (outside the
+        // sliders and buttons) opens this focused view with bigger
+        // touch targets, so the 1280x800 kiosk isn't trying to squeeze
+        // fine-motor controls into a 174px-wide card.
+        modalLight: null,
+        openLight(light) {
+          if (!light) return;
+          this.modalLight = light;
+        },
+        closeLight() {
+          this.modalLight = null;
+        },
+
         // Helper function for color temperature label
         getColorTempLabel(colorTemp) {
           if (colorTemp <= 280) return 'Cool White';
