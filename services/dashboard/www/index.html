@@ -718,6 +718,25 @@
                     </button>
                   </div>
 
+                  <!-- Circadian Override Banner. Single-line strip between
+                       header and sliders when the user has manually
+                       overridden circadian for this room. "Override" label
+                       dropped — the ✋ icon + amber tint carry that meaning,
+                       and the card is only ~172px wide so each extra word
+                       wraps the flex row. Auto grid row collapses to 0 when
+                       not active. -->
+                  <div class="light-override-banner"
+                       x-show="$store.circadian.enabled && $store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active"
+                       x-cloak
+                       :title="'Circadian manually overridden — resumes in ' + $store.circadian.formatExpiry($store.circadian.getRoom(light.id))">
+                    <span class="light-override-icon">✋</span>
+                    <span class="light-override-expiry"
+                          x-text="$store.circadian.formatExpiry($store.circadian.getRoom(light.id))"></span>
+                    <button class="light-override-clear"
+                            @click.stop="$store.circadian.clearOverride($store.circadian.getRoom(light.id))"
+                            title="Resume circadian schedule">Clear</button>
+                  </div>
+
                   <!-- Vertical Sliders -->
                   <div class="sliders-row" :class="{ 'four': light.supportsColor }">
 
@@ -852,12 +871,23 @@
                             x-text="$store.circadian.overrides[$store.circadian.getRoom(light.id)]?.active ? '✋' : '🔄'"></button>
                   </div>
 
-                  <!-- Meta -->
+                  <!-- Meta: availability, upstream smart-switch state (for
+                       lights that have one: Study / Living / Bedroom have a
+                       SONOFF wall switch feeding the bulb; Bath / Hallway
+                       don't), link quality. Switch indicator is read-only —
+                       tapping the main bulb toggle auto-pulses the switch
+                       on if needed (see _togglePerLight). -->
                   <div class="light-meta">
                     <span class="light-availability meta-item"
                           :class="{ 'available': light.available, 'unavailable': !light.available }">
                       <span x-text="light.available ? '🟢' : '🔴'"></span>
                       <span x-text="light.available ? 'Online' : 'Offline'"></span>
+                    </span>
+                    <span class="light-switch-info meta-item"
+                          x-show="light.switchId"
+                          :class="{ 'switch-off': $store.lights.isSwitchOff(light) }"
+                          :title="'Upstream wall switch (SONOFF). Tap bulb toggle to auto-pulse ON.'">
+                      🔌 <span x-text="(($store.lights.getLightSwitch(light) || {}).state) || '?'"></span>
                     </span>
                     <span class="light-linkquality meta-item" x-show="light.available"
                           :title="'Link Quality: ' + light.linkquality">
