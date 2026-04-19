@@ -6858,3 +6858,55 @@
         plain_text: >-
           Google Assistant integration error:
           {{ trigger.event.data.message | default('(no message)') }}
+
+# -----------------------------------------------------------------------------
+# Smart Plug Network LED: re-disable on device reconnect
+# -----------------------------------------------------------------------------
+# The blue network-status LED on each SONOFF S60ZBTPF smart plug disturbs sleep
+# in the bedroom at night. We disable it via a Z2M external converter that
+# exposes `network_indicator` (see configs/zigbee2mqtt/external_converters/
+# sonoff-s60zbtpf-network-indicator.js).
+#
+# The LED setting is stored in device firmware, but we do NOT know whether it
+# survives a full power loss (plug unplugged / breaker flip). This automation
+# re-issues the OFF command every time a plug reconnects to the Zigbee network,
+# so the LED stays off even if firmware defaults to ON on boot.
+#
+# Triggers on HA's availability signal (switch entity goes from `unavailable`
+# to any real state). This also fires on every Z2M restart, which is harmless:
+# it just re-writes the same attribute value.
+- id: smart_plug_disable_network_led_on_reconnect
+  alias: "Smart Plug: disable blue LED on reconnect"
+  description: "Re-issue network_indicator=OFF every time a smart plug comes back online, so a power cycle can't re-enable the blue LED."
+  mode: parallel
+  max: 10
+
+  variables:
+    # switch.smart_plug_1 / 2 / 3 -> "1" / "2" / "3"
+    plug_num: "{{ trigger.entity_id.split('_') | last }}"
+
+  trigger:
+    - platform: state
+      entity_id: switch.smart_plug_1
+      from: "unavailable"
+    - platform: state
+      entity_id: switch.smart_plug_2
+      from: "unavailable"
+    - platform: state
+      entity_id: switch.smart_plug_3
+      from: "unavailable"
+
+  condition:
+    # Ignore the unavailable -> unknown transition that can occur during HA
+    # startup before the device's retained state is applied.
+    - condition: template
+      value_template: "{{ trigger.to_state.state not in ['unavailable', 'unknown'] }}"
+
+  action:
+    # Let the device fully rejoin before writing attributes.
+    - delay:
+        seconds: 5
+    - service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/Smart Plug [{{ plug_num }}]/set"
+        payload: '{"network_indicator": false}'
