@@ -468,56 +468,37 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 │  ├──────────────────────────────┼──────────┼─────────┼───────┼────────────┤ │
 │  │  zigbee_device_left_alert    │ CRITICAL │   ✓     │   ✓   │ MQTT leave │ │
 │  │  z2m_bridge_state_alert      │ CRITICAL │   ✓     │   ✓   │ bridge LWT │ │
-│  │  zigbee_any_device_offline   │ branched │         │   ✓   │ +/avail    │ │
+│  │  z2m_stuck_down_hourly_nag   │ CRITICAL │   ✓ 7-22│   ✓   │ /1h poll   │ │
+│  │  zigbee_offline_waiter       │ gated    │         │       │ +/avail    │ │
+│  │  zigbee_offline_confirmed    │ branched │         │   ✓   │ after wait │ │
 │  │  zigbee_any_device_back_online│INFO     │         │   ✓   │ +/avail    │ │
-│  │  zigbee-ghost-sweep (script) │ CRITICAL │         │   ✓   │ 03:30+15:30│ │
+│  │  zigbee-ghost-sweep (script) │ WARNING  │         │   ✓   │ 03:30+15:30│ │
 │  │  contact_sensor_offline_alert│ WARNING  │   ✓     │   ✓   │ Unavail    │ │
-│  │  zigbee_router_offline_alert │ CRITICAL │         │   ✓   │ Unavail 2m │ │
 │  │  thermostat_low_battery_alert│ WARNING  │         │   ✓   │ Batt < 30% │ │
-│  │  zigbee_router_online_alert  │ INFO     │         │   ✓   │ Recovery   │ │
 │  │  email_delivery_failure      │ CRITICAL │   ✓     │       │ SMTP error │ │
+│  │  smtp_canary_weekly          │ INFO     │         │   ✓   │ Sun 09:00  │ │
 │  └──────────────────────────────┴──────────┴─────────┴───────┴────────────┘ │
 │                                                                              │
 │  Siva: email-only (removed from phone group Feb 2026).                       │
 │  Nithya: phone push for critical events needing immediate action.            │
-│  Router alerts: email-only (12 devices, phone too noisy).                    │
-│  Router recovery: INFO email (resolves offline alert in inbox).               │
+│  Z2M stuck-down nag: phone push gated to 07:00-22:00 local.                   │
+│  Device-offline alerts: the wildcard waiter/emailer pair applies the          │
+│    configurable N-min recovery delay (default 720 = 12h).                    │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Zigbee Router Monitoring
+### Adding a new Zigbee device
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  MONITORED ROUTERS (always-powered — offline = real problem)                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  Smart Plug [1], [2], [3]          mains-powered                            │
-│  [Study] Light Switch              hardwired SONOFF                          │
-│  [Bed] Light Switch                hardwired SONOFF                          │
-│  [Living] Light Switch             hardwired SONOFF                          │
-│  [Hallway] CO2 Sensor              USB-powered (NOUS E10, router)            │
-│  [Study] Human Presence            USB-powered (SNZB-06P, router)            │
-│  [Living] Human Presence           USB-powered (SNZB-06P, router)            │
-│  [Kitchen] Human Presence          USB-powered (SNZB-06P, router)            │
-│  [Bath] Human Presence             USB-powered (SNZB-06P, router)            │
-│  [Bed] Human Presence              USB-powered (SNZB-06P, router)            │
-│                                                                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  EXCLUDED (manually powered off via wall switch — false positives)           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  [Study] IKEA Light                wall switch                               │
-│  [Living] IKEA Light               wall switch                               │
-│  [Bath] Light (AwoX)               wall switch                               │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+No manual alert-list edits required — the wildcard `zigbee_offline_waiter`
++ `zigbee_offline_confirmed_emailer` pair covers every device via MQTT
+`+/availability` automatically.
 
-**If adding a new always-powered device**, add it to BOTH automations:
-- `zigbee_router_offline_alert` (trigger + device_names)
-- `zigbee_router_online_alert` (trigger + device_names)
+If the new device should be EXCLUDED from offline alerts (e.g. a light
+controlled only by a physical wall switch), edit
+`input_text.zigbee_offline_exclusions` via HA UI → Settings → Devices &
+Services → Helpers. Default exclusions: `[Study] IKEA Light`,
+`[Living] IKEA Light`, `[Bath] Light`.
 
 ---
 
@@ -856,7 +837,7 @@ the HA restart that applied the config.
     - Email HTML template: added `color-scheme: light` meta so Gmail dark
       mode stops mangling the wrapper background.
   - **New layers**:
-    - **L5 weekly SMTP canary** (`smtp_canary_weekly`): Sundays 09:00, a
+    - **L5 weekly SMTP canary** (automation `smtp_canary_weekly`, alias "SMTP Canary — Weekly Heartbeat"): Sundays 09:00, a
       minimal INFO heartbeat email. Silent absence = Gmail App Password
       broken (complements L4 which only fires on active send errors).
     - **L3 stuck-offline detector** (in zigbee-ghost-sweep.py): covers the

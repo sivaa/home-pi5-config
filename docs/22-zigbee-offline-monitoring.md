@@ -60,7 +60,7 @@
 
 ### Additional resilience features (Apr 2026)
 
-**Weekly SMTP canary** (`smtp_canary_weekly_heartbeat`): Sundays at 09:00 local, sends a minimal INFO "Pi weekly heartbeat" email. Its absence means Gmail App Password has silently expired. L4 complements this: fires immediately on an active SMTP error, whereas the canary catches the case where no real email was attempted during the quiet period.
+**Weekly SMTP canary** (automation `smtp_canary_weekly`, alias "SMTP Canary — Weekly Heartbeat"): Sundays at 09:00 local, sends a minimal INFO "Pi weekly heartbeat" email. Its absence means Gmail App Password has silently expired. L4 complements this: fires immediately on an active SMTP error, whereas the canary catches the case where no real email was attempted during the quiet period.
 
 **Z2M stuck-down hourly nag** (`z2m_stuck_down_hourly_nag`): if `input_boolean.z2m_online` stays `off` for >1 hour, fires hourly CRITICAL email + phone push. Gated to 07:00–22:00 local so it doesn't wake anyone at 3am — the initial L0 transition alert already fired when Z2M went down, the nag is for persistent daytime visibility.
 
@@ -373,3 +373,6 @@ If rebuilding the Pi from scratch:
 
 - **2026-04-20** — Built. 4 layers + storm guard + startup grace. Triggered by `[Living] Light Switch` ghost-removal incident. Total HA automations: 78 → 83.
 - **2026-04-20** — Code-review fixes (commit 2713492): storm-guard race fixed (post-increment counter read), L1b recovery storm guard added, ghost-sweep re-pair detection, HTML-escape on email template, tightened L4 trigger.
+- **2026-04-20** — 12-hour recovery delay (commit 8fbd880): L1a split into parallel waiter + queued emailer. Wait configurable via `input_number.zigbee_offline_delay_minutes` (default 720). Transient offlines no longer email.
+- **2026-04-20** — Full-system review response (commit 61acdc6): retired legacy `zigbee_router_offline_alert`/`_online_alert` (redundant with L1a), removed dead `_summary_last` helpers, added B5 stuck-offline detector in ghost sweep, systemd `OnFailure=` hook, Z2M stuck-down hourly nag, snapshot-corruption CRITICAL alert, self-heal leak fix, weekly SMTP canary, contact-repeat cadence /4h→/12h, HTML template dark-mode fixes.
+- **2026-04-20** — Post-review fixes: B5 tracking preserves state on MQTT/HA failure (no false re-alerts); notify-failure.sh uses real newlines; stale docs swept.

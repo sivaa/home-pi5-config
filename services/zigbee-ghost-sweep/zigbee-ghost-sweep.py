@@ -541,59 +541,85 @@ def main() -> int:
     # device (minutes for routers, ~25 h for battery devices). This loop
     # catches devices that are retained-offline across multiple sweeps.
     availability_now = mqtt_read_all_availability()
-    exclusions = get_exclusions()
-    delay_minutes = get_delay_minutes()
     availability_tracking: dict[str, dict[str, Any]] = {}
-    stuck_count = 0
-    now_ts = time.time()
+    # Carry forward prev tracking keys unchanged — used as the fallback path
+    # when any upstream read (MQTT or HA) fails. Preserves the clock on
+    # devices that were already being tracked so a single transient failure
+    # doesn't reset first_offline_sweep_at and cause a false re-alert next
+    # sweep.
+    def _carry_forward_all():
+        for ieee, prev_dev in prev_by_ieee.items():
+            carry = {k: prev_dev[k] for k in ("availability", "first_offline_sweep_at", "stuck_alerted") if k in prev_dev}
+            if carry:
+                availability_tracking[ieee] = carry
 
-    for ieee, device in current_by_ieee.items():
-        name = device.get("friendly_name", "")
-        if not name or name in exclusions:
-            continue
-        state = availability_now.get(name, "unknown")
-        prev_dev = prev_by_ieee.get(ieee, {})
+    # Guard: if MQTT retained-availability read failed (empty dict from
+    # `-W 5` timeout) OR if HA API is unreachable (exclusions/delay lookup
+    # returns sentinel), skip this sweep's stuck-offline detection entirely.
+    # Without these reads we can't correctly distinguish online-but-unknown
+    # from excluded-by-user, and resetting tracking would cause false alerts
+    # next sweep.
+    if not availability_now:
+        log.warning("STUCK-OFFLINE: skipping — retained availability read returned no results (mosquitto slow / down?)")
+        _carry_forward_all()
+    else:
+        exclusions_raw = ha_read_state("input_text.zigbee_offline_exclusions")
+        if exclusions_raw is None:
+            log.warning("STUCK-OFFLINE: skipping — HA API unreachable (exclusions lookup failed)")
+            _carry_forward_all()
+        else:
+            exclusions = {s.strip() for s in exclusions_raw.split(",") if s.strip()}
+            delay_minutes = get_delay_minutes()
+            stuck_count = 0
+            now_ts = time.time()
 
-        if state != "offline":
-            # Online or unknown — reset tracking. Unknown means no retained
-            # availability at all (newly paired, never reported) — treat as
-            # online to avoid false positives.
-            availability_tracking[ieee] = {"availability": state}
-            continue
+            for ieee, device in current_by_ieee.items():
+                name = device.get("friendly_name", "")
+                if not name or name in exclusions:
+                    continue
+                state = availability_now.get(name, "unknown")
+                prev_dev = prev_by_ieee.get(ieee, {})
 
-        # Device is retained-offline.
-        if prev_dev.get("availability") != "offline":
-            # First sweep seeing it offline — mark, don't alert yet
-            availability_tracking[ieee] = {
-                "availability": "offline",
-                "first_offline_sweep_at": now_ts,
-                "stuck_alerted": False,
-            }
-            continue
+                if state != "offline":
+                    # Online or unknown — reset tracking. Unknown means no retained
+                    # availability at all (newly paired, never reported) — treat as
+                    # online to avoid false positives.
+                    availability_tracking[ieee] = {"availability": state}
+                    continue
 
-        # Seen offline in both prev and current. Carry forward the first-seen
-        # timestamp, and decide whether to alert.
-        first_ts = prev_dev.get("first_offline_sweep_at") or now_ts
-        already_alerted = bool(prev_dev.get("stuck_alerted"))
-        availability_tracking[ieee] = {
-            "availability": "offline",
-            "first_offline_sweep_at": first_ts,
-            "stuck_alerted": already_alerted,
-        }
+                # Device is retained-offline.
+                if prev_dev.get("availability") != "offline":
+                    # First sweep seeing it offline — mark, don't alert yet
+                    availability_tracking[ieee] = {
+                        "availability": "offline",
+                        "first_offline_sweep_at": now_ts,
+                        "stuck_alerted": False,
+                    }
+                    continue
 
-        elapsed_min = int((now_ts - first_ts) / 60)
-        if elapsed_min >= delay_minutes and not already_alerted:
-            first_iso = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(first_ts)))
-            log.warning(
-                "  STUCK OFFLINE: %s  IEEE=%s  elapsed=%d min  delay=%d min",
-                name, ieee, elapsed_min, delay_minutes,
-            )
-            send_stuck_offline_email(name, ieee, first_iso, elapsed_min)
-            availability_tracking[ieee]["stuck_alerted"] = True
-            stuck_count += 1
+                # Seen offline in both prev and current. Carry forward the first-seen
+                # timestamp, and decide whether to alert.
+                first_ts = prev_dev.get("first_offline_sweep_at") or now_ts
+                already_alerted = bool(prev_dev.get("stuck_alerted"))
+                availability_tracking[ieee] = {
+                    "availability": "offline",
+                    "first_offline_sweep_at": first_ts,
+                    "stuck_alerted": already_alerted,
+                }
 
-    if stuck_count:
-        log.warning("STUCK-OFFLINE ALERTS: %d device(s)", stuck_count)
+                elapsed_min = int((now_ts - first_ts) / 60)
+                if elapsed_min >= delay_minutes and not already_alerted:
+                    first_iso = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(first_ts)))
+                    log.warning(
+                        "  STUCK OFFLINE: %s  IEEE=%s  elapsed=%d min  delay=%d min",
+                        name, ieee, elapsed_min, delay_minutes,
+                    )
+                    send_stuck_offline_email(name, ieee, first_iso, elapsed_min)
+                    availability_tracking[ieee]["stuck_alerted"] = True
+                    stuck_count += 1
+
+            if stuck_count:
+                log.warning("STUCK-OFFLINE ALERTS: %d device(s)", stuck_count)
 
     # 7. Save current snapshot (includes availability tracking state)
     save_snapshot(devices, availability_tracking)
