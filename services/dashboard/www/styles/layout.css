@@ -856,10 +856,21 @@
     /* ========================================
        FLOOR PLAN IN SIDEBAR
        ======================================== */
+    /* Rooms card holds only the floor plan — trim inner padding so the plan
+       takes more of the card real estate. */
+    .panel-section.rooms-section {
+      padding: var(--space-xs);
+    }
+    .compact-mode .panel-section.rooms-section {
+      padding: 4px;
+    }
+
     .floor-plan-container {
       width: 100%;
-      aspect-ratio: 1.386;
-      margin-top: var(--space-sm);
+      /* Lower aspect-ratio = taller container. 1.386 → 1.1 gives ~25% more
+         vertical space; SVG scales up to fill the wider dimension. */
+      aspect-ratio: 1.1;
+      margin-top: 0;
     }
 
     .floor-plan-svg {
@@ -888,7 +899,8 @@
     }
 
     /* Outer perimeter thicker */
-    .floor-plan-walls > rect.floor-wall {
+    .floor-plan-walls > rect.floor-wall,
+    .floor-plan-walls > path.floor-wall-outer {
       stroke-width: 2;
       stroke: var(--color-text-secondary);
     }
@@ -983,6 +995,50 @@
     .floor-plan-lights g.no-light {
       display: none;
     }
+
+    /* Window/door contact markers (SNZB-04P sensors).
+       State-driven display via the wrapper class (getWindowContactClass /
+       getDoorContactClass). Children that only apply to one state are hidden
+       by default and revealed by the matching state class. */
+
+    /* Window base styles */
+    .floor-plan-contacts .contact-seg  { stroke-width: 2;   stroke-linecap: round; fill: none; }
+    .floor-plan-contacts .contact-cap  { stroke-width: 0.6; stroke-linecap: round; fill: none; }
+    .floor-plan-contacts .contact-sash { stroke-width: 1.1; stroke-linecap: round; fill: none; display: none; }
+
+    /* Window CLOSED: green segment + caps */
+    .floor-plan-contacts .contact-closed .contact-seg,
+    .floor-plan-contacts .contact-closed .contact-cap { stroke: #5a8a6b; }
+
+    /* Window OPEN: amber segment (faded) + amber caps + sash revealed */
+    .floor-plan-contacts .contact-open .contact-seg  { stroke: #e8b341; opacity: 0.55; }
+    .floor-plan-contacts .contact-open .contact-cap,
+    .floor-plan-contacts .contact-open .contact-sash { stroke: #e8b341; }
+    .floor-plan-contacts .contact-open .contact-sash { display: inline; }
+
+    /* Window UNKNOWN (sensor offline or uninitialized): gray, dimmed */
+    .floor-plan-contacts .contact-unknown .contact-seg,
+    .floor-plan-contacts .contact-unknown .contact-cap { stroke: #8a7e68; opacity: 0.35; }
+
+    /* Door base styles */
+    .floor-plan-contacts .contact-door-hinge { fill: #5a8a6b; stroke: none; }
+    .floor-plan-contacts .contact-door-leaf  { stroke-width: 1.7; stroke-linecap: round; fill: none; display: none; }
+    .floor-plan-contacts .contact-door-knob  { stroke: none; display: none; }
+    .floor-plan-contacts .contact-door-arc   { stroke-width: 0.55; stroke-dasharray: 0.8 0.55; fill: none; opacity: 0.9; display: none; }
+    .floor-plan-contacts .contact-door-shut  { stroke-width: 2; stroke-linecap: round; fill: none; display: none; }
+
+    /* Door CLOSED: green hinge + shut-line across the gap */
+    .floor-plan-contacts .contact-door-closed .contact-door-hinge { fill: #5a8a6b; }
+    .floor-plan-contacts .contact-door-closed .contact-door-shut  { stroke: #5a8a6b; display: inline; }
+
+    /* Door OPEN: red-amber hinge, swung leaf, knob, sweep arc */
+    .floor-plan-contacts .contact-door-open .contact-door-hinge { fill: #f07a3a; }
+    .floor-plan-contacts .contact-door-open .contact-door-leaf  { stroke: #f07a3a; display: inline; }
+    .floor-plan-contacts .contact-door-open .contact-door-knob  { fill: #f07a3a; display: inline; }
+    .floor-plan-contacts .contact-door-open .contact-door-arc   { stroke: #f07a3a; display: inline; }
+
+    /* Door UNKNOWN: gray hinge only */
+    .floor-plan-contacts .contact-door-unknown .contact-door-hinge { fill: #8a7e68; opacity: 0.5; }
 
     /* Dark mode adjustments */
     [data-theme="dark"] .floor-room {

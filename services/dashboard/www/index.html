@@ -3755,9 +3755,8 @@
 
         <!-- Section: By Room (Floor Plan) -->
         <div class="panel-section panel-section-primary rooms-section">
-          <div class="panel-section-title">ROOMS</div>
           <div class="floor-plan-container">
-            <svg class="floor-plan-svg" viewBox="0 0 92.39 76.65" preserveAspectRatio="xMidYMid meet">
+            <svg class="floor-plan-svg" viewBox="-6 -6 104.39 88.65" preserveAspectRatio="xMidYMid meet">
               <!-- Room fills - Hallway as vertical corridor -->
               <g class="floor-plan-rooms">
                 <!-- Right side: Study (top), Living (bottom) -->
@@ -3869,10 +3868,22 @@
                         d="M12,4 C10.34,4 9,5.34 9,7 C9,8.66 10.34,10 12,10 C13.66,10 15,8.66 15,7 C15,5.34 13.66,4 12,4 M12,11 C9.79,11 8,12.79 8,15 L8,16 L16,16 L16,15 C16,12.79 14.21,11 12,11"/>
                 </g>
               </g>
-              <!-- Wall structure -->
+              <!-- Wall structure. Outer perimeter drawn as segments so we can leave a
+                   gap where a door exists (variant E convention: doors always break the
+                   wall). Door gaps on exterior walls:
+                     • Main entry door: north wall, x=42.5..47.5 -->
               <g class="floor-plan-walls" fill="none">
-                <!-- Outer perimeter -->
-                <rect class="floor-wall" x="0.5" y="0.5" width="91.39" height="75.65"/>
+                <!-- Outer perimeter (with door gaps).
+                     North wall gap: main entry door x=41.5..48.5 (7u, centered on x=45).
+                     East wall gap: balcony door y=60..74 (living). Leaves a small
+                     wall segment y=74..76.15 at the SE corner. -->
+                <path class="floor-wall floor-wall-outer" d="
+                  M 0.5 0.5 L 41.5 0.5
+                  M 48.5 0.5 L 91.89 0.5
+                  L 91.89 60
+                  M 91.89 74 L 91.89 76.15 L 0.5 76.15
+                  L 0.5 0.5
+                "/>
                 <!-- Internal walls -->
                 <path class="floor-wall" d="
                   M 55 0 L 55 40
@@ -3881,6 +3892,119 @@
                   M 0 20 L 35 20
                   M 0 40 L 92.39 40
                 "/>
+              </g>
+
+              <!-- Window/door contact indicators (SNZB-04P). Placement per room on the
+                   exterior wall they sit on. Closed = green segment + end-caps on wall.
+                   Open = amber faded segment + amber caps + hinged sash drawn outside
+                   the wall. Doors add a hinge bolt and a sweep arc.
+                   Coords are in the same 92.39 x 76.65 room grid as the rest of the plan. -->
+              <g class="floor-plan-contacts">
+                <!-- Bathroom · west wall (x=0.5), center y=10, 7u wide. Hinge at TOP. -->
+                <g class="contact" :class="getWindowContactClass('bath_window')">
+                  <line class="contact-seg"  x1="0.5"  y1="6.5"  x2="0.5"  y2="13.5"/>
+                  <line class="contact-cap"  x1="-0.6" y1="6.5"  x2="1.6"  y2="6.5"/>
+                  <line class="contact-cap"  x1="-0.6" y1="13.5" x2="1.6"  y2="13.5"/>
+                  <line class="contact-sash" x1="0.5"  y1="6.5"  x2="-4.5" y2="11.5"/>
+                </g>
+                <!-- Kitchen · west wall, center y=30, 7u wide. Hinge at TOP. -->
+                <g class="contact" :class="getWindowContactClass('kitchen_window')">
+                  <line class="contact-seg"  x1="0.5"  y1="26.5" x2="0.5"  y2="33.5"/>
+                  <line class="contact-cap"  x1="-0.6" y1="26.5" x2="1.6"  y2="26.5"/>
+                  <line class="contact-cap"  x1="-0.6" y1="33.5" x2="1.6"  y2="33.5"/>
+                  <line class="contact-sash" x1="0.5"  y1="26.5" x2="-4.5" y2="31.5"/>
+                </g>
+
+                <!-- Main entry door · hallway north wall, x=41.5..48.5, 7u wide.
+                     Hinge on the RIGHT (x=48.5). Leaf swings outward (y<0). -->
+                <g class="contact contact-door" :class="getDoorContactClass('main_door')">
+                  <rect class="contact-door-hinge" x="47.5" y="-0.7" width="2" height="2.4" rx="0.3"/>
+                  <!-- Closed state: leaf flat along wall, filling the gap -->
+                  <line class="contact-door-shut" x1="48.5" y1="0.5" x2="41.5" y2="0.5"/>
+                  <!-- Open state: leaf swung ~53°, knob, sweep arc (shown via .contact-door-open) -->
+                  <line class="contact-door-leaf" x1="48.5" y1="0.5" x2="44.3" y2="-5.1"/>
+                  <circle class="contact-door-knob" cx="45.14" cy="-3.98" r="0.55"/>
+                  <path class="contact-door-arc" d="M 41.5 0.5 A 7 7 0 0 1 44.3 -5.1"/>
+                </g>
+
+                <!-- Study · east wall (x=91.89), 3 windows stacked S-L-S centered on y=20.
+                     Top S (y=10..15) and Large (y=16..24) both tracked by study_large sensor
+                     (they're mechanically coupled). Bottom S (y=25..30) has its own sensor. -->
+                <g class="contact" :class="getWindowContactClass('study_large')">
+                  <line class="contact-seg"  x1="91.89" y1="10"   x2="91.89" y2="15"/>
+                  <line class="contact-cap"  x1="90.79" y1="10"   x2="92.99" y2="10"/>
+                  <line class="contact-cap"  x1="90.79" y1="15"   x2="92.99" y2="15"/>
+                  <!-- Hinge at TOP (91.89,10), free end ~45° outward to (95.4,13.5) -->
+                  <line class="contact-sash" x1="91.89" y1="10"   x2="95.4"  y2="13.5"/>
+                </g>
+                <g class="contact" :class="getWindowContactClass('study_large')">
+                  <line class="contact-seg"  x1="91.89" y1="16"   x2="91.89" y2="24"/>
+                  <line class="contact-cap"  x1="90.79" y1="16"   x2="92.99" y2="16"/>
+                  <line class="contact-cap"  x1="90.79" y1="24"   x2="92.99" y2="24"/>
+                  <!-- Hinge (91.89,24), free end ~45° outward to (97.5,18.3) -->
+                  <line class="contact-sash" x1="91.89" y1="24"   x2="97.5"  y2="18.3"/>
+                </g>
+                <g class="contact" :class="getWindowContactClass('study_small')">
+                  <line class="contact-seg"  x1="91.89" y1="25"   x2="91.89" y2="30"/>
+                  <line class="contact-cap"  x1="90.79" y1="25"   x2="92.99" y2="25"/>
+                  <line class="contact-cap"  x1="90.79" y1="30"   x2="92.99" y2="30"/>
+                  <!-- Hinge (91.89,30), free end ~45° outward to (95.4,26.5) -->
+                  <line class="contact-sash" x1="91.89" y1="30"   x2="95.4"  y2="26.5"/>
+                </g>
+
+                <!-- Bedroom · west wall (x=0.5), 2 Large windows, single sensor tracks both.
+                     Top L: y=47..55, hinged at TOP (swings down-west).
+                     Bottom L: y=62..70, hinged at BOTTOM (swings up-west).
+                     Sashes converge toward the middle wall spacer. -->
+                <g class="contact" :class="getWindowContactClass('bedroom_window')">
+                  <line class="contact-seg"  x1="0.5"  y1="47"   x2="0.5"  y2="55"/>
+                  <line class="contact-cap"  x1="-0.6" y1="47"   x2="1.6"  y2="47"/>
+                  <line class="contact-cap"  x1="-0.6" y1="55"   x2="1.6"  y2="55"/>
+                  <line class="contact-sash" x1="0.5"  y1="47"   x2="-5.2" y2="52.7"/>
+                </g>
+                <g class="contact" :class="getWindowContactClass('bedroom_window')">
+                  <line class="contact-seg"  x1="0.5"  y1="62"   x2="0.5"  y2="70"/>
+                  <line class="contact-cap"  x1="-0.6" y1="62"   x2="1.6"  y2="62"/>
+                  <line class="contact-cap"  x1="-0.6" y1="70"   x2="1.6"  y2="70"/>
+                  <line class="contact-sash" x1="0.5"  y1="70"   x2="-5.2" y2="64.3"/>
+                </g>
+
+                <!-- Living · balcony door (2 panels, OPP hinges, east wall y=60..74).
+                     Both panels tracked by a single sensor (living_balcony). -->
+                <g class="contact contact-door" :class="getDoorContactClass('living_balcony')">
+                  <!-- Top panel: hinge at top (91.89,60), leaf tip down-east (96.84,64.95) -->
+                  <rect class="contact-door-hinge" x="90.89" y="59.1" width="2" height="1.8" rx="0.25"/>
+                  <line class="contact-door-shut" x1="91.89" y1="60" x2="91.89" y2="67"/>
+                  <line class="contact-door-leaf" x1="91.89" y1="60" x2="96.84" y2="64.95"/>
+                  <circle class="contact-door-knob" cx="95.85" cy="63.96" r="0.5"/>
+                  <path class="contact-door-arc" d="M 91.89 67 A 7 7 0 0 0 96.84 64.95"/>
+                </g>
+                <g class="contact contact-door" :class="getDoorContactClass('living_balcony')">
+                  <!-- Bottom panel: hinge at bottom (91.89,74), leaf tip up-east (96.84,69.05) -->
+                  <rect class="contact-door-hinge" x="90.89" y="73.1" width="2" height="1.8" rx="0.25"/>
+                  <line class="contact-door-shut" x1="91.89" y1="74" x2="91.89" y2="67"/>
+                  <line class="contact-door-leaf" x1="91.89" y1="74" x2="96.84" y2="69.05"/>
+                  <circle class="contact-door-knob" cx="95.85" cy="70.04" r="0.5"/>
+                  <path class="contact-door-arc" d="M 91.89 67 A 7 7 0 0 1 96.84 69.05"/>
+                </g>
+
+                <!-- Living · east wall (x=91.89), upper portion. M window (7u, hinge TOP) +
+                     S window (5u, hinge BOTTOM). Both tracked by a single sensor
+                     (living_window). -->
+                <g class="contact" :class="getWindowContactClass('living_window')">
+                  <!-- M window y=43..50 -->
+                  <line class="contact-seg"  x1="91.89" y1="43"   x2="91.89" y2="50"/>
+                  <line class="contact-cap"  x1="90.79" y1="43"   x2="92.99" y2="43"/>
+                  <line class="contact-cap"  x1="90.79" y1="50"   x2="92.99" y2="50"/>
+                  <line class="contact-sash" x1="91.89" y1="43"   x2="96.8"  y2="48"/>
+                </g>
+                <g class="contact" :class="getWindowContactClass('living_window')">
+                  <!-- S window y=52..57 -->
+                  <line class="contact-seg"  x1="91.89" y1="52"   x2="91.89" y2="57"/>
+                  <line class="contact-cap"  x1="90.79" y1="52"   x2="92.99" y2="52"/>
+                  <line class="contact-cap"  x1="90.79" y1="57"   x2="92.99" y2="57"/>
+                  <line class="contact-sash" x1="91.89" y1="57"   x2="95.4"  y2="53.5"/>
+                </g>
               </g>
             </svg>
           </div>
@@ -5424,6 +5548,13 @@
             });
             console.log('[mqtt] Subscribed to switch topics');
 
+            // Subscribe to contact sensor topics (state and availability)
+            Alpine.store('contacts').list.forEach(c => {
+              this.client.subscribe(`${CONFIG.baseTopic}/${c.topic}`, { qos: 0 });
+              this.client.subscribe(`${CONFIG.baseTopic}/${c.topic}/availability`, { qos: 0 });
+            });
+            console.log('[mqtt] Subscribed to contact sensor topics');
+
             // On reconnect, reload open sensor timestamps
             if (isReconnect) {
               console.log('[mqtt] Reconnected - reloading open sensor timestamps');
@@ -5460,6 +5591,7 @@
                 const isOnline = data.state === 'online' || data === 'online' || msgStr === 'online';
                 Alpine.store('lights').setAvailability(deviceTopic, isOnline);
                 Alpine.store('switches').setAvailability(deviceTopic, isOnline);
+                Alpine.store('contacts').setAvailability(deviceTopic, isOnline);
                 return;
               }
 
@@ -5483,6 +5615,7 @@
 
               Alpine.store('lights').updateLight(deviceName, data);
               Alpine.store('switches').updateSwitch(deviceName, data);
+              Alpine.store('contacts').updateContact(deviceName, data);
             } catch (e) {
               console.error('MQTT parse error:', e);
             }
@@ -6540,6 +6673,44 @@
         }
       });
 
+      // Contacts store (read-only state tracking for SNZB-04P window/door contacts).
+      // Z2M payload: { "contact": true/false, ... }. contact=true means CLOSED.
+      // Sensor IDs are referenced from the floor-plan marker :class bindings.
+      Alpine.store('contacts', {
+        list: [
+          { id: 'bath_window',    topic: '[Bath] Window Contact Sensor',                   state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'kitchen_window', topic: '[Kitchen] Window Contact Sensor',                state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'bedroom_window', topic: '[Bed] Window Contact Sensor',                    state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'study_large',    topic: '[Study] Window Contact Sensor - Large',          state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'study_small',    topic: '[Study] Window Contact Sensor - Small',          state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'living_window',  topic: '[Living] Window Contact Sensor - Window',        state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'living_balcony', topic: '[Living] Window Contact Sensor - Balcony Door',  state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+          { id: 'main_door',      topic: '[Hallway] Window Contact Sensor - Main Door',    state: 'unknown', available: true, battery: null, linkquality: null, lastSeen: null },
+        ],
+
+        updateContact(topic, data) {
+          const c = this.list.find(x => x.topic === topic);
+          if (!c) return;
+          if (data.contact !== undefined) {
+            c.state = data.contact ? 'closed' : 'open';
+          }
+          if (data.battery !== undefined) c.battery = data.battery;
+          if (data.linkquality !== undefined) c.linkquality = data.linkquality;
+          c.lastSeen = Date.now();
+        },
+
+        setAvailability(topic, isOnline) {
+          const c = this.list.find(x => x.topic === topic);
+          if (!c) return;
+          c.available = isOnline;
+          if (!isOnline) c.state = 'unknown';
+        },
+
+        byId(id) {
+          return this.list.find(c => c.id === id) || null;
+        },
+      });
+
       // Circadian lighting store
       // Receives state from Home Assistant via MQTT statestream
       Alpine.store('circadian', {
@@ -7487,6 +7658,21 @@
           return 'floor-temp-very-hot';                    // Red
         },
 
+        // Floor plan contact markers (SNZB-04P windows/doors).
+        // Returns state class applied to the <g> wrapper.
+        // Windows → 'contact-closed' | 'contact-open' | 'contact-unknown'
+        // Doors   → 'contact-door-closed' | 'contact-door-open' | 'contact-door-unknown'
+        getWindowContactClass(contactId) {
+          const c = Alpine.store('contacts')?.byId(contactId);
+          if (!c || !c.available || c.state === 'unknown') return 'contact-unknown';
+          return c.state === 'open' ? 'contact-open' : 'contact-closed';
+        },
+        getDoorContactClass(contactId) {
+          const c = Alpine.store('contacts')?.byId(contactId);
+          if (!c || !c.available || c.state === 'unknown') return 'contact-door-unknown';
+          return c.state === 'open' ? 'contact-door-open' : 'contact-door-closed';
+        },
+
         // Get occupancy class for floor plan presence icon
         // Shows occupied (green) / empty (subtle) / stale (very faint) / no-sensor (hidden)
         getRoomOccupancyClass(roomId) {
@@ -7529,16 +7715,17 @@
             // Light unavailable - fall through to switch/illumination
           }
 
-          // Rooms without a smart light and without a presence sensor: hide indicator
-          if (!room?.presenceSensor) return 'no-light';
-
           // Priority 2: Check smart switch state (fallback when smart bulb is offline
-          // or for rooms whose only controlled device is a wall switch). Currently all
-          // rooms with a smart light also have a switch cutting power upstream.
+          // or for rooms whose only controlled device is a wall switch).
           const sw = Alpine.store('switches')?.getSwitchForRoom(roomId);
           if (sw) {
             return sw.state === 'ON' ? 'lit' : 'off';
           }
+
+          // Rooms without a presence sensor can't fall through to illumination.
+          // If the room HAS a configured smart light (even offline, e.g. power cut),
+          // show 'off' so the fixture stays visible. Otherwise hide entirely.
+          if (!room?.presenceSensor) return lightId ? 'off' : 'no-light';
 
           // Priority 3: Use illumination from presence sensor
           // (for rooms without smart lights/switches, or when devices are offline)
