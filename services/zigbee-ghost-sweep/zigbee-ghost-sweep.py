@@ -377,6 +377,10 @@ def save_snapshot(devices: list[dict[str, Any]], availability_tracking: dict[str
     with tmp.open("w") as f:
         json.dump(snapshot, f, indent=2)
     tmp.replace(SNAPSHOT_FILE)
+    # Device IEEEs + friendly_names (which include room labels) aren't
+    # secret but aren't world-interesting either. 0600 keeps future
+    # multi-user / container-mount scenarios clean.
+    SNAPSHOT_FILE.chmod(0o600)
     log.info("Saved snapshot: %d devices (excl coordinator)", len(real_devices))
 
 
@@ -577,13 +581,26 @@ def main() -> int:
                 name = device.get("friendly_name", "")
                 if not name or name in exclusions:
                     continue
-                state = availability_now.get(name, "unknown")
                 prev_dev = prev_by_ieee.get(ieee, {})
 
+                # If the wildcard MQTT read didn't return a value for this
+                # device (partial response — mosquitto slow, or >48 devices
+                # straddled the 5s window), preserve prev tracking unchanged
+                # rather than resetting to "unknown" (which would wipe
+                # first_offline_sweep_at and cause a false re-alert later).
+                if name not in availability_now:
+                    carry = {k: prev_dev[k] for k in ("availability", "first_offline_sweep_at", "stuck_alerted") if k in prev_dev}
+                    if carry:
+                        availability_tracking[ieee] = carry
+                    continue
+
+                state = availability_now[name]
+
                 if state != "offline":
-                    # Online or unknown — reset tracking. Unknown means no retained
-                    # availability at all (newly paired, never reported) — treat as
-                    # online to avoid false positives.
+                    # Online or unknown — reset tracking. "unknown" here means
+                    # retained availability was genuinely an unknown value
+                    # (broker returned a parseable payload we didn't recognise);
+                    # missing-from-dict is handled by the branch above.
                     availability_tracking[ieee] = {"availability": state}
                     continue
 

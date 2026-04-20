@@ -10,3 +10,15 @@ ExecStart=/opt/zigbee-ghost-sweep/notify-failure.sh
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=zigbee-ghost-sweep-failure
+
+# Hardening — the notifier only needs: read env, read journal, curl localhost
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true

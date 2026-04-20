@@ -19,3 +19,17 @@ SyslogIdentifier=zigbee-ghost-sweep
 
 # Don't restart on failure — next timer fire will try again
 Restart=no
+
+# Hardening — the script only needs: read env, read/write
+# /var/lib/zigbee-ghost-sweep, exec docker CLI, HTTP to localhost:8123
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/zigbee-ghost-sweep
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true

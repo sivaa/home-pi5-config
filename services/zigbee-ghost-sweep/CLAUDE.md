@@ -82,6 +82,18 @@ Optional environment overrides:
 - `HA_URL` (default `http://localhost:8123`)
 - `MOSQUITTO_CONTAINER` (default `mosquitto`)
 
+## Dependencies
+
+On the Pi host (not inside any container):
+
+| Package | Why |
+|---------|-----|
+| `python3` | runs `zigbee-ghost-sweep.py` |
+| `docker` CLI | invokes `mosquitto_sub` / `mosquitto_pub` via `docker exec mosquitto` |
+| `systemd` | timer + service + OnFailure |
+| `jq` | `notify-failure.sh` builds the alert JSON body with `jq -n --arg ...`. Install via `sudo apt-get install -y jq` if missing — ghost-sweep will still run, but failure-path emails silently drop until `jq` is present. |
+| `curl` | `notify-failure.sh` POSTs to HA API |
+
 ## Behavior on First Run
 
 If `snapshot.json` doesn't exist, the script saves the current device list

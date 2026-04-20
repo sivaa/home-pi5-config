@@ -7301,8 +7301,6 @@
           genuine Zigbee / heater alerts would also be silently failing.
         actions: ""
         details: >-
-          Uptime:       {{ relative_time(now() - timedelta(seconds=(as_timestamp(now()) - as_timestamp(states.sensor.home_assistant_uptime.state | default(now()))) | int(0))) if states.sensor.home_assistant_uptime else 'n/a' }}
-
           Z2M bridge:   {{ states('input_boolean.z2m_online') }}
 
           Automations:  {{ states | selectattr('entity_id','match','^automation\\.') | list | count }}
