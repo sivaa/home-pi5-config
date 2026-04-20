@@ -7037,25 +7037,45 @@
                 plain_text: "Z2M bridge back online."
 
 # -----------------------------------------------------------------------------
-# L1a: WILDCARD DEVICE OFFLINE
-# Covers EVERY Zigbee device via `zigbee2mqtt/+/availability`. New devices
-# added in the future are covered automatically — no per-device entity_id
-# list to maintain.
+# L1a: WILDCARD DEVICE OFFLINE — two-stage (waiter + emailer)
+# -----------------------------------------------------------------------------
+# L1a is split in two so we can add a configurable N-minute wait before
+# actually emailing. The wait absorbs:
+#   - wall-switch reboots (user flips a light switch, device is "offline"
+#     in Z2M's sense but will be back in seconds to minutes)
+#   - Z2M restarts that republish stale retained `offline`
+#   - transient mesh routing hiccups
 #
-# Skips:
+# L1a-waiter   — mode: parallel, max: 60. On MQTT +/availability offline,
+#                starts an N-minute wait (configured via
+#                input_number.zigbee_offline_delay_minutes, default 720 = 12h).
+#                If the device goes `online` during the wait, the run exits
+#                silently. If the wait times out (device still offline) it
+#                fires an internal `zigbee_offline_confirmed` event.
+#
+# L1a-emailer  — mode: queued, max: 50. Picks up the `zigbee_offline_confirmed`
+#                event and runs the storm-guard counter + per-device email.
+#                Queued mode is REQUIRED here: the storm guard reads the
+#                counter after incrementing it, which is only safe under
+#                serial execution (see commit 2713492 for the race fix).
+#
+# Covers EVERY Zigbee device via the MQTT wildcard. New devices added in the
+# future are auto-covered — no per-device entity_id list to maintain.
+#
+# Waiter skips:
 #   - bridge/* topics (handled by L0)
-#   - devices in input_text.zigbee_offline_exclusions (manual wall switches)
+#   - devices in input_text.zigbee_offline_exclusions (wall-switch lights)
 #   - if Z2M itself is down (input_boolean.z2m_online == off)
 #   - first 30 min after HA start (absorbs retained replays)
 #
-# Storm guard: if 6+ devices report offline within a 5-min sliding window,
-# sends ONE summary email and stops processing for the rest of the window.
+# Emailer's storm guard: if 6+ devices confirmed-offline within a 5-min
+# window, sends ONE summary email and suppresses the per-device flood.
 # -----------------------------------------------------------------------------
-- id: zigbee_any_device_offline_alert
-  alias: "Zigbee Any Device Offline Alert (wildcard)"
-  description: "MQTT wildcard trigger on +/availability offline. Auto-covers all current + future Zigbee devices. Has storm guard + startup grace + per-friendly_name severity branching."
-  mode: queued
-  max: 50
+- id: zigbee_offline_waiter
+  alias: "Zigbee Offline Waiter (wildcard, delayed confirm)"
+  description: "Stage 1 of L1a. Triggers on MQTT +/availability offline, waits N minutes (default 12h), and fires zigbee_offline_confirmed event if the device is still offline at the end. Parallel mode so each device waits independently."
+  mode: parallel
+  max: 60
 
   trigger:
     - platform: mqtt
@@ -7064,6 +7084,7 @@
   variables:
     # Z2M friendly_name from "zigbee2mqtt/<NAME>/availability"
     device_name: "{{ trigger.topic.split('/')[1] }}"
+    device_topic: "{{ trigger.topic }}"
     is_offline: >-
       {% set p = trigger.payload %}
       {% if p is string and p.startswith('{') %}
@@ -7073,11 +7094,6 @@
       {% endif %}
     excluded: >-
       {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
-    # Storm window expired check is a pure read of persisted datetime — safe
-    # to capture at trigger time. The counter IS NOT read here; see action block.
-    sentinel: 86400
-    storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_offline_storm_window_start')) | default(0) }}"
-    storm_window_expired: "{{ storm_start_ts < sentinel or (as_timestamp(now()) - storm_start_ts) >= 300 }}"
 
   condition:
     # Must be an offline payload
@@ -7097,6 +7113,68 @@
     - condition: state
       entity_id: input_boolean.ha_startup_complete
       state: "on"
+
+  action:
+    # Wait up to N minutes for this device to come back online. Delay is
+    # configurable via input_number.zigbee_offline_delay_minutes (default 720
+    # = 12 h). Set to 0 for immediate alerting. The wait_for_trigger only
+    # completes on a payload==online message for this device's availability
+    # topic — retained `offline` replays during the wait do NOT complete it.
+    - wait_for_trigger:
+        - platform: mqtt
+          topic: "{{ device_topic }}"
+          payload: "online"
+          value_template: >-
+            {% set p = value %}
+            {% if p is string and p.startswith('{') %}
+              {{ (p | from_json).state }}
+            {% else %}
+              {{ p }}
+            {% endif %}
+      timeout:
+        minutes: "{{ states('input_number.zigbee_offline_delay_minutes') | int(720) }}"
+      continue_on_timeout: true
+
+    # Device came back online during the wait → silent, no email.
+    - condition: template
+      value_template: "{{ not wait.completed }}"
+
+    # Re-verify Z2M is still up (it may have gone down during our N-minute
+    # wait; L0 will have alerted separately). We don't re-check startup grace
+    # here since a 12-hour wait has long since crossed the 30-min gate.
+    - condition: state
+      entity_id: input_boolean.z2m_online
+      state: "on"
+
+    # Fire internal event for the emailer (stage 2) to pick up. Passing the
+    # device context through event_data decouples the parallel waiter from
+    # the queued emailer so the storm-guard counter logic stays serializable.
+    - event: zigbee_offline_confirmed
+      event_data:
+        device_name: "{{ device_name }}"
+        topic: "{{ device_topic }}"
+
+# -----------------------------------------------------------------------------
+# L1a-emailer: stage 2 — storm-guarded email sender
+# -----------------------------------------------------------------------------
+- id: zigbee_offline_confirmed_emailer
+  alias: "Zigbee Offline Confirmed - Email Sender (storm-guarded)"
+  description: "Stage 2 of L1a. Fires on zigbee_offline_confirmed event (emitted by the waiter after N minutes). Runs storm-guard + per-device email. Queued mode is required for storm-guard correctness — see commit 2713492 for the race-fix history."
+  mode: queued
+  max: 50
+
+  trigger:
+    - platform: event
+      event_type: zigbee_offline_confirmed
+
+  variables:
+    device_name: "{{ trigger.event.data.device_name }}"
+    device_topic: "{{ trigger.event.data.topic | default('zigbee2mqtt/' ~ device_name ~ '/availability') }}"
+    # Storm window expired check is a pure read of persisted datetime — safe
+    # to capture at trigger time. The counter IS NOT read here; see action block.
+    sentinel: 86400
+    storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_offline_storm_window_start')) | default(0) }}"
+    storm_window_expired: "{{ storm_start_ts < sentinel or (as_timestamp(now()) - storm_start_ts) >= 300 }}"
 
   action:
     # 1. Reset storm window if expired (new 5-min window)
@@ -7143,7 +7221,7 @@
             - service: notify.all_phones
               data:
                 title: "🌩 ZIGBEE OFFLINE STORM"
-                message: "6+ devices offline within 5 min. Per-device alerts suppressed."
+                message: "6+ devices confirmed-offline in 5 min. Per-device alerts suppressed."
                 data:
                   channel: "Critical"
                   importance: max
@@ -7154,12 +7232,14 @@
                 title: "Zigbee Offline Storm"
                 subtitle: "6+ devices reported offline in 5 minutes"
                 description: >-
-                  Multiple Zigbee devices went offline in a short window. Per-device
-                  emails for the rest of this 5-min window are suppressed to avoid
-                  inboxing 49 alerts. Common causes: coordinator died, mesh routing
-                  collapsed, mosquitto restarted, or a critical router went offline.
+                  Multiple Zigbee devices went offline in a short window (after
+                  the configured N-minute wait). Per-device emails for the rest
+                  of this 5-min window are suppressed to avoid inboxing 49
+                  alerts. Common causes: coordinator died, mesh routing
+                  collapsed, mosquitto restarted, or a critical router went
+                  offline and took others down with it.
                 actions: "ssh pi@pi 'sudo systemctl status zigbee2mqtt'|Check Z2M logs: docker logs zigbee2mqtt --tail 100|Check mosquitto: docker logs mosquitto --tail 50|Open dashboard Device Health view (key D)"
-                plain_text: "6+ Zigbee devices offline in 5 min. Per-device alerts suppressed."
+                plain_text: "6+ Zigbee devices confirmed-offline in 5 min. Per-device alerts suppressed."
             - stop: "Storm summary sent — suppress remaining per-device emails."
         - conditions:
             - condition: template
@@ -7167,7 +7247,7 @@
           sequence:
             - stop: "Already in storm window — suppressing to prevent email flood."
 
-    # 3. Per-device email (severity branched by friendly_name pattern)
+    # 4. Per-device email (severity branched by friendly_name pattern)
     - service: script.send_alert_email
       data:
         severity: >-
@@ -7183,44 +7263,55 @@
         subtitle: "{{ device_name }}"
         description: >-
           {%- set n = device_name | lower -%}
+          {%- set delay_min = states('input_number.zigbee_offline_delay_minutes') | int(720) -%}
           {%- if 'window' in n or 'door' in n or 'contact' in n -%}
-          Contact sensor offline. This affects the heater safety system —
-          heaters may not auto-resume when this opening closes because the
-          sensor state reads "unavailable" instead of "closed".
+          Contact sensor has been offline for at least {{ delay_min }} minutes.
+          This affects the heater safety system — heaters may not auto-resume
+          when this opening closes because the sensor state reads "unavailable"
+          instead of "closed".
           {%- elif 'switch' in n -%}
-          Wall switch (Zigbee router) offline. Mesh backbone may be weakened —
-          nearby battery sensors could lose their relay path.
+          Wall switch (Zigbee router) has been offline for at least {{ delay_min }}
+          minutes. Mesh backbone may be weakened — nearby battery sensors could
+          lose their relay path.
           {%- elif 'plug' in n -%}
-          Smart plug (Zigbee router) offline. Mesh backbone may be weakened
-          and any device controlled by this plug is no longer responsive.
+          Smart plug (Zigbee router) has been offline for at least {{ delay_min }}
+          minutes. Mesh backbone may be weakened and any device controlled by
+          this plug is no longer responsive.
           {%- elif 'presence' in n -%}
-          Human-presence sensor offline. Bath / circadian / occupancy
-          automations for that room are suspended until the sensor recovers.
+          Human-presence sensor has been offline for at least {{ delay_min }}
+          minutes. Bath / circadian / occupancy automations for that room are
+          suspended until the sensor recovers.
           {%- elif 'thermostat' in n -%}
-          Thermostat (TRV) offline. Heating control for that room is suspended;
-          the heater watchdog will alert separately if this stays offline long.
+          Thermostat (TRV) has been offline for at least {{ delay_min }} minutes.
+          Heating control for that room is suspended; the heater watchdog will
+          alert separately if this stays offline long.
           {%- elif 'remote' in n -%}
-          Remote offline (battery dead or out of range). Direct light control
-          via the physical remote is unavailable until the battery is replaced.
+          Remote has been offline for at least {{ delay_min }} minutes (battery
+          dead or out of range). Direct light control via the physical remote
+          is unavailable until the battery is replaced.
           {%- elif 'co2' in n -%}
-          CO2 sensor offline. Air-quality automations + ventilation prompts
-          will not fire until the sensor recovers.
+          CO2 sensor has been offline for at least {{ delay_min }} minutes.
+          Air-quality automations + ventilation prompts will not fire until the
+          sensor recovers.
           {%- else -%}
-          Sensor offline. No data being received from this device.
+          Sensor has been offline for at least {{ delay_min }} minutes. No data
+          received from this device.
           {%- endif %}
-        actions: "Open dashboard Device Health view (key D)|Check the device's battery / power|If a router: docker logs zigbee2mqtt --tail 100|If offline > 24h, consider re-pairing"
+        actions: "Open dashboard Device Health view (key D)|Check the device's battery / power|If a router: docker logs zigbee2mqtt --tail 100|If offline > 24h, consider re-pairing|To change the delay: HA Helpers -> Zigbee Offline Alert Delay (minutes)"
         details: >-
-          Device: {{ device_name }}
+          Device:       {{ device_name }}
 
-          Topic:  {{ trigger.topic }}
+          Topic:        {{ device_topic }}
 
-          Time:   {{ now().strftime('%Y-%m-%d %H:%M:%S %Z') }}
+          Confirmed at: {{ now().strftime('%Y-%m-%d %H:%M:%S %Z') }}
+
+          Delay used:   {{ states('input_number.zigbee_offline_delay_minutes') | int(720) }} minutes
 
 
           NOTE: This alert auto-covers ALL Zigbee devices via wildcard.
           To suppress a specific device (e.g. a wall-switch-controlled
           light), edit input_text.zigbee_offline_exclusions in HA Helpers.
-        plain_text: "{{ device_name }} went offline at {{ now().strftime('%H:%M on %b %d') }}."
+        plain_text: "{{ device_name }} has been offline for {{ states('input_number.zigbee_offline_delay_minutes') | int(720) }} minutes."
 
 # -----------------------------------------------------------------------------
 # L1b: WILDCARD DEVICE BACK ONLINE — recovery email

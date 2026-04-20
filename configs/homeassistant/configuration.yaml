@@ -964,6 +964,23 @@ input_number:
     max: 10
     step: 1
     icon: mdi:counter
+  # =========================================================================
+  # ZIGBEE OFFLINE ALERT DELAY (Apr 2026)
+  # Triggered offlines wait this many minutes before emailing. If the device
+  # comes back online during the wait, no email fires. Protects against
+  # false positives from wall-switch reboots, Z2M restarts, transient mesh
+  # hiccups. Default 720 min (12 h). Set to 0 for immediate alerts.
+  # Range: 0 to 10080 (1 week).
+  # Change via HA UI: Settings -> Devices & Services -> Helpers.
+  # =========================================================================
+  zigbee_offline_delay_minutes:
+    name: Zigbee Offline Alert Delay (minutes)
+    min: 0
+    max: 10080
+    step: 1
+    unit_of_measurement: "min"
+    icon: mdi:timer-sand
+    mode: box
 
 # =============================================================================
 # INPUT TEXT - Editable Strings via HA UI

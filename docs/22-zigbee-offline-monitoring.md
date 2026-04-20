@@ -72,11 +72,78 @@
 
 ## Detection Timing
 
-| Device class | When does L1a fire? |
-|---|---|
-| Mains-powered router (plugs, switches, USB sensors) | ~2 min after going dark (Z2M `active.timeout: 2`) |
-| Battery end device (temp sensors, thermostats, contacts, remotes) | ~25 hours after last message (Z2M default `passive.timeout`) |
-| Silent registry removal | Caught by L3 ghost sweep at next 03:30 or 15:30 |
+| Device class | Z2M marks as offline | Email fires (with 12 h delay) |
+|---|---|---|
+| Mains-powered router (plugs, switches, USB sensors) | ~2 min (Z2M `active.timeout: 2`) | ~12 h later, if still offline |
+| Battery end device (temp / thermostats / contacts / remotes) | ~25 h (Z2M default `passive.timeout`) | ~12 h later, if still offline |
+| Silent registry removal | never (the whole bug) | Caught by L3 ghost sweep at next 03:30 or 15:30 — fires immediately (no delay) |
+
+### Configurable recovery delay
+
+L1a does NOT email immediately when a device goes offline. It waits
+`input_number.zigbee_offline_delay_minutes` (default **720 min = 12 h**)
+and only emails if the device is STILL offline at the end. If the
+device publishes `availability=online` during the wait, the run exits
+silently — no email.
+
+Rationale: many "offlines" are transient (wall-switch reboot, Z2M
+restart republishing stale retained state, momentary mesh routing
+hiccup). The 12-hour wait absorbs all of them.
+
+Change the delay via HA UI → Settings → Devices & Services → Helpers →
+*Zigbee Offline Alert Delay (minutes)*. Effective immediately for
+newly-triggered waits (in-flight waits keep their original timeout).
+
+- **0 min** → back to immediate alerts (old behavior)
+- **60 min** → 1-hour grace (sensible for battery devices that
+  occasionally stall briefly)
+- **720 min** → default 12 h
+- **1440 min** → 24 h (maximally forgiving)
+
+The ghost sweep (L3) and Z2M-down alert (L0) are NOT affected by this
+helper — both fire immediately, because both represent irrecoverable
+conditions that need human attention.
+
+### Two-stage L1a architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  L1a STAGE 1: zigbee_offline_waiter (mode: parallel, max: 60)        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  trigger: MQTT +/availability                                        │
+│  conditions: offline payload, not excluded, Z2M up, grace passed     │
+│         │                                                            │
+│         ▼                                                            │
+│  wait_for_trigger on same topic with payload: online                 │
+│  timeout: zigbee_offline_delay_minutes min (default 720)             │
+│         │                                                            │
+│         ├── online arrived → wait.completed=true → skip, exit         │
+│         └── timeout → fire event zigbee_offline_confirmed           │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  L1a STAGE 2: zigbee_offline_confirmed_emailer (mode: queued, max:50)│
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  trigger: event zigbee_offline_confirmed                             │
+│  action:                                                             │
+│    reset storm window if expired                                     │
+│    counter.increment                                                 │
+│    if count == 6 → send summary email + stop                         │
+│    if count >  6 → suppress + stop                                   │
+│    else          → send per-device email                             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Why split? The waiter is `parallel` so each device waits independently
+(48 devices can wait 12 h simultaneously without blocking each other).
+The emailer is `queued` because the storm-guard counter is only safe
+under serial execution (see commit 2713492 for the race-fix detail).
+The internal event is the bridge that decouples them.
 
 ## Storm Guard (Both Directions)
 
@@ -207,6 +274,7 @@ ssh pi@pi 'sudo journalctl -u zigbee-ghost-sweep.service -n 30 --no-pager'
 | `input_datetime.zigbee_offline_storm_summary_last` | Last summary email sent | sentinel |
 | `input_datetime.zigbee_recovery_storm_summary_last` | Last recovery summary sent | sentinel |
 | `input_datetime.email_delivery_alert_last` | L4 throttle (1/24h) | sentinel |
+| `input_number.zigbee_offline_delay_minutes` | L1a wait time before emailing | 720 (12 h) |
 
 ## Testing
 

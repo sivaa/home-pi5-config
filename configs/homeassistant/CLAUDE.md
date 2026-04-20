@@ -819,6 +819,30 @@ the HA restart that applied the config.
 
 ## History
 
+- **Apr 20, 2026**: 12-hour recovery delay on offline emails (configurable)
+  - Too many offline emails were firing for transient cases: wall-switch
+    reboots, brief Z2M restarts, mesh routing hiccups — all of which
+    resolve within seconds to minutes without human intervention.
+  - L1a split into two linked automations:
+    - **`zigbee_offline_waiter`** (`mode: parallel, max: 60`): triggers
+      on MQTT `+/availability` offline, starts a `wait_for_trigger` for
+      the same device's `online` payload with timeout configured via
+      `input_number.zigbee_offline_delay_minutes` (default 720 = 12 h,
+      range 0-10080). On recovery within the window: silent exit. On
+      timeout (still offline): fires internal event.
+    - **`zigbee_offline_confirmed_emailer`** (`mode: queued, max: 50`):
+      picks up the internal event, runs storm guard + per-device email.
+      Queued mode preserves the storm-guard counter correctness.
+  - Default delay = 12 h. Set to 0 for immediate alerts (old behavior).
+    Editable via HA UI → Settings → Devices & Services → Helpers.
+  - Verified live:
+    - Flap test (offline → online within 2-min delay): counter stayed
+      at 0, emailer never fired ✓
+    - Storm test (7 offlines, delay=0): 5 per-device + 1 summary + 1
+      suppressed ✓
+  - `docs/22-zigbee-offline-monitoring.md` updated with the new
+    architecture diagram + delay helper docs.
+
 - **Apr 20, 2026** (commit 2713492): Code-review fixes on the offline coverage
   - **Storm-guard race fix**: L1a captured `storm_count` in a `variables:`
     snapshot at trigger-queue time, so 6+ rapid offlines all saw count=0
