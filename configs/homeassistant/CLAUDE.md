@@ -466,18 +466,18 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 │  │  Automation                  │ Severity │ Nithya  │ Siva  │ Trigger    │ │
 │  │                              │          │ (phone) │(email)│            │ │
 │  ├──────────────────────────────┼──────────┼─────────┼───────┼────────────┤ │
-│  │  zigbee_device_left_alert    │ CRITICAL │   ✓     │   ✓   │ MQTT leave │ │
-│  │  z2m_bridge_state_alert      │ CRITICAL │   ✓     │   ✓   │ bridge LWT │ │
-│  │  z2m_stuck_down_hourly_nag   │ CRITICAL │   ✓ 7-22│   ✓   │ /1h poll   │ │
-│  │  zigbee_offline_waiter       │ gated    │         │       │ +/avail    │ │
-│  │  zigbee_offline_confirmed    │ branched │         │   ✓   │ after wait │ │
-│  │  zigbee_any_device_back_online│INFO     │         │   ✓   │ +/avail    │ │
-│  │  zigbee-ghost-sweep (script) │ WARNING  │         │   ✓   │ 03:30+15:30│ │
-│  │  contact_sensor_offline_alert│ WARNING  │   ✓     │   ✓   │ Unavail    │ │
-│  │  thermostat_low_battery_alert│ WARNING  │         │   ✓   │ Batt < 30% │ │
-│  │  email_delivery_failure      │ CRITICAL │   ✓     │       │ SMTP error │ │
-│  │  smtp_canary_weekly          │ INFO     │         │   ✓   │ Sun 09:00  │ │
-│  └──────────────────────────────┴──────────┴─────────┴───────┴────────────┘ │
+│  │  zigbee_device_left_alert       │CRITICAL│   ✓   │   ✓   │ MQTT leave │ │
+│  │  z2m_bridge_state_alert         │CRITICAL│   ✓   │   ✓   │ bridge LWT │ │
+│  │  z2m_stuck_down_hourly_nag      │CRITICAL│ ✓7-22 │   ✓   │ /1h poll   │ │
+│  │  zigbee_offline_waiter          │ gated  │       │       │ +/avail    │ │
+│  │  zigbee_offline_confirmed_emailer│branch │       │   ✓   │ after wait │ │
+│  │  zigbee_any_device_back_online_alert│INFO│       │   ✓   │ +/avail    │ │
+│  │  zigbee-ghost-sweep (script)    │WARNING │       │   ✓   │ 03:30+15:30│ │
+│  │  contact_sensor_offline_alert   │WARNING │   ✓   │   ✓   │ Unavail    │ │
+│  │  thermostat_low_battery_alert   │WARNING │       │   ✓   │ Batt < 30% │ │
+│  │  email_delivery_failure_alert   │CRITICAL│   ✓   │       │ SMTP error │ │
+│  │  smtp_canary_weekly             │ INFO   │       │   ✓   │ Sun 09:00  │ │
+│  └─────────────────────────────────┴────────┴───────┴───────┴────────────┘ │
 │                                                                              │
 │  Siva: email-only (removed from phone group Feb 2026).                       │
 │  Nithya: phone push for critical events needing immediate action.            │

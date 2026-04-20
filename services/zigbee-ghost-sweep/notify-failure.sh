@@ -20,7 +20,11 @@ fi
 # emits a properly JSON-escaped string, so multi-line content is fine. The
 # HTML email template renders `\n` → `<br>` on the `details` field, so
 # newlines preserve visual structure in the inbox.
-LAST_LOG=$(journalctl -u zigbee-ghost-sweep.service -n 20 --no-pager 2>/dev/null | tail -c 2000)
+#
+# Line-based (`tail -n 20`) rather than byte-based (`tail -c 2000`) so we
+# never split a multi-byte UTF-8 codepoint — jq handles invalid UTF-8 by
+# substituting U+FFFD, but cleaner to just not generate it.
+LAST_LOG=$(journalctl -u zigbee-ghost-sweep.service -n 20 --no-pager 2>/dev/null)
 
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

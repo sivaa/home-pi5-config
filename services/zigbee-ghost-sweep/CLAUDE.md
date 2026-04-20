@@ -129,7 +129,10 @@ ssh pi@pi 'sudo cat /var/lib/zigbee-ghost-sweep/snapshot.json | jq ".device_coun
 | ID | Layer | Role |
 |----|-------|------|
 | `z2m_bridge_state_alert` | L0 | Alert when Z2M itself goes down — gates this script |
-| `zigbee_any_device_offline_alert` | L1 | Wildcard MQTT availability=offline emails |
+| `z2m_stuck_down_hourly_nag` | L0 | Hourly re-nag (07-22) while bridge stays down |
+| `zigbee_offline_waiter` + `zigbee_offline_confirmed_emailer` | L1a | Wildcard MQTT availability=offline → N-min wait → storm-guarded email |
+| `zigbee_any_device_back_online_alert` | L1b | Wildcard MQTT availability=online recovery email |
 | `zigbee_device_left_alert` | L2 | Explicit Zigbee Leave frame emails |
-| (this script) | L3 | Catches the silent-removal case the others miss |
+| (this script) | L3 | Catches the silent-removal case the others miss — ALSO runs a retained-availability stuck-offline detector that covers the HA startup-grace edge case |
 | `email_delivery_failure_alert` | L4 | Phone fallback if SMTP itself fails |
+| `smtp_canary_weekly` | L5 | Sunday heartbeat email — silent absence = SMTP broken |
