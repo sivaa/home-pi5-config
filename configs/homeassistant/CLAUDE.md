@@ -819,6 +819,31 @@ the HA restart that applied the config.
 
 ## History
 
+- **Apr 20, 2026** (commit 2713492): Code-review fixes on the offline coverage
+  - **Storm-guard race fix**: L1a captured `storm_count` in a `variables:`
+    snapshot at trigger-queue time, so 6+ rapid offlines all saw count=0
+    pre-increment and none hit threshold. Fixed by reading counter via
+    `states('counter.zigbee_offline_storm_count')` AFTER `counter.increment`.
+    Verified live: 7 rapid MQTT offlines now produce exactly 5 per-device +
+    1 summary + 1 silent suppression.
+  - **L1b recovery storm guard**: previously had no guard, so a Z2M restart
+    recovering 48 devices = 48 INFO emails. Mirrored L1a's pattern with new
+    helpers `counter.zigbee_recovery_storm_count` + `input_datetime.zigbee_
+    recovery_storm_{window_start,summary_last}`.
+  - **Ghost-sweep re-pair detection**: re-pairing a device gives it a new
+    IEEE while the friendly_name persists in Z2M config. The diff was
+    flagging old IEEE as a ghost. Now: if a ghost's friendly_name matches
+    any newcomer's friendly_name in the same sweep, log INFO "RE-PAIR"
+    and skip the alert + self-heal.
+  - **HTML escape on email template**: added `| e` filter to
+    `subtitle`/`description`/`details`/`actions`/`title` in
+    `script.send_alert_email`. Closes a low-impact HTML-injection vector
+    via attacker-controlled friendly_names.
+  - **Tightened L4 trigger**: was matching any log entry containing 'smtp'
+    + 'auth|fail|connect'. Now matches only the specific HA SMTP notify
+    logger names. Avoids false-positive phone pushes.
+  - User-facing reference doc added: `docs/22-zigbee-offline-monitoring.md`.
+
 - **Apr 20, 2026**: Universal Zigbee offline email coverage (4 new layers)
   - Triggered by `[Living] Light Switch` silently vanishing from `bridge/devices`
     ~22 days before discovery — neither retained `availability=offline` was

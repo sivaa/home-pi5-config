@@ -87,6 +87,7 @@
 | 17 | [Heater Watchdog](docs/17-heater-watchdog.md) | Poll-based safety monitor for heater-window violations |
 | 18 | [Kiosk Browser](docs/18-kiosk-browser.md) | Auto-launch dashboard in fullscreen on boot |
 | 19 | [Zigbee Watchdog](docs/19-zigbee-watchdog.md) | Auto-restart zigbee2mqtt after USB disconnect |
+| 22 | [Zigbee Offline Monitoring](docs/22-zigbee-offline-monitoring.md) | Universal email + push alerts when any Zigbee device drops off (4-layer system) |
 | - | [Secrets Recovery](docs/secrets-recovery.md) | How to recover secrets and credentials |
 | - | [Securing Pi5](docs/securing-pi5.md) | Pi 5 security configuration guide |
 
