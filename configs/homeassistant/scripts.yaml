@@ -1007,9 +1007,9 @@ send_alert_email:
 
             <!-- TITLE -->
             <tr><td style="padding:28px 28px 8px;">
-            <h1 style="margin:0;font-size:20px;font-weight:600;color:#0f172a;line-height:1.3;">{{ title }}</h1>
+            <h1 style="margin:0;font-size:20px;font-weight:600;color:#0f172a;line-height:1.3;">{{ title | e }}</h1>
             {% if subtitle | default('') | length > 0 %}
-            <p style="margin:8px 0 0;font-size:14px;color:#64748b;line-height:1.4;">{{ subtitle }}</p>
+            <p style="margin:8px 0 0;font-size:14px;color:#64748b;line-height:1.4;">{{ subtitle | e }}</p>
             {% endif %}
             </td></tr>
 
@@ -1020,7 +1020,7 @@ send_alert_email:
 
             <!-- DESCRIPTION -->
             <tr><td style="padding:20px 28px;">
-            <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;">{{ description | replace('\n', '<br>') }}</p>
+            <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;">{{ description | e | replace('\n', '<br>') }}</p>
             </td></tr>
 
             <!-- ACTION BOX -->
@@ -1031,7 +1031,7 @@ send_alert_email:
             <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:{% if severity == 'CRITICAL' %}#991b1b{% elif severity == 'WARNING' %}#92400e{% else %}#1e40af{% endif %};">Action Required</p>
             <ol style="margin:0;padding-left:20px;color:#334155;font-size:14px;line-height:2.0;">
             {% for item in actions.split('|') %}
-            <li style="padding-left:4px;">{{ item | trim }}</li>
+            <li style="padding-left:4px;">{{ item | trim | e }}</li>
             {% endfor %}
             </ol>
             </td></tr>
@@ -1045,7 +1045,7 @@ send_alert_email:
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
             <tr><td style="padding:16px 20px;">
             <p style="margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#64748b;">Details</p>
-            <pre style="margin:0;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:13px;color:#334155;line-height:1.6;white-space:pre-wrap;word-break:break-all;">{{ details }}</pre>
+            <pre style="margin:0;font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:13px;color:#334155;line-height:1.6;white-space:pre-wrap;word-break:break-all;">{{ details | e }}</pre>
             </td></tr>
             </table>
             </td></tr>

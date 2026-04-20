@@ -64,9 +64,6 @@ HA_URL = os.environ.get("HA_URL", "http://localhost:8123")
 HA_TOKEN = (os.environ.get("HA_TOKEN") or os.environ.get("ZIGBEE_WATCHDOG_HA_TOKEN") or "").strip()
 MOSQUITTO_CONTAINER = os.environ.get("MOSQUITTO_CONTAINER", "mosquitto")
 MQTT_TIMEOUT_SEC = 10
-# A ghost must have been present for at least this many runs before alerting.
-# Prevents one-shot bridge/devices glitches from causing false positives.
-MIN_PRESENT_RUNS_BEFORE_GHOST_ALERT = 1
 
 logging.basicConfig(
     level=logging.INFO,
@@ -200,6 +197,23 @@ def send_ghost_email(friendly_name: str, ieee: str, last_seen_iso: str | None) -
 # -----------------------------------------------------------------------------
 # Snapshot I/O
 # -----------------------------------------------------------------------------
+def _format_last_seen(last_seen: Any) -> str | None:
+    """Format Z2M's `last_seen` value. Auto-detect ms vs seconds: any timestamp
+    > 1e12 (i.e. > year 33658 if interpreted as seconds) must be ms. Z2M has
+    historically emitted ms but future versions may change."""
+    if isinstance(last_seen, (int, float)):
+        v = float(last_seen)
+        if v > 1e12:
+            v = v / 1000.0
+        try:
+            return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(v)))
+        except (ValueError, OSError):
+            return None
+    if isinstance(last_seen, str):
+        return last_seen
+    return None
+
+
 def load_snapshot() -> dict[str, Any] | None:
     """Load previous snapshot. Returns None if missing or corrupt."""
     if not SNAPSHOT_FILE.exists():
@@ -306,31 +320,46 @@ def main() -> int:
         log.info(
             "New devices since last sweep (%d): %s",
             len(new_ieees),
-            ", ".join(prev_by_ieee.get(i, current_by_ieee.get(i, {})).get("friendly_name", i) for i in new_ieees),
+            ", ".join(current_by_ieee.get(i, {}).get("friendly_name", i) for i in new_ieees),
         )
 
-    if not ghost_ieees:
-        log.info("No ghosts detected. ✓")
+    # Re-pair detection: if a ghost's friendly_name matches any new device's
+    # friendly_name, the user just re-paired the device (new IEEE, same name).
+    # That's not a silent removal — it's a deliberate action. Log INFO, skip
+    # the CRITICAL email + self-heal. Keyed by friendly_name because IEEE
+    # changes on re-pair but friendly_name is preserved via Z2M config.
+    new_friendly_names = {
+        current_by_ieee.get(i, {}).get("friendly_name")
+        for i in new_ieees
+        if current_by_ieee.get(i, {}).get("friendly_name")
+    }
+    repaired_ieees: set[str] = set()
+    true_ghost_ieees: list[str] = []
+    for ieee in ghost_ieees:
+        prev_fn = prev_by_ieee.get(ieee, {}).get("friendly_name")
+        if prev_fn and prev_fn in new_friendly_names:
+            repaired_ieees.add(ieee)
+            log.info(
+                "  RE-PAIR (not a ghost): %s — old IEEE=%s replaced by new IEEE",
+                prev_fn, ieee,
+            )
+        else:
+            true_ghost_ieees.append(ieee)
+
+    if not true_ghost_ieees:
+        if repaired_ieees:
+            log.info("Only re-pairs detected (%d); no true ghosts. ✓", len(repaired_ieees))
+        else:
+            log.info("No ghosts detected. ✓")
         save_snapshot(devices)
         return 0
 
-    # 5. Alert + self-heal each ghost
-    log.warning("GHOSTS DETECTED: %d device(s) silently removed", len(ghost_ieees))
-    for ieee in ghost_ieees:
+    # 5. Alert + self-heal each true ghost
+    log.warning("GHOSTS DETECTED: %d device(s) silently removed", len(true_ghost_ieees))
+    for ieee in true_ghost_ieees:
         prev_dev = prev_by_ieee.get(ieee, {})
         friendly_name = prev_dev.get("friendly_name", "unknown")
-        last_seen = prev_dev.get("last_seen")
-        last_seen_iso = None
-        if isinstance(last_seen, (int, float)):
-            try:
-                last_seen_iso = time.strftime(
-                    "%Y-%m-%d %H:%M:%S UTC",
-                    time.gmtime(int(last_seen) / 1000),
-                )
-            except (ValueError, OSError):
-                pass
-        elif isinstance(last_seen, str):
-            last_seen_iso = last_seen
+        last_seen_iso = _format_last_seen(prev_dev.get("last_seen"))
 
         log.warning("  GHOST: %s  IEEE=%s  last_seen=%s", friendly_name, ieee, last_seen_iso)
 
@@ -346,6 +375,12 @@ def main() -> int:
                 log.info("  Self-healed retained availability for %s", friendly_name)
             else:
                 log.error("  Self-heal failed for %s", friendly_name)
+        else:
+            log.warning(
+                "  Skipping self-heal — friendly_name missing for IEEE %s "
+                "(retained availability for its true name, if any, remains stale).",
+                ieee,
+            )
 
     # 6. Save current snapshot for next run
     save_snapshot(devices)

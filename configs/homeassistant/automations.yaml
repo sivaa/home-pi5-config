@@ -7073,11 +7073,11 @@
       {% endif %}
     excluded: >-
       {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
-    # Storm window: 5 min sliding (sentinel pattern as elsewhere in this file)
+    # Storm window expired check is a pure read of persisted datetime — safe
+    # to capture at trigger time. The counter IS NOT read here; see action block.
     sentinel: 86400
     storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_offline_storm_window_start')) | default(0) }}"
-    storm_window_active: "{{ storm_start_ts > sentinel and (as_timestamp(now()) - storm_start_ts) < 300 }}"
-    storm_count: "{{ states('counter.zigbee_offline_storm_count') | int(0) }}"
+    storm_window_expired: "{{ storm_start_ts < sentinel or (as_timestamp(now()) - storm_start_ts) >= 300 }}"
 
   condition:
     # Must be an offline payload
@@ -7099,11 +7099,11 @@
       state: "on"
 
   action:
-    # 1. Update storm-window state (sliding 5 min)
+    # 1. Reset storm window if expired (new 5-min window)
     - choose:
         - conditions:
             - condition: template
-              value_template: "{{ not storm_window_active }}"
+              value_template: "{{ storm_window_expired }}"
           sequence:
             - service: counter.reset
               target:
@@ -7113,18 +7113,27 @@
                 entity_id: input_datetime.zigbee_offline_storm_window_start
               data:
                 timestamp: "{{ as_timestamp(now()) }}"
+
+    # 2. Increment counter — must happen BEFORE the threshold check below so
+    # each serialized run sees its own post-increment value. With mode: queued
+    # HA serializes action execution, so run N's increment completes before
+    # run N+1 starts.
     - service: counter.increment
       target:
         entity_id: counter.zigbee_offline_storm_count
 
-    # 2. STORM HANDLING
-    #    counter just-incremented to 6  -> send ONE summary email
-    #    counter > 6                    -> stop (already alerted this storm)
-    #    counter <= 5                   -> fall through to per-device email
+    # 3. STORM HANDLING
+    #    Read counter FRESH via states() inside the condition template — this
+    #    is post-increment state, unlike a `variables:` snapshot which would
+    #    stale-read the pre-trigger state and break the guard under load.
+    #
+    #    counter == 6  -> this run crosses the threshold, send ONE summary
+    #    counter >  6  -> already alerted this storm, suppress silently
+    #    counter <= 5  -> fall through to per-device email
     - choose:
         - conditions:
             - condition: template
-              value_template: "{{ (storm_count + 1) == 6 }}"
+              value_template: "{{ states('counter.zigbee_offline_storm_count') | int(0) == 6 }}"
           sequence:
             - service: input_datetime.set_datetime
               target:
@@ -7154,7 +7163,7 @@
             - stop: "Storm summary sent — suppress remaining per-device emails."
         - conditions:
             - condition: template
-              value_template: "{{ (storm_count + 1) > 6 }}"
+              value_template: "{{ states('counter.zigbee_offline_storm_count') | int(0) > 6 }}"
           sequence:
             - stop: "Already in storm window — suppressing to prevent email flood."
 
@@ -7237,6 +7246,12 @@
       {% endif %}
     excluded: >-
       {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
+    # Recovery-storm window: 5-min sliding (mirrors L1a offline-storm guard).
+    # Typical trigger: Z2M crash recovers → 48 devices go online within seconds →
+    # without this guard, 48 recovery emails arrive in the same burst.
+    sentinel: 86400
+    recovery_storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_recovery_storm_window_start')) | default(0) }}"
+    recovery_storm_window_expired: "{{ recovery_storm_start_ts < sentinel or (as_timestamp(now()) - recovery_storm_start_ts) >= 300 }}"
 
   condition:
     - condition: template
@@ -7253,6 +7268,57 @@
       state: "on"
 
   action:
+    # 1. Reset recovery-storm window if expired
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ recovery_storm_window_expired }}"
+          sequence:
+            - service: counter.reset
+              target:
+                entity_id: counter.zigbee_recovery_storm_count
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.zigbee_recovery_storm_window_start
+              data:
+                timestamp: "{{ as_timestamp(now()) }}"
+
+    # 2. Increment (same ordering as L1a offline guard)
+    - service: counter.increment
+      target:
+        entity_id: counter.zigbee_recovery_storm_count
+
+    # 3. Storm handling: threshold 6 (matches L1a). counter read fresh via
+    # states() after increment to avoid the variables-snapshot race.
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ states('counter.zigbee_recovery_storm_count') | int(0) == 6 }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.zigbee_recovery_storm_summary_last
+              data:
+                timestamp: "{{ as_timestamp(now()) }}"
+            - service: script.send_alert_email
+              data:
+                severity: "INFO"
+                title: "Zigbee Recovery Storm"
+                subtitle: "6+ devices came back online in 5 minutes"
+                description: >-
+                  Multiple Zigbee devices recovered in a short window — typical
+                  after a Z2M restart or network outage. Per-device recovery
+                  emails for the rest of this 5-min window are suppressed.
+                actions: "Open dashboard Device Health view (key D) for the full live status"
+                plain_text: "6+ Zigbee devices recovered in 5 min. Per-device recovery emails suppressed."
+            - stop: "Recovery storm summary sent — suppress remaining per-device emails."
+        - conditions:
+            - condition: template
+              value_template: "{{ states('counter.zigbee_recovery_storm_count') | int(0) > 6 }}"
+          sequence:
+            - stop: "Already in recovery-storm window — suppressing."
+
+    # 4. Per-device recovery email (fall-through)
     - service: script.send_alert_email
       data:
         severity: "INFO"
@@ -7284,13 +7350,17 @@
         level: ERROR
 
   condition:
+    # Tight match on HA's SMTP notify logger ONLY. Avoids feedback from other
+    # integrations that happen to log 'smtp' (e.g. sensors scraping SMTP-aware
+    # services, generic auth errors). The Gmail SMTP notifier logs under
+    # 'homeassistant.components.smtp.notify' when it fails.
     - condition: template
       value_template: >-
         {% set name = (trigger.event.data.name | default('')) | lower %}
-        {% set msg = (trigger.event.data.message | default('')) | lower %}
-        {{ 'smtp' in name or 'smtplib' in name or 'notify.email' in name
-           or 'notify.smtp' in name
-           or ('smtp' in msg and ('auth' in msg or 'fail' in msg or 'connect' in msg)) }}
+        {{ name in ['homeassistant.components.smtp.notify',
+                    'homeassistant.components.notify.smtp',
+                    'homeassistant.components.notify.email']
+           or name.startswith('homeassistant.components.smtp.') }}
     # Throttle: 1 push per 24h (sentinel "1970-01-01 00:00:00" = never sent)
     - condition: template
       value_template: >-
