@@ -32,7 +32,7 @@ Browser-based home dashboard served by nginx. Displays temperature, humidity, CO
 
 | Path | Purpose |
 |------|---------|
-| `www/index.html` | Main dashboard entry (Alpine templates, inline stores for lights/switches/circadian) |
+| `www/index.html` | Main dashboard entry (Alpine templates, inline stores for lights/switches/circadian/contacts) |
 | `nginx/dashboard.conf` | Nginx proxy configuration |
 
 ### Views (`www/views/`)
@@ -1048,3 +1048,120 @@ Hidden view for reviewing TTS announcement history. Accessible via `#tts-log` UR
 | `js/stores/tts-log-store.js` | Alpine store - fetches TTS history from InfluxDB |
 | `views/tts-log.js` | View controller with lifecycle management |
 | `styles/views/tts-log.css` | View styling |
+
+---
+
+## Contacts Store & Floor-Plan Window/Door Markers (2026-04)
+
+Live window/door open-closed indicators rendered directly on the mini floor
+plan in the Rooms sidebar, driven by the 8 SNZB-04P contact sensors.
+
+### Architecture
+
+```
++-----------------------------------------------------------------+
+|  CONTACT SENSOR → FLOOR-PLAN MARKER FLOW                        |
++-----------------------------------------------------------------+
+|                                                                 |
+|  SNZB-04P contact → Zigbee2MQTT → MQTT                          |
+|                                    |                            |
+|                                    v                            |
+|                              mqtt-store dispatch                |
+|                                    |                            |
+|                                    v                            |
+|                      Alpine.store('contacts')                   |
+|                      updateContact / setAvailability            |
+|                                    |                            |
+|                                    v Alpine reactivity          |
+|                      getWindowContactClass(id)                  |
+|                      getDoorContactClass(id)                    |
+|                                    |                            |
+|                                    v                            |
+|                      <g> wrapper :class binding                 |
+|                      CSS toggles state-specific children        |
+|                                                                 |
++-----------------------------------------------------------------+
+```
+
+### Store Shape
+
+```javascript
+// Defined inline in index.html (Alpine.store('contacts'))
+{
+  id: 'bath_window',
+  topic: '[Bath] Window Contact Sensor',
+  state: 'closed' | 'open' | 'unknown',
+  available: true,        // seeded true to match switches-store precedent
+  battery: null,
+  linkquality: null,
+  lastSeen: null
+}
+```
+
+MQTT payload: Z2M publishes `{"contact": true/false, ...}`. `contact: true` means
+CLOSED (reed switch engaged), `contact: false` means OPEN.
+
+### Visual Vocabulary (variant E)
+
+```
++---------------------------------------------------------------+
+|  ELEMENT         |  CLOSED          |  OPEN                   |
++------------------+------------------+-------------------------+
+|  Window          |  green segment   |  amber segment (faded)  |
+|                  |  + end-cap ticks |  + caps + hinged sash   |
+|                  |  (wall intact)   |  drawn outside wall     |
+|                  |                  |                         |
+|  Door            |  green shut-line |  red-amber leaf swung   |
+|                  |  in wall gap     |  outward + hinge bolt   |
+|                  |  + green hinge   |  + knob + sweep arc     |
+|                  |  (gap always)    |                         |
+|                  |                  |                         |
+|  Unknown         |  grey dim        |  grey dim               |
+|  (offline)       |  segment/hinge   |  (nothing else shown)   |
++---------------------------------------------------------------+
+```
+
+The wall-gap convention (doors always break the wall; windows don't) plus the
+redder amber tone plus the square hinge bolt together make door-vs-window
+unambiguous at kiosk distance.
+
+### Sensor → Marker Mapping
+
+| Sensor ID | Topic suffix | Floor-plan marker(s) |
+|-----------|--------------|----------------------|
+| `bath_window` | `[Bath] Window Contact Sensor` | Bath west-wall window |
+| `kitchen_window` | `[Kitchen] Window Contact Sensor` | Kitchen west-wall window |
+| `bedroom_window` | `[Bed] Window Contact Sensor` | Both bedroom west-wall windows (shared) |
+| `study_large` | `[Study] Window Contact Sensor - Large` | Study middle L + top S (mechanically coupled) |
+| `study_small` | `[Study] Window Contact Sensor - Small` | Study bottom S |
+| `living_window` | `[Living] Window Contact Sensor - Window` | Both living east-wall windows (M + S, shared) |
+| `living_balcony` | `[Living] Window Contact Sensor - Balcony Door` | Both balcony-door panels (shared) |
+| `main_door` | `[Hallway] Window Contact Sensor - Main Door` | Main entry door (north wall of hallway) |
+
+### Floor-Plan Geometry Notes
+
+- SVG `viewBox="-6 -6 104.39 88.65"` — extended by 6 units on each side so
+  sashes and door leaves drawn *outside* the apartment walls aren't clipped.
+- Outer-perimeter wall is drawn as a `<path class="floor-wall-outer">` with
+  gaps at door locations (main entry `x=41.5..48.5`, balcony `y=60..74`).
+  The old outer `<rect>` could not express gaps.
+- All marker coordinates are inline in the SVG and documented with comments;
+  they depend on the room rectangle geometry in `floor-plan-rooms`.
+
+### Key Code Locations
+
+| Search for | Purpose |
+|------------|---------|
+| `Alpine.store('contacts'` in `index.html` | Store definition (sensor list, `updateContact`, `setAvailability`, `byId`) |
+| `Subscribed to contact sensor topics` in `index.html` | MQTT subscribe loop |
+| `Alpine.store('contacts').updateContact` | Data-message dispatch |
+| `getWindowContactClass` / `getDoorContactClass` | Helpers returning the state class for the `<g>` wrapper |
+| `floor-plan-contacts` in `styles/layout.css` | All marker CSS (state-driven `display:none`/`inline` on children) |
+| `<g class="floor-plan-contacts">` in `index.html` | The 12 marker wrappers |
+
+### CSS State Toggling
+
+State-specific children (sash for windows; leaf/knob/arc/shut-line for doors)
+default to `display: none`. The matching state class on the ancestor `<g>`
+reveals them via `display: inline`. This keeps the DOM identical regardless
+of state — only visibility and stroke colors change.
