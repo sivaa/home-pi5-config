@@ -98,6 +98,51 @@ def mqtt_read_retained(topic: str) -> str | None:
     return result.stdout.strip() or None
 
 
+def mqtt_read_all_availability() -> dict[str, str]:
+    """Read retained `zigbee2mqtt/+/availability` for all devices in one pass.
+    Returns {friendly_name: 'online'|'offline'|'unknown'}. Used by the
+    stuck-offline detector to cover the HA-startup-grace edge case where L1a
+    never gets a fresh MQTT trigger to start its 12-h wait."""
+    try:
+        result = subprocess.run(
+            [
+                "docker", "exec", MOSQUITTO_CONTAINER,
+                "mosquitto_sub", "-h", "localhost",
+                "-t", "zigbee2mqtt/+/availability",
+                "-v", "-W", "5",  # wall-clock timeout: retained msgs arrive in ms
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        log.warning("mosquitto_sub wildcard availability read timed out")
+        return {}
+
+    out: dict[str, str] = {}
+    for line in result.stdout.strip().splitlines():
+        parts = line.split(" ", 1)
+        if len(parts) != 2:
+            continue
+        topic, payload = parts
+        if not topic.startswith("zigbee2mqtt/") or not topic.endswith("/availability"):
+            continue
+        name = topic[len("zigbee2mqtt/"):-len("/availability")]
+        if name == "bridge":
+            continue
+        payload = payload.strip()
+        state = "unknown"
+        if payload.startswith("{"):
+            try:
+                state = json.loads(payload).get("state", "unknown")
+            except json.JSONDecodeError:
+                pass
+        elif payload in ("online", "offline"):
+            state = payload
+        out[name] = state
+    return out
+
+
 def mqtt_publish_retained(topic: str, payload: str) -> bool:
     """Publish a retained MQTT message. Returns True on success."""
     try:
@@ -147,6 +192,72 @@ def ha_call_service(domain: str, service: str, data: dict[str, Any]) -> bool:
         return False
 
 
+def ha_read_state(entity_id: str) -> str | None:
+    """GET /api/states/<entity_id>. Returns the state string, or None."""
+    if not HA_TOKEN:
+        return None
+    url = f"{HA_URL}/api/states/{entity_id}"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {HA_TOKEN}"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.load(resp)
+            return data.get("state")
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+        return None
+
+
+def get_exclusions() -> set[str]:
+    """Read `input_text.zigbee_offline_exclusions` from HA and parse to a set."""
+    raw = ha_read_state("input_text.zigbee_offline_exclusions") or ""
+    return {s.strip() for s in raw.split(",") if s.strip()}
+
+
+def get_delay_minutes() -> int:
+    """Read the configured offline alert delay. Default 720 (12 h)."""
+    raw = ha_read_state("input_number.zigbee_offline_delay_minutes")
+    try:
+        return int(float(raw)) if raw else 720
+    except (ValueError, TypeError):
+        return 720
+
+
+def send_stuck_offline_email(name: str, ieee: str, first_seen_iso: str, elapsed_min: int) -> None:
+    """Alert for a device that's been retained-offline across sweeps.
+    Covers the narrow edge case where a device went offline during HA's 30-min
+    startup grace window and L1a never got a fresh MQTT trigger to start its
+    wait. The ghost sweep catches it here by cross-referencing retained
+    availability with the snapshot history."""
+    ha_call_service(
+        "script", "send_alert_email",
+        {
+            "severity": "WARNING",
+            "title": "Zigbee Device Stuck Offline",
+            "subtitle": name,
+            "description": (
+                f"{name} has been retained-offline across multiple ghost-sweep "
+                f"runs for at least {elapsed_min} minutes. The main wildcard "
+                f"offline alert (L1a) likely missed it because the device went "
+                f"offline during the HA 30-min startup grace window — no fresh "
+                f"MQTT trigger arrived afterwards to start its delay timer. "
+                f"This sweep-based detector is the safety net."
+            ),
+            "actions": (
+                "Open dashboard Device Health view (key D)|"
+                "Check the device's battery / power|"
+                f"docker logs zigbee2mqtt --tail 100 | grep -i '{name}'"
+            ),
+            "details": (
+                f"Device:       {name}\n"
+                f"IEEE:         {ieee}\n"
+                f"First seen offline by sweep: {first_seen_iso}\n"
+                f"Elapsed:      {elapsed_min} minutes\n"
+                f"Detector:     zigbee-ghost-sweep (retained-availability scan)"
+            ),
+            "plain_text": f"{name} retained offline for {elapsed_min} min.",
+        },
+    )
+
+
 def send_ghost_email(friendly_name: str, ieee: str, last_seen_iso: str | None) -> None:
     """Send a CRITICAL email about a ghost-removed device."""
     description = (
@@ -179,7 +290,9 @@ def send_ghost_email(friendly_name: str, ieee: str, last_seen_iso: str | None) -
     ok = ha_call_service(
         "script", "send_alert_email",
         {
-            "severity": "CRITICAL",
+            # WARNING — not CRITICAL. A ghost is a stale-registry condition
+            # discovered during batch housekeeping, not a 3am emergency.
+            "severity": "WARNING",
             "title": "Zigbee Ghost Device Detected",
             "subtitle": friendly_name,
             "description": description,
@@ -214,8 +327,15 @@ def _format_last_seen(last_seen: Any) -> str | None:
     return None
 
 
+class SnapshotCorrupt(Exception):
+    """Raised when the snapshot file exists but can't be parsed. We refuse to
+    overwrite in this case — a silent first-run reset after a genuine ghost
+    removal would lose the only evidence of it forever."""
+
+
 def load_snapshot() -> dict[str, Any] | None:
-    """Load previous snapshot. Returns None if missing or corrupt."""
+    """Load previous snapshot. Returns None if missing (first run). Raises
+    SnapshotCorrupt if the file exists but can't be parsed."""
     if not SNAPSHOT_FILE.exists():
         log.info("No prior snapshot at %s — first run, will save and exit.", SNAPSHOT_FILE)
         return None
@@ -223,17 +343,22 @@ def load_snapshot() -> dict[str, Any] | None:
         with SNAPSHOT_FILE.open() as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        log.error("Snapshot %s is corrupt: %s — treating as first run.", SNAPSHOT_FILE, e)
-        return None
+        raise SnapshotCorrupt(f"Cannot parse {SNAPSHOT_FILE}: {e}") from e
 
 
-def save_snapshot(devices: list[dict[str, Any]]) -> None:
+def save_snapshot(devices: list[dict[str, Any]], availability_tracking: dict[str, dict[str, Any]] | None = None) -> None:
     """Persist the current non-coordinator device list as the new snapshot.
     Coordinator is excluded — it sits in bridge/devices with type=Coordinator
     but the diff logic treats it specially (never a ghost), so keeping it in
-    the snapshot would cause a false positive on the very next run."""
+    the snapshot would cause a false positive on the very next run.
+
+    `availability_tracking` (optional) is a dict keyed by IEEE with values
+    {availability, first_offline_sweep_at, stuck_alerted} used by the
+    stuck-offline detector. If provided, these fields are merged into each
+    device's entry in the saved snapshot."""
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     real_devices = [d for d in devices if d.get("type") != "Coordinator"]
+    availability_tracking = availability_tracking or {}
     snapshot = {
         "saved_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "device_count": len(real_devices),
@@ -243,6 +368,7 @@ def save_snapshot(devices: list[dict[str, Any]]) -> None:
                 "friendly_name": d.get("friendly_name"),
                 "model": (d.get("definition") or {}).get("model"),
                 "last_seen": d.get("last_seen"),
+                **availability_tracking.get(d.get("ieee_address") or "", {}),
             }
             for d in real_devices
         ],
@@ -300,7 +426,35 @@ def main() -> int:
     log.info("Current device count (excl coordinator): %d", len(current_by_ieee))
 
     # 3. Load previous snapshot
-    prev = load_snapshot()
+    try:
+        prev = load_snapshot()
+    except SnapshotCorrupt as e:
+        log.error("CRITICAL: %s", e)
+        ha_call_service(
+            "script", "send_alert_email",
+            {
+                "severity": "CRITICAL",
+                "title": "Ghost Sweep Snapshot Corrupt",
+                "subtitle": "Manual intervention required",
+                "description": (
+                    "The ghost-sweep snapshot file cannot be parsed. The script "
+                    "refuses to overwrite it with a fresh snapshot because "
+                    "doing so would silently destroy evidence of any pending "
+                    "ghost-removal detection. Inspect the file manually, "
+                    "repair or delete it if you are sure no ghost state is "
+                    "present, and the next scheduled run will re-baseline."
+                ),
+                "actions": (
+                    "ssh pi@pi 'sudo cat /var/lib/zigbee-ghost-sweep/snapshot.json | jq .'"
+                    "|If valid JSON but structure wrong: adjust or delete"
+                    "|If corrupt: sudo rm /var/lib/zigbee-ghost-sweep/snapshot.json"
+                    "|Retry: sudo systemctl start zigbee-ghost-sweep.service"
+                ),
+                "details": f"Error: {e}",
+                "plain_text": f"Ghost-sweep snapshot corrupt: {e}. Manual fix required.",
+            },
+        )
+        return 6
     if prev is None:
         save_snapshot(devices)
         log.info("First run — snapshot saved, no diff to compute.")
@@ -346,44 +500,103 @@ def main() -> int:
         else:
             true_ghost_ieees.append(ieee)
 
-    if not true_ghost_ieees:
+    # 5. Alert + self-heal each true ghost (if any)
+    if true_ghost_ieees:
+        log.warning("GHOSTS DETECTED: %d device(s) silently removed", len(true_ghost_ieees))
+        for ieee in true_ghost_ieees:
+            prev_dev = prev_by_ieee.get(ieee, {})
+            friendly_name = prev_dev.get("friendly_name", "unknown")
+            last_seen_iso = _format_last_seen(prev_dev.get("last_seen"))
+
+            log.warning("  GHOST: %s  IEEE=%s  last_seen=%s", friendly_name, ieee, last_seen_iso)
+            send_ghost_email(friendly_name, ieee, last_seen_iso)
+
+            # Self-heal: CLEAR the retained availability (publish empty + retain).
+            # Per MQTT spec, this deletes the retained message entirely. We used
+            # to publish {"state":"offline"}, but that woke L1a-waiter and caused
+            # a second email 12h later for the same ghost we already alerted on.
+            if friendly_name and friendly_name != "unknown":
+                avail_topic = f"zigbee2mqtt/{friendly_name}/availability"
+                published = mqtt_publish_retained(avail_topic, "")
+                if published:
+                    log.info("  Self-healed (cleared retained availability) for %s", friendly_name)
+                else:
+                    log.error("  Self-heal failed for %s", friendly_name)
+            else:
+                log.warning(
+                    "  Skipping self-heal — friendly_name missing for IEEE %s "
+                    "(retained availability for its true name, if any, remains stale).",
+                    ieee,
+                )
+    else:
         if repaired_ieees:
             log.info("Only re-pairs detected (%d); no true ghosts. ✓", len(repaired_ieees))
         else:
             log.info("No ghosts detected. ✓")
-        save_snapshot(devices)
-        return 0
 
-    # 5. Alert + self-heal each true ghost
-    log.warning("GHOSTS DETECTED: %d device(s) silently removed", len(true_ghost_ieees))
-    for ieee in true_ghost_ieees:
+    # 6. STUCK-OFFLINE DETECTION (covers HA startup-grace edge case).
+    # L1a's wildcard wait relies on receiving a fresh MQTT `offline` payload.
+    # If a device went offline DURING HA's 30-min startup grace, that payload
+    # was suppressed and no later message arrives until Z2M re-pings the
+    # device (minutes for routers, ~25 h for battery devices). This loop
+    # catches devices that are retained-offline across multiple sweeps.
+    availability_now = mqtt_read_all_availability()
+    exclusions = get_exclusions()
+    delay_minutes = get_delay_minutes()
+    availability_tracking: dict[str, dict[str, Any]] = {}
+    stuck_count = 0
+    now_ts = time.time()
+
+    for ieee, device in current_by_ieee.items():
+        name = device.get("friendly_name", "")
+        if not name or name in exclusions:
+            continue
+        state = availability_now.get(name, "unknown")
         prev_dev = prev_by_ieee.get(ieee, {})
-        friendly_name = prev_dev.get("friendly_name", "unknown")
-        last_seen_iso = _format_last_seen(prev_dev.get("last_seen"))
 
-        log.warning("  GHOST: %s  IEEE=%s  last_seen=%s", friendly_name, ieee, last_seen_iso)
+        if state != "offline":
+            # Online or unknown — reset tracking. Unknown means no retained
+            # availability at all (newly paired, never reported) — treat as
+            # online to avoid false positives.
+            availability_tracking[ieee] = {"availability": state}
+            continue
 
-        # Email
-        send_ghost_email(friendly_name, ieee, last_seen_iso)
+        # Device is retained-offline.
+        if prev_dev.get("availability") != "offline":
+            # First sweep seeing it offline — mark, don't alert yet
+            availability_tracking[ieee] = {
+                "availability": "offline",
+                "first_offline_sweep_at": now_ts,
+                "stuck_alerted": False,
+            }
+            continue
 
-        # Self-heal: publish retained availability=offline so dashboards stop
-        # claiming the device is online.
-        if friendly_name and friendly_name != "unknown":
-            avail_topic = f"zigbee2mqtt/{friendly_name}/availability"
-            published = mqtt_publish_retained(avail_topic, '{"state":"offline"}')
-            if published:
-                log.info("  Self-healed retained availability for %s", friendly_name)
-            else:
-                log.error("  Self-heal failed for %s", friendly_name)
-        else:
+        # Seen offline in both prev and current. Carry forward the first-seen
+        # timestamp, and decide whether to alert.
+        first_ts = prev_dev.get("first_offline_sweep_at") or now_ts
+        already_alerted = bool(prev_dev.get("stuck_alerted"))
+        availability_tracking[ieee] = {
+            "availability": "offline",
+            "first_offline_sweep_at": first_ts,
+            "stuck_alerted": already_alerted,
+        }
+
+        elapsed_min = int((now_ts - first_ts) / 60)
+        if elapsed_min >= delay_minutes and not already_alerted:
+            first_iso = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(first_ts)))
             log.warning(
-                "  Skipping self-heal — friendly_name missing for IEEE %s "
-                "(retained availability for its true name, if any, remains stale).",
-                ieee,
+                "  STUCK OFFLINE: %s  IEEE=%s  elapsed=%d min  delay=%d min",
+                name, ieee, elapsed_min, delay_minutes,
             )
+            send_stuck_offline_email(name, ieee, first_iso, elapsed_min)
+            availability_tracking[ieee]["stuck_alerted"] = True
+            stuck_count += 1
 
-    # 6. Save current snapshot for next run
-    save_snapshot(devices)
+    if stuck_count:
+        log.warning("STUCK-OFFLINE ALERTS: %d device(s)", stuck_count)
+
+    # 7. Save current snapshot (includes availability tracking state)
+    save_snapshot(devices, availability_tracking)
     log.info("=== Zigbee ghost sweep complete ===")
     return 0
 

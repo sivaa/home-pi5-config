@@ -806,19 +806,9 @@ input_datetime:
     has_date: true
     has_time: true
     icon: mdi:alert-octagon
-  zigbee_offline_storm_summary_last:
-    name: "Zigbee Offline Storm Summary Last Sent"
-    has_date: true
-    has_time: true
-    icon: mdi:alert-octagon
   # Recovery-storm guard (matches offline-storm guard for L1b back-online path)
   zigbee_recovery_storm_window_start:
     name: "Zigbee Recovery Storm Window Start"
-    has_date: true
-    has_time: true
-    icon: mdi:alert-octagon
-  zigbee_recovery_storm_summary_last:
-    name: "Zigbee Recovery Storm Summary Last Sent"
     has_date: true
     has_time: true
     icon: mdi:alert-octagon

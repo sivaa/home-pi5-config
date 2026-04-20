@@ -985,7 +985,7 @@ send_alert_email:
           html: >-
             <!DOCTYPE html>
             <html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
             <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;padding:32px 16px;">
             <tr><td align="center">
@@ -1054,7 +1054,7 @@ send_alert_email:
             <!-- FOOTER -->
             <tr><td style="background-color:#f8fafc;padding:18px 28px;border-top:1px solid #e2e8f0;">
             <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
-            {{ now().strftime('%b %d, %Y at %H:%M CET') }}<br>
+            {{ now().strftime('%b %d, %Y at %H:%M %Z') }}<br>
             Pi Home Assistant &middot; Zehlendorf, Berlin
             </p>
             </td></tr>

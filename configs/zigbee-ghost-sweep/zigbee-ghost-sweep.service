@@ -2,6 +2,10 @@
 Description=Zigbee Ghost Device Sweep — diff bridge/devices, alert on silent removals
 After=docker.service mosquitto.service
 Wants=docker.service
+# If the sweep itself errors out (Python exception, missing deps, etc.) systemd
+# will activate the notifier service, which emails CRITICAL via HA's API. This
+# closes the silent-crash gap that earlier code reviews flagged.
+OnFailure=zigbee-ghost-sweep-failure.service
 
 [Service]
 Type=oneshot

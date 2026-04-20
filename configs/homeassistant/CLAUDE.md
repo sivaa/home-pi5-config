@@ -819,6 +819,56 @@ the HA restart that applied the config.
 
 ## History
 
+- **Apr 20, 2026**: Full-system review response — retire legacy + close 4 resilience gaps
+  - Four parallel Opus agent reviews of the whole detection/notification
+    stack landed 16 findings. This batch resolved the high-priority ones.
+  - **Cleanup & dedup**:
+    - **Retired `zigbee_router_offline_alert` + `zigbee_router_online_alert`**
+      (215 lines deleted) — the wildcard L1a now covers all 12 routers and
+      was firing duplicate emails 12 h apart for the same event.
+    - **Removed dead state**: `input_datetime.zigbee_offline_storm_summary_last`
+      + `input_datetime.zigbee_recovery_storm_summary_last` were written but
+      never read in any condition. Deleted.
+    - **Ghost sweep severity** CRITICAL → WARNING (batch housekeeping, not
+      3am emergency).
+    - **Email template timezone**: hardcoded `CET` → `%Z` dynamic (CEST in
+      summer).
+  - **Resilience gaps**:
+    - **Systemd `OnFailure=` hook** for ghost-sweep — if the Python service
+      crashes, `zigbee-ghost-sweep-failure.service` POSTs a CRITICAL email
+      via HA API including the last 20 journal lines.
+    - **Z2M stuck-down hourly nag** — L0 only fires the transition email
+      once. New automation `z2m_stuck_down_hourly_nag` re-alerts every hour
+      while `input_boolean.z2m_online` stays off for >1h, gated to
+      07:00-22:00 local so it doesn't wake anyone at 3am.
+    - **Snapshot corruption alert**: ghost-sweep now raises a new
+      `SnapshotCorrupt` exception + sends a CRITICAL email instead of
+      silently resnapshotting (which would wipe evidence of a pending
+      ghost-removal).
+    - **Self-heal leak fixed (A2)**: ghost sweep used to publish retained
+      `availability=offline` for ghosts, which woke L1a-waiter and caused a
+      second email 12 h later. Changed to publish empty+retain, which
+      deletes the retained message entirely — no L1a wake, dashboards stop
+      claiming online.
+  - **UX polish**:
+    - `contact_sensor_offline_repeat` cadence `/4h` → `/12h` (3× noise
+      reduction per stuck sensor).
+    - Email HTML template: added `color-scheme: light` meta so Gmail dark
+      mode stops mangling the wrapper background.
+  - **New layers**:
+    - **L5 weekly SMTP canary** (`smtp_canary_weekly`): Sundays 09:00, a
+      minimal INFO heartbeat email. Silent absence = Gmail App Password
+      broken (complements L4 which only fires on active send errors).
+    - **L3 stuck-offline detector** (in zigbee-ghost-sweep.py): covers the
+      narrow edge case where a device went offline during HA's 30-min
+      startup grace window and L1a never started its wait. Scans retained
+      `+/availability` each sweep, tracks `first_offline_sweep_at` per
+      device in the snapshot, fires WARNING email once if stuck >
+      `zigbee_offline_delay_minutes`.
+  - **Verified live**:
+    - HA config check passes, restart clean.
+    - All 4 file md5s match between repo and Pi.
+
 - **Apr 20, 2026**: 12-hour recovery delay on offline emails (configurable)
   - Too many offline emails were firing for transient cases: wall-switch
     reboots, brief Z2M restarts, mesh routing hiccups — all of which

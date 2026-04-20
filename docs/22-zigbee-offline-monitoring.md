@@ -26,7 +26,7 @@
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-## The Solution: 4 Layers
+## The Solution: 6 Layers
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -51,10 +51,24 @@
 │                                                                            │
 │  L4  Email Delivery Monitor  ← phone push fallback if SMTP itself fails   │
 │                                                                            │
+│  L5  SMTP Canary + Z2M-Nag   ← weekly heartbeat + hourly stuck-down nag   │
+│                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Defense-in-depth**: the existing per-entity automations (`contact_sensor_offline_alert`, `zigbee_router_offline_alert`, `thermostat_low_battery_alert`) are kept alongside the new wildcard for their specialized messaging. Some devices get redundant emails — accepted per the project's documented defense-in-depth ethos.
+**Defense-in-depth**: the existing per-entity automations (`contact_sensor_offline_alert`, `thermostat_low_battery_alert`) are kept alongside the new wildcard for their specialized messaging. The legacy `zigbee_router_offline_alert` was RETIRED on 2026-04-20 after a full-system review — L1a wildcard now covers all routers and the legacy was firing duplicate emails 12 h after each L1a alert for the same event.
+
+### Additional resilience features (Apr 2026)
+
+**Weekly SMTP canary** (`smtp_canary_weekly_heartbeat`): Sundays at 09:00 local, sends a minimal INFO "Pi weekly heartbeat" email. Its absence means Gmail App Password has silently expired. L4 complements this: fires immediately on an active SMTP error, whereas the canary catches the case where no real email was attempted during the quiet period.
+
+**Z2M stuck-down hourly nag** (`z2m_stuck_down_hourly_nag`): if `input_boolean.z2m_online` stays `off` for >1 hour, fires hourly CRITICAL email + phone push. Gated to 07:00–22:00 local so it doesn't wake anyone at 3am — the initial L0 transition alert already fired when Z2M went down, the nag is for persistent daytime visibility.
+
+**Ghost-sweep stuck-offline detector** (in `zigbee-ghost-sweep.py`): covers the narrow edge case where a device went offline during HA's 30-min startup grace window and L1a never got a fresh MQTT trigger to start its wait. Each sweep scans retained `zigbee2mqtt/+/availability` topics and tracks `first_offline_sweep_at` per device in the snapshot. If a device has been retained-offline across sweeps for > `zigbee_offline_delay_minutes`, fires WARNING email once.
+
+**Ghost-sweep OnFailure hook**: systemd `OnFailure=zigbee-ghost-sweep-failure.service` POSTs a CRITICAL email via HA API if the Python script crashes. Closes the silent-crash gap.
+
+**Snapshot corruption guard**: ghost-sweep refuses to overwrite a corrupt `snapshot.json` (would wipe evidence of any pending ghost) and instead fires a CRITICAL email for manual investigation.
 
 ## What Each Layer Catches
 

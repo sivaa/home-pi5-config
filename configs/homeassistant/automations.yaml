@@ -4658,12 +4658,12 @@
 # -----------------------------------------------------------------------------
 - id: contact_sensor_offline_repeat
   alias: "Contact Sensor Offline - Repeat Alert"
-  description: "Repeat offline alert every 4 hours"
+  description: "Repeat offline alert every 12 hours. Reduced from /4 to /12 on 2026-04-20 after UX review — the original /4 fired 6 push notifications per day per stuck sensor, which was too noisy for battery-dead sensors that only need one daily reminder."
   mode: single
 
   trigger:
     - platform: time_pattern
-      hours: "/4"
+      hours: "/12"
 
   action:
     - variables:
@@ -4866,221 +4866,6 @@
           ({{ trigger.payload_json.data.ieee_address | default('Unknown') }}) left the network
         level: error
 
-# -----------------------------------------------------------------------------
-# ZIGBEE ROUTER OFFLINE ALERT
-# ┌─────────────────────────────────────────────────────────────────────────┐
-# │  Routers form the Zigbee mesh backbone. When one goes offline,         │
-# │  nearby battery sensors lose their relay path and may go offline too.  │
-# │                                                                         │
-# │  MONITORED (always-powered — offline means real problem):              │
-# │    3x Smart Plugs           (mains)                                    │
-# │    3x Light Switches        (hardwired SONOFF — Study, Bed, Living)    │
-# │    1x CO2 Sensor            (USB-powered)                              │
-# │    5x Human Presence        (USB-powered SNZB-06P — all rooms)         │
-# │                                                                         │
-# │  EXCLUDED (manually powered off — would cause false alerts):           │
-# │    2x IKEA Lights           (Study, Living — wall switch)              │
-# │    1x AwoX Bath Light       (wall switch)                              │
-# │                                                                         │
-# │  Trigger: state → "unavailable" for 2 minutes                         │
-# │  Action: HTML email only (12 devices — phone push too noisy)            │
-# └─────────────────────────────────────────────────────────────────────────┘
-# -----------------------------------------------------------------------------
-- id: zigbee_router_offline_alert
-  alias: "Zigbee Router Offline Alert"
-  description: "Notifies when any Zigbee router device goes offline"
-  mode: parallel
-  max: 10
-
-  trigger:
-    # Smart Plugs
-    - platform: state
-      entity_id: switch.smart_plug_1
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: switch.smart_plug_2
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: switch.smart_plug_3
-      to: "unavailable"
-      for:
-        minutes: 2
-    # IKEA Lights + Bath Light excluded — manually powered off via wall switch,
-    # would trigger false alerts constantly.
-    # Light Switches (SONOFF, hardwired — always powered)
-    - platform: state
-      entity_id: switch.study_light_switch
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: switch.bed_light_switch
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: switch.living_light_switch
-      to: "unavailable"
-      for:
-        minutes: 2
-    # CO2 Sensor (router device, USB-powered)
-    - platform: state
-      entity_id: sensor.hallway_co2_co2
-      to: "unavailable"
-      for:
-        minutes: 2
-    # Human Presence Sensors (SNZB-06P, USB-powered routers)
-    - platform: state
-      entity_id: binary_sensor.study_human_presence_occupancy
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: binary_sensor.living_human_presence_occupancy
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: binary_sensor.kitchen_human_presence_occupancy
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: binary_sensor.bath_human_presence_occupancy
-      to: "unavailable"
-      for:
-        minutes: 2
-    - platform: state
-      entity_id: binary_sensor.bed_human_presence_occupancy
-      to: "unavailable"
-      for:
-        minutes: 2
-
-  variables:
-    device_names:
-      switch.smart_plug_1: "Smart Plug [1]"
-      switch.smart_plug_2: "Smart Plug [2]"
-      switch.smart_plug_3: "Smart Plug [3]"
-      switch.study_light_switch: "[Study] Light Switch"
-      switch.bed_light_switch: "[Bed] Light Switch"
-      switch.living_light_switch: "[Living] Light Switch"
-      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
-      binary_sensor.study_human_presence_occupancy: "[Study] Human Presence"
-      binary_sensor.living_human_presence_occupancy: "[Living] Human Presence"
-      binary_sensor.kitchen_human_presence_occupancy: "[Kitchen] Human Presence"
-      binary_sensor.bath_human_presence_occupancy: "[Bath] Human Presence"
-      binary_sensor.bed_human_presence_occupancy: "[Bed] Human Presence"
-    device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
-
-  action:
-    # Email only — no phone push. 12 routers monitored, would be noisy.
-    - service: script.send_alert_email
-      data:
-        severity: "CRITICAL"
-        title: "Zigbee Router Offline"
-        subtitle: "{{ device_name }}"
-        description: >-
-          Router devices form the Zigbee mesh backbone. When one goes offline,
-          nearby battery-powered sensors may lose their relay path and go offline too.
-        actions: "Check if the device is physically powered on|Verify the outlet or switch hasn't been turned off|If powered, try unplugging for 10 seconds and re-plugging"
-        plain_text: >-
-          {{ device_name }} went offline at {{ now().strftime('%H:%M on %b %d') }}.
-          Router devices form the mesh backbone. Check if device is powered on.
-    - service: system_log.write
-      data:
-        message: "ROUTER OFFLINE: {{ device_name }} ({{ trigger.entity_id }}) went unavailable"
-        level: warning
-
-# -----------------------------------------------------------------------------
-# ZIGBEE ROUTER BACK ONLINE ALERT
-# Trigger: Any router device comes back online
-# Action: INFO email (resolves offline alert in inbox) + system log
-# -----------------------------------------------------------------------------
-- id: zigbee_router_online_alert
-  alias: "Zigbee Router Back Online Alert"
-  description: "Notifies when a Zigbee router device comes back online"
-  mode: parallel
-  max: 10
-
-  trigger:
-    # Smart Plugs
-    - platform: state
-      entity_id: switch.smart_plug_1
-      from: "unavailable"
-    - platform: state
-      entity_id: switch.smart_plug_2
-      from: "unavailable"
-    - platform: state
-      entity_id: switch.smart_plug_3
-      from: "unavailable"
-    # IKEA Lights + Bath Light excluded — powered off manually, see offline alert comment
-    # Light Switches (SONOFF, hardwired — always powered)
-    - platform: state
-      entity_id: switch.study_light_switch
-      from: "unavailable"
-    - platform: state
-      entity_id: switch.bed_light_switch
-      from: "unavailable"
-    - platform: state
-      entity_id: switch.living_light_switch
-      from: "unavailable"
-    # CO2 Sensor (router device, USB-powered)
-    - platform: state
-      entity_id: sensor.hallway_co2_co2
-      from: "unavailable"
-    # Human Presence Sensors (SNZB-06P, USB-powered routers)
-    - platform: state
-      entity_id: binary_sensor.study_human_presence_occupancy
-      from: "unavailable"
-    - platform: state
-      entity_id: binary_sensor.living_human_presence_occupancy
-      from: "unavailable"
-    - platform: state
-      entity_id: binary_sensor.kitchen_human_presence_occupancy
-      from: "unavailable"
-    - platform: state
-      entity_id: binary_sensor.bath_human_presence_occupancy
-      from: "unavailable"
-    - platform: state
-      entity_id: binary_sensor.bed_human_presence_occupancy
-      from: "unavailable"
-
-  variables:
-    device_names:
-      switch.smart_plug_1: "Smart Plug [1]"
-      switch.smart_plug_2: "Smart Plug [2]"
-      switch.smart_plug_3: "Smart Plug [3]"
-      switch.study_light_switch: "[Study] Light Switch"
-      switch.bed_light_switch: "[Bed] Light Switch"
-      switch.living_light_switch: "[Living] Light Switch"
-      sensor.hallway_co2_co2: "[Hallway] CO2 Sensor"
-      binary_sensor.study_human_presence_occupancy: "[Study] Human Presence"
-      binary_sensor.living_human_presence_occupancy: "[Living] Human Presence"
-      binary_sensor.kitchen_human_presence_occupancy: "[Kitchen] Human Presence"
-      binary_sensor.bath_human_presence_occupancy: "[Bath] Human Presence"
-      binary_sensor.bed_human_presence_occupancy: "[Bed] Human Presence"
-    device_name: "{{ device_names.get(trigger.entity_id, trigger.entity_id) }}"
-
-  action:
-    # Recovery email so offline alert in Siva's inbox gets a resolution signal
-    - service: script.send_alert_email
-      data:
-        severity: "INFO"
-        title: "Zigbee Router Back Online"
-        subtitle: "{{ device_name }}"
-        description: >-
-          {{ device_name }} has recovered and is back online. No action needed.
-        actions: ""
-        plain_text: >-
-          {{ device_name }} is back online at {{ now().strftime('%H:%M on %b %d') }}.
-    - service: system_log.write
-      data:
-        message: "ROUTER ONLINE: {{ device_name }} ({{ trigger.entity_id }}) is back"
-        level: info
 
 # =============================================================================
 # THERMOSTAT BOOST - EXPIRY AUTOMATIONS
@@ -7213,11 +6998,6 @@
             - condition: template
               value_template: "{{ states('counter.zigbee_offline_storm_count') | int(0) == 6 }}"
           sequence:
-            - service: input_datetime.set_datetime
-              target:
-                entity_id: input_datetime.zigbee_offline_storm_summary_last
-              data:
-                timestamp: "{{ as_timestamp(now()) }}"
             - service: notify.all_phones
               data:
                 title: "🌩 ZIGBEE OFFLINE STORM"
@@ -7386,11 +7166,6 @@
             - condition: template
               value_template: "{{ states('counter.zigbee_recovery_storm_count') | int(0) == 6 }}"
           sequence:
-            - service: input_datetime.set_datetime
-              target:
-                entity_id: input_datetime.zigbee_recovery_storm_summary_last
-              data:
-                timestamp: "{{ as_timestamp(now()) }}"
             - service: script.send_alert_email
               data:
                 severity: "INFO"
@@ -7479,3 +7254,109 @@
           channel: "Critical"
           importance: max
           tag: "email_delivery_failure"
+
+# -----------------------------------------------------------------------------
+# Z2M STUCK-DOWN NAG
+# -----------------------------------------------------------------------------
+# L0 (z2m_bridge_state_alert) fires ONE email when Z2M transitions online →
+# offline. If the user misses that email AND HA doesn't restart, there is no
+# subsequent reminder — Z2M can sit stuck-down for days silently. This nag
+# fires once an hour while `input_boolean.z2m_online` is off, giving a
+# persistent reminder without spamming.
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# WEEKLY SMTP CANARY
+# -----------------------------------------------------------------------------
+# If Gmail App Password expires during a quiet period (no real alerts fired),
+# L4 (email_delivery_failure_fallback) never triggers because there's no send
+# attempt to fail. This canary fires a single heartbeat email every Sunday at
+# 09:00 local. If it stops arriving, the user knows the pipe is broken.
+#
+# Content is intentionally minimal so it's easy to auto-archive / filter.
+# +1 email/week is the cost of detecting silent SMTP breakage.
+# -----------------------------------------------------------------------------
+- id: smtp_canary_weekly
+  alias: "SMTP Canary — Weekly Heartbeat"
+  description: "Sunday 09:00 heartbeat email. Silent absence = Gmail App Password broken. Complements L4 (which only fires on active SMTP errors)."
+  mode: single
+
+  trigger:
+    - platform: time
+      at: "09:00:00"
+
+  condition:
+    - condition: template
+      value_template: "{{ now().weekday() == 6 }}"  # 6 = Sunday
+
+  action:
+    - service: script.send_alert_email
+      data:
+        severity: "INFO"
+        title: "Pi Weekly Heartbeat"
+        subtitle: "SMTP pipe is alive"
+        description: >-
+          If you're reading this, notify.email is working. This is sent every
+          Sunday at 09:00 as a passive canary — its absence means the Gmail
+          App Password has been revoked or the SMTP relay is broken, and
+          genuine Zigbee / heater alerts would also be silently failing.
+        actions: ""
+        details: >-
+          Uptime:       {{ relative_time(now() - timedelta(seconds=(as_timestamp(now()) - as_timestamp(states.sensor.home_assistant_uptime.state | default(now()))) | int(0))) if states.sensor.home_assistant_uptime else 'n/a' }}
+
+          Z2M bridge:   {{ states('input_boolean.z2m_online') }}
+
+          Automations:  {{ states | selectattr('entity_id','match','^automation\\.') | list | count }}
+
+          Zigbee dev:   {{ states('counter.zigbee_offline_storm_count') | int(0) }} offline events in current storm window
+        plain_text: "Pi weekly heartbeat — if absent, Gmail SMTP is broken."
+
+- id: z2m_stuck_down_hourly_nag
+  alias: "Z2M Stuck Down Hourly Nag"
+  description: "Hourly reminder while zigbee2mqtt/bridge/state stays offline. Ensures a stuck-down Z2M gets seen even if the original L0 transition email was missed."
+  mode: single
+
+  trigger:
+    - platform: time_pattern
+      hours: "/1"
+
+  condition:
+    # Only fire if Z2M has been continuously offline for > 1 hour
+    - condition: state
+      entity_id: input_boolean.z2m_online
+      state: "off"
+      for:
+        hours: 1
+    # Quiet-hours gate: only nag between 07:00 and 22:00 local. The initial
+    # L0 transition email/push already fired when Z2M went down — this
+    # hourly reminder is for daytime visibility, not to wake anyone at 3am.
+    # If Z2M stays down overnight, the nag resumes at 07:00.
+    - condition: template
+      value_template: "{{ now().hour >= 7 and now().hour < 22 }}"
+
+  action:
+    - service: notify.all_phones
+      data:
+        title: "🚨 Z2M STILL DOWN"
+        message: >-
+          Bridge has been offline for
+          {{ relative_time(states.input_boolean.z2m_online.last_changed) }}.
+          Every Zigbee alert is suppressed until it recovers.
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "z2m_bridge_state"
+    - service: script.send_alert_email
+      data:
+        severity: "CRITICAL"
+        title: "Z2M Still Down"
+        subtitle: >-
+          Bridge offline for
+          {{ relative_time(states.input_boolean.z2m_online.last_changed) }}
+        description: >-
+          The zigbee2mqtt bridge has been offline for over an hour and has not
+          recovered. All Zigbee device monitoring is suspended — no offline
+          alerts, no ghost sweep, nothing. This hourly nag fires until the
+          bridge comes back. Last recorded state transition:
+          {{ states.input_boolean.z2m_online.last_changed }}.
+        actions: "ssh pi@pi 'sudo systemctl status zigbee2mqtt'|ssh pi@pi 'sudo journalctl -u zigbee2mqtt -n 50 --no-pager'|Check USB: ssh pi@pi 'ls /dev/serial/by-id/'|If dongle missing: power-cycle the Pi after unplugging/replugging|See docs/19-zigbee-watchdog.md + docs/21-zigbee-network-incident-2026-01-04.md"
+        plain_text: "Z2M has been down for over an hour. Every Zigbee alert is suppressed until it recovers."

@@ -1,0 +1,12 @@
+[Unit]
+Description=Email on zigbee-ghost-sweep failure
+# Triggered by OnFailure= in zigbee-ghost-sweep.service.
+# Single-shot: reads journalctl + POSTs CRITICAL email via HA API.
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/zigbee-watchdog/.env
+ExecStart=/opt/zigbee-ghost-sweep/notify-failure.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zigbee-ghost-sweep-failure
