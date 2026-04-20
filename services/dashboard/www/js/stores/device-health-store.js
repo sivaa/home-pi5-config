@@ -1,6 +1,6 @@
 /**
  * Device Health Store
- * Monitors health status of ALL Zigbee devices (39 total)
+ * Monitors health status of ALL Zigbee devices (49 total)
  * Identifies dead/stale devices based on last_seen timestamps
  *
  * Data sources:
@@ -17,17 +17,22 @@ const HEALTH_THRESHOLDS = {
 };
 
 // Device type definitions with icons
+// Order here is the order shown in the filter sidebar.
 const DEVICE_TYPES = {
   coordinator: { icon: '📡', label: 'Coordinator', color: '#ff6b6b' },
-  climate: { icon: '🌡️', label: 'Temperature', color: '#22c55e' },
-  contact: { icon: '🚪', label: 'Door/Window', color: '#3b82f6' },
-  thermostat: { icon: '🔥', label: 'Thermostat', color: '#ef4444' },
-  plug: { icon: '🔌', label: 'Smart Plug', color: '#8b5cf6' },
-  light: { icon: '💡', label: 'Light', color: '#fbbf24' },
-  remote: { icon: '🎛️', label: 'Remote', color: '#6b7280' },
+  climate: { icon: '🌡️', label: 'Temp/Humidity', color: '#22c55e' },
   co2: { icon: '💨', label: 'CO2', color: '#06b6d4' },
-  motion: { icon: '👁️', label: 'Motion', color: '#f59e0b' },
+  illuminance: { icon: '🔆', label: 'Light Sensor', color: '#eab308' },
+  contact: { icon: '🚪', label: 'Door/Window', color: '#3b82f6' },
+  motion: { icon: '🏃', label: 'Motion (PIR)', color: '#f59e0b' },
+  presence: { icon: '👁️', label: 'Presence (mmWave)', color: '#f97316' },
   vibration: { icon: '💧', label: 'Vibration', color: '#ec4899' },
+  thermostat: { icon: '🔥', label: 'Thermostat', color: '#ef4444' },
+  light: { icon: '💡', label: 'Light', color: '#fbbf24' },
+  switch: { icon: '🎚️', label: 'Wall Switch', color: '#a855f7' },
+  plug: { icon: '🔌', label: 'Smart Plug', color: '#8b5cf6' },
+  remote: { icon: '🎛️', label: 'Remote', color: '#6b7280' },
+  fingerbot: { icon: '🤖', label: 'Fingerbot', color: '#14b8a6' },
   unknown: { icon: '❓', label: 'Unknown', color: '#9ca3af' }
 };
 
@@ -37,12 +42,16 @@ const MEANINGFUL_DATA_FIELDS = {
   climate: ['temperature', 'humidity'],
   contact: ['contact'],
   motion: ['occupancy'],
+  presence: ['occupancy'],
   thermostat: ['local_temperature', 'running_state', 'occupied_heating_setpoint'],
   plug: ['state', 'power'],
+  switch: ['state'],
   light: ['state', 'brightness'],
   co2: ['co2'],
   vibration: ['vibration'],
   remote: ['action'],
+  illuminance: ['illuminance', 'illuminance_lux'],
+  fingerbot: ['state'],
   coordinator: []  // Coordinator never sends meaningful data
 };
 
@@ -54,27 +63,49 @@ function getDeviceType(device) {
   // Coordinator is special
   if (device.type === 'Coordinator') return 'coordinator';
 
-  // Use exposes metadata for accurate detection
+  // Model-specific detection first — more reliable than feature-sniffing for
+  // devices whose exposes overlap with other categories (e.g. SNZB-06P has
+  // both occupancy AND illuminance; ZBM5 wall switch has only `state` and
+  // would otherwise fall through to 'unknown').
+  const model = device.definition?.model || '';
+  if (model === 'SNZB-06P') return 'presence';       // mmWave (5 units)
+  if (model === 'SNZB-03P') return 'motion';         // PIR (1 unit, mailbox)
+  if (model.startsWith('ZBM5')) return 'switch';     // SONOFF wall switches (3 units)
+  if (model === 'TS0001_fingerbot') return 'fingerbot';
+  if (model === 'ZSS-QT-LS-C' || model === 'TS0222') return 'illuminance';
+
+  // Feature-based fallback for everything else
   const exposes = device.definition?.exposes || [];
   const features = exposes.flatMap(e => e.features || [e]);
   const featureNames = features.map(f => f.name);
 
-  // Priority order: most specific first
+  // Priority order: most specific first.
+  // IMPORTANT: `brightness` must be checked BEFORE `action`. Some smart lights
+  // (e.g. EGLO Rovito-Z, model 900087) expose an `action` feature for scene
+  // binding. Without this ordering they get misclassified as remotes.
   if (featureNames.includes('co2')) return 'co2';
-  if (featureNames.includes('occupancy')) return 'motion';
   if (featureNames.includes('vibration')) return 'vibration';  // Check before contact (vibration sensors also have contact)
+  if (featureNames.includes('occupancy')) return 'motion';     // Generic PIR fallback
   if (featureNames.includes('contact')) return 'contact';
-  if (featureNames.includes('action')) return 'remote';  // Button presses
 
   // Thermostat: has both local_temperature AND heating setpoint
   if (featureNames.includes('local_temperature') &&
       featureNames.includes('occupied_heating_setpoint')) return 'thermostat';
 
-  // Light: has brightness control
+  // Light: has brightness control (checked before `action` — see note above)
   if (featureNames.includes('brightness')) return 'light';
 
-  // Plug: has power/energy monitoring
+  // Remote: has `action` (button press events) but no brightness
+  if (featureNames.includes('action')) return 'remote';
+
+  // Plug: power/energy monitoring (distinguishes from plain wall switch)
   if (featureNames.includes('power') || featureNames.includes('energy')) return 'plug';
+
+  // Illuminance-only sensor (no occupancy)
+  if (featureNames.includes('illuminance') || featureNames.includes('illuminance_lux')) return 'illuminance';
+
+  // Plain on/off switch (state but no brightness/power)
+  if (featureNames.includes('state')) return 'switch';
 
   // Climate: temperature or humidity sensors
   if (featureNames.includes('temperature') || featureNames.includes('humidity')) return 'climate';
@@ -323,6 +354,10 @@ export function initDeviceHealthStore(Alpine, CONFIG) {
       if (data.occupied_heating_setpoint !== undefined) values.targetTemp = data.occupied_heating_setpoint;
       if (data.running_state !== undefined) values.runningState = data.running_state;
       if (data.power !== undefined) values.power = data.power;
+      if (data.illuminance_lux !== undefined) values.illuminance = data.illuminance_lux;
+      else if (data.illuminance !== undefined && typeof data.illuminance === 'number') values.illuminance = data.illuminance;
+      if (data.vibration !== undefined) values.vibration = data.vibration;
+      if (data.action !== undefined) values.action = data.action;
 
       if (Object.keys(values).length > 0) {
         health.values = { ...health.values, ...values };
@@ -653,6 +688,9 @@ export function initDeviceHealthStore(Alpine, CONFIG) {
       if (vals.state !== undefined) parts.push(vals.state);
       if (vals.runningState !== undefined) parts.push(vals.runningState);
       if (vals.power !== undefined) parts.push(`${vals.power.toFixed(0)}W`);
+      if (vals.illuminance !== undefined) parts.push(`${Math.round(vals.illuminance)} lx`);
+      if (vals.vibration !== undefined) parts.push(vals.vibration ? 'Vibrating' : 'Still');
+      if (vals.action) parts.push(vals.action);
 
       return parts.join(' | ') || '--';
     },
