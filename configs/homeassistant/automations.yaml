@@ -6910,3 +6910,411 @@
       data:
         topic: "zigbee2mqtt/Smart Plug [{{ plug_num }}]/set"
         payload: '{"network_indicator": false}'
+
+# =============================================================================
+# ZIGBEE NETWORK MONITORING — UNIVERSAL OFFLINE EMAIL ALERTS (Apr 2026)
+# Wildcard MQTT-driven alerts that auto-cover ALL Zigbee devices, current and
+# future. Companion to (not replacement for) the existing per-entity contact /
+# router automations — those remain for defense-in-depth + heater-safety
+# specific messaging. The wildcard fills the gap for the ~27 devices NOT in
+# either curated list, and any device added in the future.
+#
+# Architecture (4 layers):
+#   L0  z2m_bridge_state_alert         — Z2M bridge itself online/offline
+#                                         (gates L1 + L3 to prevent spam during Z2M outage)
+#   L1a zigbee_any_device_offline_alert — wildcard +/availability offline
+#                                         (with storm guard + 30-min startup grace)
+#   L1b zigbee_any_device_back_online_alert — wildcard recovery email
+#   L4  email_delivery_failure_alert    — phone fallback if SMTP itself fails
+#
+# Plus storm guard inside L1a: if 6+ devices report offline within a 5-min
+# window, send ONE summary email and suppress the per-device flood.
+#
+# Plus separate startup-grace setter: ha_startup_complete_setter.
+#
+# Layer 3 (daily ghost-device sweep) lives outside HA — see
+# scripts/zigbee-ghost-sweep.py.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# HA STARTUP GRACE SETTER
+# Why: After HA restart, retained MQTT availability messages re-deliver. Z2M
+# may also be restarting in parallel, republishing `offline` for batteries it
+# hasn't repinged yet. The wildcard alert is muted for 30 min after start to
+# absorb both. Bridge-state alert (L0) is NOT muted — Z2M-down should fire
+# immediately on startup if true.
+# -----------------------------------------------------------------------------
+- id: ha_startup_complete_setter
+  alias: "HA Startup Complete (30-min grace setter)"
+  description: "Sets input_boolean.ha_startup_complete to ON 30 minutes after HA start. Used by wildcard offline alert as gate."
+  mode: restart  # restart on each HA boot
+
+  trigger:
+    - platform: homeassistant
+      event: start
+
+  action:
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.ha_startup_complete
+    - delay:
+        minutes: 30
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.ha_startup_complete
+
+# -----------------------------------------------------------------------------
+# L0: Z2M BRIDGE STATE — alert when zigbee2mqtt itself goes down or recovers
+# Z2M publishes `online`/`offline` to zigbee2mqtt/bridge/state via MQTT LWT.
+# -----------------------------------------------------------------------------
+- id: z2m_bridge_state_alert
+  alias: "Z2M Bridge State Alert"
+  description: "Tracks zigbee2mqtt bridge online/offline. Updates input_boolean.z2m_online (used by L1+L3 as gate). Sends critical email on transition to offline + recovery email on transition back to online."
+  mode: queued
+  max: 5
+
+  trigger:
+    - platform: mqtt
+      topic: "zigbee2mqtt/bridge/state"
+
+  variables:
+    is_offline: >-
+      {% set p = trigger.payload %}
+      {% if p is string and p.startswith('{') %}
+        {{ (p | from_json).state == 'offline' }}
+      {% else %}
+        {{ p == 'offline' }}
+      {% endif %}
+    was_online: "{{ states('input_boolean.z2m_online') == 'on' }}"
+
+  action:
+    - choose:
+        # Transition: ONLINE -> OFFLINE
+        - conditions:
+            - condition: template
+              value_template: "{{ is_offline and was_online }}"
+          sequence:
+            - service: input_boolean.turn_off
+              target:
+                entity_id: input_boolean.z2m_online
+            - service: notify.all_phones
+              data:
+                title: "🚨 Z2M BRIDGE DOWN"
+                message: "zigbee2mqtt is offline. Per-device alerts suppressed until it recovers."
+                data:
+                  channel: "Critical"
+                  importance: max
+                  tag: "z2m_bridge_state"
+            - service: script.send_alert_email
+              data:
+                severity: "CRITICAL"
+                title: "Z2M Bridge Offline"
+                subtitle: "zigbee2mqtt is not running"
+                description: >-
+                  The Z2M bridge reported offline via its MQTT Last-Will-and-Testament
+                  (zigbee2mqtt/bridge/state). All per-device offline alerts are
+                  suppressed until it recovers — the daily ghost sweep is also
+                  paused. Common causes: container crashed, USB dongle disconnected,
+                  Pi rebooting.
+                actions: "ssh pi@pi 'sudo systemctl status zigbee2mqtt'|If down: sudo systemctl restart zigbee2mqtt|Check USB: ssh pi@pi ls /dev/serial/by-id/|See docs/19-zigbee-watchdog.md"
+                plain_text: "Z2M bridge offline. SSH and check systemctl status zigbee2mqtt."
+
+        # Transition: OFFLINE -> ONLINE (recovery)
+        - conditions:
+            - condition: template
+              value_template: "{{ not is_offline and not was_online }}"
+          sequence:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: input_boolean.z2m_online
+            - service: script.send_alert_email
+              data:
+                severity: "INFO"
+                title: "Z2M Bridge Recovered"
+                subtitle: "zigbee2mqtt is back online"
+                description: "The Z2M bridge is reachable again. Device offline alerts are re-enabled."
+                actions: ""
+                plain_text: "Z2M bridge back online."
+
+# -----------------------------------------------------------------------------
+# L1a: WILDCARD DEVICE OFFLINE
+# Covers EVERY Zigbee device via `zigbee2mqtt/+/availability`. New devices
+# added in the future are covered automatically — no per-device entity_id
+# list to maintain.
+#
+# Skips:
+#   - bridge/* topics (handled by L0)
+#   - devices in input_text.zigbee_offline_exclusions (manual wall switches)
+#   - if Z2M itself is down (input_boolean.z2m_online == off)
+#   - first 30 min after HA start (absorbs retained replays)
+#
+# Storm guard: if 6+ devices report offline within a 5-min sliding window,
+# sends ONE summary email and stops processing for the rest of the window.
+# -----------------------------------------------------------------------------
+- id: zigbee_any_device_offline_alert
+  alias: "Zigbee Any Device Offline Alert (wildcard)"
+  description: "MQTT wildcard trigger on +/availability offline. Auto-covers all current + future Zigbee devices. Has storm guard + startup grace + per-friendly_name severity branching."
+  mode: queued
+  max: 50
+
+  trigger:
+    - platform: mqtt
+      topic: "zigbee2mqtt/+/availability"
+
+  variables:
+    # Z2M friendly_name from "zigbee2mqtt/<NAME>/availability"
+    device_name: "{{ trigger.topic.split('/')[1] }}"
+    is_offline: >-
+      {% set p = trigger.payload %}
+      {% if p is string and p.startswith('{') %}
+        {{ (p | from_json).state == 'offline' }}
+      {% else %}
+        {{ p == 'offline' }}
+      {% endif %}
+    excluded: >-
+      {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
+    # Storm window: 5 min sliding (sentinel pattern as elsewhere in this file)
+    sentinel: 86400
+    storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_offline_storm_window_start')) | default(0) }}"
+    storm_window_active: "{{ storm_start_ts > sentinel and (as_timestamp(now()) - storm_start_ts) < 300 }}"
+    storm_count: "{{ states('counter.zigbee_offline_storm_count') | int(0) }}"
+
+  condition:
+    # Must be an offline payload
+    - condition: template
+      value_template: "{{ is_offline }}"
+    # Skip the bridge itself — handled by L0
+    - condition: template
+      value_template: "{{ '/bridge/' not in trigger.topic and device_name != 'bridge' }}"
+    # Skip user-managed exclusions (lights powered off via wall switches)
+    - condition: template
+      value_template: "{{ not excluded }}"
+    # Skip if the bridge itself is down — Z2M crash, not per-device fault
+    - condition: state
+      entity_id: input_boolean.z2m_online
+      state: "on"
+    # Startup grace: skip for first 30 min after HA start
+    - condition: state
+      entity_id: input_boolean.ha_startup_complete
+      state: "on"
+
+  action:
+    # 1. Update storm-window state (sliding 5 min)
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ not storm_window_active }}"
+          sequence:
+            - service: counter.reset
+              target:
+                entity_id: counter.zigbee_offline_storm_count
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.zigbee_offline_storm_window_start
+              data:
+                timestamp: "{{ as_timestamp(now()) }}"
+    - service: counter.increment
+      target:
+        entity_id: counter.zigbee_offline_storm_count
+
+    # 2. STORM HANDLING
+    #    counter just-incremented to 6  -> send ONE summary email
+    #    counter > 6                    -> stop (already alerted this storm)
+    #    counter <= 5                   -> fall through to per-device email
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ (storm_count + 1) == 6 }}"
+          sequence:
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: input_datetime.zigbee_offline_storm_summary_last
+              data:
+                timestamp: "{{ as_timestamp(now()) }}"
+            - service: notify.all_phones
+              data:
+                title: "🌩 ZIGBEE OFFLINE STORM"
+                message: "6+ devices offline within 5 min. Per-device alerts suppressed."
+                data:
+                  channel: "Critical"
+                  importance: max
+                  tag: "zigbee_storm"
+            - service: script.send_alert_email
+              data:
+                severity: "CRITICAL"
+                title: "Zigbee Offline Storm"
+                subtitle: "6+ devices reported offline in 5 minutes"
+                description: >-
+                  Multiple Zigbee devices went offline in a short window. Per-device
+                  emails for the rest of this 5-min window are suppressed to avoid
+                  inboxing 49 alerts. Common causes: coordinator died, mesh routing
+                  collapsed, mosquitto restarted, or a critical router went offline.
+                actions: "ssh pi@pi 'sudo systemctl status zigbee2mqtt'|Check Z2M logs: docker logs zigbee2mqtt --tail 100|Check mosquitto: docker logs mosquitto --tail 50|Open dashboard Device Health view (key D)"
+                plain_text: "6+ Zigbee devices offline in 5 min. Per-device alerts suppressed."
+            - stop: "Storm summary sent — suppress remaining per-device emails."
+        - conditions:
+            - condition: template
+              value_template: "{{ (storm_count + 1) > 6 }}"
+          sequence:
+            - stop: "Already in storm window — suppressing to prevent email flood."
+
+    # 3. Per-device email (severity branched by friendly_name pattern)
+    - service: script.send_alert_email
+      data:
+        severity: >-
+          {% set n = device_name | lower %}
+          {%- if 'switch' in n or 'plug' in n or 'co2' in n or 'presence' in n -%}
+          CRITICAL
+          {%- elif 'window' in n or 'door' in n or 'contact' in n -%}
+          WARNING
+          {%- else -%}
+          INFO
+          {%- endif %}
+        title: "Zigbee Device Offline"
+        subtitle: "{{ device_name }}"
+        description: >-
+          {%- set n = device_name | lower -%}
+          {%- if 'window' in n or 'door' in n or 'contact' in n -%}
+          Contact sensor offline. This affects the heater safety system —
+          heaters may not auto-resume when this opening closes because the
+          sensor state reads "unavailable" instead of "closed".
+          {%- elif 'switch' in n -%}
+          Wall switch (Zigbee router) offline. Mesh backbone may be weakened —
+          nearby battery sensors could lose their relay path.
+          {%- elif 'plug' in n -%}
+          Smart plug (Zigbee router) offline. Mesh backbone may be weakened
+          and any device controlled by this plug is no longer responsive.
+          {%- elif 'presence' in n -%}
+          Human-presence sensor offline. Bath / circadian / occupancy
+          automations for that room are suspended until the sensor recovers.
+          {%- elif 'thermostat' in n -%}
+          Thermostat (TRV) offline. Heating control for that room is suspended;
+          the heater watchdog will alert separately if this stays offline long.
+          {%- elif 'remote' in n -%}
+          Remote offline (battery dead or out of range). Direct light control
+          via the physical remote is unavailable until the battery is replaced.
+          {%- elif 'co2' in n -%}
+          CO2 sensor offline. Air-quality automations + ventilation prompts
+          will not fire until the sensor recovers.
+          {%- else -%}
+          Sensor offline. No data being received from this device.
+          {%- endif %}
+        actions: "Open dashboard Device Health view (key D)|Check the device's battery / power|If a router: docker logs zigbee2mqtt --tail 100|If offline > 24h, consider re-pairing"
+        details: >-
+          Device: {{ device_name }}
+
+          Topic:  {{ trigger.topic }}
+
+          Time:   {{ now().strftime('%Y-%m-%d %H:%M:%S %Z') }}
+
+
+          NOTE: This alert auto-covers ALL Zigbee devices via wildcard.
+          To suppress a specific device (e.g. a wall-switch-controlled
+          light), edit input_text.zigbee_offline_exclusions in HA Helpers.
+        plain_text: "{{ device_name }} went offline at {{ now().strftime('%H:%M on %b %d') }}."
+
+# -----------------------------------------------------------------------------
+# L1b: WILDCARD DEVICE BACK ONLINE — recovery email
+# -----------------------------------------------------------------------------
+- id: zigbee_any_device_back_online_alert
+  alias: "Zigbee Any Device Back Online (wildcard)"
+  description: "INFO email when a previously-alerted device comes back online. Same wildcard scope as L1a. Skipped during Z2M outage and HA startup grace."
+  mode: queued
+  max: 50
+
+  trigger:
+    - platform: mqtt
+      topic: "zigbee2mqtt/+/availability"
+
+  variables:
+    device_name: "{{ trigger.topic.split('/')[1] }}"
+    is_online: >-
+      {% set p = trigger.payload %}
+      {% if p is string and p.startswith('{') %}
+        {{ (p | from_json).state == 'online' }}
+      {% else %}
+        {{ p == 'online' }}
+      {% endif %}
+    excluded: >-
+      {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
+
+  condition:
+    - condition: template
+      value_template: "{{ is_online }}"
+    - condition: template
+      value_template: "{{ '/bridge/' not in trigger.topic and device_name != 'bridge' }}"
+    - condition: template
+      value_template: "{{ not excluded }}"
+    - condition: state
+      entity_id: input_boolean.z2m_online
+      state: "on"
+    - condition: state
+      entity_id: input_boolean.ha_startup_complete
+      state: "on"
+
+  action:
+    - service: script.send_alert_email
+      data:
+        severity: "INFO"
+        title: "Zigbee Device Recovered"
+        subtitle: "{{ device_name }}"
+        description: "{{ device_name }} is back online and reporting normally."
+        actions: ""
+        plain_text: "{{ device_name }} back online at {{ now().strftime('%H:%M on %b %d') }}."
+
+# -----------------------------------------------------------------------------
+# L4: EMAIL DELIVERY FAILURE FALLBACK
+# -----------------------------------------------------------------------------
+# If notify.email itself fails (e.g. Gmail App Password expired, SMTP timeout,
+# 2FA disabled), Zigbee + heater + safety alerts silently disappear. This
+# automation watches HA logs for SMTP errors and falls back to a phone push
+# so we don't lose visibility. Throttled to 1 push per 24h.
+#
+# Mirrors the existing google_assistant_integration_error pattern.
+# -----------------------------------------------------------------------------
+- id: email_delivery_failure_alert
+  alias: "Email Delivery Failure Fallback"
+  description: "Phone push when notify.email fails (SMTP error in HA logs). Throttled 1/day."
+  mode: single
+
+  trigger:
+    - platform: event
+      event_type: system_log_event
+      event_data:
+        level: ERROR
+
+  condition:
+    - condition: template
+      value_template: >-
+        {% set name = (trigger.event.data.name | default('')) | lower %}
+        {% set msg = (trigger.event.data.message | default('')) | lower %}
+        {{ 'smtp' in name or 'smtplib' in name or 'notify.email' in name
+           or 'notify.smtp' in name
+           or ('smtp' in msg and ('auth' in msg or 'fail' in msg or 'connect' in msg)) }}
+    # Throttle: 1 push per 24h (sentinel "1970-01-01 00:00:00" = never sent)
+    - condition: template
+      value_template: >-
+        {% set last = states('input_datetime.email_delivery_alert_last') %}
+        {% if last in ['unknown', 'unavailable', ''] %}
+          true
+        {% else %}
+          {% set ts = as_timestamp(last) | default(0) %}
+          {{ ts < 86400 or (as_timestamp(now()) - ts) > 86400 }}
+        {% endif %}
+
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.email_delivery_alert_last
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+    - service: notify.all_phones
+      data:
+        title: "📧 EMAIL DELIVERY FAILED"
+        message: >-
+          notify.email is failing — Zigbee + heater alerts won't reach Siva's
+          inbox. Most likely Gmail App Password expired. Check secrets.yaml.
+        data:
+          channel: "Critical"
+          importance: max
+          tag: "email_delivery_failure"

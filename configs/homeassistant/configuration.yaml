@@ -662,6 +662,21 @@ input_boolean:
   bed_backlight_state:
     name: Bed Backlight State
     icon: mdi:led-strip-variant
+  # =========================================================================
+  # ZIGBEE NETWORK MONITOR (Apr 2026)
+  # Tracks whether Z2M itself is reachable. Used as a condition gate by the
+  # wildcard offline alert + ghost sweep to suppress per-device alerts when
+  # the bridge is the actual problem. Driven by zigbee2mqtt/bridge/state LWT.
+  # =========================================================================
+  z2m_online:
+    name: Z2M Bridge Online
+    icon: mdi:lan-connect
+    initial: true   # Default to online; bridge/state retained MQTT corrects on startup
+  # 30-min grace period after HA start. Suppresses wildcard offline alerts to
+  # absorb retained-message replays + give Z2M time to re-ping every device.
+  ha_startup_complete:
+    name: HA Startup Complete (30-min grace passed)
+    icon: mdi:timer-check
 
 # =============================================================================
 # INPUT DATETIMES - Override Expiration Timestamps
@@ -780,6 +795,27 @@ input_datetime:
     has_date: true
     has_time: true
     icon: mdi:google-assistant
+
+  # =========================================================================
+  # ZIGBEE OFFLINE EMAIL MONITOR (Apr 2026)
+  # Used by zigbee_any_device_offline_alert + storm guard.
+  # All sentinel "1970-01-01 00:00:00" = never-fired (same pattern as CO2).
+  # =========================================================================
+  zigbee_offline_storm_window_start:
+    name: "Zigbee Offline Storm Window Start"
+    has_date: true
+    has_time: true
+    icon: mdi:alert-octagon
+  zigbee_offline_storm_summary_last:
+    name: "Zigbee Offline Storm Summary Last Sent"
+    has_date: true
+    has_time: true
+    icon: mdi:alert-octagon
+  email_delivery_alert_last:
+    name: "Email Delivery Alert Last Sent"
+    has_date: true
+    has_time: true
+    icon: mdi:email-alert
 
 # =============================================================================
 # INPUT NUMBERS - Saved Setpoints for Temperature Restoration
@@ -917,6 +953,33 @@ input_number:
     max: 10
     step: 1
     icon: mdi:counter
+
+# =============================================================================
+# INPUT TEXT - Editable Strings via HA UI
+# Purpose: Free-form lists/maps that change occasionally without touching YAML
+# =============================================================================
+input_text:
+  # Comma-separated friendly_names of Zigbee devices to EXCLUDE from the
+  # wildcard offline alert. These lights are powered off via wall switches
+  # (not Zigbee), so "offline" is normal, not a fault.
+  # Edit from HA UI: Settings -> Devices & Services -> Helpers
+  zigbee_offline_exclusions:
+    name: "Zigbee Offline Alert Exclusions"
+    icon: mdi:bell-off
+    max: 255
+    initial: "[Study] IKEA Light,[Living] IKEA Light,[Bath] Light"
+
+# =============================================================================
+# COUNTERS
+# Purpose: Sliding-window event counters (e.g. storm guard for offline alerts)
+# =============================================================================
+counter:
+  zigbee_offline_storm_count:
+    name: "Zigbee Offline Storm Count"
+    icon: mdi:alert-octagon
+    initial: 0
+    step: 1
+    minimum: 0
 
 # =============================================================================
 # HOT WATER USAGE TRACKING

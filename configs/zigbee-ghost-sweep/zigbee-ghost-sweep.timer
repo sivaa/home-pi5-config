@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Zigbee Ghost Device Sweep twice daily
+
+[Timer]
+# Twice daily: 03:30 (before 04:30 reboot) and 15:30 (mid-day)
+OnCalendar=*-*-* 03:30:00
+OnCalendar=*-*-* 15:30:00
+# Catch up after Pi was off
+Persistent=true
+# Allow up to 5 min scheduling variance — not time-critical
+AccuracySec=5min
+
+[Install]
+WantedBy=timers.target

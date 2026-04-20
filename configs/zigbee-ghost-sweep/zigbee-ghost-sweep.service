@@ -1,0 +1,17 @@
+[Unit]
+Description=Zigbee Ghost Device Sweep — diff bridge/devices, alert on silent removals
+After=docker.service mosquitto.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/zigbee-watchdog/.env
+ExecStart=/usr/bin/python3 /opt/zigbee-ghost-sweep/zigbee-ghost-sweep.py
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zigbee-ghost-sweep
+
+# Don't restart on failure — next timer fire will try again
+Restart=no

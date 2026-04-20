@@ -467,10 +467,15 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 │  │                              │          │ (phone) │(email)│            │ │
 │  ├──────────────────────────────┼──────────┼─────────┼───────┼────────────┤ │
 │  │  zigbee_device_left_alert    │ CRITICAL │   ✓     │   ✓   │ MQTT leave │ │
+│  │  z2m_bridge_state_alert      │ CRITICAL │   ✓     │   ✓   │ bridge LWT │ │
+│  │  zigbee_any_device_offline   │ branched │         │   ✓   │ +/avail    │ │
+│  │  zigbee_any_device_back_online│INFO     │         │   ✓   │ +/avail    │ │
+│  │  zigbee-ghost-sweep (script) │ CRITICAL │         │   ✓   │ 03:30+15:30│ │
 │  │  contact_sensor_offline_alert│ WARNING  │   ✓     │   ✓   │ Unavail    │ │
 │  │  zigbee_router_offline_alert │ CRITICAL │         │   ✓   │ Unavail 2m │ │
 │  │  thermostat_low_battery_alert│ WARNING  │         │   ✓   │ Batt < 30% │ │
 │  │  zigbee_router_online_alert  │ INFO     │         │   ✓   │ Recovery   │ │
+│  │  email_delivery_failure      │ CRITICAL │   ✓     │       │ SMTP error │ │
 │  └──────────────────────────────┴──────────┴─────────┴───────┴────────────┘ │
 │                                                                              │
 │  Siva: email-only (removed from phone group Feb 2026).                       │
@@ -813,6 +818,45 @@ the HA restart that applied the config.
 ---
 
 ## History
+
+- **Apr 20, 2026**: Universal Zigbee offline email coverage (4 new layers)
+  - Triggered by `[Living] Light Switch` silently vanishing from `bridge/devices`
+    ~22 days before discovery — neither retained `availability=offline` was
+    ever published nor a `device_leave` event fired. Existing per-entity
+    automations couldn't catch the class.
+  - **L0** `z2m_bridge_state_alert` — watches `zigbee2mqtt/bridge/state` LWT,
+    flips `input_boolean.z2m_online`, sends critical email on Z2M down +
+    recovery on bridge return. Used as condition gate for L1 + L3.
+  - **L1a** `zigbee_any_device_offline_alert_wildcard` — MQTT wildcard
+    `+/availability` covers ALL current + future devices. Has storm guard
+    (6+ offline within 5 min → ONE summary email instead of N), 30-min
+    startup grace via `input_boolean.ha_startup_complete`, severity
+    branching by `friendly_name` pattern (contact=WARN, plug/switch/
+    presence=CRIT, others=INFO), and `input_text.zigbee_offline_exclusions`
+    for wall-switch-controlled lights.
+  - **L1b** `zigbee_any_device_back_online_wildcard` — INFO recovery email.
+  - **L4** `email_delivery_failure_fallback` — phone-push fallback if SMTP
+    itself fails (same throttled pattern as `google_assistant_integration_error`).
+  - **L3** standalone systemd timer `zigbee-ghost-sweep.timer` (03:30 + 15:30
+    daily) runs `services/zigbee-ghost-sweep/` Python script that diffs
+    `bridge/devices` against `/var/lib/zigbee-ghost-sweep/snapshot.json`.
+    On silent removal: CRITICAL email + publishes retained
+    `availability={"state":"offline"}` to fix the lying state. Catches the
+    Living-Switch incident class.
+  - **NEW helpers**: input_boolean.z2m_online (initial:on),
+    input_boolean.ha_startup_complete, input_text.zigbee_offline_exclusions,
+    counter.zigbee_offline_storm_count, input_datetime.{zigbee_offline_storm_window_start,
+    zigbee_offline_storm_summary_last, email_delivery_alert_last}.
+  - **Defense-in-depth**: existing `contact_sensor_offline_alert`,
+    `zigbee_router_offline_alert`, `thermostat_low_battery_alert`,
+    `zigbee_router_online_alert` are kept. Some devices now get redundant
+    alerts (~20 of 48); accepted per the project's documented defense-in-depth
+    ethos. The wildcard fills gaps for the 27 previously uncovered devices
+    AND any device added in the future.
+  - Total automations: 78 -> 83.
+  - Verified live: fake `[Test] Fake Device` offline payload triggered the
+    wildcard automation cleanly (counter increment + send_alert_email path).
+    Ghost-sweep service deployed; first-run snapshot saved 47 devices.
 
 - **Apr 19, 2026**: Smart plug blue network LED disable + reconnect safety net
   - New Z2M external converter exposes `network_indicator` on SONOFF S60ZBTPF
