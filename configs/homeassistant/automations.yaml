@@ -6939,6 +6939,40 @@
         device_name: "{{ device_name }}"
         topic: "{{ device_topic }}"
 
+    # Recovery gate: now that this device got an offline email, also wait for
+    # it to come back online and fire a recovery-confirmed event. This gates
+    # L1b so recovery emails ONLY fire for devices that got an offline email
+    # (i.e. devices that were offline ≥ N minutes). Short blips → no offline
+    # email → no recovery email.
+    #
+    # 30-day timeout: plenty of slack for vacation/long outages; anything
+    # longer and the user has already debugged it without needing the email.
+    # HA restart loses in-flight waits (same limitation as the offline wait
+    # above), so a device offline across a restart won't get a recovery email.
+    - wait_for_trigger:
+        - platform: mqtt
+          topic: "{{ device_topic }}"
+          payload: "online"
+          value_template: >-
+            {% set p = value %}
+            {% if p is string and p.startswith('{') %}
+              {{ (p | from_json).state }}
+            {% else %}
+              {{ p }}
+            {% endif %}
+      timeout:
+        days: 30
+      continue_on_timeout: true
+
+    # Gave up waiting for recovery → silent exit.
+    - condition: template
+      value_template: "{{ wait.completed }}"
+
+    - event: zigbee_recovery_confirmed
+      event_data:
+        device_name: "{{ device_name }}"
+        topic: "{{ device_topic }}"
+
 # -----------------------------------------------------------------------------
 # L1a-emailer: stage 2 — storm-guarded email sender
 # -----------------------------------------------------------------------------
@@ -7098,45 +7132,27 @@
 # -----------------------------------------------------------------------------
 - id: zigbee_any_device_back_online_alert
   alias: "Zigbee Any Device Back Online (wildcard)"
-  description: "INFO email when a previously-alerted device comes back online. Same wildcard scope as L1a. Skipped during Z2M outage and HA startup grace."
+  description: "INFO email when a previously-alerted device recovers. Triggered by the waiter's zigbee_recovery_confirmed event, so this fires ONLY for devices that got an offline email (i.e. were offline ≥ input_number.zigbee_offline_delay_minutes). Short blips → no recovery email."
   mode: queued
   max: 50
 
   trigger:
-    - platform: mqtt
-      topic: "zigbee2mqtt/+/availability"
+    - platform: event
+      event_type: zigbee_recovery_confirmed
 
   variables:
-    device_name: "{{ trigger.topic.split('/')[1] }}"
-    is_online: >-
-      {% set p = trigger.payload %}
-      {% if p is string and p.startswith('{') %}
-        {{ (p | from_json).state == 'online' }}
-      {% else %}
-        {{ p == 'online' }}
-      {% endif %}
-    excluded: >-
-      {{ device_name in (states('input_text.zigbee_offline_exclusions') | default('')).split(',') | map('trim') | reject('equalto', '') | list }}
+    device_name: "{{ trigger.event.data.device_name }}"
     # Recovery-storm window: 5-min sliding (mirrors L1a offline-storm guard).
-    # Typical trigger: Z2M crash recovers → 48 devices go online within seconds →
-    # without this guard, 48 recovery emails arrive in the same burst.
+    # Typical trigger: Z2M crash recovers → N devices go online within seconds
+    # → without this guard, N recovery emails arrive in the same burst. Only
+    # reached after each device's waiter completed its N-min offline wait, so
+    # the storm window is against confirmed-recoveries, not all online events.
     sentinel: 86400
     recovery_storm_start_ts: "{{ as_timestamp(states('input_datetime.zigbee_recovery_storm_window_start')) | default(0) }}"
     recovery_storm_window_expired: "{{ recovery_storm_start_ts < sentinel or (as_timestamp(now()) - recovery_storm_start_ts) >= 300 }}"
 
-  condition:
-    - condition: template
-      value_template: "{{ is_online }}"
-    - condition: template
-      value_template: "{{ '/bridge/' not in trigger.topic and device_name != 'bridge' }}"
-    - condition: template
-      value_template: "{{ not excluded }}"
-    - condition: state
-      entity_id: input_boolean.z2m_online
-      state: "on"
-    - condition: state
-      entity_id: input_boolean.ha_startup_complete
-      state: "on"
+  # All online/exclusion/z2m/startup gating was enforced by the waiter before
+  # it fired zigbee_recovery_confirmed — no need to re-check here.
 
   action:
     # 1. Reset recovery-storm window if expired

@@ -40,7 +40,9 @@
 │                                covers ALL devices (current + future)      │
 │                                + storm guard + 30-min startup grace       │
 │                                                                            │
-│  L1b Wildcard Recovery       ← back-online emails (with own storm guard)  │
+│  L1b Wildcard Recovery       ← back-online emails — ONLY for devices     │
+│                                that previously got an L1a offline email  │
+│                                (short blips produce no recovery email)   │
 │                                                                            │
 │  L2  Device Left (existing)  ← explicit Zigbee Leave frame                │
 │                                (already wildcard, kept untouched)         │
@@ -133,7 +135,9 @@ conditions that need human attention.
 │  timeout: zigbee_offline_delay_minutes min (default 720)             │
 │         │                                                            │
 │         ├── online arrived → wait.completed=true → skip, exit         │
-│         └── timeout → fire event zigbee_offline_confirmed           │
+│         └── timeout → fire event zigbee_offline_confirmed            │
+│                        then second wait_for_trigger (online, 30 d)   │
+│                        on recovery → fire zigbee_recovery_confirmed  │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
                                  │
@@ -149,6 +153,17 @@ conditions that need human attention.
 │    if count == 6 → send summary email + stop                         │
 │    if count >  6 → suppress + stop                                   │
 │    else          → send per-device email                             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  L1b: zigbee_any_device_back_online_alert (mode: queued, max: 50)    │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  trigger: event zigbee_recovery_confirmed (from the waiter)          │
+│           — NOT MQTT, so devices that never got an offline email     │
+│           also never get a recovery email                            │
+│  action: recovery storm guard + per-device recovery email            │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -376,3 +391,4 @@ If rebuilding the Pi from scratch:
 - **2026-04-20** — 12-hour recovery delay (commit 8fbd880): L1a split into parallel waiter + queued emailer. Wait configurable via `input_number.zigbee_offline_delay_minutes` (default 720). Transient offlines no longer email.
 - **2026-04-20** — Full-system review response (commit 61acdc6): retired legacy `zigbee_router_offline_alert`/`_online_alert` (redundant with L1a), removed dead `_summary_last` helpers, added B5 stuck-offline detector in ghost sweep, systemd `OnFailure=` hook, Z2M stuck-down hourly nag, snapshot-corruption CRITICAL alert, self-heal leak fix, weekly SMTP canary, contact-repeat cadence /4h→/12h, HTML template dark-mode fixes.
 - **2026-04-20** — Post-review fixes: B5 tracking preserves state on MQTT/HA failure (no false re-alerts); notify-failure.sh uses real newlines; stale docs swept.
+- **2026-04-21** — Recovery-email gate: L1b trigger changed from MQTT `+/availability` to a new `zigbee_recovery_confirmed` event fired by the waiter. Recovery emails now ONLY fire for devices that previously got an L1a offline email (i.e. were offline ≥ `zigbee_offline_delay_minutes`). Short blips no longer produce a standalone recovery email. Waiter extended with a 30-day second `wait_for_trigger` after `zigbee_offline_confirmed`.

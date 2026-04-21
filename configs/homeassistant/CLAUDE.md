@@ -471,7 +471,7 @@ ssh pi@pi "curl -s -X POST http://localhost:8123/api/services/notify/email \
 │  │  z2m_stuck_down_hourly_nag      │CRITICAL│ ✓7-22 │   ✓   │ /1h poll   │ │
 │  │  zigbee_offline_waiter          │ gated  │       │       │ +/avail    │ │
 │  │  zigbee_offline_confirmed_emailer│branch │       │   ✓   │ after wait │ │
-│  │  zigbee_any_device_back_online_alert│INFO│       │   ✓   │ +/avail    │ │
+│  │  zigbee_any_device_back_online_alert│INFO│       │   ✓   │ recov event│ │
 │  │  zigbee-ghost-sweep (script)    │WARNING │       │   ✓   │ 03:30+15:30│ │
 │  │  contact_sensor_offline_alert   │WARNING │   ✓   │   ✓   │ Unavail    │ │
 │  │  thermostat_low_battery_alert   │WARNING │       │   ✓   │ Batt < 30% │ │
@@ -799,6 +799,26 @@ the HA restart that applied the config.
 ---
 
 ## History
+
+- **Apr 21, 2026**: Recovery-email gate — L1b fires only for devices that got an L1a offline email
+  - User report: "getting Zigbee Device Recovered too much". L1b's MQTT trigger
+    was firing for every `availability=online` transition, including short
+    blips (e.g. device pingback after a 30-s mesh routing hiccup) that never
+    triggered an offline email in the first place — asymmetric noise.
+  - Fix: gated L1b on the offline waiter. After the waiter fires
+    `zigbee_offline_confirmed` (device was offline ≥ N min), it now runs a
+    second `wait_for_trigger` on the same topic with `payload: online` and a
+    30-day timeout; on completion it fires a new `zigbee_recovery_confirmed`
+    event. L1b's trigger changed from MQTT `+/availability` to that event.
+  - Side benefits:
+    - L1b no longer needs redundant z2m/exclusion/startup/online checks — the
+      waiter already enforced all of them before firing the event.
+    - Storm guard semantics unchanged: still against confirmed-recoveries.
+  - Limitation: HA restart loses in-flight waits (same as the existing
+    offline wait), so a device that went offline and recovered across a
+    restart won't email. Accepted — matches existing behavior.
+  - Verified: `check_config` clean, automation reloaded via API, L1b loaded
+    with new event trigger.
 
 - **Apr 20, 2026**: Full-system review response — retire legacy + close 4 resilience gaps
   - Four parallel Opus agent reviews of the whole detection/notification
