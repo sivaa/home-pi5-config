@@ -814,9 +814,14 @@ the HA restart that applied the config.
     - L1b no longer needs redundant z2m/exclusion/startup/online checks — the
       waiter already enforced all of them before firing the event.
     - Storm guard semantics unchanged: still against confirmed-recoveries.
-  - Limitation: HA restart loses in-flight waits (same as the existing
-    offline wait), so a device that went offline and recovered across a
-    restart won't email. Accepted — matches existing behavior.
+  - Limitations (HA restart loses in-flight waits):
+    1. Device offline across the entire restart → no offline email (same
+       as pre-change behavior).
+    2. **New gap**: offline email sent pre-restart, device recovers
+       post-restart → recovery email is silently lost. Before this change,
+       L1b triggered on raw MQTT `online` and would have emailed. Accepted
+       trade-off for eliminating the spurious recovery emails that
+       motivated the fix.
   - Verified: `check_config` clean, automation reloaded via API, L1b loaded
     with new event trigger.
 

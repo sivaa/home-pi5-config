@@ -6947,8 +6947,14 @@
     #
     # 30-day timeout: plenty of slack for vacation/long outages; anything
     # longer and the user has already debugged it without needing the email.
-    # HA restart loses in-flight waits (same limitation as the offline wait
-    # above), so a device offline across a restart won't get a recovery email.
+    #
+    # HA restart loses in-flight waits. Two cases where no recovery email fires:
+    #   1. Device offline across the entire restart → no offline email either.
+    #   2. Offline email sent pre-restart, device recovers post-restart →
+    #      recovery email is silently lost.
+    # Case 2 is a new gap vs. the pre-Apr-21 design (when L1b triggered on
+    # raw MQTT online). Accepted trade-off for eliminating spurious recovery
+    # emails from devices that never got an offline email.
     - wait_for_trigger:
         - platform: mqtt
           topic: "{{ device_topic }}"
