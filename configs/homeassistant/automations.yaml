@@ -3500,7 +3500,7 @@
               data:
                 brightness: "{{ final_brightness }}"
                 color_temp_kelvin: "{{ final_color_temp }}"
-                transition: 30
+                transition: 2
 
     # Living light (if on and not overridden)
     # GOLDEN RULE (Phase-Aware):
@@ -3546,7 +3546,7 @@
               data:
                 brightness: "{{ final_brightness }}"
                 color_temp_kelvin: "{{ final_color_temp }}"
-                transition: 30
+                transition: 2
 
     # Bath light (if on and not overridden)
     # GOLDEN RULE (Phase-Aware):
@@ -3592,7 +3592,7 @@
               data:
                 brightness: "{{ final_brightness }}"
                 color_temp_kelvin: "{{ final_color_temp }}"
-                transition: 30
+                transition: 2
 
     # Bed light — main ring + backlight (if on and not overridden)
     # Single-endpoint EGLO Rovito-Z: light.turn_on with color_temp_kelvin
@@ -3632,7 +3632,7 @@
               data:
                 brightness: "{{ final_brightness }}"
                 color_temp_kelvin: "{{ final_color_temp }}"
-                transition: 30
+                transition: 2
 
     # Hallway light — BOTH endpoints (if on and not overridden)
     # Dual-endpoint Aqara T1M: update white ring and RGB strip independently.
@@ -3697,7 +3697,7 @@
                   data:
                     brightness: "{{ final_brightness }}"
                     color_temp_kelvin: "{{ final_color_temp }}"
-                    transition: 30
+                    transition: 2
             # Update RGB strip with same circadian values
             - if:
                 - condition: state
@@ -3709,7 +3709,7 @@
                   data:
                     brightness: "{{ final_brightness }}"
                     color_temp_kelvin: "{{ final_color_temp }}"
-                    transition: 30
+                    transition: 2
 
     # Clear debounce flag after 5 seconds (allows time for light state to update)
     - delay:
