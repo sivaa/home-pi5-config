@@ -3431,13 +3431,32 @@
 # -----------------------------------------------------------------------------
 - id: circadian_schedule_update
   alias: "Circadian - Schedule Update"
-  description: "Updates light brightness and color temp every minute"
-  mode: single
+  description: "Updates light brightness and color temp every minute, and
+    immediately when any per-room override is cleared (dashboard clear,
+    resume button, or natural expiry)."
+  # queued (not single): state trigger fires the instant an override clears,
+  # and may collide with the /1 min tick already running. single-mode would
+  # silently drop the state trigger and leave the user waiting up to a full
+  # minute. Runtime per tick is well under a second, so queueing a second
+  # run behind the first is cheap.
+  mode: queued
+  max: 3
   max_exceeded: silent
 
   trigger:
     - platform: time_pattern
       minutes: "/1"
+    # Fire immediately when a per-room override clears (manual clear from
+    # dashboard, "Resume circadian" button, or natural expiry timer).
+    - platform: state
+      entity_id:
+        - input_boolean.circadian_study_override
+        - input_boolean.circadian_living_override
+        - input_boolean.circadian_bath_override
+        - input_boolean.circadian_bed_override
+        - input_boolean.circadian_hallway_override
+      from: "on"
+      to: "off"
 
   condition:
     - condition: state
