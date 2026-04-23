@@ -9,47 +9,70 @@
 # Usage: Run as a systemd service during night mode
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 LOG_TAG="input-wake-monitor"
-IDLE_TIMEOUT=300  # 5 minutes
 DISPLAY_OUTPUT="HDMI-A-1"
+DEBOUNCE_SEC=2      # Skip wakes within N seconds of previous wake
 
-# Find touch/mouse input devices
-INPUT_DEVICES=$(find /dev/input -name 'event*' 2>/dev/null | head -5)
+# Debounce state — bash builtin $EPOCHSECONDS, zero fork per check
+LAST_WAKE=0
 
+# Under systemd --user, stdout already goes to journald — drop the `logger`
+# fork that was duplicating every line into syslog.
 log() {
-    logger -t "$LOG_TAG" "$1"
     echo "$(date '+%H:%M:%S') $1"
 }
 
 wake_display() {
-    log "Input detected - waking display and resetting brightness"
+    # ┌─────────────────────────────────────────────────────────────────┐
+    # │  INCIDENT 2026-04-23: Pi 5 load hit 6.02 / CPU 59% for 5 min   │
+    # │                                                                 │
+    # │  Root cause: ILITEK touchscreen (USB 222a:0001) is powered     │
+    # │  via the monitor's USB hub. wlopm --off HDMI-A-1 drops the     │
+    # │  hub, USB re-enumerates, kernel emits HID init reports that    │
+    # │  libinput reports as TOUCH/POINTER events. This fires          │
+    # │  wake_display ~950×/min. Each call was forking wlopm + grep +  │
+    # │  brightness-dimmer.sh (sudo + ddcutil) + logger = ~10 forks.   │
+    # │                                                                 │
+    # │  Fix: debounce to 1 wake per N seconds, skip entirely when     │
+    # │  display is already on. Real user touches still wake instantly │
+    # │  because the first event per quiet window passes through.      │
+    # └─────────────────────────────────────────────────────────────────┘
+    local now=$EPOCHSECONDS
+    (( now - LAST_WAKE < DEBOUNCE_SEC )) && return 0
+    LAST_WAKE=$now
 
-    # Turn display on if it's off
-    if wlopm 2>/dev/null | grep -q "off"; then
-        wlopm --on "$DISPLAY_OUTPUT"
-    fi
+    # Idempotent: only do work when display is actually off.
+    local status
+    status=$(wlopm 2>/dev/null) || return 0
+    [[ "$status" == *"$DISPLAY_OUTPUT off"* ]] || return 0
 
-    # Reset brightness to wake level (80%)
-    if [ -x "$HOME/.local/bin/brightness-dimmer.sh" ]; then
-        "$HOME/.local/bin/brightness-dimmer.sh" wake 2>/dev/null || true
+    log "Input detected - waking display"
+    wlopm --on "$DISPLAY_OUTPUT" || true
+
+    if [[ -x "$HOME/.local/bin/brightness-dimmer.sh" ]]; then
+        "$HOME/.local/bin/brightness-dimmer.sh" wake &>/dev/null || true
     fi
 }
 
-# Use libinput to monitor all input events
-# When any input is detected, wake the display
+# Use libinput to monitor all input events. Wake on TOUCH/POINTER/KEYBOARD/BUTTON.
+# IMPORTANT: bash builtin =~ used instead of `echo | grep` — saves 2 forks per
+# event line, critical at >10 events/sec.
 monitor_input() {
     log "Starting input monitor (watching for touch/mouse/keyboard)"
 
-    # libinput monitor outputs events as they happen
-    # We wake the display on any event, then swayidle handles the idle timeout
     stdbuf -oL libinput debug-events 2>/dev/null | while read -r line; do
-        # Only act on actual input events (not DEVICE_ADDED etc)
-        if echo "$line" | grep -qE "TOUCH|POINTER|KEYBOARD|BUTTON"; then
+        if [[ "$line" =~ (TOUCH|POINTER|KEYBOARD|BUTTON) ]]; then
             wake_display
         fi
     done
+
+    # libinput exited or the pipe broke. `set -e` would NOT catch this because
+    # `while` is in a subshell of a pipeline. Return non-zero so systemd's
+    # Restart=on-failure actually restarts us instead of silently going dormant.
+    log "ERROR: libinput debug-events stream ended unexpectedly"
+    return 1
 }
 
 # Check if libinput is available
@@ -64,5 +87,5 @@ if ! libinput debug-events --help &>/dev/null; then
     exit 1
 fi
 
-log "Input wake monitor started"
+log "Input wake monitor started (debounce=${DEBOUNCE_SEC}s)"
 monitor_input
