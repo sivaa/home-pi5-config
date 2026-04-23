@@ -472,7 +472,8 @@
   background: linear-gradient(to top, #7a5a22, var(--color-warning));
 }
 .v-track.brightness .v-fill { background: linear-gradient(to top, #6b5a2a, #fff1c9); }
-.v-track.cct .v-fill { background: linear-gradient(to top, #3a6fa8, #ffe7b8, #ff8844); }
+/* CCT fill is inverted: tall bar = cool daytime (top), short bar = warm evening (bottom). */
+.v-track.cct .v-fill { background: linear-gradient(to top, #ff8844, #ffe7b8, #3a6fa8); }
 .v-track.hue .v-fill {
   background: linear-gradient(to top,
     #ff4444, #ff8800, #ffee00, #44dd44, #00ccff, #3366ff, #cc44ff, #ff44aa);

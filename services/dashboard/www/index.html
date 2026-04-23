@@ -760,14 +760,18 @@
                     <div class="v-slider"
                          :class="{ 'control-disabled': light.state !== 'ON' || !light.available || light.syncing }">
                       <span class="v-slider-label"><span class="icon">🌡️</span>CCT</span>
+                      <!-- CCT track is inverted vs. mired: top = cool/daytime (low mired),
+                           bottom = warm/evening (high mired). This way the fill rises with
+                           brightness at midday peak and falls with it at sunset, instead of
+                           running the opposite direction. -->
                       <div class="v-track cct">
-                        <div class="v-fill" :style="'height: ' + ((light.colorTemp - light.colorTempMin) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
-                        <div class="v-thumb" :style="'bottom: ' + ((light.colorTemp - light.colorTempMin) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-fill" :style="'height: ' + ((light.colorTempMax - light.colorTemp) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + ((light.colorTempMax - light.colorTemp) / (light.colorTempMax - light.colorTempMin) * 100) + '%'"></div>
                         <input type="range" class="v-input"
                                :min="light.colorTempMin" :max="light.colorTempMax"
-                               x-model.number="light.colorTemp"
+                               :value="light.colorTempMax + light.colorTempMin - light.colorTemp"
                                :disabled="light.state !== 'ON' || !light.available || light.syncing"
-                               @input="$store.lights.setColorTemp(light, $event.target.value)">
+                               @input="$store.lights.setColorTemp(light, light.colorTempMax + light.colorTempMin - Number($event.target.value))">
                       </div>
                       <span class="v-slider-value" x-text="getColorTempLabel(light.colorTemp)"></span>
                     </div>
@@ -964,14 +968,15 @@
                     <div class="v-slider modal-v-slider"
                          :class="{ 'control-disabled': modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing }">
                       <span class="v-slider-label"><span class="icon">🌡️</span>CCT</span>
+                      <!-- Inverted CCT track — see matching card version above for rationale. -->
                       <div class="v-track cct">
-                        <div class="v-fill" :style="'height: ' + ((modalLight.colorTemp - modalLight.colorTempMin) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
-                        <div class="v-thumb" :style="'bottom: ' + ((modalLight.colorTemp - modalLight.colorTempMin) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-fill" :style="'height: ' + ((modalLight.colorTempMax - modalLight.colorTemp) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
+                        <div class="v-thumb" :style="'bottom: ' + ((modalLight.colorTempMax - modalLight.colorTemp) / (modalLight.colorTempMax - modalLight.colorTempMin) * 100) + '%'"></div>
                         <input type="range" class="v-input"
                                :min="modalLight.colorTempMin" :max="modalLight.colorTempMax"
-                               x-model.number="modalLight.colorTemp"
+                               :value="modalLight.colorTempMax + modalLight.colorTempMin - modalLight.colorTemp"
                                :disabled="modalLight.state !== 'ON' || !modalLight.available || modalLight.syncing"
-                               @input="$store.lights.setColorTemp(modalLight, $event.target.value)">
+                               @input="$store.lights.setColorTemp(modalLight, modalLight.colorTempMax + modalLight.colorTempMin - Number($event.target.value))">
                       </div>
                       <span class="v-slider-value" x-text="getColorTempLabel(modalLight.colorTemp)"></span>
                     </div>
@@ -6744,8 +6749,7 @@
         },
 
         get colorTempLabel() {
-          if (this.colorTemp <= 2400) return 'Warm';
-          if (this.colorTemp <= 2800) return 'Warm White';
+          if (this.colorTemp <= 2800) return 'Warm';
           return 'Neutral';
         },
 
@@ -8290,7 +8294,6 @@
         getColorTempLabel(colorTemp) {
           if (colorTemp <= 280) return 'Cool White';
           if (colorTemp <= 350) return 'Neutral';
-          if (colorTemp <= 400) return 'Warm White';
           return 'Warm';
         },
 
