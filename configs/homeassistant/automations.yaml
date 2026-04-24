@@ -3878,6 +3878,14 @@
     # Light must be on
     - condition: template
       value_template: "{{ trigger.to_state.state == 'on' }}"
+    # Previous state must also be 'on' — filters out unavailable→on and off→on
+    # transitions so Zigbee reconnects (e.g. the bath bulb's flaky parent route)
+    # aren't misread as manual adjustments. A real manual change is always on→on
+    # with a changed attribute; power-on is covered separately by circadian_power_on.
+    # Bath log evidence 2026-04-24: 6 spurious overrides in 3 h, each one exactly
+    # at an offline→online reconnect where brightness "jumped" from missing (0) to 249.
+    - condition: template
+      value_template: "{{ trigger.from_state.state == 'on' }}"
     # Circadian must be enabled
     - condition: state
       entity_id: input_boolean.circadian_enabled
