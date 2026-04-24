@@ -979,7 +979,7 @@ send_alert_email:
     - service: notify.email
       data:
         title: >-
-          {% if severity == 'CRITICAL' %}🚨{% elif severity == 'WARNING' %}⚠️{% else %}ℹ️{% endif %} {{ title }}
+          {% if severity == 'CRITICAL' %}🚨{% elif severity == 'WARNING' %}⚠️{% else %}ℹ️{% endif %} {{ title }}{% if subtitle | default('') | length > 0 %}: {{ subtitle }}{% endif %}
         message: "{{ plain_text }}"
         data:
           html: >-
